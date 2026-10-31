@@ -710,7 +710,7 @@ export default function Topbar({
       >
         <div className="workspace-topbar-row">
           {/* Left: Navigation Toggle + Quick Search (Alt+K) + Product Lookup (Alt+P) */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
             {/* Mobile menu button — visible on < lg */}
             <div className="lg:hidden shrink-0">
               <button
@@ -745,11 +745,11 @@ export default function Topbar({
               title="Quick Navigation — Go to any page or report (Alt+K)"
               aria-label="Open page search"
               aria-keyshortcuts="Alt+K"
-              className="inline-flex items-center gap-2 h-9 px-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 text-xs text-slate-600 dark:text-slate-300 transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-2 h-9 w-9 md:w-auto md:px-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 text-xs text-slate-600 dark:text-slate-300 transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap"
             >
-              <MagnifyingGlassIcon className="w-4 h-4 text-slate-400 shrink-0" />
-              <span className="hidden sm:inline font-medium">Search Pages</span>
-              <kbd className="hidden md:inline-block px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shrink-0">
+              <MagnifyingGlassIcon className="w-4 h-4 text-slate-500 dark:text-slate-400 shrink-0" />
+              <span className="hidden md:inline font-medium">Search Pages</span>
+              <kbd className="hidden xl:inline-block px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shrink-0">
                 Alt+K
               </kbd>
             </button>
@@ -761,11 +761,11 @@ export default function Topbar({
               title="Global Product & Batch Lookup (Alt+P)"
               aria-label="Open product lookup"
               aria-keyshortcuts="Alt+P"
-              className="inline-flex items-center gap-2 h-9 px-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 text-xs font-medium text-slate-700 dark:text-slate-200 transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap"
+              className="inline-flex items-center justify-center gap-2 h-9 w-9 xl:w-auto xl:px-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 text-xs font-medium text-slate-700 dark:text-slate-200 transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap"
             >
               <CubeIcon className="w-4 h-4 text-slate-500 dark:text-slate-400 shrink-0" />
               <span className="hidden xl:inline">Products</span>
-              <kbd className="hidden md:inline-block px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shrink-0">
+              <kbd className="hidden 2xl:inline-block px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shrink-0">
                 Alt+P
               </kbd>
             </button>
@@ -788,21 +788,21 @@ export default function Topbar({
               <>
                 <div
                   aria-hidden="true"
-                  className="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-100/70 dark:bg-slate-800/60 shrink-0"
+                  className="inline-flex items-center gap-1.5 h-9 px-2 sm:px-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-100/70 dark:bg-slate-800/60 shrink-0"
                 >
                   <span className="kd-skeleton-bone w-4 h-4 rounded shrink-0" />
                   <span className="kd-skeleton-bone-accent w-2 h-2 rounded-full shrink-0" />
-                  <span className="hidden lg:inline-block kd-skeleton-bone h-3 w-16 rounded-full" />
+                  <span className="hidden xl:inline-block kd-skeleton-bone h-3 w-16 rounded-full" />
                 </div>
                 <div
                   aria-hidden="true"
-                  className="inline-flex items-center gap-1.5 h-9 px-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-100/70 dark:bg-slate-800/60 shrink-0"
+                  className="inline-flex items-center gap-1.5 h-9 px-2 sm:px-2.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-100/70 dark:bg-slate-800/60 shrink-0"
                 >
                   <span className="kd-skeleton-bone w-4 h-4 rounded shrink-0" />
                   <span className="kd-skeleton-bone-accent w-2 h-2 rounded-full shrink-0" />
-                  <span className="hidden lg:inline-block kd-skeleton-bone h-3 w-20 rounded-full" />
+                  <span className="hidden xl:inline-block kd-skeleton-bone h-3 w-20 rounded-full" />
                 </div>
-                <div className="mx-0.5 h-5 w-px bg-slate-300/60 dark:bg-slate-700/60 shrink-0" />
+                <div className="hidden sm:block mx-0.5 h-5 w-px bg-slate-300/60 dark:bg-slate-700/60 shrink-0" />
               </>
             ) : (
               <>
@@ -822,7 +822,7 @@ export default function Topbar({
                         ? "Cash Drawer is Closed — Click to Open Shift (Alt+D)"
                         : "Cash Drawer is Closed"
                     }
-                    className={`inline-flex items-center gap-1.5 h-9 px-2.5 text-xs font-semibold rounded-xl transition-all duration-150 relative z-20 shrink-0 whitespace-nowrap border ${
+                    className={`inline-flex items-center gap-1 sm:gap-1.5 h-9 px-2 sm:px-2.5 text-xs font-semibold rounded-xl transition-all duration-150 relative z-20 shrink-0 whitespace-nowrap border ${
                       canOpenDrawerPopup ? "cursor-pointer" : "cursor-default"
                     } ${
                       drawerStatus.isOpen
@@ -841,9 +841,9 @@ export default function Topbar({
                       }`}
                     />
                     {drawerStatus.loading ? (
-                      <span className="hidden lg:inline-block kd-skeleton-bone h-3 w-16 rounded-full" />
+                      <span className="hidden xl:inline-block kd-skeleton-bone h-3 w-16 rounded-full" />
                     ) : (
-                      <span className="hidden lg:inline font-bold">
+                      <span className="hidden xl:inline font-bold">
                         {drawerStatus.isOpen ? formatCurrency(drawerStatus.expected) : "Drawer"}
                       </span>
                     )}
@@ -856,14 +856,14 @@ export default function Topbar({
                     onClick={() => setAccountsModalOpen(true)}
                     aria-label="Financial Accounts register"
                     title={`Financial Accounts Register: ${formatCurrency(accountsStatus.total_balance)} across all accounts (Alt+A)`}
-                    className="inline-flex items-center gap-1.5 h-9 px-2.5 text-xs font-semibold rounded-xl transition-all duration-150 relative z-20 shrink-0 whitespace-nowrap border bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 cursor-pointer"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 h-9 px-2 sm:px-2.5 text-xs font-semibold rounded-xl transition-all duration-150 relative z-20 shrink-0 whitespace-nowrap border bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 cursor-pointer"
                   >
                     <BuildingLibraryIcon className="w-4 h-4 shrink-0" />
                     <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
                     {accountsStatus.loading ? (
-                      <span className="hidden lg:inline-block kd-skeleton-bone h-3 w-20 rounded-full" />
+                      <span className="hidden xl:inline-block kd-skeleton-bone h-3 w-20 rounded-full" />
                     ) : (
-                      <span className="hidden lg:inline font-bold">
+                      <span className="hidden xl:inline font-bold">
                         {formatCurrency(accountsStatus.total_balance)}
                       </span>
                     )}
@@ -871,7 +871,7 @@ export default function Topbar({
                 )}
 
                 {(canViewDrawer || has("account.view")) && (
-                  <div className="mx-0.5 h-5 w-px bg-slate-300/60 dark:bg-slate-700/60 shrink-0" />
+                  <div className="hidden sm:block mx-0.5 h-5 w-px bg-slate-300/60 dark:bg-slate-700/60 shrink-0" />
                 )}
               </>
             )}
@@ -910,7 +910,7 @@ export default function Topbar({
               title="Keyboard Shortcuts (?)"
               aria-label="Open keyboard shortcuts guide"
               aria-keyshortcuts="?"
-              className={`relative inline-flex items-center justify-center h-9 w-9 ${buttonStyleClass} transition-colors focus:outline-hidden focus:ring-2 focus:ring-${themeColors.primary}/50 shrink-0 cursor-pointer ${isOutlined ? 'border-2' : 'shadow-xs'}`}
+              className={`relative hidden md:inline-flex items-center justify-center h-9 w-9 ${buttonStyleClass} transition-colors focus:outline-hidden focus:ring-2 focus:ring-${themeColors.primary}/50 shrink-0 cursor-pointer ${isOutlined ? 'border-2' : 'shadow-xs'}`}
               style={{
                 background: getButtonBg(themeColors.primary),
                 border: getButtonBorder(themeColors.primary),
@@ -925,13 +925,13 @@ export default function Topbar({
               <ThemeToggle />
             </div>
 
-            <div className="mx-0.5 h-5 w-px bg-slate-300/60 dark:bg-slate-700/60 shrink-0" />
+            <div className="hidden sm:block mx-0.5 h-5 w-px bg-slate-300/60 dark:bg-slate-700/60 shrink-0" />
 
             {/* Group 3: License & User Account */}
             <button
               type="button"
               onClick={() => navigate("/settings#license")}
-              className="inline-flex items-center gap-1.5 h-9 px-2.5 text-xs font-semibold theme-btn-tertiary relative z-20 shrink-0 whitespace-nowrap"
+              className="hidden sm:inline-flex items-center justify-center gap-1.5 h-9 px-2.5 text-xs font-semibold rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-100/80 dark:bg-slate-800/70 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 transition-all duration-150 relative z-20 shrink-0 whitespace-nowrap cursor-pointer"
               title={licLoading ? "Checking license…" : licValid ? `License active (${leftTxt} left)` : "License required – click to activate"}
             >
               <ClockIcon className="w-3.5 h-3.5 shrink-0" />
@@ -944,7 +944,7 @@ export default function Topbar({
                 ref={btnRef}
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                className="inline-flex items-center gap-1.5 h-9 px-2.5 text-xs font-semibold theme-btn-tertiary relative z-20 shrink-0"
+                className="inline-flex items-center gap-1 sm:gap-1.5 h-9 px-2 sm:px-2.5 text-xs font-semibold rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-100/80 dark:bg-slate-800/70 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 text-slate-700 dark:text-slate-200 transition-all duration-150 relative z-20 shrink-0 cursor-pointer"
                 aria-haspopup="menu"
                 aria-expanded={open}
                 aria-controls="topbar-user-menu"
@@ -980,6 +980,26 @@ export default function Topbar({
                     className="workspace-user-menu-item"
                   >
                     Profile
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      navigate("/settings#license");
+                    }}
+                    className="workspace-user-menu-item sm:hidden"
+                  >
+                    {licLoading ? "License Status" : licValid ? `License (${leftTxt} left)` : "Activate License"}
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      setShortcutsModalOpen(true);
+                    }}
+                    className="workspace-user-menu-item md:hidden"
+                  >
+                    Keyboard Shortcuts
                   </button>
                   <button
                     role="menuitem"

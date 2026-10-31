@@ -386,26 +386,6 @@ export default function PrinterSetting({
         </div>
       </div>
 
-      {/* ===== Save ===== */}
-      <div className="settings-block">
-        <div className="settings-body">
-          <div className="settings-actions settings-actions-between">
-            <span className="settings-hint">
-              Shortcut: <span className="people-shortcut">Alt+S</span> to save
-            </span>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={disableInputs || saving}
-              className="products-action products-action-primary theme-btn-primary"
-              title={!disableInputs ? "Alt+S" : "You lack update permission"}
-            >
-              {saving ? "Saving…" : "Save settings"}
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* ===== Template preview modal ===== */}
       {showPreviewModal && previewingTemplate && (
         <div

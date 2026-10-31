@@ -430,7 +430,7 @@ export default function CubeAiSetting({
                 </a>
               </div>
 
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 min-w-0">
                 <input
                   id="setting-cube-groq-key"
                   type={showGroqKey ? "text" : "password"}
@@ -447,7 +447,7 @@ export default function CubeAiSetting({
                       ? "Configured via .env (enter a key here to override from UI)"
                       : "Paste your free Groq API Key (starts with gsk_...)"
                   }
-                  className="g-input flex-1 min-w-0 font-mono"
+                  className="g-input flex-1 min-w-[200px] font-mono"
                 />
                 <button
                   type="button"
@@ -601,7 +601,7 @@ export default function CubeAiSetting({
                 </a>
               </div>
 
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 min-w-0">
                 <input
                   id="setting-cube-gemini-key"
                   type={showGeminiKey ? "text" : "password"}
@@ -618,7 +618,7 @@ export default function CubeAiSetting({
                       ? "Configured via .env (enter a key here to override from UI)"
                       : "Paste your free Google Gemini API Key (starts with AIza...)"
                   }
-                  className="g-input flex-1 min-w-0 font-mono"
+                  className="g-input flex-1 min-w-[200px] font-mono"
                 />
                 <button
                   type="button"

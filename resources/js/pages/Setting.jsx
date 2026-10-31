@@ -538,11 +538,11 @@ export default function Setting() {
   const ActiveSectionIcon = activeTabMeta.icon;
 
   return (
-    <div className="settings-page space-y-5">
+    <div className="settings-page">
       {/* ===== Top Workspace Header ===== */}
       <div className="settings-panel">
         <div className="settings-heading">
-          <div className="flex items-center gap-4 min-w-0">
+          <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
             <div className="settings-identity-icon">
               <CogIcon className="w-6 h-6" />
             </div>
@@ -550,7 +550,9 @@ export default function Setting() {
               <h1 className="settings-title">System Settings &amp; Preferences</h1>
               <p className="settings-subtitle">
                 <CogIcon className="w-3.5 h-3.5 shrink-0" />
-                Manage store identity, sales operations, shared PDF designs, WhatsApp &amp; Email delivery, printing, and licensing.
+                <span>
+                  Manage store identity, sales operations, shared PDF designs, WhatsApp &amp; Email delivery, printing, and licensing.
+                </span>
               </p>
             </div>
           </div>
@@ -573,11 +575,64 @@ export default function Setting() {
         </div>
       </div>
 
+      {/* ===== Mobile & Tablet Horizontal Category Bar (< lg) ===== */}
+      <div className="settings-panel lg:hidden">
+        <div
+          className="settings-tabs"
+          role="tablist"
+          aria-label="Settings categories"
+        >
+          {ALL_TABS.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                id={`settings-mobile-tab-${item.id}`}
+                aria-selected={isActive}
+                aria-controls={`settings-panel-${item.id}`}
+                onClick={(e) => {
+                  setActiveTab(item.id);
+                  if (typeof window !== "undefined") {
+                    window.history.replaceState(null, "", `#${item.id}`);
+                  }
+                  e.currentTarget.scrollIntoView({
+                    behavior: "smooth",
+                    inline: "center",
+                    block: "nearest",
+                  });
+                }}
+                className="settings-tab cursor-pointer"
+                style={
+                  isActive
+                    ? {
+                        backgroundColor: themeColors.primary,
+                        color: primaryTextColor,
+                        boxShadow: "none",
+                      }
+                    : undefined
+                }
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ===== Two-Column Categorized Settings Workspace ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Categorized Navigation Sidebar */}
-        <div className="lg:col-span-3 lg:sticky lg:top-4">
-          <GlassCard className="p-3 space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 items-start min-w-0">
+        {/* Left Categorized Navigation Sidebar (Desktop lg+) */}
+        <div
+          className="hidden lg:block lg:col-span-4 xl:col-span-3 lg:sticky lg:top-4 min-w-0"
+          role="tablist"
+          aria-orientation="vertical"
+          aria-label="Settings categories"
+        >
+          <div className="settings-panel p-3 space-y-4">
             {SETTING_GROUPS.map((group) => (
               <div key={group.groupLabel} className="space-y-1">
                 <div className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-500">
@@ -600,7 +655,7 @@ export default function Setting() {
                           window.history.replaceState(null, "", `#${item.id}`);
                         }
                       }}
-                      className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${
+                      className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left transition-all cursor-pointer ${
                         isActive
                           ? "shadow-sm"
                           : isDark
@@ -646,7 +701,7 @@ export default function Setting() {
                 })}
               </div>
             ))}
-          </GlassCard>
+          </div>
         </div>
 
         {/* Right Content Workspace */}
@@ -654,19 +709,19 @@ export default function Setting() {
           id={`settings-panel-${activeTab}`}
           role="tabpanel"
           aria-labelledby={`settings-tab-${activeTab}`}
-          className="lg:col-span-9 space-y-5"
+          className="lg:col-span-8 xl:col-span-9 settings-main-col space-y-5"
         >
           {/* Active Section Header Bar */}
           <div
-            className={`px-5 py-3.5 rounded-2xl border flex items-center justify-between gap-4 ${
+            className={`px-4 sm:px-5 py-3.5 rounded-2xl border flex items-center justify-between gap-3 sm:gap-4 min-w-0 ${
               isDark
                 ? "bg-slate-800/70 border-slate-700/80 text-slate-100"
                 : "bg-white/90 border-gray-200/80 text-gray-900"
             }`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <div
-                className="p-2 rounded-xl"
+                className="p-2 rounded-xl shrink-0"
                 style={{
                   backgroundColor: isDark
                     ? "rgba(59,130,246,0.16)"
@@ -676,11 +731,11 @@ export default function Setting() {
               >
                 <ActiveSectionIcon className="w-5 h-5 shrink-0" />
               </div>
-              <div>
-                <h2 className="text-base font-bold leading-tight">
+              <div className="min-w-0">
+                <h2 className="text-sm sm:text-base font-bold leading-tight truncate">
                   {activeTabMeta.label}
                 </h2>
-                <p className="text-xs text-gray-500 dark:text-slate-400">
+                <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-2 sm:truncate">
                   {activeTabMeta.subtitle}
                 </p>
               </div>

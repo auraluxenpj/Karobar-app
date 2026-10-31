@@ -1487,16 +1487,16 @@ export function GuideBotTopbarButton({
       aria-expanded={isOpen}
       aria-keyshortcuts="Alt+G"
       title="Guide Bot (Alt+G)"
-      className="group relative inline-flex items-center gap-2 h-10 px-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/90 text-slate-900 dark:text-slate-100 transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap shadow-2xs hover:shadow-sm active:scale-[0.98]"
+      className="group relative inline-flex items-center justify-center gap-1.5 h-9 px-2 sm:px-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/90 text-slate-900 dark:text-slate-100 transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap shadow-2xs hover:shadow-sm active:scale-[0.98]"
     >
       {/* Cube Mascot Icon */}
       <span className="inline-flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105">
-        <GuideBotAvatar className="w-8 h-[26px]" speaking={isOpen} fullBody={false} />
+        <GuideBotAvatar className="w-7 h-[22px] sm:w-8 sm:h-[24px]" speaking={isOpen} fullBody={false} />
       </span>
 
       {/* English-Only Label */}
       {!compact && (
-        <span className="hidden sm:inline text-xs font-extrabold tracking-tight">
+        <span className="hidden lg:inline text-xs font-extrabold tracking-tight">
           Guide Bot
         </span>
       )}
@@ -1626,7 +1626,7 @@ export function InspectElementTopbarButton({ compact = false }) {
           ? "Cursor is following your mouse! Click any item on the page to explain it (Esc to stop)"
           : "Summon Cursor — your cute pointer friend that follows your mouse & explains any item (Alt+E)"
       }
-      className={`group relative inline-flex items-center gap-2 h-10 px-2.5 rounded-xl border transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap shadow-2xs active:scale-[0.98] ${
+      className={`group relative hidden md:inline-flex items-center justify-center gap-1.5 h-9 px-2 sm:px-2.5 rounded-xl border transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap shadow-2xs active:scale-[0.98] ${
         inspectMode
           ? "bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-400 shadow-amber-500/25 shadow-md ring-2 ring-amber-400/50"
           : "border-slate-200 dark:border-slate-700/80 bg-white hover:bg-cyan-50/70 dark:bg-slate-900 dark:hover:bg-slate-800/90 text-slate-800 dark:text-slate-100 hover:border-cyan-300 dark:hover:border-cyan-700"
@@ -1639,14 +1639,14 @@ export function InspectElementTopbarButton({ compact = false }) {
         }`}
       >
         <CursorBuddyAvatar
-          className="w-6 h-6"
+          className="w-5 h-5"
           fullBody={false}
           speaking={inspectMode}
         />
       </span>
 
       {!compact && (
-        <span className="hidden sm:inline text-xs font-extrabold tracking-tight">
+        <span className="hidden xl:inline text-xs font-extrabold tracking-tight">
           {inspectMode ? "Cursor Active..." : "Explain"}
         </span>
       )}

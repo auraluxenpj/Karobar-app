@@ -379,7 +379,7 @@ export default function WhatsAppSetting({ form, setForm, canUpdate, disableInput
 
   return (
     <div className="space-y-6">
-      <GlassCard className="p-6">
+      <GlassCard className="p-4 sm:p-6">
         {/* Header & Enable Toggle */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-gray-200 dark:border-slate-700">
           <div className="flex items-start gap-3.5">

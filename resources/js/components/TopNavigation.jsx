@@ -217,9 +217,10 @@ export default function TopNavigation() {
     const button = buttonRefs.current[sectionName];
     if (button) {
       const rect = button.getBoundingClientRect();
+      const maxLeft = typeof window !== "undefined" ? Math.max(8, window.innerWidth - 256) : rect.left;
       setDropdownPosition({
         top: rect.bottom + 8,
-        left: rect.left
+        left: Math.max(8, Math.min(rect.left, maxLeft))
       });
     }
     setOpenDropdown(sectionName);
@@ -258,17 +259,17 @@ export default function TopNavigation() {
         border-b border-gray-200/60 dark:border-slate-700/60
         shadow-lg
       ">
-        <div className="flex items-stretch h-13">
+        <div className="flex items-stretch h-13 min-w-0">
           {/* Logo & Brand - Enhanced visibility */}
-          <div className="flex items-center gap-2.5 px-4 border-r border-gray-200/60 dark:border-slate-700/60 shrink-0">
-            <div className="relative group">
+          <div className="flex items-center gap-2 sm:gap-2.5 px-2.5 sm:px-4 border-r border-gray-200/60 dark:border-slate-700/60 shrink-0">
+            <div className="relative group shrink-0">
               <picture>
                 {logoCandidates.map((src) => (
                   <img
                     key={src}
                     src={src}
                     alt={brandName}
-                    className="h-9 w-9 object-contain rounded-xl shadow-md hidden"
+                    className="h-8 w-8 sm:h-9 sm:w-9 object-contain rounded-xl shadow-md hidden"
                     onLoad={(e) => {
                       const imgs = e.currentTarget.parentElement.querySelectorAll("img");
                       imgs.forEach((im) => (im.style.display = "none"));
@@ -280,8 +281,8 @@ export default function TopNavigation() {
               {/* Decorative gradient ring */}
               <div className="absolute inset-0 rounded-xl bg-linear-to-br from-violet-500/30 to-purple-500/30 dark:from-violet-400/30 dark:to-purple-400/30" />
             </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-bold bg-linear-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent whitespace-nowrap">
+            <div className="hidden sm:flex flex-col min-w-0">
+              <span className="text-sm font-bold bg-linear-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent whitespace-nowrap truncate max-w-[140px]">
                 {brandName}
               </span>
               <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">
@@ -394,7 +395,7 @@ export default function TopNavigation() {
           </nav>
 
           {/* Right: Screen-Aware Bilingual Guide Bot + Click-to-Explain */}
-          <div className="flex items-center gap-1.5 px-3 border-l border-gray-200/60 dark:border-slate-700/60 shrink-0">
+          <div className="flex items-center gap-1.5 px-2 sm:px-3 border-l border-gray-200/60 dark:border-slate-700/60 shrink-0">
             <GuideBotTopbarButton
               onClick={() => setGuideBotOpen((v) => !v)}
               isOpen={guideBotOpen}
@@ -425,8 +426,9 @@ export default function TopNavigation() {
             style={{
               top: dropdownPosition.top,
               left: dropdownPosition.left,
-              minWidth: '240px',
-              maxHeight: '400px',
+              minWidth: 'min(240px, calc(100vw - 16px))',
+              maxWidth: 'calc(100vw - 16px)',
+              maxHeight: 'min(400px, calc(100dvh - 80px))',
               overflowY: 'auto'
             }}
           >

@@ -215,8 +215,8 @@ ${urduNotePreview}
                 <Icon className="w-5 h-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-bold truncate">{item.label}</span>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-sm font-bold leading-snug">{item.label}</span>
                   {item.badge && (
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${
@@ -232,7 +232,7 @@ ${urduNotePreview}
                   )}
                 </div>
                 <p
-                  className={`text-xs mt-0.5 truncate ${
+                  className={`text-xs mt-0.5 line-clamp-2 ${
                     isDark ? "text-slate-400" : "text-gray-500"
                   }`}
                 >
@@ -247,7 +247,7 @@ ${urduNotePreview}
       {/* Sub-tab 1: PDF Design & Message Format */}
       {subTab === "pdf_design" && (
         <div className="space-y-6">
-          <GlassCard className="p-6">
+          <GlassCard className="p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-gray-200 dark:border-slate-700">
               <div className="flex items-start gap-3.5">
                 <div className="p-3 rounded-xl bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
@@ -524,20 +524,20 @@ ${urduNotePreview}
       {/* Template Preview Modal */}
       {previewTemplate && (
         <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4"
           onClick={() => setPreviewTemplate(null)}
         >
           <div
-            className={`w-full max-w-4xl h-[85vh] rounded-2xl border shadow-2xl overflow-hidden flex flex-col ${
+            className={`w-full max-w-4xl h-[88dvh] sm:h-[85vh] rounded-2xl border shadow-2xl overflow-hidden flex flex-col ${
               isDark
                 ? "bg-slate-800 border-slate-700 text-slate-100"
                 : "bg-white border-gray-200 text-gray-900"
             }`}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold">
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2">
+              <div className="min-w-0">
+                <h3 className="text-sm sm:text-base font-bold truncate">
                   Template Preview —{" "}
                   {SHARED_PDF_DESIGNS.find((d) => d.id === previewTemplate)?.name}
                 </h3>
@@ -545,7 +545,7 @@ ${urduNotePreview}
                   Live A4 invoice layout preview
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 {!disableInputs && selectedTemplate !== previewTemplate && (
                   <button
                     type="button"
@@ -567,7 +567,7 @@ ${urduNotePreview}
                 </button>
               </div>
             </div>
-            <div className="flex-1 bg-gray-100 dark:bg-slate-900 p-4">
+            <div className="flex-1 bg-gray-100 dark:bg-slate-900 p-2 sm:p-4 min-h-0">
               <iframe
                 src={`/print/a4-preview/${previewTemplate}`}
                 title="A4 Template Preview"
