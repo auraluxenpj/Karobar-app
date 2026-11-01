@@ -684,7 +684,7 @@ export default function PageSearchModal({ isOpen, onClose }) {
           onClose?.();
         }
       }}
-      className="fixed inset-0 z-100000 flex items-start justify-center pt-16 sm:pt-24 p-3 sm:p-4 bg-black/55 backdrop-blur-xs animate-in fade-in duration-150"
+      className="fixed inset-0 z-100000 flex items-start justify-center pt-12 sm:pt-24 p-3 sm:p-4 bg-black/55 backdrop-blur-xs animate-in fade-in duration-150"
       role="dialog"
       aria-modal="true"
       aria-label="Go to page"
@@ -716,7 +716,7 @@ export default function PageSearchModal({ isOpen, onClose }) {
             autoCapitalize="off"
             spellCheck={false}
             aria-label="Search available pages"
-            className="flex-1 bg-transparent text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
+            className="flex-1 bg-transparent text-base sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
           />
           {query && (
             <button
@@ -737,7 +737,7 @@ export default function PageSearchModal({ isOpen, onClose }) {
         </div>
 
         {/* Results List */}
-        <div className="max-h-[60vh] overflow-y-auto p-2 divide-y divide-slate-100/60 dark:divide-slate-800/60">
+        <div className="max-h-[60dvh] overflow-y-auto p-2 divide-y divide-slate-100/60 dark:divide-slate-800/60">
           {filteredPages.length === 0 ? (
             <div className="py-12 text-center text-slate-400">
               <p className="text-sm font-medium">No pages found for "{query}"</p>

@@ -70,13 +70,13 @@ export default function SupplierImportModal({ open, onClose, onImported }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white w-[min(900px,95vw)] rounded-2xl shadow-xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
+      <div className="bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 border border-transparent w-[min(1000px,95vw)] max-h-[92dvh] flex flex-col rounded-2xl shadow-xl overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Import Suppliers (CSV)</h2>
+        <div className="px-4 sm:px-6 py-4 border-b dark:border-slate-700 flex items-center justify-between shrink-0">
+          <h2 className="text-xl font-semibold dark:text-slate-100">Import Suppliers (CSV)</h2>
           <button
-            className="px-3 py-1 rounded-sm border hover:bg-gray-50"
+            className="px-3 py-1 rounded-sm border hover:bg-gray-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
             onClick={() => { reset(); onClose?.(); }}
           >
             ✕
@@ -84,26 +84,26 @@ export default function SupplierImportModal({ open, onClose, onImported }) {
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-6">
           {/* Step 1: Select file */}
           {!res && (
             <>
               <div className="space-y-3">
-                <label className="block text-sm font-medium">
-                  Choose CSV file <span className="text-gray-500">(header required: name,address,phone)</span>
+                <label className="block text-sm font-medium dark:text-slate-200">
+                  Choose CSV file <span className="text-gray-500 dark:text-slate-400">(header required: name,address,phone)</span>
                 </label>
                 <input
                   type="file"
                   accept=".csv,text/csv"
                   onChange={(e) => setFile(e.target.files?.[0] || null)}
-                  className="block w-full border rounded-sm p-2"
+                  className="block w-full border rounded-sm p-2 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
                 />
                 <div className="flex items-center gap-3">
-                  <label className="text-sm text-gray-700">Delimiter</label>
+                  <label className="text-sm text-gray-700 dark:text-slate-300">Delimiter</label>
                   <select
                     value={delimiter}
                     onChange={(e) => setDelimiter(e.target.value)}
-                    className="border rounded-sm h-9 px-2 text-sm"
+                    className="border rounded-sm h-9 px-2 text-sm dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
                   >
                     <option value=",">Comma (,)</option>
                     <option value=";">Semicolon (;)</option>
@@ -111,11 +111,11 @@ export default function SupplierImportModal({ open, onClose, onImported }) {
                     <option value="|">Pipe (|)</option>
                   </select>
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-gray-600 dark:text-slate-400">
                   Need a sample?{" "}
                   <a
                     href="/api/suppliers/import/template"
-                    className="text-blue-600 underline"
+                    className="text-blue-600 dark:text-blue-400 underline"
                   >
                     Download CSV template
                   </a>
@@ -135,17 +135,17 @@ export default function SupplierImportModal({ open, onClose, onImported }) {
 
               {res.invalid_samples?.length > 0 && (
                 <div>
-                  <h3 className="font-medium mb-2">Invalid sample rows (first {res.invalid_samples.length}):</h3>
-                  <div className="max-h-64 overflow-auto border rounded-sm">
+                  <h3 className="font-medium mb-2 dark:text-slate-200">Invalid sample rows (first {res.invalid_samples.length}):</h3>
+                  <div className="max-h-64 overflow-auto border rounded-sm dark:border-slate-700">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 sticky top-0">
+                      <thead className="bg-gray-50 dark:bg-slate-800 sticky top-0">
                         <tr>
                           <Th>Row#</Th><Th>Name</Th><Th>Address</Th><Th>Phone</Th><Th>Errors</Th>
                         </tr>
                       </thead>
                       <tbody>
                         {res.invalid_samples.map((r, idx) => (
-                          <tr key={idx} className="odd:bg-white even:bg-gray-50">
+                          <tr key={idx} className="odd:bg-white even:bg-gray-50 dark:odd:bg-slate-800/40 dark:even:bg-slate-900/40">
                             <Td>{r.row}</Td>
                             <Td>{r.data?.name}</Td>
                             <Td>{r.data?.address}</Td>
@@ -165,17 +165,17 @@ export default function SupplierImportModal({ open, onClose, onImported }) {
 
               {res.valid_samples?.length > 0 && (
                 <div>
-                  <h3 className="font-medium mb-2">Valid sample rows (first {res.valid_samples.length}):</h3>
-                  <div className="max-h-48 overflow-auto border rounded-sm">
+                  <h3 className="font-medium mb-2 dark:text-slate-200">Valid sample rows (first {res.valid_samples.length}):</h3>
+                  <div className="max-h-48 overflow-auto border rounded-sm dark:border-slate-700">
                     <table className="w-full text-sm">
-                      <thead className="bg-gray-50 sticky top-0">
+                      <thead className="bg-gray-50 dark:bg-slate-800 sticky top-0">
                         <tr>
                           <Th>Row#</Th><Th>Name</Th><Th>Address</Th><Th>Phone</Th>
                         </tr>
                       </thead>
                       <tbody>
                         {res.valid_samples.map((r, idx) => (
-                          <tr key={idx} className="odd:bg-white even:bg-gray-50">
+                          <tr key={idx} className="odd:bg-white even:bg-gray-50 dark:odd:bg-slate-800/40 dark:even:bg-slate-900/40">
                             <Td>{r.row}</Td>
                             <Td>{r.data?.name}</Td>
                             <Td>{r.data?.address}</Td>
@@ -189,7 +189,7 @@ export default function SupplierImportModal({ open, onClose, onImported }) {
               )}
 
               {res.invalid > 0 && (
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 dark:text-slate-400">
                   Tip: Fix your CSV to reduce invalid rows, or continue and we’ll import only the valid ones.
                 </p>
               )}
@@ -198,10 +198,10 @@ export default function SupplierImportModal({ open, onClose, onImported }) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-4 border-t dark:border-slate-700 flex flex-wrap gap-3 items-center justify-between shrink-0">
           {!res ? (
             <>
-              <div className="text-sm text-gray-600">CSV with header: <code>name,address,phone</code></div>
+              <div className="text-sm text-gray-600 dark:text-slate-400">CSV with header: <code>name,address,phone</code></div>
               <div className="flex items-center gap-2">
                 <button
                   className="theme-btn theme-btn-tertiary"
@@ -252,13 +252,13 @@ export default function SupplierImportModal({ open, onClose, onImported }) {
 
 function Badge({ label, variant = "gray" }) {
   const map = {
-    gray:  "bg-gray-100 text-gray-700",
-    green: "bg-green-100 text-green-700",
-    red:   "bg-red-100 text-red-700",
-    blue:  "bg-blue-100 text-blue-700",
+    gray:  "bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-slate-200",
+    green: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+    red:   "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+    blue:  "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
   };
   return <span className={`inline-flex items-center px-2 py-1 rounded-sm text-sm ${map[variant]}`}>{label}</span>;
 }
 
-function Th({ children }) { return <th className="border p-2 text-left">{children}</th>; }
-function Td({ children }) { return <td className="border p-2">{children}</td>; }
+function Th({ children }) { return <th className="border dark:border-slate-700 p-2 text-left dark:text-slate-200">{children}</th>; }
+function Td({ children }) { return <td className="border dark:border-slate-700 p-2 dark:text-slate-200">{children}</td>; }

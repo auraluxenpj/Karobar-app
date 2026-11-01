@@ -226,6 +226,7 @@ body:has(.login-page) { overflow: hidden; transform: none; }
   align-items: flex-start;
   gap: 16px;
   min-height: 100vh;
+  min-height: 100dvh;
   padding: 16px;
   color: var(--workspace-ink);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -303,7 +304,7 @@ body:has(.workspace-shell) { transform: none; }
 
 .workspace-sidebar { height: 100%; border: 1px solid var(--workspace-edge); border-radius: 24px; background: var(--workspace-surface); box-shadow: inset 0 1px 0 var(--workspace-edge), var(--workspace-shadow); }
 .workspace-sidebar-inner { display: flex; flex-direction: column; height: 100%; overflow: hidden; border-radius: inherit; transition: width 220ms ease-out; }
-.workspace-sidebar-expanded { width: 286px; }
+.workspace-sidebar-expanded { width: 286px; max-width: 100%; }
 .workspace-sidebar-collapsed { width: 72px; }
 .workspace-sidebar-brand { padding: 14px 14px 12px; border-bottom: 1px solid var(--workspace-border); }
 .workspace-brand-mark { position: relative; display: grid; place-items: center; flex-shrink: 0; width: 36px; height: 36px; border-radius: 11px; background: color-mix(in srgb, var(--workspace-accent) 12%, var(--workspace-surface)); color: var(--workspace-accent); font-size: 20px; font-weight: 800; }
@@ -411,6 +412,13 @@ body:has(.workspace-shell) { transform: none; }
   opacity: 1;
   pointer-events: auto;
   scale: 1.05;
+}
+@media (hover: none) {
+  .workspace-nav-actions {
+    opacity: 0.92;
+    pointer-events: auto;
+    scale: 0.94;
+  }
 }
 .workspace-nav-action-btn {
   scale: 1;
@@ -554,10 +562,11 @@ body:has(.workspace-shell) { transform: none; }
   .workspace-topbar { padding: 4px 8px; }
   .workspace-topbar-actions { gap: 4px; }
   .dashboard-page { gap: 16px; }
-  .dashboard-title { font-size: 1.625rem; }
-  .dashboard-headline-stats { width: 100%; }
-  .dashboard-headline-stats > div { padding: 0 8px !important; }
-  .workspace-page { padding-top: 16px; }
+  .dashboard-title { font-size: 1.5rem; }
+  .dashboard-headline-stats { width: 100%; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 6px; }
+  .dashboard-headline-stats > div { padding: 0 6px !important; min-width: 0; }
+  .dashboard-headline-value { font-size: 14px; overflow-wrap: anywhere; }
+  .workspace-page { padding-top: 12px; }
 }
 @media (prefers-reduced-transparency: reduce) {
   .workspace-sidebar, .workspace-topbar, .dashboard-page .dashboard-panel { background: var(--workspace-surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
@@ -1041,20 +1050,21 @@ body {
 /* Mobile responsiveness */
 @media (max-width: 639px) {
   .react-datepicker.modern-datepicker-calendar {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
+    max-width: calc(100dvw - 24px);
   }
   .react-datepicker.modern-datepicker-calendar .react-datepicker__day,
   .react-datepicker.modern-datepicker-calendar .react-datepicker__day-name {
-    width: 1.75rem;
-    height: 1.75rem;
-    line-height: 1.75rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    line-height: 2.25rem;
     margin: 0.1rem;
   }
   .react-datepicker.modern-datepicker-calendar .react-datepicker__month-text,
   .react-datepicker.modern-datepicker-calendar .react-datepicker__year-text {
-    width: 1.75rem;
-    height: 1.75rem;
-    line-height: 1.75rem;
+    width: 2.5rem;
+    height: 2.25rem;
+    line-height: 2.25rem;
   }
 }
 
@@ -1102,7 +1112,7 @@ body {
 .products-catalog { overflow: hidden; }
 .products-catalog-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 20px 24px; }
 .products-section-title { font-size: 18px; font-weight: 600; }
-.products-table-scroll { overflow: auto; max-height: 65vh; padding: 8px 16px; background: var(--workspace-reading-fill); border-block: 1px solid var(--workspace-border); }
+.products-table-scroll { overflow: auto; max-height: 65dvh; padding: 8px 16px; background: var(--workspace-reading-fill); border-block: 1px solid var(--workspace-border); -webkit-overflow-scrolling: touch; }
 .products-table { width: 100%; min-width: 55rem; table-layout: fixed; border-collapse: separate; border-spacing: 0 6px; font-size: 14px; }
 .products-column-label { color: var(--workspace-muted); font-size: 12px; font-weight: 500; }
 .products-table th { padding-top: 10px; padding-bottom: 14px; }
@@ -1150,7 +1160,7 @@ body {
 .report-kpi-value { margin-top: 12px; font-size: clamp(1.5rem, 2vw, 2rem); line-height: 1.15; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--workspace-ink); overflow-wrap: anywhere; }
 .report-kpi-note { margin-top: 4px; font-size: var(--type-support); color: var(--workspace-muted); }
 .report-state { padding: 24px; color: var(--workspace-muted); }
-.report-table-scroll { max-height: 65vh; overflow: auto; background: var(--workspace-reading-fill); border-block: 1px solid var(--workspace-border); }
+.report-table-scroll { max-height: 65dvh; overflow: auto; background: var(--workspace-reading-fill); border-block: 1px solid var(--workspace-border); -webkit-overflow-scrolling: touch; }
 .report-table { width: 100%; min-width: 64rem; border-collapse: separate; border-spacing: 0; font-size: var(--type-label); font-variant-numeric: tabular-nums; }
 .report-table th { position: sticky; top: 0; z-index: 10; padding: 12px; text-align: left; white-space: nowrap; color: var(--workspace-muted); background: var(--workspace-surface); border-bottom: 1px solid var(--workspace-border); text-transform: none; letter-spacing: normal; }
 .report-table td { padding: 12px; border-bottom: 1px solid var(--workspace-border); color: var(--workspace-ink); background: var(--workspace-reading-fill); vertical-align: middle; }
@@ -1209,15 +1219,23 @@ body {
 .report-stock-value { margin-top: 4px; font-size: clamp(1.5rem, 2vw, 2rem); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--workspace-ink); }
 .report-page :is(button, a, input, select, [tabindex]):focus-visible { outline: 2px solid var(--workspace-accent); outline-offset: 3px; }
 @media (min-width: 768px) {
-  .report-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .report-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .report-kpis-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 760px; }
-  .report-kpis-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .report-kpis-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .report-kpis-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .report-kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .report-kpis-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 @media (min-width: 1536px) {
   .report-kpis-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
+  .report-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 639px) {
+  .report-kpis { grid-template-columns: minmax(0, 1fr); }
   .report-filters, .report-filters-pair { grid-template-columns: minmax(0, 1fr); max-width: none; }
 }
 @media print {
@@ -1362,7 +1380,7 @@ body {
 .purchase-invoices-page .directory-search-field .g-input { padding-left: 44px; }
 .purchase-invoices-page select { min-height: 44px; background: var(--workspace-surface); color: var(--workspace-ink); border-color: var(--workspace-border); }
 .purchase-invoice-catalog { overflow: hidden; }
-.purchase-invoice-table-scroll { max-height: 65vh; overflow: auto; background: var(--workspace-reading-fill); border-block: 1px solid var(--workspace-border); }
+.purchase-invoice-table-scroll { max-height: 65dvh; overflow: auto; background: var(--workspace-reading-fill); border-block: 1px solid var(--workspace-border); -webkit-overflow-scrolling: touch; }
 .purchase-invoice-table-scroll table { min-width: 64rem; }
 .purchase-invoice-table-scroll th { padding: 14px 12px; color: var(--workspace-muted); background: var(--workspace-surface); text-transform: none; letter-spacing: normal; }
 .purchase-invoice-table-scroll td { background: var(--workspace-reading-fill); border-bottom: 1px solid var(--workspace-border); padding-block: 12px; }
@@ -1543,8 +1561,10 @@ body {
 .product-modal-save { box-shadow: 0 4px 12px -6px var(--workspace-accent); }
 .product-modal-dialog :is(input, textarea, button):focus-visible { outline: 2px solid var(--workspace-accent); outline-offset: 2px; }
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .product-modal-dialog { background: var(--workspace-panel-fill); backdrop-filter: blur(28px) saturate(145%); -webkit-backdrop-filter: blur(28px) saturate(145%); } }
+@media (max-width: 1023px) {
+ .product-modal-dialog { left: 8px !important; right: 8px !important; top: 8px !important; width: calc(100dvw - 16px) !important; height: calc(100dvh - 16px) !important; max-width: calc(100dvw - 16px) !important; max-height: calc(100dvh - 16px) !important; min-width: 0 !important; min-height: 0 !important; }
+}
 @media (max-width: 640px) {
- .product-modal-dialog { left: 8px !important; top: 8px !important; width: calc(100vw - 16px) !important; height: calc(100dvh - 16px) !important; min-width: 0 !important; min-height: 0 !important; }
  .product-modal-body .grid { grid-template-columns: minmax(0, 1fr); }
  .product-modal-footer { flex-wrap: wrap; }
  .product-modal-footer > .flex { margin-left: auto; }
@@ -1592,7 +1612,10 @@ body {
 .product-search-dialog :is(button, input):focus-visible { outline: 2px solid var(--picker-accent); outline-offset: 2px; }
 .product-search-trigger > svg { color: var(--color-primary, #2563eb); }
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .product-search-dialog { background: color-mix(in srgb, var(--picker-surface) 76%, transparent); backdrop-filter: blur(28px) saturate(145%); -webkit-backdrop-filter: blur(28px) saturate(145%); } }
-@media (max-width: 640px) { .product-search-dialog { left: 8px !important; top: 8px !important; width: calc(100vw - 16px) !important; height: calc(100dvh - 16px) !important; min-width: 0 !important; min-height: 0 !important; } .product-search-header { padding: 12px; gap: 8px; } .product-search-header > kbd { display: none; } }
+@media (max-width: 1023px) {
+ .product-search-dialog { left: 8px !important; right: 8px !important; top: 8px !important; width: calc(100dvw - 16px) !important; height: calc(100dvh - 16px) !important; max-width: calc(100dvw - 16px) !important; max-height: calc(100dvh - 16px) !important; min-width: 0 !important; min-height: 0 !important; }
+}
+@media (max-width: 640px) { .product-search-header { padding: 12px; gap: 8px; } .product-search-header > kbd { display: none; } }
 @media (prefers-reduced-transparency: reduce) { .product-search-dialog { background: var(--picker-surface); backdrop-filter: none; -webkit-backdrop-filter: none; } .product-search-overlay { backdrop-filter: none; } }
 @media (prefers-reduced-motion: reduce) { .product-search-dialog * { animation: none !important; transition: none !important; } }
 
@@ -1629,8 +1652,8 @@ body {
 .purchase-show-delete p, .purchase-show-delete div { color: var(--workspace-muted); }
 .purchase-show :is(input, button):focus-visible { outline: 2px solid var(--workspace-accent); outline-offset: 2px; }
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .purchase-show-header { backdrop-filter: blur(24px) saturate(140%); -webkit-backdrop-filter: blur(24px) saturate(140%); } }
-@media (max-width: 900px) {
- .purchase-show { min-height: 0 !important; max-height: none !important; }
+@media (max-width: 1023px) {
+ .purchase-show { min-height: 0 !important; max-height: none !important; height: auto !important; }
  .purchase-show-header, .purchase-show-footer { position: static; }
  .purchase-show-details > .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
  .purchase-show-details > .grid > div { grid-column: auto; min-width: 0; }
@@ -1639,9 +1662,14 @@ body {
  .purchase-show-remarks > div { flex-basis: 100%; min-width: 0; }
  .purchase-show-items { flex: none; max-height: 460px; }
  .purchase-show-footer :is(table, tbody) { display: block; }
- .purchase-show-footer tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+ .purchase-show-footer thead { display: none; }
+ .purchase-show-footer tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
  .purchase-show-footer td { display: block; width: auto; min-width: 0; }
- .purchase-show-banner { align-items: flex-start; }
+ .purchase-show-banner { align-items: flex-start; flex-wrap: wrap; }
+}
+@media (max-width: 639px) {
+ .purchase-show-details > .grid { grid-template-columns: minmax(0, 1fr); }
+ .purchase-show-footer tr { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-transparency: reduce) { .purchase-show, .purchase-show-header { background: var(--workspace-surface); backdrop-filter: none; -webkit-backdrop-filter: none; } }
 
@@ -1911,8 +1939,8 @@ body {
 .return-entry-form :is(input,button):focus-visible { outline: 2px solid var(--workspace-accent); outline-offset: 2px; }
 .purchase-return-list .sale-list-header > .relative:first-of-type { flex-wrap: wrap; gap: 16px; }
 }
-@media screen and (max-width: 900px) {
-.return-entry-form { height: auto; min-height: calc(100dvh - 130px); }
+@media screen and (max-width: 1023px) {
+.return-entry-form, .purchase-return-form { height: auto !important; min-height: calc(100dvh - 130px); }
 .return-header, .return-footer { position: static; }
 .return-details > .grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
 .return-details > .grid > div { grid-column: auto; min-width: 0; }
@@ -1920,7 +1948,11 @@ body {
 .return-footer > .grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 .return-items { max-height: 400px; min-height: 200px; }
 }
-@media screen and (prefers-reduced-transparency: reduce) { .return-entry-form, .return-header { background: var(--workspace-surface); backdrop-filter: none; } }
+@media screen and (max-width: 639px) {
+.return-details > .grid { grid-template-columns: minmax(0,1fr); }
+.return-footer > .grid { grid-template-columns: minmax(0,1fr); }
+}
+@media screen and (prefers-reduced-transparency: reduce) { .return-entry-form, .purchase-return-form, .return-header { background: var(--workspace-surface); backdrop-filter: none; } }
 
 @media screen {
 .sale-return-page { width: 100%; min-width: 0; }
@@ -1928,10 +1960,13 @@ body {
 .sale-return-form .return-items table { min-width: 900px; }
 .sale-return-form .return-footer td { border: 0; padding: 8px; }
 }
-@media screen and (max-width: 900px) {
+@media screen and (max-width: 1023px) {
 .sale-return-form .return-footer :is(table,tbody) { display: block; }
 .sale-return-form .return-footer tr { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
 .sale-return-form .return-footer td { display: block; width: auto; min-width: 0; }
+}
+@media screen and (max-width: 639px) {
+.sale-return-form .return-footer tr { grid-template-columns: minmax(0,1fr); }
 }
 
 /* Forecast controls and results use the same glass frame as invoice lists. */
@@ -2146,7 +2181,7 @@ body {
 .ledger-stat-ok .ledger-stat-value { color: var(--color-success); }
 .ledger-table-toolbar { border-bottom: 1px solid var(--workspace-border); background: color-mix(in srgb,var(--workspace-accent) 6%,transparent); }
 .ledger-table-toolbar > .flex { flex-wrap: wrap; }
-.ledger-table-scroll { max-height: 65vh; overflow: auto; background: var(--workspace-reading-fill); }
+.ledger-table-scroll { max-height: 65dvh; overflow: auto; background: var(--workspace-reading-fill); -webkit-overflow-scrolling: touch; }
 .ledger-table-scroll table { width: 100%; min-width: 980px; table-layout: fixed; }
 .ledger-table-scroll th:nth-child(1) { width: 5%; }
 .ledger-table-scroll th:nth-child(2) { width: 3%; }
@@ -2279,7 +2314,7 @@ body {
 .settings-modal-card-lg { display: flex; flex-direction: column; max-width: 920px; height: min(90dvh, 760px); }
 .settings-modal-body-flush { flex: 1; min-height: 0; overflow: auto; padding: 20px; background: color-mix(in srgb, var(--workspace-ink) 5%, var(--workspace-surface)); }
 .settings-modal-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-top: 1px solid var(--workspace-border); background: color-mix(in srgb, var(--workspace-accent) 4%, transparent); }
-.settings-table-scroll { max-height: 60vh; overflow: auto; background: var(--workspace-reading-fill); border-block: 1px solid var(--workspace-border); }
+.settings-table-scroll { max-height: 60dvh; overflow: auto; background: var(--workspace-reading-fill); border-block: 1px solid var(--workspace-border); -webkit-overflow-scrolling: touch; }
 .settings-table { width: 100%; min-width: 44rem; border-collapse: separate; border-spacing: 0; font-size: var(--type-label); font-variant-numeric: tabular-nums; }
 .settings-table th { position: sticky; top: 0; z-index: 10; padding: 12px 16px; text-align: left; white-space: nowrap; color: var(--workspace-muted); background: var(--workspace-surface); border-bottom: 1px solid var(--workspace-border); }
 .settings-table td { padding: 12px 16px; border-bottom: 1px solid var(--workspace-border); color: var(--workspace-ink); background: var(--workspace-reading-fill); vertical-align: middle; }
@@ -3265,13 +3300,15 @@ html:not([data-btn-style]) :is(.theme-btn-success, .products-action-success) {
   pointer-events: none;
   transition: width 300ms, background-color 300ms;
 }
-:is(.btn-slide, html[data-btn-style="soft"] :is(.theme-btn-primary, .g-btn-primary, .products-action-primary, .purchase-order-action-primary, .activity-primary-button, .product-modal-save, .theme-btn-secondary, .g-btn-secondary, .activity-secondary-button, .product-modal-cancel, .theme-btn-tertiary, .g-btn-tertiary, .theme-btn-danger, .products-action-danger, .purchase-order-action-danger, .theme-btn-success, .products-action-success):not([data-btn-preview])):is(:hover, :focus-visible):not(:disabled) {
-  background: var(--sl-deep) !important;
-  color: transparent !important;
-  transform: none;
-}
-:is(.btn-slide, html[data-btn-style="soft"] :is(.theme-btn-primary, .g-btn-primary, .products-action-primary, .purchase-order-action-primary, .activity-primary-button, .product-modal-save, .theme-btn-secondary, .g-btn-secondary, .activity-secondary-button, .product-modal-cancel, .theme-btn-tertiary, .g-btn-tertiary, .theme-btn-danger, .products-action-danger, .purchase-order-action-danger, .theme-btn-success, .products-action-success):not([data-btn-preview])):is(:hover, :focus-visible):not(:disabled)::after {
-  width: 100%;
+@media (hover: hover) and (pointer: fine) {
+  :is(.btn-slide, html[data-btn-style="soft"] :is(.theme-btn-primary, .g-btn-primary, .products-action-primary, .purchase-order-action-primary, .activity-primary-button, .product-modal-save, .theme-btn-secondary, .g-btn-secondary, .activity-secondary-button, .product-modal-cancel, .theme-btn-tertiary, .g-btn-tertiary, .theme-btn-danger, .products-action-danger, .purchase-order-action-danger, .theme-btn-success, .products-action-success):not([data-btn-preview])):is(:hover, :focus-visible):not(:disabled) {
+    background: var(--sl-deep) !important;
+    color: transparent !important;
+    transform: none;
+  }
+  :is(.btn-slide, html[data-btn-style="soft"] :is(.theme-btn-primary, .g-btn-primary, .products-action-primary, .purchase-order-action-primary, .activity-primary-button, .product-modal-save, .theme-btn-secondary, .g-btn-secondary, .activity-secondary-button, .product-modal-cancel, .theme-btn-tertiary, .g-btn-tertiary, .theme-btn-danger, .products-action-danger, .purchase-order-action-danger, .theme-btn-success, .products-action-success):not([data-btn-preview])):is(:hover, :focus-visible):not(:disabled)::after {
+    width: 100%;
+  }
 }
 :is(.btn-slide, html[data-btn-style="soft"] :is(.theme-btn-primary, .g-btn-primary, .products-action-primary, .purchase-order-action-primary, .activity-primary-button, .product-modal-save, .theme-btn-secondary, .g-btn-secondary, .activity-secondary-button, .product-modal-cancel, .theme-btn-tertiary, .g-btn-tertiary, .theme-btn-danger, .products-action-danger, .purchase-order-action-danger, .theme-btn-success, .products-action-success):not([data-btn-preview])):active:not(:disabled) {
   border-color: var(--sl-press) !important;
@@ -3439,14 +3476,16 @@ html:not([data-btn-style]) :is(.theme-btn-success, .products-action-success) {
   cursor: pointer;
   transition: transform 400ms, box-shadow 400ms, background-color 400ms;
 }
-:is(.btn-lift, html[data-btn-style="outlined"] :is(.theme-btn-primary, .g-btn-primary, .products-action-primary, .purchase-order-action-primary, .activity-primary-button, .product-modal-save, .theme-btn-secondary, .g-btn-secondary, .activity-secondary-button, .product-modal-cancel, .theme-btn-tertiary, .g-btn-tertiary, .theme-btn-danger, .products-action-danger, .purchase-order-action-danger, .theme-btn-success, .products-action-success):not([data-btn-preview])):is(:hover, :focus-visible):not(:disabled) {
-  background: var(--lift-face) !important;
-  transform: translateY(-10px);
-  box-shadow:
-    inset 0 0 0 1px var(--lift-ring),
-    0 7px 0 -2px var(--lift-a),
-    0 15px 0 -4px var(--lift-b),
-    0 16px 10px -3px var(--lift-b) !important;
+@media (hover: hover) and (pointer: fine) {
+  :is(.btn-lift, html[data-btn-style="outlined"] :is(.theme-btn-primary, .g-btn-primary, .products-action-primary, .purchase-order-action-primary, .activity-primary-button, .product-modal-save, .theme-btn-secondary, .g-btn-secondary, .activity-secondary-button, .product-modal-cancel, .theme-btn-tertiary, .g-btn-tertiary, .theme-btn-danger, .products-action-danger, .purchase-order-action-danger, .theme-btn-success, .products-action-success):not([data-btn-preview])):is(:hover, :focus-visible):not(:disabled) {
+    background: var(--lift-face) !important;
+    transform: translateY(-10px);
+    box-shadow:
+      inset 0 0 0 1px var(--lift-ring),
+      0 7px 0 -2px var(--lift-a),
+      0 15px 0 -4px var(--lift-b),
+      0 16px 10px -3px var(--lift-b) !important;
+  }
 }
 :is(.btn-lift, html[data-btn-style="outlined"] :is(.theme-btn-primary, .g-btn-primary, .products-action-primary, .purchase-order-action-primary, .activity-primary-button, .product-modal-save, .theme-btn-secondary, .g-btn-secondary, .activity-secondary-button, .product-modal-cancel, .theme-btn-tertiary, .g-btn-tertiary, .theme-btn-danger, .products-action-danger, .purchase-order-action-danger, .theme-btn-success, .products-action-success):not([data-btn-preview])):active:not(:disabled) {
   transition-duration: 200ms;
@@ -4978,7 +5017,323 @@ html.guide-bot-inspect-active * {
   }
 }
 
+/* ============================================================================
+   MOBILE-FIRST & TOUCH-RESILIENCE FOUNDATION
+   ----------------------------------------------------------------------------
+   1. Prevents iOS Safari / Android WebView auto-zoom on form field focus by
+      enforcing >= 16px (1rem) font-size on all interactive inputs below 1024px,
+      including React portals outside #app (modals, react-select, datepicker).
+   2. Ensures horizontal scroll containers support smooth touch momentum and
+      contained overscroll.
+   3. Protects Letter Cascade ("pill") buttons from sticky :hover transparent
+      text on touch devices.
+   ========================================================================== */
+@media (max-width: 1023px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
+  select,
+  textarea,
+  .react-select__input,
+  .react-select__input input,
+  .react-select__single-value,
+  .rs__input input,
+  .rs__single-value,
+  .purchase-entry-items input,
+  .purchase-entry-items .product-search-trigger input,
+  .purchase-entry-items .batch-search-trigger input,
+  .sale-entry-items input,
+  .sale-entry-items select,
+  .sale-entry-items .product-search-trigger input,
+  .sale-entry-items .batch-search-trigger input {
+    font-size: max(16px, 1rem) !important;
+  }
 
+  .purchase-entry-items input,
+  .purchase-entry-items .product-search-trigger input,
+  .purchase-entry-items .batch-search-trigger input,
+  .sale-entry-items input,
+  .sale-entry-items select,
+  .sale-entry-items .product-search-trigger input,
+  .sale-entry-items .batch-search-trigger input {
+    min-height: 36px;
+  }
+}
 
+@media (hover: none) {
+  :is(.btn-cascade, html[data-btn-style="pill"] :is(.theme-btn-primary, .g-btn-primary, .products-action-primary, .purchase-order-action-primary, .activity-primary-button, .product-modal-save, .theme-btn-secondary, .g-btn-secondary, .activity-secondary-button, .product-modal-cancel, .theme-btn-tertiary, .g-btn-tertiary, .theme-btn-danger, .products-action-danger, .purchase-order-action-danger, .theme-btn-success, .products-action-success):not([data-btn-preview])):hover:not(:focus-visible):not(:disabled) {
+    color: color-mix(in oklab, var(--lc-accent) 70%, #000000) !important;
+    animation: none;
+  }
+  :is(.btn-cascade, html[data-btn-style="pill"] :is(.theme-btn-primary, .g-btn-primary, .products-action-primary, .purchase-order-action-primary, .activity-primary-button, .product-modal-save, .theme-btn-secondary, .g-btn-secondary, .activity-secondary-button, .product-modal-cancel, .theme-btn-tertiary, .g-btn-tertiary, .theme-btn-danger, .products-action-danger, .purchase-order-action-danger, .theme-btn-success, .products-action-success):not([data-btn-preview])):hover:not(:focus-visible):not(:disabled)::before {
+    transform: none;
+  }
+}
+
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* ============================================================================
+   MOBILE-FIRST INVOICE & RETURN REPEATER CARDS (< 1024px)
+   ----------------------------------------------------------------------------
+   Transforms wide multi-column invoice/return/POS line-item tables into
+   structured, touch-friendly stacked repeater cards below 1024px while
+   keeping the single semantic <table> DOM tree so all React refs, keyboard
+   navigation (Enter / ArrowUp / ArrowDown), drag-and-drop handles, and
+   @media print layouts remain 100% intact.
+   ========================================================================== */
+@media screen and (max-width: 1023px) {
+  .sale-entry-items,
+  .purchase-entry-items,
+  .purchase-show-items,
+  .return-items,
+  .barcode-pos-items {
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: 8px !important;
+  }
+
+  .invoice-repeater-table {
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    border: 0 !important;
+  }
+
+  .invoice-repeater-table thead {
+    display: none !important;
+  }
+
+  .invoice-repeater-table tbody {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+    width: 100% !important;
+  }
+
+  /* Brand group header banner in Purchase Invoice form & show */
+  .invoice-repeater-table tbody tr.purchase-invoice-brand-heading {
+    display: block !important;
+    width: 100% !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+  }
+
+  .invoice-repeater-table tbody tr.purchase-invoice-brand-heading th {
+    display: block !important;
+    width: 100% !important;
+    padding: 8px 12px !important;
+    text-align: left !important;
+    border-radius: 10px !important;
+  }
+
+  /* Empty cart state row in Barcode POS */
+  .invoice-repeater-table tbody tr.barcode-pos-empty-row,
+  .invoice-repeater-table tbody tr.barcode-pos-empty-row > td {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  /* Individual Line-Item Repeater Card */
+  .invoice-repeater-table tbody tr.invoice-repeater-row {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 10px 12px !important;
+    padding: 12px !important;
+    width: 100% !important;
+    align-items: end !important;
+    border: 1px solid var(--workspace-border, rgba(148, 163, 184, 0.35)) !important;
+    border-radius: 16px !important;
+    background: var(--workspace-surface, #ffffff) !important;
+    box-shadow: 0 4px 12px -4px rgba(15, 23, 42, 0.08) !important;
+  }
+
+  .dark .invoice-repeater-table tbody tr.invoice-repeater-row {
+    background: rgba(30, 41, 59, 0.9) !important;
+    border-color: rgba(71, 85, 105, 0.65) !important;
+    box-shadow: 0 6px 16px -6px rgba(0, 0, 0, 0.35) !important;
+  }
+
+  .invoice-repeater-table tbody tr.invoice-repeater-row.invoice-row-invalid {
+    border-color: #ef4444 !important;
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
+  }
+
+  /* Reset table cell styles inside repeater card */
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-end !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    text-align: left !important;
+  }
+
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td.hidden,
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td[style*="display: none"] {
+    display: none !important;
+  }
+
+  /* Field Labels injected from data-label */
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td[data-label]:not(.invoice-cell-index):not(.invoice-cell-index-only)::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 10.5px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--workspace-muted, #64748b);
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Card Top Header: Item # Badge (left) + Delete Action (right) */
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td.invoice-cell-index {
+    order: -20 !important;
+    grid-column: 1 / 2 !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 4px !important;
+    min-height: 32px !important;
+    padding-bottom: 6px !important;
+    border-bottom: 1px dashed var(--workspace-border, rgba(148, 163, 184, 0.3)) !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    color: var(--workspace-muted, #64748b) !important;
+  }
+
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td.invoice-cell-index::before {
+    content: "ITEM #";
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--workspace-muted, #64748b);
+  }
+
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td.invoice-cell-del {
+    order: -19 !important;
+    grid-column: 2 / -1 !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    min-height: 32px !important;
+    padding-bottom: 6px !important;
+    border-bottom: 1px dashed var(--workspace-border, rgba(148, 163, 184, 0.3)) !important;
+  }
+
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td.invoice-cell-del button {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Combined Index + Drag + Delete header cell (Purchase Invoice & Purchase Return) */
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td.invoice-cell-index-actions {
+    order: -20 !important;
+    grid-column: 1 / -1 !important;
+    min-height: 32px !important;
+    padding-bottom: 6px !important;
+    border-bottom: 1px dashed var(--workspace-border, rgba(148, 163, 184, 0.3)) !important;
+  }
+
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td.invoice-cell-index-actions button {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Read-only Index header cell (SaleInvoice/Show & PurchaseInvoice/Show) */
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td.invoice-cell-index-only {
+    order: -20 !important;
+    grid-column: 1 / -1 !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 4px !important;
+    padding-bottom: 6px !important;
+    border-bottom: 1px dashed var(--workspace-border, rgba(148, 163, 184, 0.3)) !important;
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    color: var(--workspace-muted, #64748b) !important;
+  }
+
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td.invoice-cell-index-only::before {
+    content: "ITEM #";
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--workspace-muted, #64748b);
+  }
+
+  /* Full-width Product Row right below card header */
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td.invoice-cell-product {
+    order: -10 !important;
+    grid-column: 1 / -1 !important;
+  }
+
+  /* Full-width Sub Total footer row inside card */
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td.invoice-cell-subtotal {
+    order: 90 !important;
+    grid-column: 1 / -1 !important;
+    padding-top: 8px !important;
+    border-top: 1px dashed var(--workspace-border, rgba(148, 163, 184, 0.3)) !important;
+  }
+
+  /* Hide redundant per-row "+" button on non-last cards; turn last card's "+" into full-width "Add Next Item" CTA */
+  .invoice-repeater-table tbody tr.invoice-repeater-row:not(:last-child) > td.invoice-cell-add {
+    display: none !important;
+  }
+
+  .invoice-repeater-table tbody tr.invoice-repeater-row:last-child > td.invoice-cell-add {
+    order: 99 !important;
+    grid-column: 1 / -1 !important;
+    margin-top: 2px !important;
+  }
+
+  .invoice-repeater-table tbody tr.invoice-repeater-row:last-child > td.invoice-cell-add button {
+    width: 100% !important;
+    min-height: 38px !important;
+    padding: 6px 12px !important;
+    border: 1px dashed var(--workspace-accent, #3b82f6) !important;
+    border-radius: 10px !important;
+    background: color-mix(in srgb, var(--workspace-accent, #3b82f6) 8%, transparent) !important;
+    color: var(--workspace-accent, #3b82f6) !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+  }
+
+  .invoice-repeater-table tbody tr.invoice-repeater-row:last-child > td.invoice-cell-add button::after {
+    content: "Add Next Item";
+  }
+
+  /* Comfortable touch height & radius for inputs inside repeater cards */
+  .invoice-repeater-table tbody tr.invoice-repeater-row > td input:not([type="checkbox"]):not([type="radio"]) {
+    min-height: 38px !important;
+    border-radius: 8px !important;
+  }
+}
+
+@media screen and (max-width: 639px) {
+  .invoice-repeater-table tbody tr.invoice-repeater-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    padding: 12px !important;
+  }
+}
 
 

@@ -549,7 +549,7 @@ export default function AccountingPage() {
 
       {/* Tabs + Period Filter Bar */}
       <div className="p-3.5 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-gray-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 w-full lg:w-auto">
           {[
             { id: "balance_sheet", label: "Balance Sheet", icon: ScaleIcon },
             { id: "trial_balance", label: "Trial Balance", icon: BookOpenIcon },
@@ -564,13 +564,13 @@ export default function AccountingPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold shrink-0 whitespace-nowrap transition-all cursor-pointer ${
                   active
                     ? "bg-blue-600 text-white shadow-xs"
                     : "text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-4 h-4 shrink-0" />
                 <span>{tab.label}</span>
               </button>
             );
@@ -626,31 +626,31 @@ export default function AccountingPage() {
               <div className="divide-y divide-gray-100 dark:divide-slate-800/80">
                 {bs.assets.map((row) => (
                   <div key={row.id} className="px-5 py-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold shrink-0 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300">
                           {row.code}
                         </span>
-                        <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
+                        <span className="text-xs sm:text-sm font-medium truncate text-gray-900 dark:text-white">
                           {row.name}
                         </span>
                       </div>
-                      <span className="text-xs sm:text-sm font-bold font-mono text-gray-900 dark:text-white">
+                      <span className="text-xs sm:text-sm font-bold font-mono shrink-0 text-gray-900 dark:text-white">
                         {formatCurrency(row.amount)}
                       </span>
                     </div>
 
                     {row.sub_accounts?.length > 0 && (
-                      <div className="mt-2 ml-9 pl-3 border-l-2 border-blue-200 dark:border-blue-800 space-y-1">
+                      <div className="mt-2 ml-4 sm:ml-9 pl-2 sm:pl-3 border-l-2 border-blue-200 dark:border-blue-800 space-y-1">
                         {row.sub_accounts.map((sub) => (
                           <div
                             key={sub.id}
-                            className="flex items-center justify-between text-xs text-gray-500 dark:text-slate-400"
+                            className="flex items-center justify-between gap-2 text-xs text-gray-500 dark:text-slate-400"
                           >
-                            <span>
+                            <span className="min-w-0 truncate">
                               {sub.name} ({sub.type.toUpperCase()})
                             </span>
-                            <span className="font-mono">{formatCurrency(sub.balance)}</span>
+                            <span className="font-mono shrink-0">{formatCurrency(sub.balance)}</span>
                           </div>
                         ))}
                       </div>
@@ -686,16 +686,16 @@ export default function AccountingPage() {
 
               <div className="divide-y divide-gray-100 dark:divide-slate-800/80">
                 {bs.liabilities.map((row) => (
-                  <div key={row.id} className="px-5 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300">
+                  <div key={row.id} className="px-5 py-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold shrink-0 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300">
                         {row.code}
                       </span>
-                      <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
+                      <span className="text-xs sm:text-sm font-medium truncate text-gray-900 dark:text-white">
                         {row.name}
                       </span>
                     </div>
-                    <span className="text-xs sm:text-sm font-bold font-mono text-gray-900 dark:text-white">
+                    <span className="text-xs sm:text-sm font-bold font-mono shrink-0 text-gray-900 dark:text-white">
                       {formatCurrency(row.amount)}
                     </span>
                   </div>
@@ -719,13 +719,13 @@ export default function AccountingPage() {
 
               <div className="divide-y divide-gray-100 dark:divide-slate-800/80">
                 {bs.equity.map((row) => (
-                  <div key={row.id} className="px-5 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300">
+                  <div key={row.id} className="px-5 py-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold shrink-0 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300">
                         {row.code}
                       </span>
-                      <div>
-                        <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
+                      <div className="min-w-0">
+                        <span className="text-xs sm:text-sm font-medium block truncate text-gray-900 dark:text-white">
                           {row.name}
                         </span>
                         {row.includes_net_income !== undefined && (
@@ -735,7 +735,7 @@ export default function AccountingPage() {
                         )}
                       </div>
                     </div>
-                    <span className="text-xs sm:text-sm font-bold font-mono text-gray-900 dark:text-white">
+                    <span className="text-xs sm:text-sm font-bold font-mono shrink-0 text-gray-900 dark:text-white">
                       {formatCurrency(row.amount)}
                     </span>
                   </div>
@@ -763,7 +763,7 @@ export default function AccountingPage() {
                 Every debit and credit balance across Assets, Liabilities, Equity, Revenue, and Expenses
               </p>
             </div>
-            <div className="w-64">
+            <div className="w-full sm:w-64">
               <Select
                 options={ACCOUNT_CLASS_OPTIONS}
                 value={classFilter}
@@ -776,7 +776,7 @@ export default function AccountingPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse min-w-[560px]">
               <thead>
                 <tr className="bg-gray-50/80 dark:bg-slate-800/60 border-b border-gray-200/70 dark:border-slate-800 text-[11px] font-bold uppercase text-gray-500 dark:text-slate-400">
                   <th className="py-3 px-4">Code</th>
@@ -831,8 +831,8 @@ export default function AccountingPage() {
       {activeTab === "general_ledger" && gl && (
         <div className="space-y-4">
           <div className="p-4 rounded-2xl bg-white/85 dark:bg-slate-900/85 border border-gray-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3 flex-1">
-              <div className="w-72">
+            <div className="flex flex-wrap items-center gap-3 flex-1 w-full sm:w-auto">
+              <div className="w-full sm:w-72">
                 <Select
                   options={GL_SOURCE_OPTIONS}
                   value={glSourceFilter}
@@ -847,7 +847,7 @@ export default function AccountingPage() {
                 value={glSearch}
                 onChange={(e) => setGlSearch(e.target.value)}
                 placeholder="Search voucher #, reference, description…"
-                className="h-9 px-3 text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white w-64"
+                className="h-9 px-3 text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white w-full sm:w-64"
               />
             </div>
             <div className="text-xs text-gray-500 dark:text-slate-400">
@@ -899,38 +899,40 @@ export default function AccountingPage() {
                   </div>
                 </div>
 
-                <table className="w-full text-xs border-collapse">
-                  <thead>
-                    <tr className="text-[10px] uppercase text-gray-400 dark:text-slate-500 border-b border-gray-100 dark:border-slate-800/60">
-                      <th className="py-2 px-4 text-left w-24">Code</th>
-                      <th className="py-2 px-4 text-left">Account</th>
-                      <th className="py-2 px-4 text-left">Line Narration</th>
-                      <th className="py-2 px-4 text-right w-36">Debit (Dr)</th>
-                      <th className="py-2 px-4 text-right w-36">Credit (Cr)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-slate-800/40">
-                    {(entry.lines || []).map((line, i) => (
-                      <tr key={i}>
-                        <td className="py-2 px-4 font-mono font-bold text-gray-600 dark:text-slate-400">
-                          {line.account_code}
-                        </td>
-                        <td className="py-2 px-4 font-medium text-gray-900 dark:text-white">
-                          {line.account_name}
-                        </td>
-                        <td className="py-2 px-4 text-gray-500 dark:text-slate-400">
-                          {line.description || "—"}
-                        </td>
-                        <td className="py-2 px-4 text-right font-mono text-gray-900 dark:text-white">
-                          {line.debit > 0 ? formatCurrency(line.debit) : "—"}
-                        </td>
-                        <td className="py-2 px-4 text-right font-mono text-gray-900 dark:text-white">
-                          {line.credit > 0 ? formatCurrency(line.credit) : "—"}
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse min-w-[540px]">
+                    <thead>
+                      <tr className="text-[10px] uppercase text-gray-400 dark:text-slate-500 border-b border-gray-100 dark:border-slate-800/60">
+                        <th className="py-2 px-4 text-left w-24">Code</th>
+                        <th className="py-2 px-4 text-left">Account</th>
+                        <th className="py-2 px-4 text-left">Line Narration</th>
+                        <th className="py-2 px-4 text-right w-36">Debit (Dr)</th>
+                        <th className="py-2 px-4 text-right w-36">Credit (Cr)</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-slate-800/40">
+                      {(entry.lines || []).map((line, i) => (
+                        <tr key={i}>
+                          <td className="py-2 px-4 font-mono font-bold text-gray-600 dark:text-slate-400">
+                            {line.account_code}
+                          </td>
+                          <td className="py-2 px-4 font-medium text-gray-900 dark:text-white">
+                            {line.account_name}
+                          </td>
+                          <td className="py-2 px-4 text-gray-500 dark:text-slate-400">
+                            {line.description || "—"}
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono text-gray-900 dark:text-white">
+                            {line.debit > 0 ? formatCurrency(line.debit) : "—"}
+                          </td>
+                          <td className="py-2 px-4 text-right font-mono text-gray-900 dark:text-white">
+                            {line.credit > 0 ? formatCurrency(line.credit) : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ))}
           </div>
@@ -1328,8 +1330,11 @@ export default function AccountingPage() {
                 </div>
 
                 {jvLines.map((line, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-5">
+                  <div
+                    key={idx}
+                    className="grid grid-cols-12 gap-2 items-center p-2.5 sm:p-0 rounded-xl border sm:border-0 border-slate-200 dark:border-slate-700"
+                  >
+                    <div className="col-span-12 sm:col-span-5">
                       <Select
                         options={coaOptions}
                         value={
@@ -1346,7 +1351,7 @@ export default function AccountingPage() {
                         menuPortalTarget={typeof document !== "undefined" ? document.body : null}
                       />
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-12 sm:col-span-3">
                       <input
                         type="text"
                         value={line.description}
@@ -1359,7 +1364,7 @@ export default function AccountingPage() {
                         className="w-full h-9 px-2.5 text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-6 sm:col-span-2">
                       <input
                         type="number"
                         step="any"
@@ -1374,7 +1379,7 @@ export default function AccountingPage() {
                         className="w-full h-9 px-2.5 text-xs text-right font-mono rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800"
                       />
                     </div>
-                    <div className="col-span-2 flex items-center gap-1">
+                    <div className="col-span-6 sm:col-span-2 flex items-center gap-1">
                       <input
                         type="number"
                         step="any"
@@ -1392,7 +1397,7 @@ export default function AccountingPage() {
                         <button
                           type="button"
                           onClick={() => setJvLines(jvLines.filter((_, i) => i !== idx))}
-                          className="text-rose-500 hover:text-rose-700 p-1"
+                          className="text-rose-500 hover:text-rose-700 p-1 shrink-0"
                         >
                           <XMarkIcon className="w-4 h-4" />
                         </button>
@@ -1404,7 +1409,7 @@ export default function AccountingPage() {
 
               {/* Balance Verification Footer */}
               <div
-                className={`p-3 rounded-xl border flex items-center justify-between text-xs font-bold ${
+                className={`p-3 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 text-xs font-bold ${
                   jvTotals.balanced
                     ? "bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-200"
                     : "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-200"

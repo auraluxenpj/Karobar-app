@@ -278,8 +278,7 @@ export default function PurchaseInvoiceShow() {
 
 return (
     <div
-      className="purchase-show flex flex-col"
-      style={{ minHeight: "calc(100vh - 130px)", maxHeight: "calc(100vh - 130px)" }}
+      className="purchase-show flex flex-col h-auto lg:h-[calc(100dvh-130px)]"
       autoComplete="off"
     >
       {inv.purchase_order && <div className="g-toolbar p-3">Source Purchase Order: <a className="underline" href={`/purchase-orders/${inv.purchase_order.id}`}>{inv.purchase_order.number}</a></div>}
@@ -339,7 +338,7 @@ return (
 
           {/* Action Buttons */}
           <div className="purchase-show-remarks mt-2 flex justify-end">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setSearchOpen(true)}
@@ -487,7 +486,7 @@ return (
       <div className="purchase-show-items purchase-entry-items flex-1 min-h-0 overflow-auto p-1" autoComplete="off">
         <h2 className="text-xs font-bold mb-1 dark:text-gray-200">Items</h2>
 
-        <table className="w-full border-collapse text-[11px]">
+        <table className="invoice-repeater-table w-full border-collapse text-[11px]">
           <thead className="sticky top-0 bg-gray-100 dark:bg-slate-700 z-5">
             <tr>
               <th rowSpan={2} className="border w-6 dark:border-slate-600 dark:text-gray-200">#</th>
@@ -535,27 +534,27 @@ return (
                       <th colSpan={20} scope="rowgroup">{brand || "No Brand"}</th>
                     </tr>
                   )}
-                  <tr className="text-center dark:text-gray-300">
-                    <td className="border px-1 dark:border-slate-600">{i + 1}</td>
-                    <td className="border px-1 text-left dark:border-slate-600">{fmt(item.product?.name ?? item.product_id)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.pack_size)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.batch)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.expiry)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.pack_quantity)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.unit_quantity)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.pack_purchase_price)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.unit_purchase_price)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.item_discount_percentage)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.pack_bonus)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.unit_bonus)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.pack_sale_price)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.unit_sale_price)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.whole_sale_pack_price)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.whole_sale_unit_price)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.margin)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.whole_sale_margin)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.avg_price)}</td>
-                    <td className="border px-1 dark:border-slate-600">{fmt(item.sub_total)}</td>
+                  <tr className="invoice-repeater-row text-center dark:text-gray-300">
+                    <td data-label="Item #" className="invoice-cell-index-only border px-1 dark:border-slate-600">{i + 1}</td>
+                    <td data-label="Product" className="invoice-cell-product border px-1 text-left dark:border-slate-600">{fmt(item.product?.name ?? item.product_id)}</td>
+                    <td data-label="Pack Size" className="border px-1 dark:border-slate-600">{fmt(item.pack_size)}</td>
+                    <td data-label="Batch" className="border px-1 dark:border-slate-600">{fmt(item.batch)}</td>
+                    <td data-label="Expiry" className="border px-1 dark:border-slate-600">{fmt(item.expiry)}</td>
+                    <td data-label="Pack Qty" className="border px-1 dark:border-slate-600">{fmt(item.pack_quantity)}</td>
+                    <td data-label="Unit Qty" className="border px-1 dark:border-slate-600">{fmt(item.unit_quantity)}</td>
+                    <td data-label="Pack Cost" className="border px-1 dark:border-slate-600">{fmt(item.pack_purchase_price)}</td>
+                    <td data-label="Unit Cost" className="border px-1 dark:border-slate-600">{fmt(item.unit_purchase_price)}</td>
+                    <td data-label="Disc %" className="border px-1 dark:border-slate-600">{fmt(item.item_discount_percentage)}</td>
+                    <td data-label="Pack Bonus" className="border px-1 dark:border-slate-600">{fmt(item.pack_bonus)}</td>
+                    <td data-label="Unit Bonus" className="border px-1 dark:border-slate-600">{fmt(item.unit_bonus)}</td>
+                    <td data-label="Pack Sale" className="border px-1 dark:border-slate-600">{fmt(item.pack_sale_price)}</td>
+                    <td data-label="Unit Sale" className="border px-1 dark:border-slate-600">{fmt(item.unit_sale_price)}</td>
+                    <td data-label="W.S. Pack" className="border px-1 dark:border-slate-600">{fmt(item.whole_sale_pack_price)}</td>
+                    <td data-label="W.S. Unit" className="border px-1 dark:border-slate-600">{fmt(item.whole_sale_unit_price)}</td>
+                    <td data-label="Margin %" className="border px-1 dark:border-slate-600">{fmt(item.margin)}</td>
+                    <td data-label="W.S. Mrg %" className="border px-1 dark:border-slate-600">{fmt(item.whole_sale_margin)}</td>
+                    <td data-label="Avg Cost" className="border px-1 dark:border-slate-600">{fmt(item.avg_price)}</td>
+                    <td data-label="Sub Total" className="invoice-cell-subtotal border px-1 dark:border-slate-600">{fmt(item.sub_total)}</td>
                   </tr>
                 </Fragment>
               );

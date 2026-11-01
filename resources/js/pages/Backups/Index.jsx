@@ -882,8 +882,8 @@ export default function BackupsIndex() {
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex items-center gap-2 min-w-[270px]">
+                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                  <div className="flex items-center gap-2 w-full sm:w-auto sm:min-w-[270px]">
                     <label className="text-xs font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap">
                       Type:
                     </label>
@@ -916,7 +916,7 @@ export default function BackupsIndex() {
 
           {/* Table Toolbar */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               <input
                 type="text"
                 placeholder="Search backups by name or type…"
@@ -925,7 +925,7 @@ export default function BackupsIndex() {
                 className="w-full sm:w-72 text-xs rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 px-3.5 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
 
-              <div className="w-44">
+              <div className="w-full sm:w-44">
                 <Select
                   value={TYPE_FILTER_OPTIONS.find((o) => o.value === typeFilter)}
                   onChange={(opt) => setTypeFilter(opt?.value || "all")}
@@ -1111,8 +1111,8 @@ export default function BackupsIndex() {
       {/* TAB 2: AUTOMATED SCHEDULE CONFIGURATION                   */}
       {/* ======================================================== */}
       {activeTab === "schedule" && (
-        <form id="backup-panel-schedule" role="tabpanel" aria-labelledby="backup-tab-schedule" onSubmit={handleSaveSchedule} className="products-panel bg-white/70 dark:bg-slate-900/70 backdrop-blur-md rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-6 shadow-sm space-y-6">
-          <div className="flex items-start justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+        <form id="backup-panel-schedule" role="tabpanel" aria-labelledby="backup-tab-schedule" onSubmit={handleSaveSchedule} className="products-panel bg-white/70 dark:bg-slate-900/70 backdrop-blur-md rounded-2xl border border-slate-200/80 dark:border-slate-800/80 p-4 sm:p-6 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
             <div>
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <ClockIcon className="w-5 h-5 text-blue-500" />
@@ -1418,7 +1418,7 @@ export default function BackupsIndex() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex flex-wrap items-center gap-2 shrink-0">
                     <button
                       type="button"
                       onClick={openFolderBrowser}
@@ -1753,14 +1753,14 @@ export default function BackupsIndex() {
 
             {/* Inline New Folder Form */}
             {showCreateFolderInput && (
-              <form onSubmit={handleCreateDirectory} className="px-5 py-2.5 bg-emerald-50/60 dark:bg-emerald-950/40 border-b border-emerald-200 dark:border-emerald-800 flex items-center gap-2 shrink-0">
+              <form onSubmit={handleCreateDirectory} className="px-5 py-2.5 bg-emerald-50/60 dark:bg-emerald-950/40 border-b border-emerald-200 dark:border-emerald-800 flex flex-wrap items-center gap-2 shrink-0">
                 <input
                   type="text"
                   required
                   placeholder="New folder name (e.g. KarobarBackups)"
                   value={newFolderName}
                   onChange={(e) => setNewFolderName(e.target.value)}
-                  className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="flex-1 min-w-[160px] text-xs px-3 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
                 <button
                   type="submit"

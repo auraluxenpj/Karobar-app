@@ -474,7 +474,7 @@ export function ManageStorageLocationsModal({
           </button>
         </div>
 
-        <div className="p-5 space-y-5 max-h-[80vh] overflow-y-auto">
+        <div className="p-4 sm:p-5 space-y-5 max-h-[80dvh] overflow-y-auto">
           {/* Add / Edit Location Form */}
           <form
             onSubmit={handleSave}
@@ -571,7 +571,7 @@ export function ManageStorageLocationsModal({
           </form>
 
           {/* Existing Locations Table */}
-          <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-slate-700">
+          <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700">
             <table className="w-full text-xs sm:text-sm text-left">
               <thead className={isDark ? "bg-slate-700/80 text-slate-200" : "bg-gray-50 text-gray-700"}>
                 <tr>

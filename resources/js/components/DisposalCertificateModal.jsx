@@ -94,7 +94,7 @@ export default function DisposalCertificateModal({
         >
           {/* Modal Header */}
           <div
-            className={`flex items-center justify-between px-6 py-4 border-b no-print ${
+            className={`flex flex-wrap gap-2 items-center justify-between px-4 sm:px-6 py-4 border-b no-print ${
               isDark
                 ? "border-slate-700/80 bg-slate-800/50"
                 : "border-gray-200 bg-gray-50"
@@ -132,7 +132,7 @@ export default function DisposalCertificateModal({
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={handlePrint}
@@ -177,7 +177,7 @@ export default function DisposalCertificateModal({
           <div
             id="disposal-printable-certificate"
             ref={printAreaRef}
-            className={`p-8 space-y-6 print:bg-white print:text-black ${
+            className={`p-4 sm:p-8 space-y-6 print:bg-white print:text-black ${
               isDark ? "bg-slate-900 text-slate-100" : "bg-white text-gray-900"
             }`}
           >
@@ -410,6 +410,7 @@ export default function DisposalCertificateModal({
               >
                 Itemized Stock Schedule
               </h4>
+              <div className="overflow-x-auto">
               <table
                 className={`w-full text-xs text-left border-collapse border print:border-gray-300 ${
                   isDark ? "border-slate-700" : "border-gray-200"
@@ -476,6 +477,7 @@ export default function DisposalCertificateModal({
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
 
             {/* Totals Summary */}
@@ -503,7 +505,7 @@ export default function DisposalCertificateModal({
             </div>
 
             {/* Signature Blocks for Regulatory & Audit Compliance */}
-            <div className="grid grid-cols-3 gap-6 pt-10 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-10 text-xs">
               <div className={`border-t pt-2 text-center ${isDark ? "border-slate-700 text-slate-400" : "border-gray-300 text-gray-600"}`}>
                 <p className={`font-semibold ${isDark ? "text-slate-200" : "text-gray-800"}`}>
                   {disposal.creator?.name || "________________"}

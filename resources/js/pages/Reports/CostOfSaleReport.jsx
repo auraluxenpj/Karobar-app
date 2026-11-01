@@ -173,10 +173,6 @@ export default function CostOfSaleReport() {
     if (!computed.withDerived.length) return;
 
     const pdfWindow = window.open("", "_blank");
-    if (!pdfWindow) {
-      toast.error("Allow pop-ups to open the PDF report.");
-      return;
-    }
     setPdfLoading(true);
     try {
       const response = await axios.get("/api/reports/cost-of-sale/pdf", {
@@ -184,11 +180,20 @@ export default function CostOfSaleReport() {
         responseType: "blob",
       });
       const url = URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
-      pdfWindow.location.href = url;
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      if (pdfWindow) {
+        pdfWindow.location.href = url;
+      } else {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `cost-of-sale-${fromDate || "report"}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (error) {
       console.error(error);
-      pdfWindow.close();
+      if (pdfWindow) pdfWindow.close();
       toast.error("Failed to generate Cost of Sale PDF.");
     } finally {
       setPdfLoading(false);

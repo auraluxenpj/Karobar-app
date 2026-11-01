@@ -103,7 +103,7 @@ export default function StockAdjustmentReport() {
     const formatYMD = (date) => date.toISOString().split("T")[0];
 
     if (!fromDate) setFromDate(formatYMD(firstDay));
-    if (!toDate) setFromDate(formatYMD(lastDay));
+    if (!toDate) setToDate(formatYMD(lastDay));
   }, []);
 
   /* ============ Fetch report ============ */
@@ -148,8 +148,16 @@ export default function StockAdjustmentReport() {
       });
       const blob = new Blob([res.data], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      URL.revokeObjectURL(url);
+      const win = window.open(url, "_blank");
+      if (!win) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `stock-adjustment-${fromDate || "report"}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (e) {
       console.error(e);
       toast.error("Failed to generate PDF");
@@ -462,7 +470,7 @@ export default function StockAdjustmentReport() {
                     <td className="report-num report-amount-up">
                       {fmtCurrency(summary.total_worth_adjusted)}
                     </td>
-                    <td colSpan={4}></td>
+                    <td colSpan={2}></td>
                   </tr>
                 </tfoot>
               </table>

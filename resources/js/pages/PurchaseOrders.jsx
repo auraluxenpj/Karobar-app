@@ -267,7 +267,7 @@ export default function PurchaseOrders() {
       </div>
       {error && <p role="alert" className="text-red-600 dark:text-red-400">{error}</p>}
       {loading && (id || creating || !listing) ? <p>Loading Purchase Orders…</p> : creating || editing ? <>
-        <div className="purchase-entry-details grid gap-3 sm:grid-cols-5 px-3 py-2.5">
+        <div className="purchase-entry-details grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 px-3 py-2.5">
           <label>Date<input className="w-full h-8 border rounded-md px-2 text-xs" type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></label>
           <label>Expected Receiving Date *<input required className="w-full h-8 border rounded-md px-2 text-xs" type="date" min={form.date} value={form.expected_received_date || ''} onChange={e => setForm({ ...form, expected_received_date: e.target.value })} /></label>
           <label>Reference<input className="w-full h-8 border rounded-md px-2 text-xs" value={form.reference || ''} onChange={e => setForm({ ...form, reference: e.target.value })} /></label>

@@ -361,9 +361,9 @@ export default function RecordPaymentModal({
         if (e.target === e.currentTarget && !submitting) onClose();
       }}
     >
-      <div className="relative w-full max-w-3xl my-8">
+      <div className="relative w-full max-w-3xl my-4 sm:my-8">
         <GlassCard
-          className={`border shadow-2xl rounded-2xl overflow-hidden transition-colors ${
+          className={`max-h-[92dvh] flex flex-col border shadow-2xl rounded-2xl overflow-hidden transition-colors ${
             isDark
               ? "bg-slate-900/95 border-slate-700/80 text-slate-100"
               : "bg-white border-gray-200 text-gray-900"
@@ -371,7 +371,7 @@ export default function RecordPaymentModal({
         >
           {/* Header */}
           <div
-            className={`flex items-center justify-between px-6 py-4 border-b ${
+            className={`flex items-center justify-between px-4 sm:px-6 py-4 border-b shrink-0 ${
               isDark
                 ? "border-slate-700/80 bg-slate-800/50"
                 : "border-gray-200 bg-gray-50"
@@ -424,7 +424,7 @@ export default function RecordPaymentModal({
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-6">
             {/* Top Row: Date, Amount, Method */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
@@ -683,7 +683,7 @@ export default function RecordPaymentModal({
                 </div>
               ) : (
                 <div
-                  className={`rounded-xl border overflow-hidden max-h-56 overflow-y-auto ${
+                  className={`rounded-xl border overflow-x-auto max-h-56 overflow-y-auto ${
                     isDark ? "border-slate-700/80" : "border-gray-200"
                   }`}
                 >
@@ -790,7 +790,7 @@ export default function RecordPaymentModal({
                   : "bg-gray-50 border-gray-200"
               }`}
             >
-              <div className="flex items-center gap-6">
+              <div className="flex flex-wrap items-center gap-6">
                 <div>
                   <span
                     className={`text-[11px] uppercase tracking-wider block font-medium ${

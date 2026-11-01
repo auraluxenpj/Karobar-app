@@ -266,10 +266,10 @@ export default function CreateUserDemand() {
         </div>
 
         {/* Top Details Bar */}
-        <div className="purchase-entry-details grid gap-3 sm:grid-cols-3 px-3 py-2.5 items-end">
+        <div className="purchase-entry-details grid grid-cols-1 sm:grid-cols-3 gap-3 px-3 py-2.5 items-end">
           <label className="sm:col-span-1">
             Customer (optional)
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-1.5">
               <button
                 type="button"
                 disabled={saving}

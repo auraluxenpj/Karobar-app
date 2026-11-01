@@ -228,6 +228,7 @@ export default function Customers() {
       credit_status: c.credit_status || "active",
     });
     setEditingId(c.id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleDelete = async (c) => {
@@ -544,7 +545,7 @@ return (
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-xs font-medium mb-1">Credit Limit (Rs.)</label>
                   <GlassInput
@@ -571,7 +572,7 @@ return (
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-xs font-medium mb-1">Tax Status</label>
                   <Select
@@ -989,7 +990,7 @@ return (
                   </p>
                 </div>
               ) : (
-                <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
+                <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead className="bg-gray-100 dark:bg-slate-700/70 text-gray-600 dark:text-gray-300 uppercase">
                       <tr>
@@ -1036,7 +1037,7 @@ return (
                                       setSelectedPriceProduct(prod.id ? prod : { id: cp.product_id, name: `Product #${cp.product_id}` });
                                       setCustomPackPriceInput(String(cp.pack_price));
                                     }}
-                                    className="p-1 rounded hover:bg-blue-50 dark:hover:bg-slate-600 text-blue-600 dark:text-blue-400"
+                                    className="p-2 rounded hover:bg-blue-50 dark:hover:bg-slate-600 text-blue-600 dark:text-blue-400"
                                     title="Edit custom price"
                                     aria-label="Edit custom price"
                                   >
@@ -1045,7 +1046,7 @@ return (
                                   <button
                                     type="button"
                                     onClick={() => handleDeleteCustomPrice(cp)}
-                                    className="p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400"
+                                    className="p-2 rounded hover:bg-rose-50 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400"
                                     title="Remove custom price"
                                     aria-label="Remove custom price"
                                   >

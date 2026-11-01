@@ -273,7 +273,7 @@ export default function BrandsIndex() {
         </div>
 
         {/* Search & React Select Filter Bar */}
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+        <div className="mt-3 px-4 pb-4 sm:px-6 sm:pb-5 grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
           <div className="md:col-span-6 relative">
             <MagnifyingGlassIcon className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <GlassInput

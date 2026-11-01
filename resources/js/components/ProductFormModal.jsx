@@ -60,17 +60,36 @@ const ProductFormModal = forwardRef(({ open, onClose, onProductCreated }, ref) =
   const [saving, setSaving] = useState(false);
   const [windowPos, setWindowPos] = useState(() => {
     const saved = localStorage.getItem("productModalPos");
-    if (saved) return JSON.parse(saved);
-    const width = 800;
-    const height = 600;
-    const x = (window.innerWidth - width) / 2;
-    const y = (window.innerHeight - height) / 2;
+    const isCompact = typeof window !== "undefined" && window.innerWidth < 1024;
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return isCompact
+        ? { x: Math.max(8, Number(parsed.x ?? 8)), y: Math.max(8, Number(parsed.y ?? 8)) }
+        : parsed;
+    }
+    const width = isCompact ? Math.min(800, window.innerWidth - 16) : 800;
+    const height = isCompact ? Math.min(600, window.innerHeight - 24) : 600;
+    const x = isCompact ? Math.max(8, (window.innerWidth - width) / 2) : (window.innerWidth - width) / 2;
+    const y = isCompact ? Math.max(8, (window.innerHeight - height) / 2) : (window.innerHeight - height) / 2;
     return { x, y };
   });
 
   const [windowSize, setWindowSize] = useState(() => {
     const saved = localStorage.getItem("productModalSize");
-    return saved ? JSON.parse(saved) : { width: 800, height: 600 };
+    const isCompact = typeof window !== "undefined" && window.innerWidth < 1024;
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return isCompact
+        ? {
+            width: Math.min(800, Number(parsed.width || 800), window.innerWidth - 16),
+            height: Math.min(600, Number(parsed.height || 600), window.innerHeight - 24),
+          }
+        : parsed;
+    }
+    return {
+      width: isCompact ? Math.min(800, window.innerWidth - 16) : 800,
+      height: isCompact ? Math.min(600, window.innerHeight - 24) : 600,
+    };
   });
 
 const modalRef = useRef(null);
@@ -86,8 +105,12 @@ const supplierRef = useRef(null);
   const saveButtonRef = useRef(null);
 
   // Resize state
-  const MIN_WIDTH = 600;
-  const MIN_HEIGHT = 400;
+  const MIN_WIDTH = typeof window !== "undefined" && window.innerWidth < 1024
+    ? Math.min(600, window.innerWidth - 16)
+    : 600;
+  const MIN_HEIGHT = typeof window !== "undefined" && window.innerWidth < 1024
+    ? Math.min(400, window.innerHeight - 24)
+    : 400;
   const resizeRef = useRef(null); // { direction, startX, startY, startWidth, startHeight, startLeft, startTop }
   const [isResizing, setIsResizing] = useState(false);
 
@@ -590,12 +613,12 @@ const stopDrag = () => {
         className="product-modal-dialog absolute flex flex-col"
         role="dialog" aria-modal="true" aria-labelledby="product-modal-title"
 style={{
-          left: `${windowPos.x}px`,
-          top: `${windowPos.y}px`,
-          width: `${windowSize.width}px`,
-          height: `${windowSize.height}px`,
-          minWidth: "600px",
-          minHeight: "400px",
+          left: `${typeof window !== "undefined" && window.innerWidth < 1024 ? Math.max(8, windowPos.x) : windowPos.x}px`,
+          top: `${typeof window !== "undefined" && window.innerWidth < 1024 ? Math.max(8, windowPos.y) : windowPos.y}px`,
+          width: `${typeof window !== "undefined" && window.innerWidth < 1024 ? Math.min(800, windowSize.width, window.innerWidth - 16) : windowSize.width}px`,
+          height: `${typeof window !== "undefined" && window.innerWidth < 1024 ? Math.min(windowSize.height, window.innerHeight - 24) : windowSize.height}px`,
+          minWidth: `${typeof window !== "undefined" && window.innerWidth < 1024 ? Math.min(600, window.innerWidth - 16) : 600}px`,
+          minHeight: `${typeof window !== "undefined" && window.innerWidth < 1024 ? Math.min(400, window.innerHeight - 24) : 400}px`,
           userSelect: isResizing ? "none" : undefined,
         }}
       >
@@ -625,7 +648,7 @@ style={{
         <form onSubmit={handleSubmit} className="product-modal-body flex-1 overflow-auto p-4">
           <div className="space-y-3">
             {/* Code / Barcode inline */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label htmlFor="modal-product-code" className="block text-xs font-medium mb-1 dark:text-slate-300">Product Code</label>
                 <input
@@ -696,7 +719,7 @@ style={{
             </div>
 
             {/* Name / Formulation / Pack Size (Formulation only for pharmacy shops) */}
-            <div className={`grid ${isPharmacy ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
+            <div className={`grid ${isPharmacy ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2"} gap-3`}>
               <div>
                 <label htmlFor="modal-product-name" className="block text-xs font-medium mb-1 dark:text-slate-300">Name *</label>
                 <input
@@ -792,7 +815,7 @@ style={{
             </div>
 
             {/* Category / Brand / Supplier */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-medium mb-1 dark:text-slate-300">Category</label>
 <Select

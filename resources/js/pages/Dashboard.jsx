@@ -883,12 +883,12 @@ const heroStats = [
             <label className="text-xs font-semibold dashboard-muted sm:whitespace-nowrap">To</label>
             <ModernDatePicker value={to} onChange={setTo} placeholder="End date" className="w-full min-w-0 sm:w-48" portalId="dashboard-calendar-portal" popperProps={{ strategy: "fixed" }} />
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0 sm:flex-wrap sm:gap-2 sm:ml-auto">
             {quickPresets.map((p) => (
               <button
                 key={p.label}
                 onClick={p.fn}
-                className="theme-btn-secondary inline-flex items-center justify-center min-h-10 px-3.5 py-2 text-xs font-semibold"
+                className="theme-btn-secondary shrink-0 whitespace-nowrap inline-flex items-center justify-center min-h-10 px-3.5 py-2 text-xs font-semibold"
               >
                 <span>{p.label}</span>
               </button>
@@ -898,7 +898,7 @@ const heroStats = [
       </SectionCard>
 
 {/* ===== KPI Money Cards ===== */}
-      <div className="grid grid-cols-1 sm:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 sm:gap-4">
         {kpiCards.map((k, idx) => (
           <div
             key={k.label}
@@ -912,7 +912,7 @@ const heroStats = [
               }
             }}
             title={k.path ? `Open ${k.label} page` : undefined}
-            className={`g-card dashboard-panel dashboard-kpi group min-w-0 ${idx < 2 || kpiCards.length === 4 ? "sm:col-span-3" : "sm:col-span-2"}`}
+            className={`g-card dashboard-panel dashboard-kpi group min-w-0 ${idx < 2 || kpiCards.length === 4 ? "lg:col-span-3" : "lg:col-span-2"}`}
           >
 
             <div className="p-4 sm:p-5">
@@ -1010,7 +1010,7 @@ const heroStats = [
           title="Revenue Overview"
           subtitle="Sales vs Purchases over the selected period"
           right={
-            <div className="flex items-center gap-4 text-xs font-medium text-slate-500 dark:text-slate-400">
+            <div className="hidden sm:flex items-center gap-4 text-xs font-medium text-slate-500 dark:text-slate-400">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: themeColors.primary }} />
                 Sales
@@ -1096,7 +1096,7 @@ const heroStats = [
       </SectionCard>
 
 {/* ===== Chart trio: comparison + returns trend + top brands ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Sales vs Purchases comparison bar */}
         <SectionCard>
           <CardHeader
@@ -1413,7 +1413,7 @@ const heroStats = [
 
 {/* Expiry table */}
         <div className="overflow-auto max-h-[24rem]">
-          <div className="min-w-[760px]">
+          <div className="min-w-full sm:min-w-[600px] md:min-w-[760px]">
           <table className="min-w-full text-sm">
             <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800 z-10 border-b border-slate-200 dark:border-slate-700">
               <tr className="text-left">

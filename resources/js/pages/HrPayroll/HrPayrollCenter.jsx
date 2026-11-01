@@ -746,76 +746,76 @@ export default function HrPayrollCenter() {
       </div>
 
       {/* Top Executive KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
-        <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 shadow-xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+        <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 shadow-xs min-w-0">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block truncate">
             Active Staff
           </span>
-          <div className="flex items-baseline justify-between mt-1">
-            <span className="text-2xl font-bold font-mono text-slate-900 dark:text-white">
+          <div className="flex items-baseline justify-between gap-1 mt-1">
+            <span className="text-lg sm:text-2xl font-bold font-mono text-slate-900 dark:text-white truncate">
               {overview?.active_employees ?? employees.filter((e) => e.status === "active").length}
             </span>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-slate-500 shrink-0">
               Total: {overview?.total_employees ?? employees.length}
             </span>
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
             On Leave: {overview?.on_leave_employees ?? 0}
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 shadow-xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+        <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 shadow-xs min-w-0">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block truncate">
             Attendance ({attendanceDate})
           </span>
-          <div className="flex items-baseline gap-3 mt-1 font-mono">
-            <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+          <div className="flex flex-wrap items-baseline gap-2 sm:gap-3 mt-1 font-mono">
+            <span className="text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400">
               P: {overview?.today_attendance?.present ?? 0}
             </span>
-            <span className="text-sm font-bold text-amber-600 dark:text-amber-400">
+            <span className="text-xs sm:text-sm font-bold text-amber-600 dark:text-amber-400">
               L: {overview?.today_attendance?.late ?? 0}
             </span>
-            <span className="text-sm font-bold text-rose-600 dark:text-rose-400">
+            <span className="text-xs sm:text-sm font-bold text-rose-600 dark:text-rose-400">
               A: {overview?.today_attendance?.absent ?? 0}
             </span>
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
             Unmarked: {overview?.today_attendance?.unmarked ?? 0}
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 shadow-xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+        <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 shadow-xs min-w-0">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 block truncate">
             Fixed Monthly Salary Pool
           </span>
-          <div className="text-xl font-bold font-mono text-slate-900 dark:text-white mt-1">
+          <div className="text-base sm:text-xl font-bold font-mono text-slate-900 dark:text-white mt-1 truncate">
             {fmtCurrency(overview?.monthly_fixed_payroll_pool ?? 0)}
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
             Base Salaries + Fixed Allowances
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 shadow-xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+        <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 shadow-xs min-w-0">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400 block truncate">
             Sales Commissions ({selectedPayrollMonth})
           </span>
-          <div className="text-xl font-bold font-mono text-purple-600 dark:text-purple-400 mt-1">
+          <div className="text-base sm:text-xl font-bold font-mono text-purple-600 dark:text-purple-400 mt-1 truncate">
             {fmtCurrency(overview?.monthly_commissions_total ?? 0)}
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
             Attributed Net Sales: {fmtCurrency(overview?.monthly_net_sales_attributed ?? 0)}
           </p>
         </div>
 
-        <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 shadow-xs">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+        <div className="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-3.5 shadow-xs min-w-0 col-span-2 sm:col-span-1">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400 block truncate">
             Outstanding Staff Advances
           </span>
-          <div className="text-xl font-bold font-mono text-amber-600 dark:text-amber-400 mt-1">
+          <div className="text-base sm:text-xl font-bold font-mono text-amber-600 dark:text-amber-400 mt-1 truncate">
             {fmtCurrency(overview?.total_outstanding_advances ?? 0)}
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
             Recoverable from monthly payroll
           </p>
         </div>
@@ -888,7 +888,7 @@ export default function HrPayrollCenter() {
                 placeholder="Search by name, code, phone, or designation..."
                 value={empSearch}
                 onChange={(e) => setEmpSearch(e.target.value)}
-                className="h-9 px-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-xs w-64"
+                className="h-9 px-3 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900 text-xs w-full sm:w-64"
               />
               <select
                 value={empDeptFilter}
@@ -1109,7 +1109,157 @@ export default function HrPayrollCenter() {
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+          {/* Mobile Attendance Card List (< md) */}
+          <div className="md:hidden space-y-2.5">
+            {loadingAttendance ? (
+              <div className="py-8 text-center text-xs text-slate-400">
+                Loading attendance sheet...
+              </div>
+            ) : attendanceSheet.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400">
+                No active employees found. Add employees in Tab 1 first.
+              </div>
+            ) : (
+              attendanceSheet.map((row) => (
+                <div
+                  key={row.employee_id}
+                  className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-900/50 space-y-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5 flex-wrap">
+                        <span className="truncate">{row.employee_name}</span>
+                        {row.is_marked && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/15 text-emerald-600">
+                            Saved
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-500 truncate">
+                        {row.designation} • {row.shift_name} ({row.shift_start}–{row.shift_end})
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 1-Click Status Pills */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {ATTENDANCE_STATUSES.map((st) => {
+                      const active = row.status === st.value;
+                      return (
+                        <button
+                          key={st.value}
+                          type="button"
+                          onClick={() => updateAttendanceRow(row.employee_id, "status", st.value)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                            active
+                              ? st.badge
+                              : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700"
+                          }`}
+                        >
+                          {st.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Compact Expandable Row for Check-In / Out / OT / Fine */}
+                  <details className="group pt-1 border-t border-slate-200/70 dark:border-slate-700/70">
+                    <summary className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 cursor-pointer select-none flex items-center justify-between">
+                      <span>
+                        Check-In / Out / OT / Fine
+                        {(Number(row.late_minutes) > 0 ||
+                          Number(row.overtime_hours) > 0 ||
+                          Number(row.fine_amount) > 0) && (
+                          <span className="ml-1.5 text-[10px] font-mono text-slate-500">
+                            ({row.check_in || "—"}–{row.check_out || "—"} | OT:{row.overtime_hours}h)
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-[10px] text-slate-400 group-open:rotate-180 transition-transform">
+                        ▼
+                      </span>
+                    </summary>
+                    <div className="grid grid-cols-2 gap-2 pt-2 text-[11px]">
+                      <div>
+                        <label className="block text-[10px] text-slate-500 mb-0.5">Check In</label>
+                        <input
+                          type="time"
+                          value={row.check_in || ""}
+                          onChange={(e) =>
+                            updateAttendanceRow(row.employee_id, "check_in", e.target.value)
+                          }
+                          className="w-full h-8 px-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-500 mb-0.5">Check Out</label>
+                        <input
+                          type="time"
+                          value={row.check_out || ""}
+                          onChange={(e) =>
+                            updateAttendanceRow(row.employee_id, "check_out", e.target.value)
+                          }
+                          className="w-full h-8 px-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-500 mb-0.5">Late (Mins)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={row.late_minutes}
+                          onChange={(e) =>
+                            updateAttendanceRow(row.employee_id, "late_minutes", e.target.value)
+                          }
+                          className="w-full h-8 px-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-500 mb-0.5">Overtime (Hrs)</label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0"
+                          value={row.overtime_hours}
+                          onChange={(e) =>
+                            updateAttendanceRow(row.employee_id, "overtime_hours", e.target.value)
+                          }
+                          className="w-full h-8 px-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-500 mb-0.5">Fine / Deduction</label>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={row.fine_amount}
+                          onChange={(e) =>
+                            updateAttendanceRow(row.employee_id, "fine_amount", e.target.value)
+                          }
+                          className="w-full h-8 px-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-500 mb-0.5">Notes</label>
+                        <input
+                          type="text"
+                          placeholder="Remark..."
+                          value={row.notes || ""}
+                          onChange={(e) =>
+                            updateAttendanceRow(row.employee_id, "notes", e.target.value)
+                          }
+                          className="w-full h-8 px-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </details>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
             <table className="w-full text-xs text-left">
               <thead className="bg-slate-50 dark:bg-slate-900/80 text-slate-500 dark:text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-700">
                 <tr>
@@ -1275,7 +1425,7 @@ export default function HrPayrollCenter() {
                 </label>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   disabled={generatingPayroll}
@@ -1535,7 +1685,7 @@ export default function HrPayrollCenter() {
                   Tracks cash/bank advances given to employees, direct repayments, and automatic monthly payroll deductions.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => handleOpenAdvanceModal(null, "repayment")}
@@ -1661,7 +1811,7 @@ export default function HrPayrollCenter() {
               </button>
             </div>
 
-            <div className="flex items-center gap-3 text-xs font-mono">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs font-mono">
               <div className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700">
                 Net Sales: <strong>{fmtCurrency(commReport?.summary?.total_net_sales)}</strong>
               </div>
@@ -1790,7 +1940,7 @@ export default function HrPayrollCenter() {
       {/* MODAL 1: ADD / EDIT EMPLOYEE */}
       {employeeModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-3xl w-full p-5 shadow-2xl space-y-4 my-8">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-3xl w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl space-y-4 my-4">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-3">
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 {editingEmployee
@@ -2107,7 +2257,7 @@ export default function HrPayrollCenter() {
       {/* MODAL 2: STAFF ADVANCE / REPAYMENT */}
       {advanceModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-3">
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 {advanceForm.type === "advance"
@@ -2153,7 +2303,7 @@ export default function HrPayrollCenter() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">Amount *</label>
                   <input
@@ -2177,7 +2327,7 @@ export default function HrPayrollCenter() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">Payment Method</label>
                   <select
@@ -2245,7 +2395,7 @@ export default function HrPayrollCenter() {
       {/* MODAL 3: ADJUST UNPAID PAYSLIP */}
       {editingPayslip && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-lg w-full p-5 shadow-2xl space-y-4">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-lg w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -2265,7 +2415,7 @@ export default function HrPayrollCenter() {
             </div>
 
             <form onSubmit={handleSavePayslipEdit} className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold mb-1">Basic Salary</label>
                   <input
@@ -2411,7 +2561,7 @@ export default function HrPayrollCenter() {
       {/* MODAL 4: PAY SINGLE PAYSLIP OR PAY ALL RUN */}
       {(payingPayslip || payAllRunModal) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-md w-full p-5 shadow-2xl space-y-4">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl max-w-md w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-3">
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 {payingPayslip
@@ -2518,8 +2668,8 @@ export default function HrPayrollCenter() {
       {/* MODAL 5: PRINTABLE PAYSLIP VIEW */}
       {printingPayslip && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="bg-white text-slate-900 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3 print:hidden">
+          <div className="bg-white text-slate-900 rounded-2xl max-w-xl w-full max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3 print:hidden">
               <h3 className="text-base font-bold">Employee Payslip ({printingPayslip.period_month})</h3>
               <div className="flex items-center gap-2">
                 <button
@@ -2540,8 +2690,8 @@ export default function HrPayrollCenter() {
               </div>
             </div>
 
-            <div className="border border-slate-300 rounded-xl p-5 space-y-4 text-xs">
-              <div className="flex justify-between items-start border-b border-slate-200 pb-3">
+            <div className="border border-slate-300 rounded-xl p-4 sm:p-5 space-y-4 text-xs">
+              <div className="flex flex-wrap justify-between items-start gap-2 border-b border-slate-200 pb-3">
                 <div>
                   <h2 className="text-lg font-extrabold tracking-tight">SALARY & COMMISSION SLIP</h2>
                   <p className="text-slate-500">
@@ -2560,7 +2710,7 @@ export default function HrPayrollCenter() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-lg">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-50 p-3 rounded-lg">
                 <div>
                   <span className="text-slate-500">Employee:</span>{" "}
                   <strong>{printingPayslip.employee?.name}</strong>
@@ -2582,7 +2732,7 @@ export default function HrPayrollCenter() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <div className="font-bold uppercase text-[10px] text-emerald-700 border-b pb-1">
                     Earnings & Incentives

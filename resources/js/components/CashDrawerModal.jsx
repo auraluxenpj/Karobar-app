@@ -473,7 +473,7 @@ export default function CashDrawerModal({ isOpen, onClose, onSessionUpdated }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full ${activeTab === "report" ? "max-w-4xl" : "max-w-2xl"} rounded-2xl shadow-2xl overflow-hidden border flex flex-col max-h-[90vh] transition-all ${
+        className={`w-full ${activeTab === "report" ? "max-w-4xl" : "max-w-2xl"} rounded-2xl shadow-2xl overflow-hidden border flex flex-col max-h-[92dvh] transition-all ${
           isDark ? "bg-slate-900 border-slate-700 text-slate-100" : "bg-white border-gray-200 text-gray-900"
         }`}
       >
@@ -586,7 +586,7 @@ export default function CashDrawerModal({ isOpen, onClose, onSessionUpdated }) {
         )}
 
         {/* Body */}
-        <div className="p-6 overflow-y-auto space-y-4 flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
           {/* View 1: When drawer is CLOSED -> Open Shift Form */}
           {!isOpenShift && activeTab === "overview" && (
             canOpenShift ? (
@@ -718,7 +718,7 @@ export default function CashDrawerModal({ isOpen, onClose, onSessionUpdated }) {
               </div>
 
               {/* Inflow vs Outflow grid */}
-              <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 {/* Cash Inflow */}
                 <div className={`p-3.5 rounded-xl border ${isDark ? "bg-slate-800/40 border-slate-700/60" : "bg-emerald-50/40 border-emerald-100"}`}>
                   <div className="flex items-center justify-between font-bold text-emerald-500 mb-2">
@@ -786,7 +786,7 @@ export default function CashDrawerModal({ isOpen, onClose, onSessionUpdated }) {
 
               {/* Action shortcuts */}
               {(canRecordTxn || canCloseShift) && (
-                <div className="flex items-center gap-2 pt-2">
+                <div className="flex flex-wrap items-center gap-2 pt-2">
                   {canRecordTxn && (
                     <>
                       <button

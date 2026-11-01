@@ -224,17 +224,18 @@ export default function DashboardLayout({ children }) {
     clearDockTimers();
   }, [location.pathname, clearDockTimers]);
 
-  // Close floating dock on Escape key
+  // Close floating dock or mobile sidebar on Escape key
   useEffect(() => {
-    if (!dockOpen || sidebarPinned) return;
+    if ((!dockOpen || sidebarPinned) && !mobileSidebarOpen) return;
     const onKeyDown = (e) => {
       if (e.key === "Escape") {
         setDockOpen(false);
+        setMobileSidebarOpen(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [dockOpen, sidebarPinned]);
+  }, [dockOpen, sidebarPinned, mobileSidebarOpen]);
 
   // Cleanup timers on unmount
   useEffect(() => () => clearDockTimers(), [clearDockTimers]);
@@ -322,8 +323,11 @@ export default function DashboardLayout({ children }) {
           />
           {/* Slide-in panel */}
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation menu"
             className="
-              workspace-mobile-drawer fixed inset-y-3 left-3 w-[272px] max-w-[calc(100vw-24px)]
+              workspace-mobile-drawer fixed inset-y-3 left-3 w-[286px] max-w-[calc(100dvw-24px)]
               kd-mobile-panel
               lg:hidden
             "

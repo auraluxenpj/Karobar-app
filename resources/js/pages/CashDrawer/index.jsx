@@ -169,13 +169,13 @@ function attachRunningBalance(transactions, openingBalance) {
 /** KPI card used in the 4-grid summary row. */
 function KpiCard({ label, value, sub, color = "text-slate-700 dark:text-slate-200", icon: Icon }) {
   return (
-    <GlassCard className="p-4 flex flex-col gap-1">
+    <GlassCard className="p-4 flex flex-col gap-1 min-w-0">
       <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-        {Icon && <Icon className="w-4 h-4" />}
-        {label}
+        {Icon && <Icon className="w-4 h-4 shrink-0" />}
+        <span className="truncate">{label}</span>
       </div>
-      <div className={`text-2xl font-bold ${color}`}>{value}</div>
-      {sub && <div className="text-xs text-slate-400">{sub}</div>}
+      <div className={`text-lg sm:text-2xl font-bold truncate ${color}`}>{value}</div>
+      {sub && <div className="text-xs text-slate-400 truncate">{sub}</div>}
     </GlassCard>
   );
 }
@@ -415,7 +415,7 @@ function DenominationCalculator({ onApplyTotal, formatCurrency, isDark }) {
           <p className="text-[11px] text-slate-500 dark:text-slate-400">
             Enter note counts below to automatically calculate your physical cash total:
           </p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {PKR_DENOMINATIONS.map((d) => {
               const qty = Math.max(parseFloat(counts[d.key]) || 0, 0);
               const sub = qty * d.multiplier;
@@ -612,7 +612,7 @@ function TransactionModal({ onClose, onSuccess, isDark, btnSecondary, btnDanger,
     <ModalBackdrop onClose={onClose}>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {/* Header strip */}
-        <div className={`flex items-center justify-between -mx-6 -mt-6 px-6 py-4 rounded-t-2xl ${isCashIn ? "bg-emerald-500" : "bg-red-500"}`}>
+        <div className={`flex items-center justify-between -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 px-4 sm:px-6 py-4 rounded-t-2xl ${isCashIn ? "bg-emerald-500" : "bg-red-500"}`}>
           <div className="flex items-center gap-3">
             {isCashIn
               ? <ArrowUpCircleIcon className="w-6 h-6 text-white" />
@@ -839,7 +839,7 @@ function ModalBackdrop({ onClose, children }) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 w-full max-w-md">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6 w-full max-w-md">
         {children}
       </div>
     </div>

@@ -163,6 +163,7 @@ export default function Categories() {
     if (!can.update) return toast.error("You don't have permission to edit categories.");
     setForm({ name: c.name || "" });
     setEditingId(c.id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleDelete = async (c) => {

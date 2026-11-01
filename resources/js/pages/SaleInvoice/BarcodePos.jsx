@@ -917,7 +917,7 @@ export default function BarcodePos() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col font-sans select-none transition-colors duration-150 ${
+      className={`min-h-[calc(100dvh-4rem)] lg:h-[calc(100dvh-4rem)] flex flex-col lg:overflow-hidden font-sans select-none transition-colors duration-150 ${
         isDark ? "bg-slate-950 text-slate-100" : "bg-slate-100 text-slate-800"
       }`}
     >
@@ -925,7 +925,7 @@ export default function BarcodePos() {
       {/* TOP POS HEADER BAR                                       */}
       {/* ======================================================== */}
       <header
-        className={`px-4 py-2.5 flex items-center justify-between shrink-0 border-b shadow-xs transition-colors duration-150 ${
+        className={`px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0 border-b shadow-xs transition-colors duration-150 ${
           isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
         }`}
       >
@@ -943,14 +943,14 @@ export default function BarcodePos() {
                 Hands-Free Active
               </span>
             </div>
-            <p className={`text-[11px] ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+            <p className={`hidden md:block text-[11px] ${isDark ? "text-slate-400" : "text-slate-500"}`}>
               Zero-click hardware barcode scanner active. Swipe items across your scanner beam.
             </p>
           </div>
         </div>
 
         {/* Center / Right Quick Bar */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           {/* Screen-Aware Bilingual Guide Bot (English & اردو) */}
           <GuideBotTopbarButton
             onClick={() => setGuideBotOpen(true)}
@@ -1016,7 +1016,7 @@ export default function BarcodePos() {
       {/* ======================================================== */}
       {/* MAIN DUAL-PANE POS WORKSPACE                             */}
       {/* ======================================================== */}
-      <div className="flex-1 p-3 grid grid-cols-1 lg:grid-cols-12 gap-3 min-h-0 overflow-hidden">
+      <div className="flex-1 p-3 grid grid-cols-1 lg:grid-cols-12 gap-3 min-h-0 lg:overflow-hidden">
         {/* ====================================================== */}
         {/* LEFT COLUMN: SCAN HUD & CART ITEMS (8 COLS)           */}
         {/* ====================================================== */}
@@ -1082,9 +1082,9 @@ export default function BarcodePos() {
             )}
 
             {/* Product Search & Manual Barcode Input Controls */}
-            <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0 w-full sm:w-auto">
               {/* ProductSearchInput Component Integration */}
-              <div className="w-52 sm:w-64" title="Search product by name or SKU using ProductSearchInput (F3)">
+              <div className="w-full sm:w-64" title="Search product by name or SKU using ProductSearchInput (F3)">
                 <ProductSearchInput
                   ref={productSearchRef}
                   value={null}
@@ -1098,8 +1098,8 @@ export default function BarcodePos() {
               </div>
 
               {/* Manual Barcode / SKU Entry */}
-              <form onSubmit={handleManualScanSubmit} className="flex items-center gap-1.5 shrink-0">
-                <div className="relative">
+              <form onSubmit={handleManualScanSubmit} className="flex flex-1 sm:flex-initial items-center gap-1.5 shrink-0">
+                <div className="relative flex-1 sm:flex-initial">
                   <MagnifyingGlassIcon className={`w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 ${isDark ? "text-slate-500" : "text-slate-400"}`} />
                   <input
                     ref={manualInputRef}
@@ -1107,7 +1107,7 @@ export default function BarcodePos() {
                     placeholder="Barcode/SKU (F2)…"
                     value={manualCode}
                     onChange={(e) => setManualCode(e.target.value)}
-                    className={`scanner-target w-32 sm:w-36 pl-8 pr-2.5 py-1.5 text-xs rounded-xl border focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-colors ${
+                    className={`scanner-target w-full sm:w-36 pl-8 pr-2.5 py-1.5 text-xs rounded-xl border focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-colors ${
                       isDark
                         ? "border-slate-700 bg-slate-800 text-white placeholder-slate-500"
                         : "border-slate-300 bg-slate-50 text-slate-900 placeholder-slate-400"
@@ -1127,7 +1127,7 @@ export default function BarcodePos() {
 
           {/* Cart Table Card */}
           <div
-            className={`flex-1 min-h-0 rounded-2xl border flex flex-col overflow-hidden shadow-xs transition-colors duration-150 ${
+            className={`flex-1 min-h-[280px] lg:min-h-0 rounded-2xl border flex flex-col overflow-hidden shadow-xs transition-colors duration-150 ${
               isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
             }`}
           >
@@ -1175,8 +1175,8 @@ export default function BarcodePos() {
             </div>
 
             {/* Cart Table Rows */}
-            <div className="flex-1 overflow-auto min-h-0">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="barcode-pos-items flex-1 overflow-auto min-h-0">
+              <table className="invoice-repeater-table w-full text-left text-xs border-collapse">
                 <thead
                   className={`sticky top-0 z-10 text-[11px] font-bold uppercase tracking-wider border-b ${
                     isDark
@@ -1197,7 +1197,7 @@ export default function BarcodePos() {
                 </thead>
                 <tbody className={`divide-y ${isDark ? "divide-slate-800" : "divide-slate-100"}`}>
                   {items.length === 0 ? (
-                    <tr>
+                    <tr className="barcode-pos-empty-row">
                       <td colSpan={8} className="py-16 text-center">
                         <div className="flex flex-col items-center justify-center gap-3">
                           <div className={`p-4 rounded-3xl ${isDark ? "bg-slate-800/60 text-slate-500" : "bg-slate-100 text-slate-400"}`}>
@@ -1241,7 +1241,7 @@ export default function BarcodePos() {
                       return (
                         <tr
                           key={it.uid}
-                          className={`transition-colors duration-200 ${
+                          className={`invoice-repeater-row transition-colors duration-200 ${
                             isFlashed
                               ? isDark
                                 ? "bg-emerald-950/40 ring-1 ring-inset ring-emerald-500"
@@ -1251,12 +1251,12 @@ export default function BarcodePos() {
                               : "hover:bg-slate-50/80"
                           }`}
                         >
-                          <td className={`py-2 px-3 text-center font-mono ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                          <td data-label="Item #" className={`invoice-cell-index py-2 px-3 text-center font-mono ${isDark ? "text-slate-500" : "text-slate-400"}`}>
                             {idx + 1}
                           </td>
 
                           {/* Product Info */}
-                          <td className="py-2 px-3">
+                          <td data-label="Product" className="invoice-cell-product py-2 px-3">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className={`font-bold text-xs ${isDark ? "text-white" : "text-slate-900"}`}>
                                 {it.product_name}
@@ -1326,8 +1326,8 @@ export default function BarcodePos() {
                           </td>
 
                           {/* React Select Batch Picker */}
-                          <td className="py-2 px-3">
-                            <div className="w-36">
+                          <td data-label="Batch (FEFO)" className="py-2 px-3">
+                            <div className="w-full lg:w-36">
                               <Select
                                 options={batchOptions}
                                 value={
@@ -1344,7 +1344,7 @@ export default function BarcodePos() {
                           </td>
 
                           {/* Quantity Controls */}
-                          <td className="py-2 px-3 text-center">
+                          <td data-label="Quantity" className="py-2 px-3 text-center">
                             <div className="inline-flex items-center rounded-lg border border-slate-300 dark:border-slate-700 overflow-hidden shadow-2xs">
                               <button
                                 type="button"
@@ -1381,21 +1381,21 @@ export default function BarcodePos() {
                           </td>
 
                           {/* Unit Price (Editable Override) */}
-                          <td className="py-2 px-3 text-right">
+                          <td data-label="Unit Price" className="py-2 px-3 text-right">
                             <input
                               type="number"
                               min="0"
                               step="0.01"
                               value={it.price}
                               onChange={(e) => handleUpdatePrice(it.uid, e.target.value)}
-                              className={`w-20 text-right px-1.5 py-1 text-xs font-mono font-bold rounded border focus:outline-hidden ${
+                              className={`w-full lg:w-20 text-right px-1.5 py-1 text-xs font-mono font-bold rounded border focus:outline-hidden ${
                                 isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
                               }`}
                             />
                           </td>
 
                           {/* Line-Item Discount % */}
-                          <td className="py-2 px-3 text-right">
+                          <td data-label="Disc %" className="py-2 px-3 text-right">
                             <input
                               type="number"
                               min="0"
@@ -1404,19 +1404,19 @@ export default function BarcodePos() {
                               value={it.item_discount_percentage || ""}
                               placeholder="0"
                               onChange={(e) => handleUpdateItemDiscount(it.uid, e.target.value)}
-                              className={`w-16 text-right px-1.5 py-1 text-xs font-mono font-bold rounded border focus:outline-hidden ${
+                              className={`w-full lg:w-16 text-right px-1.5 py-1 text-xs font-mono font-bold rounded border focus:outline-hidden ${
                                 isDark ? "bg-slate-900 border-slate-700 text-white" : "bg-white border-slate-300 text-slate-900"
                               }`}
                             />
                           </td>
 
                           {/* Subtotal */}
-                          <td className="py-2 px-3 text-right font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                          <td data-label="Sub Total" className="invoice-cell-subtotal py-2 px-3 text-right font-bold font-mono text-emerald-600 dark:text-emerald-400">
                             Rs. {it.sub_total.toFixed(2)}
                           </td>
 
                           {/* Delete Item */}
-                          <td className="py-2 px-2 text-center">
+                          <td className="invoice-cell-del py-2 px-2 text-center">
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(it.uid)}
@@ -1436,7 +1436,7 @@ export default function BarcodePos() {
 
             {/* Bottom Hotkey Bar in Cart Card */}
             <div
-              className={`px-4 py-2 border-t flex items-center justify-between text-[11px] shrink-0 ${
+              className={`px-4 py-2 border-t hidden lg:flex items-center justify-between text-[11px] shrink-0 ${
                 isDark ? "bg-slate-900 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-600"
               }`}
             >
@@ -1464,7 +1464,7 @@ export default function BarcodePos() {
         {/* ====================================================== */}
         {/* RIGHT COLUMN: TOTALS, CUSTOMER & TENDER (4 COLS)       */}
         {/* ====================================================== */}
-        <div className="lg:col-span-4 flex flex-col min-h-0">
+        <div id="pos-tender-panel" className="lg:col-span-4 flex flex-col min-h-0">
           <div
             className={`flex-1 rounded-2xl border p-4 flex flex-col justify-between overflow-y-auto shadow-xs transition-colors duration-150 ${
               isDark ? "bg-slate-900/90 border-slate-800" : "bg-white border-slate-200"
@@ -1954,6 +1954,57 @@ export default function BarcodePos() {
       </div>
 
       {/* ======================================================== */}
+      {/* MOBILE STICKY BOTTOM SUMMARY & CHECKOUT BAR              */}
+      {/* ======================================================== */}
+      <div
+        className={`lg:hidden sticky bottom-0 z-30 px-3 py-2.5 border-t flex items-center justify-between gap-2 shadow-lg ${
+          isDark ? "bg-slate-900/95 border-slate-800 text-white backdrop-blur-md" : "bg-white/95 border-slate-200 text-slate-900 backdrop-blur-md"
+        }`}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="text-xs">
+            <span className={`block text-[10px] font-bold uppercase ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+              Items
+            </span>
+            <span className="font-black font-mono">
+              {totals.totalItems} ({totals.totalUnits}u)
+            </span>
+          </div>
+          <div className={`h-6 w-px ${isDark ? "bg-slate-800" : "bg-slate-200"}`} />
+          <div className="min-w-0">
+            <span className={`block text-[10px] font-bold uppercase ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+              Net Total
+            </span>
+            <span className="text-sm font-black font-mono text-blue-600 dark:text-blue-400 truncate block">
+              Rs. {totals.netPayableAfterCredit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => document.getElementById("pos-tender-panel")?.scrollIntoView({ behavior: "smooth" })}
+            className={`px-3 py-2 rounded-xl border text-xs font-bold transition-colors ${
+              isDark
+                ? "border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
+                : "border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            Tender
+          </button>
+          <button
+            type="button"
+            onClick={handleCompleteSale}
+            disabled={!canCreatePosSale || isSubmitting || items.length === 0}
+            className="px-3.5 py-2 rounded-xl text-xs font-black text-white bg-gradient-to-r from-emerald-600 to-teal-600 shadow-sm disabled:opacity-40 flex items-center gap-1"
+          >
+            <CheckCircleIcon className="w-4 h-4" />
+            <span>Complete Sale</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ======================================================== */}
       {/* COMPLETED SALE SUMMARY MODAL (RECEIPT PROMPT)             */}
       {/* ======================================================== */}
       {completedSale && (
@@ -2005,7 +2056,7 @@ export default function BarcodePos() {
             </div>
 
             {/* Action Buttons */}
-            <div className="grid grid-cols-3 gap-2 pt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
               <Link
                 to={`/sale-invoices/${completedSale.invoice_id}`}
                 target="_blank"
@@ -2077,7 +2128,7 @@ export default function BarcodePos() {
                 {parkedCarts.map((p) => (
                   <div
                     key={p.id}
-                    className={`p-3 rounded-2xl border flex items-center justify-between ${
+                    className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-2 ${
                       isDark ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-200"
                     }`}
                   >

@@ -588,7 +588,7 @@ export default function BatchExpiryTracking() {
       </div>
 
       {/* KPI Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {/* Card 1: Expired Stock */}
         <div
           onClick={() => setStatusFilter("expired")}
@@ -693,7 +693,7 @@ export default function BatchExpiryTracking() {
       {/* Main Content Workspace */}
       <div className={`rounded-2xl border overflow-hidden ${isDark ? "bg-slate-800/80 border-slate-700" : "bg-white border-slate-200 shadow-xs"}`}>
         {/* Status Filter Tabs styled as Theme Buttons */}
-        <div className={`flex flex-wrap items-center gap-2 p-3.5 border-b text-xs font-semibold ${isDark ? "border-slate-700 bg-slate-800/60" : "border-slate-200 bg-slate-50/70"}`}>
+        <div className={`flex overflow-x-auto whitespace-nowrap no-scrollbar sm:flex-wrap items-center gap-2 p-3.5 pb-2.5 sm:pb-3.5 border-b text-xs font-semibold ${isDark ? "border-slate-700 bg-slate-800/60" : "border-slate-200 bg-slate-50/70"}`}>
           {[
             { id: "all", label: "All Active Batches", count: summary.total_batches_tracked },
             { id: "expired", label: "🔴 Expired", count: summary.total_expired_batches },

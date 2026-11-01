@@ -270,7 +270,7 @@ export default function SuppliersIndex() {
         </div>
 
         {/* Search & React Select Filter Bar */}
-        <div className="mt-3 grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+        <div className="mt-3 px-4 pb-4 sm:px-6 sm:pb-5 grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
           <div className="md:col-span-6 relative">
             <MagnifyingGlassIcon className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <GlassInput
@@ -627,7 +627,7 @@ export default function SuppliersIndex() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div className="p-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50/70 dark:bg-slate-900/40">
                       <span className="text-[10px] uppercase tracking-wider text-gray-400 block">
                         Current Payable

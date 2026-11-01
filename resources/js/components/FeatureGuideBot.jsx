@@ -1410,7 +1410,7 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
   return (
     <div
       data-roaming-cube="true"
-      className="fixed bottom-0 left-0 z-40 pointer-events-none select-none"
+      className="hidden md:block fixed bottom-0 left-0 z-40 pointer-events-none select-none"
       style={{
         transform: `translate3d(${state.x}px, -${state.bottomOffset}px, 0)`,
         transitionProperty: "transform",
@@ -3884,7 +3884,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   isUr ? "کوئی بھی صفحہ تلاش کریں..." : "Search any screen or feature..."
                 }
                 aria-label="Search screens"
-                className={`w-full h-9 pl-9 pr-3 rounded-xl border text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full h-9 pl-9 pr-3 rounded-xl border text-base sm:text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-blue-500 ${
                   isDark
                     ? "bg-slate-800 border-slate-700 text-white placeholder-slate-400"
                     : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"
@@ -4028,7 +4028,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                       ? "مثلاً: Panadol یا Augmentin (اختیاری)..."
                       : "e.g. Panadol or Augmentin (optional)..."
                   }
-                  className={`w-full h-9 px-3 rounded-xl border text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 ${
+                  className={`w-full h-9 px-3 rounded-xl border text-base sm:text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 ${
                     isDark
                       ? "bg-slate-800 border-slate-700 text-white placeholder-slate-500"
                       : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"
@@ -4677,7 +4677,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   ? "کچھ بھی پوچھیں (مثلاً: پرچیز آرڈر کیسے بنائیں؟)..."
                   : "Ask Cube anything (e.g. how to make purchase order)..."
               }
-              className={`flex-1 h-10 px-3.5 text-xs sm:text-[13px] font-medium rounded-xl border focus:outline-hidden focus:ring-2 focus:ring-blue-500 ${
+              className={`flex-1 h-10 px-3.5 text-base sm:text-[13px] font-medium rounded-xl border focus:outline-hidden focus:ring-2 focus:ring-blue-500 ${
                 isDark
                   ? "bg-slate-800 border-slate-700 text-white placeholder-slate-400"
                   : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"

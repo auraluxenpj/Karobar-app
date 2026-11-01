@@ -93,7 +93,7 @@ export default function PaymentReceiptModal({
         >
           {/* Modal Header */}
           <div
-            className={`flex items-center justify-between px-6 py-4 border-b no-print ${
+            className={`flex flex-wrap gap-2 items-center justify-between px-4 sm:px-6 py-4 border-b no-print ${
               isDark
                 ? "border-slate-700/80 bg-slate-800/50"
                 : "border-gray-200 bg-gray-50"
@@ -117,7 +117,7 @@ export default function PaymentReceiptModal({
                 Payment Receipt Voucher
               </span>
             </div>
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setShareOpen(true)}
@@ -155,7 +155,7 @@ export default function PaymentReceiptModal({
           <div
             id="payment-printable-voucher"
             ref={printAreaRef}
-            className={`p-8 space-y-6 print:bg-white print:text-black ${
+            className={`p-4 sm:p-8 space-y-6 print:bg-white print:text-black ${
               isDark ? "bg-slate-900 text-slate-100" : "bg-white text-gray-900"
             }`}
           >
@@ -329,6 +329,7 @@ export default function PaymentReceiptModal({
                   No direct invoice allocations. 100% of payment retained as unapplied credit / advance.
                 </div>
               ) : (
+                <div className="overflow-x-auto">
                 <table
                   className={`w-full text-xs text-left border-collapse border print:border-gray-300 ${
                     isDark ? "border-slate-700" : "border-gray-200"
@@ -420,6 +421,7 @@ export default function PaymentReceiptModal({
                     })}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
 

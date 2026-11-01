@@ -1931,7 +1931,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="flex flex-wrap items-center gap-2">
               {!saleId && (
                 <InvoiceDraftIndicator
                   saveStatus={draftHook.saveStatus}
@@ -1945,7 +1945,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
               )}
 
               {/* Invoice Type Segmented Control */}
-              <div className="sale-type-toggle flex items-center" role="radiogroup" aria-label="Invoice payment type">
+              <div className="sale-type-toggle flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Invoice payment type">
                 {["debit", "credit"].map((type) => {
                   const active = form.invoice_type === type;
                   return (
@@ -2273,7 +2273,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                 }`}
               >
                 <table
-                  className="w-full min-w-[920px] text-[11px] table-fixed border-collapse"
+                  className="invoice-repeater-table w-full min-w-[920px] text-[11px] lg:table-fixed border-collapse"
                   autoComplete="off"
                 >
                   <thead
@@ -2292,65 +2292,65 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                         DEL
                       </th>
                       <th className="w-7 text-center sale-th-readonly">#</th>
-                      <th className="w-[22%] sale-th-editable">Product *</th>
-                      <th className="w-12 text-center sale-th-readonly" title="Pack Size (Auto)">
+                      <th className="min-w-[200px] w-[22%] sale-th-editable">Product *</th>
+                      <th className="min-w-[76px] w-12 text-center sale-th-readonly" title="Pack Size (Auto)">
                         PSize
                       </th>
-                      <th className="w-[11%] sale-th-editable">Batch</th>
-                      <th className="w-21 text-center sale-th-readonly" title="Expiry Date (Auto)">
+                      <th className="min-w-[130px] w-[11%] sale-th-editable">Batch</th>
+                      <th className="min-w-[76px] w-21 text-center sale-th-readonly" title="Expiry Date (Auto)">
                         Expiry
                       </th>
                       <th
-                        className="w-23 text-center sale-th-readonly"
+                        className="min-w-[76px] w-23 text-center sale-th-readonly"
                         title="Available Stock in Packs & Units (Auto)"
                       >
                         Avail (P/U)
                       </th>
                       <th
-                        className="w-15 text-center sale-th-editable"
+                        className="min-w-[76px] w-15 text-center sale-th-editable"
                         title="Number of Full Packs"
                       >
                         Pack.Q
                       </th>
                       <th
-                        className="w-15 text-center sale-th-editable"
+                        className="min-w-[76px] w-15 text-center sale-th-editable"
                         title="Number of Loose Units"
                       >
                         Unit.Q
                       </th>
                       <th
-                        className="w-14 text-center sale-th-editable"
+                        className="min-w-[76px] w-14 text-center sale-th-editable"
                         title="Free Bonus Packs (deducted from stock, not billed)"
                       >
                         Pack.B
                       </th>
                       <th
-                        className="w-14 text-center sale-th-editable"
+                        className="min-w-[76px] w-14 text-center sale-th-editable"
                         title="Free Bonus Loose Units (deducted from stock, not billed)"
                       >
                         Unit.B
                       </th>
                       <th
-                        className="w-15 text-center sale-th-readonly"
+                        className="min-w-[76px] w-15 text-center sale-th-readonly"
                         title="Total Billed Units (Pack.Q × PSize + Unit.Q)"
                       >
                         Tot.U
                       </th>
                       <th
-                        className="w-21 text-center sale-th-editable"
+                        className="min-w-[76px] w-21 text-center sale-th-editable"
                         title="Wholesale Pack Price (Synced with Unit Price)"
                       >
                         Pack.P *
                       </th>
                       <th
-                        className="w-20 text-center sale-th-editable"
+                        className="min-w-[76px] w-20 text-center sale-th-editable"
                         title="Wholesale Unit Price (Synced with Pack Price)"
                       >
                         Unit.P *
                       </th>
-                      <th className="w-15 text-center sale-th-editable">Disc %</th>
+                      <th className="min-w-[76px] w-15 text-center sale-th-editable">Disc %</th>
                       <th
-                        className="w-24 text-center sale-th-readonly"
+                        className="min-w-[76px] w-24 text-center sale-th-readonly"
                         title="Row Sub Total (Auto)"
                       >
                         Sub Total
@@ -2371,11 +2371,11 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           id={invoiceErrors.rowId(i)}
                           onFocusCapture={() => setFocusedRowIndex(i)}
                           aria-invalid={invoiceErrors.rowMessages(i).length > 0 || undefined}
-                          className={`${
+                          className={`invoice-repeater-row ${
                             invoiceErrors.rowMessages(i).length ? "invoice-row-invalid" : ""
                           } border-b ${isDark ? "border-slate-700/80" : "border-gray-100"}`}
                         >
-                          <td className="text-center">
+                          <td className="invoice-cell-del text-center">
                             <button
                               type="button"
                               tabIndex={-1}
@@ -2388,7 +2388,8 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                             </button>
                           </td>
                           <td
-                            className={`text-center font-semibold text-[11px] ${
+                            data-label="Item #"
+                            className={`invoice-cell-index text-center font-semibold text-[11px] ${
                               isDark ? "text-slate-400" : "text-gray-500"
                             }`}
                           >
@@ -2396,7 +2397,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Product */}
-                          <td>
+                          <td data-label="Product *" className="invoice-cell-product">
                             <InvoiceRowError messages={invoiceErrors.rowMessages(i)} />
                             <div ref={(el) => (productRefs.current[i] = el)}>
                               <ProductSearchInput
@@ -2422,7 +2423,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Pack Size */}
-                          <td className="text-center">
+                          <td data-label="Pack Size" className="text-center">
                             <input
                               type="text"
                               readOnly
@@ -2435,7 +2436,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Batch */}
-                          <td>
+                          <td data-label="Batch">
                             <div ref={(el) => (batchRefs.current[i] = el)}>
                               <BatchSearchInput
                                 value={
@@ -2474,7 +2475,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Expiry */}
-                          <td className="text-center">
+                          <td data-label="Expiry" className="text-center">
                             <input
                               type="text"
                               value={it.expiry ?? ""}
@@ -2487,7 +2488,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Avail (P/U) */}
-                          <td className="text-center">
+                          <td data-label="Avail (P/U)" className="text-center">
                             <input
                               type="text"
                               readOnly
@@ -2505,7 +2506,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Pack Qty */}
-                          <td className="text-center">
+                          <td data-label="Pack Qty" className="text-center">
                             <input
                               ref={(el) => (packQtyRefs.current[i] = el)}
                               type="text"
@@ -2528,7 +2529,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Unit Qty */}
-                          <td className="text-center">
+                          <td data-label="Unit Qty" className="text-center">
                             <input
                               ref={(el) => (unitQtyRefs.current[i] = el)}
                               type="text"
@@ -2551,7 +2552,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Pack Bonus */}
-                          <td className="text-center">
+                          <td data-label="Pack Bonus" className="text-center">
                             <input
                               ref={(el) => (packBonusRefs.current[i] = el)}
                               type="text"
@@ -2576,7 +2577,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Unit Bonus */}
-                          <td className="text-center">
+                          <td data-label="Unit Bonus" className="text-center">
                             <input
                               ref={(el) => (unitBonusRefs.current[i] = el)}
                               type="text"
@@ -2601,7 +2602,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Total Billed Units (Read-Only) */}
-                          <td className="text-center">
+                          <td data-label="Total Units" className="text-center">
                             <input
                               type="text"
                               readOnly
@@ -2626,7 +2627,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Pack Wholesale Price (Editable) */}
-                          <td className="text-center">
+                          <td data-label="Pack Price *" className="text-center">
                             <div className="relative">
                               <input
                                 ref={(el) => (packPriceRefs.current[i] = el)}
@@ -2673,7 +2674,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Unit Wholesale Price (Editable) */}
-                          <td className="text-center">
+                          <td data-label="Unit Price *" className="text-center">
                             <input
                               ref={(el) => (priceRefs.current[i] = el)}
                               type="text"
@@ -2705,7 +2706,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Disc % */}
-                          <td className="text-center">
+                          <td data-label="Disc %" className="text-center">
                             <input
                               ref={(el) => (discRefs.current[i] = el)}
                               type="text"
@@ -2740,7 +2741,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           </td>
 
                           {/* Sub Total */}
-                          <td className="text-center">
+                          <td data-label="Sub Total" className="invoice-cell-subtotal text-center">
                             <input
                               type="text"
                               readOnly
@@ -2752,7 +2753,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                             />
                           </td>
 
-                          <td className="text-center">
+                          <td className="invoice-cell-add text-center">
                             <button
                               type="button"
                               onClick={addRow}
@@ -2773,7 +2774,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
           </div>
 
           {/* BOTTOM: Wholesale Summary Footer */}
-          <div className="shrink-0 sticky bottom-0 z-10">
+          <div id="wholesale-summary-footer" className="shrink-0 lg:sticky lg:bottom-0 z-10">
             <div
               className={`sale-entry-summary rounded-xl overflow-hidden border shadow-[0_-4px_16px_-6px_rgba(0,0,0,0.14)] ${
                 isDark
@@ -2805,7 +2806,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-4 gap-1.5 items-end">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 items-end">
                       <div>
                         <label className="block text-[9px] font-semibold uppercase tracking-wide text-gray-500 dark:text-slate-400 mb-0.5">
                           Disc %
@@ -3112,6 +3113,51 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Mobile Sticky Bottom Bar */}
+          <div
+            className={`lg:hidden sticky bottom-0 z-20 px-3 py-2 rounded-xl border flex items-center justify-between gap-2 shadow-lg ${
+              isDark
+                ? "bg-slate-800/95 border-slate-700 text-slate-100 backdrop-blur-md"
+                : "bg-white/95 border-gray-200 text-gray-900 backdrop-blur-md"
+            }`}
+          >
+            <div>
+              <span className="block text-[9px] font-bold uppercase tracking-wider text-gray-400 dark:text-slate-400">
+                Net Payable
+              </span>
+              <span
+                className="text-sm font-black font-mono"
+                style={{ color: themeColors.primary }}
+              >
+                Rs. {form.total ?? 0}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  document
+                    .getElementById("wholesale-summary-footer")
+                    ?.scrollIntoView({ behavior: "smooth" })
+                }
+                className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-bold ${
+                  isDark
+                    ? "border-slate-600 bg-slate-700 text-slate-200"
+                    : "border-gray-300 bg-gray-100 text-gray-700"
+                }`}
+              >
+                Tender
+              </button>
+              <button
+                type="submit"
+                className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all duration-200 ${btnPrimary.className}`}
+                style={btnPrimary.style}
+              >
+                {saleId ? "Update" : "Save"}
+              </button>
             </div>
           </div>
         </div>

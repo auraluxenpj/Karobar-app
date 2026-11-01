@@ -190,7 +190,7 @@ export default function StocktakeReview() {
   return (
     <div className="space-y-5 px-1">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Link
           to={`/stocktake-sessions/${id}`}
           className={`p-2 rounded-lg transition-colors ${
@@ -266,7 +266,7 @@ export default function StocktakeReview() {
       </div>
 
       {/* Surplus / Shortage breakdown */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <GlassCard className={`p-4 border-l-4 border-emerald-500`}>
           <div className="flex items-center gap-2 mb-1">
             <ArrowTrendingUpIcon className="w-4 h-4 text-emerald-500" />
@@ -298,6 +298,7 @@ export default function StocktakeReview() {
             Discrepancies ({discrepancyItems.length})
           </h2>
           <GlassCard className="overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className={`border-b text-xs font-semibold uppercase tracking-wide ${
@@ -411,6 +412,7 @@ export default function StocktakeReview() {
                 })}
               </tbody>
             </table>
+            </div>
           </GlassCard>
         </div>
       )}
@@ -453,7 +455,7 @@ export default function StocktakeReview() {
 
       {/* Bottom finalize CTA */}
       {!isReadonly && (
-        <div className={`sticky bottom-4 flex items-center justify-between gap-4 px-5 py-4 rounded-2xl shadow-xl ${
+        <div className={`sticky bottom-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 px-5 py-4 rounded-2xl shadow-xl ${
           isDark ? "bg-slate-800 border border-slate-700" : "bg-white border border-slate-200"
         }`}>
           <div className={`text-sm ${isDark ? "text-slate-300" : "text-slate-600"}`}>

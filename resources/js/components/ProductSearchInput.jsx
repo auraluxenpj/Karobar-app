@@ -54,20 +54,31 @@ const triggerRef = useRef(null);
     const resizeRef = useRef(null);
     const [isResizing, setIsResizing] = useState(false);
 
-const MIN_WIDTH = 640;
-    const MIN_HEIGHT = 420;
+const MIN_WIDTH = typeof window !== "undefined" && window.innerWidth < 1024
+      ? Math.min(640, window.innerWidth - 16)
+      : 640;
+    const MIN_HEIGHT = typeof window !== "undefined" && window.innerWidth < 1024
+      ? Math.min(420, window.innerHeight - 24)
+      : 420;
     const PREF_KEY_POS = "productSearchModalPos";
     const PREF_KEY_SIZE = "productSearchModalSize";
 
     const [windowPos, setWindowPos] = useState(() => {
-      const width = 960;
-      const height = 600;
+      const isCompact = typeof window !== "undefined" && window.innerWidth < 1024;
+      const width = isCompact ? Math.min(960, window.innerWidth - 16) : 960;
+      const height = isCompact ? Math.min(600, window.innerHeight - 24) : 600;
       return {
-        x: (window.innerWidth - width) / 2,
-        y: Math.max((window.innerHeight - height) / 2, 10),
+        x: Math.max(8, (window.innerWidth - width) / 2),
+        y: Math.max(8, (window.innerHeight - height) / 2),
       };
     });
-    const [windowSize, setWindowSize] = useState({ width: 960, height: 600 });
+    const [windowSize, setWindowSize] = useState(() => {
+      const isCompact = typeof window !== "undefined" && window.innerWidth < 1024;
+      return {
+        width: isCompact ? Math.min(960, window.innerWidth - 16) : 960,
+        height: isCompact ? Math.min(600, window.innerHeight - 24) : 600,
+      };
+    });
 
     // Load saved modal size & position from DB preferences lazily when modal opens
     useEffect(() => {
@@ -75,18 +86,21 @@ const MIN_WIDTH = 640;
       let cancelled = false;
       loadSharedModalPreferences().then((prefs) => {
         if (cancelled || !prefs) return;
+        const isCompact = typeof window !== "undefined" && window.innerWidth < 1024;
         const savedSize = prefs[PREF_KEY_SIZE];
         const savedPos = prefs[PREF_KEY_POS];
         if (savedSize && Number(savedSize.width) && Number(savedSize.height)) {
+          const rawW = Math.max(MIN_WIDTH, Number(savedSize.width));
+          const rawH = Math.max(MIN_HEIGHT, Number(savedSize.height));
           setWindowSize({
-            width: Math.max(MIN_WIDTH, Number(savedSize.width)),
-            height: Math.max(MIN_HEIGHT, Number(savedSize.height)),
+            width: isCompact ? Math.min(960, rawW, window.innerWidth - 16) : rawW,
+            height: isCompact ? Math.min(600, rawH, window.innerHeight - 24) : rawH,
           });
         }
         if (savedPos && savedPos.x != null && savedPos.y != null) {
           setWindowPos({
-            x: Number(savedPos.x),
-            y: Number(savedPos.y),
+            x: isCompact ? Math.max(8, Number(savedPos.x)) : Number(savedPos.x),
+            y: isCompact ? Math.max(8, Number(savedPos.y)) : Number(savedPos.y),
           });
         }
       });
@@ -519,12 +533,12 @@ const stopResize = () => {
                 className="product-search-dialog absolute flex flex-col overflow-hidden"
                 role="dialog" aria-modal="true" aria-label="Search products"
                 style={{
-                  left: `${windowPos.x}px`,
-                  top: `${windowPos.y}px`,
-                  width: `${windowSize.width}px`,
-                  height: `${windowSize.height}px`,
-                  minWidth: `${MIN_WIDTH}px`,
-                  minHeight: `${MIN_HEIGHT}px`,
+                  left: `${typeof window !== "undefined" && window.innerWidth < 1024 ? Math.max(8, windowPos.x) : windowPos.x}px`,
+                  top: `${typeof window !== "undefined" && window.innerWidth < 1024 ? Math.max(8, windowPos.y) : windowPos.y}px`,
+                  width: `${typeof window !== "undefined" && window.innerWidth < 1024 ? Math.min(960, windowSize.width, window.innerWidth - 16) : windowSize.width}px`,
+                  height: `${typeof window !== "undefined" && window.innerWidth < 1024 ? Math.min(600, windowSize.height, window.innerHeight - 24) : windowSize.height}px`,
+                  minWidth: `${typeof window !== "undefined" && window.innerWidth < 1024 ? Math.min(640, window.innerWidth - 16) : MIN_WIDTH}px`,
+                  minHeight: `${typeof window !== "undefined" && window.innerWidth < 1024 ? Math.min(420, window.innerHeight - 24) : MIN_HEIGHT}px`,
                   userSelect: isResizing ? "none" : undefined,
                 }}
               >
@@ -549,7 +563,7 @@ const stopResize = () => {
                     autoCorrect="off"
                     autoCapitalize="off"
                     spellCheck={false}
-                    className={`flex-1 bg-transparent border-0 outline-hidden placeholder:text-slate-400 dark:placeholder:text-slate-500 text-[1em] text-slate-900 dark:text-slate-100 ${
+                    className={`flex-1 bg-transparent border-0 outline-hidden placeholder:text-slate-400 dark:placeholder:text-slate-500 text-base sm:text-sm h-10 sm:h-9 text-slate-900 dark:text-slate-100 ${
                       isInvalidInput ? "animate-shake" : ""
                     }`}
                     autoFocus

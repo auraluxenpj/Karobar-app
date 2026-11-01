@@ -969,7 +969,7 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
         </div>
 
         {/* Compact Pagination */}
-        <div className="px-3 py-2 flex items-center justify-between border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 text-xs">
+        <div className="px-3 py-2 flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 text-xs">
           <span className="text-gray-500 dark:text-gray-400">
             Page {page} of {lastPage} ({total} total)
           </span>

@@ -676,7 +676,7 @@ export default function CreateStockDisposal() {
         {/* Line Items Table */}
         <GlassCard className="overflow-hidden">
           <div
-            className={`flex items-center justify-between px-5 py-3.5 border-b ${
+            className={`flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 border-b ${
               isDark ? "border-slate-700 bg-slate-800/40" : "border-gray-200 bg-gray-50"
             }`}
           >
@@ -894,7 +894,7 @@ export default function CreateStockDisposal() {
               </label>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => navigate("/stock-disposals")}

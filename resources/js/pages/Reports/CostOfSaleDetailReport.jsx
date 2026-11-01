@@ -145,8 +145,16 @@ export default function CostOfSaleDetailReport() {
       });
       const blob = new Blob([res.data], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
-      window.open(url, "_blank");
-      URL.revokeObjectURL(url);
+      const win = window.open(url, "_blank");
+      if (!win) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `cost-of-sale-detail-${fromDate || "report"}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (e) {
       console.error(e);
       toast.error("Failed to generate PDF");

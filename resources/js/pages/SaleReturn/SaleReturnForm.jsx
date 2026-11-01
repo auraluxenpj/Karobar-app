@@ -1336,7 +1336,7 @@ const handleSelectChange = async (field, value) => {
 
   return (
     <div className="relative">
-      <form className={`sale-entry sale-entry-form sale-return-form h-[calc(100vh-130px)] flex flex-col ${isDark ? "bg-slate-900" : "bg-white"}`} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false}>
+      <form className={`sale-entry sale-entry-form sale-return-form h-auto lg:h-[calc(100dvh-130px)] flex flex-col ${isDark ? "bg-slate-900" : "bg-white"}`} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false}>
         <InvoiceErrorSummary errors={invoiceErrors} />
         {/* ===== HEADER ===== */}
         <div className={`sale-entry-header shrink-0 sticky top-0 z-20 border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
@@ -1390,7 +1390,7 @@ const handleSelectChange = async (field, value) => {
           <div className="sale-entry-details px-3 py-2">
             <div className="grid grid-cols-12 gap-2 items-end">
               {/* Posted Number */}
-              <div className="col-span-2">
+              <div className="col-span-6 sm:col-span-3 lg:col-span-2">
                 <label className="block text-[9px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Posted #</label>
                 <input
                   type="text"
@@ -1405,7 +1405,7 @@ const handleSelectChange = async (field, value) => {
               </div>
 
               {/* Date */}
-              <div className="col-span-2">
+              <div className="col-span-6 sm:col-span-3 lg:col-span-2">
                 <label className="block text-[9px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Date</label>
                 <input
                   type="date"
@@ -1418,7 +1418,7 @@ const handleSelectChange = async (field, value) => {
               </div>
 
               {/* Customer trigger button */}
-              <div className="col-span-4">
+              <div className="col-span-12 sm:col-span-6 lg:col-span-4">
                 <label className="block text-[9px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Customer *</label>
                 <button
                   type="button"
@@ -1443,7 +1443,7 @@ const handleSelectChange = async (field, value) => {
               </div>
 
               {/* Sale Invoice trigger button */}
-              <div className="col-span-4">
+              <div className="col-span-12 sm:col-span-6 lg:col-span-4">
                 <label className="block text-[9px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Sale Invoice (optional)</label>
                 <button
                   type="button"
@@ -1470,11 +1470,11 @@ const handleSelectChange = async (field, value) => {
           </div>
         </div>
 
-        <div className={`sale-entry-workspace flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_280px] gap-2 px-2 py-2 overflow-hidden ${isDark ? "bg-slate-900" : "bg-white"}`}>
+        <div className={`sale-entry-workspace flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_280px] gap-2 px-2 py-2 overflow-visible lg:overflow-hidden ${isDark ? "bg-slate-900" : "bg-white"}`}>
         {/* ITEMS */}
         <div className={`sale-entry-items flex-1 min-h-0 overflow-auto border-2 rounded-sm relative ${isDark ? "border-slate-700 bg-slate-800" : "border-gray-200 bg-white"}`}>
           <h2 className={`text-xs font-bold mb-1 ${isDark ? "text-slate-300" : "text-gray-700"}`}>Items</h2>
-          <table className="w-full min-w-[560px] text-[11px] table-fixed border-collapse" autoComplete="off">
+          <table className="invoice-repeater-table w-full min-w-[560px] text-[11px] lg:table-fixed border-collapse" autoComplete="off">
               <thead className={`sticky top-0 z-20 ${isDark ? "bg-slate-800/90 backdrop-blur-xs border-slate-700" : "bg-white/80 backdrop-blur-xs border-gray-200/70"} border-b`}>
                 <tr className="[&>th]:py-1 [&>th]:px-1 [&>th]:text-left">
                   <th className={`w-7 text-center ${isDark ? "text-rose-400" : "text-red-600"}`}>DEL</th>
@@ -1497,8 +1497,8 @@ const handleSelectChange = async (field, value) => {
                   ? toNum(item.unit_return_quantity) > toNum(item.unit_sale_quantity)
                   : false;
                 return (
-                  <tr key={item.id} id={invoiceErrors.rowId(i)} aria-invalid={invoiceErrors.rowMessages(i).length > 0 || undefined} className={`${invoiceErrors.rowMessages(i).length ? "invoice-row-invalid" : ""} text-center ${isDark ? "hover:bg-slate-700/50" : "hover:bg-gray-50"}`}>
-                    <td className="text-center">
+                  <tr key={item.id} id={invoiceErrors.rowId(i)} aria-invalid={invoiceErrors.rowMessages(i).length > 0 || undefined} className={`invoice-repeater-row ${invoiceErrors.rowMessages(i).length ? "invoice-row-invalid" : ""} text-center ${isDark ? "hover:bg-slate-700/50" : "hover:bg-gray-50"}`}>
+                    <td className="invoice-cell-del text-center">
                       <button
                         type="button"
                         onClick={() => removeItem(i)} aria-label="Remove item" title="Remove item"
@@ -1507,8 +1507,8 @@ const handleSelectChange = async (field, value) => {
                         <TrashIcon aria-hidden="true" />
                       </button>
                     </td>
-                    <td className="text-center">{i + 1}</td>
-                    <td>
+                    <td data-label="Item #" className="invoice-cell-index text-center">{i + 1}</td>
+                    <td data-label="Product *" className="invoice-cell-product">
                       <InvoiceRowError messages={invoiceErrors.rowMessages(i)} />
                     <div ref={(el) => (productRefs.current[i] = el)}>
                         <ProductSearchInput
@@ -1520,8 +1520,8 @@ const handleSelectChange = async (field, value) => {
                         />
                       </div>
                     </td>
-                    <td className="text-center"><input type="text" readOnly value={products.find(p => eqId(p.id, item.product_id))?.pack_size ?? ""} className={`w-full h-6 border rounded px-1 text-center ${isDark ? "border-slate-600 bg-slate-700 text-slate-300" : "border-gray-200 bg-gray-100 text-gray-700"}`} /></td>
-                    <td className="text-center">
+                    <td data-label="Pack Size" className="text-center"><input type="text" readOnly value={products.find(p => eqId(p.id, item.product_id))?.pack_size ?? ""} className={`w-full h-6 border rounded px-1 text-center ${isDark ? "border-slate-600 bg-slate-700 text-slate-300" : "border-gray-200 bg-gray-100 text-gray-700"}`} /></td>
+                    <td data-label="Batch" className="text-center">
                       <div ref={(el) => (batchRefs.current[i] = el)}>
                         <BatchSearchInput
                           value={item.batch_number ? item.batch_number : (item.is_unbatched ? "[Unbatched Stock]" : "")}
@@ -1536,7 +1536,7 @@ const handleSelectChange = async (field, value) => {
                         />
                       </div>
                     </td>
-                    <td className="text-center">
+                    <td data-label="Expiry" className="text-center">
                       <input
                         type="date"
                         readOnly
@@ -1548,7 +1548,7 @@ const handleSelectChange = async (field, value) => {
                         }`}
                       />
                     </td>
-                    <td className="text-center">
+                    <td data-label={form.sale_invoice_id ? "Returnable" : "Available"} className="text-center">
                       <input
                         type="number"
                         readOnly
@@ -1560,7 +1560,7 @@ const handleSelectChange = async (field, value) => {
                         }`}
                       />
                     </td>
-                    <td className="text-center">
+                    <td data-label="Return Qty *" className="text-center">
                       <input
                         ref={(el) => (qtyRefs.current[i] = el)}
                         type="text"
@@ -1578,7 +1578,7 @@ const handleSelectChange = async (field, value) => {
                         onKeyDown={(e) => onKeyNav(e, i, "quantity")}
                       />
                     </td>
-                    <td className="text-center">
+                    <td data-label="Unit Price" className="text-center">
                       <input
                         type="number"
                         readOnly
@@ -1590,7 +1590,7 @@ const handleSelectChange = async (field, value) => {
                         }`}
                       />
                     </td>
-                    <td className="text-center">
+                    <td data-label="Disc %" className="text-center">
                       <input
                         ref={(el) => (discRefs.current[i] = el)}
                         type="text"
@@ -1604,7 +1604,7 @@ const handleSelectChange = async (field, value) => {
                         onKeyDown={(e) => onKeyNav(e, i, "disc")}
                       />
                     </td>
-                    <td className="text-center">
+                    <td data-label="Sub Total" className="invoice-cell-subtotal text-center">
                       <input
                         type="number"
                         readOnly
@@ -1616,7 +1616,7 @@ const handleSelectChange = async (field, value) => {
                         }`}
                       />
                     </td>
-                    <td className="text-center">
+                    <td className="invoice-cell-add text-center">
                       <button
                         type="button"
                         onClick={addItem} aria-label="Add item" title="Add item"
@@ -1639,83 +1639,87 @@ const handleSelectChange = async (field, value) => {
           <table className="w-full border-collapse text-xs">
             <tbody>
               <tr>
-                <td className={`border p-1 w-1/6 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                  <label className={`block text-[10px] ${isDark ? "text-slate-400" : "text-gray-600"}`}>Gross Total</label>
-                  <input
-                    type="number"
-                    readOnly
-                    value={(Number(form.gross_total) || 0).toFixed(2)}
-                    className={`border rounded w-full p-1 h-7 text-xs ${
-                      isDark
-                        ? "border-slate-600 bg-slate-700 text-slate-300"
-                        : "border-gray-300 bg-gray-100 text-gray-700"
-                    }`}
-                  />
-                </td>
-                <td className={`border p-1 w-1/6 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                  <label className={`block text-[10px] ${isDark ? "text-slate-400" : "text-gray-600"}`}>Discount %</label>
-                  <input
-                    type="number"
-                    value={form.discount_percentage === 0 ? "" : form.discount_percentage}
-                    onChange={(e) => onDiscountPctChange(e.target.value)}
-                    className={`border rounded w-full p-1 h-7 text-xs ${
-                      isDark
-                        ? "border-slate-600 bg-slate-700 text-slate-200"
-                        : "border-gray-300 text-gray-800"
-                    }`}
-                  />
-                </td>
-                <td className={`border p-1 w-1/6 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                  <label className={`block text-[10px] ${isDark ? "text-slate-400" : "text-gray-600"}`}>Discount Amount</label>
-                  <input
-                    type="number"
-                    value={form.discount_amount === 0 ? "" : form.discount_amount}
-                    onChange={(e) => onDiscountAmtChange(e.target.value)}
-                    className={`border rounded w-full p-1 h-7 text-xs ${
-                      isDark
-                        ? "border-slate-600 bg-slate-700 text-slate-200"
-                        : "border-gray-300 text-gray-800"
-                    }`}
-                  />
-                </td>
-                <td className={`border p-1 w-1/6 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                  <label className={`block text-[10px] ${isDark ? "text-slate-400" : "text-gray-600"}`}>Tax %</label>
-                  <input
-                    type="number"
-                    value={form.tax_percentage === 0 ? "" : form.tax_percentage}
-                    onChange={(e) => onTaxPctChange(e.target.value)}
-                    className={`border rounded w-full p-1 h-7 text-xs ${
-                      isDark
-                        ? "border-slate-600 bg-slate-700 text-slate-200"
-                        : "border-gray-300 text-gray-800"
-                    }`}
-                  />
-                </td>
-                <td className={`border p-1 w-1/6 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                  <label className={`block text-[10px] ${isDark ? "text-slate-400" : "text-gray-600"}`}>Tax Amount</label>
-                  <input
-                    type="number"
-                    value={form.tax_amount === 0 ? "" : form.tax_amount}
-                    onChange={(e) => onTaxAmtChange(e.target.value)}
-                    className={`border rounded w-full p-1 h-7 text-xs ${
-                      isDark
-                        ? "border-slate-600 bg-slate-700 text-slate-200"
-                        : "border-gray-300 text-gray-800"
-                    }`}
-                  />
-                </td>
-                <td className={`border p-1 w-1/6 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                  <label className={`block text-[10px] ${isDark ? "text-slate-400" : "text-gray-600"}`}>Total</label>
-                  <input
-                    type="number"
-                    readOnly
-                    value={(Number(form.total) || 0).toFixed(2)}
-                    className={`border rounded w-full p-1 h-7 text-xs ${
-                      isDark
-                        ? "border-slate-600 bg-slate-700 text-rose-400"
-                        : "border-gray-300 bg-gray-100 text-red-600"
-                    }`}
-                  />
+                <td colSpan={6} className={`border p-2 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={`block text-[10px] mb-0.5 ${isDark ? "text-slate-400" : "text-gray-600"}`}>Gross Total</label>
+                      <input
+                        type="number"
+                        readOnly
+                        value={(Number(form.gross_total) || 0).toFixed(2)}
+                        className={`border rounded w-full p-1 h-7 text-xs ${
+                          isDark
+                            ? "border-slate-600 bg-slate-700 text-slate-300"
+                            : "border-gray-300 bg-gray-100 text-gray-700"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-[10px] mb-0.5 ${isDark ? "text-slate-400" : "text-gray-600"}`}>Discount %</label>
+                      <input
+                        type="number"
+                        value={form.discount_percentage === 0 ? "" : form.discount_percentage}
+                        onChange={(e) => onDiscountPctChange(e.target.value)}
+                        className={`border rounded w-full p-1 h-7 text-xs ${
+                          isDark
+                            ? "border-slate-600 bg-slate-700 text-slate-200"
+                            : "border-gray-300 text-gray-800"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-[10px] mb-0.5 ${isDark ? "text-slate-400" : "text-gray-600"}`}>Discount Amount</label>
+                      <input
+                        type="number"
+                        value={form.discount_amount === 0 ? "" : form.discount_amount}
+                        onChange={(e) => onDiscountAmtChange(e.target.value)}
+                        className={`border rounded w-full p-1 h-7 text-xs ${
+                          isDark
+                            ? "border-slate-600 bg-slate-700 text-slate-200"
+                            : "border-gray-300 text-gray-800"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-[10px] mb-0.5 ${isDark ? "text-slate-400" : "text-gray-600"}`}>Tax %</label>
+                      <input
+                        type="number"
+                        value={form.tax_percentage === 0 ? "" : form.tax_percentage}
+                        onChange={(e) => onTaxPctChange(e.target.value)}
+                        className={`border rounded w-full p-1 h-7 text-xs ${
+                          isDark
+                            ? "border-slate-600 bg-slate-700 text-slate-200"
+                            : "border-gray-300 text-gray-800"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-[10px] mb-0.5 ${isDark ? "text-slate-400" : "text-gray-600"}`}>Tax Amount</label>
+                      <input
+                        type="number"
+                        value={form.tax_amount === 0 ? "" : form.tax_amount}
+                        onChange={(e) => onTaxAmtChange(e.target.value)}
+                        className={`border rounded w-full p-1 h-7 text-xs ${
+                          isDark
+                            ? "border-slate-600 bg-slate-700 text-slate-200"
+                            : "border-gray-300 text-gray-800"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-[10px] mb-0.5 ${isDark ? "text-slate-400" : "text-gray-600"}`}>Total</label>
+                      <input
+                        type="number"
+                        readOnly
+                        value={(Number(form.total) || 0).toFixed(2)}
+                        className={`border rounded w-full p-1 h-7 text-xs font-bold ${
+                          isDark
+                            ? "border-slate-600 bg-slate-700 text-rose-400"
+                            : "border-gray-300 bg-gray-100 text-red-600"
+                        }`}
+                      />
+                    </div>
+                  </div>
                 </td>
               </tr>
               <tr>

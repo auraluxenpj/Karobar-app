@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <script>
       try {
         if (localStorage.getItem('theme_mode') === 'dark') {
@@ -11,10 +11,11 @@
       } catch (_) {}
     </script>
     <style>
+      html, body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
       body { margin: 0; background-color: #f3f6fb; color: #0f172a; font-family: system-ui, -apple-system, sans-serif; }
       html.dark body { background-color: #0b1220; color: #f1f5f9; }
       .boot-shell {
-        min-height: 100vh;
+        min-height: 100dvh;
         padding: 14px;
         box-sizing: border-box;
         display: grid;
@@ -26,6 +27,10 @@
         .boot-shell { grid-template-columns: minmax(0, 1fr); padding: 12px; }
         .boot-sidebar { display: none !important; }
       }
+      @media (max-width: 767px) {
+        .boot-shell { padding: 8px; }
+        .boot-hide-sm { display: none !important; }
+      }
       .boot-sidebar {
         background: rgba(255,255,255,0.86);
         border: 1px solid rgba(226,232,240,0.85);
@@ -34,7 +39,7 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
-        height: calc(100vh - 28px);
+        height: calc(100dvh - 28px);
         box-sizing: border-box;
       }
       .boot-card {
@@ -135,18 +140,17 @@
             <!-- Right Main Area: Topbar + Content -->
             <div class="boot-main">
                 <div class="boot-topbar">
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <div class="boot-bone-soft" style="width:136px;height:36px;border-radius:12px;"></div>
-                        <div class="boot-bone-soft" style="width:112px;height:36px;border-radius:12px;"></div>
-                        <div class="boot-bone-soft" style="width:104px;height:36px;border-radius:12px;"></div>
+                    <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+                        <div class="boot-bone-soft" style="width:36px;height:36px;border-radius:12px;flex-shrink:0;"></div>
+                        <div class="boot-bone-soft boot-hide-sm" style="width:112px;height:36px;border-radius:12px;"></div>
+                        <div class="boot-bone-soft boot-hide-sm" style="width:104px;height:36px;border-radius:12px;"></div>
                     </div>
-                    <div style="display:flex;align-items:center;gap:6px;">
-                        <div class="boot-bone-soft" style="width:104px;height:36px;border-radius:12px;"></div>
-                        <div class="boot-bone-soft" style="width:112px;height:36px;border-radius:12px;"></div>
+                    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                        <div class="boot-bone-soft boot-hide-sm" style="width:104px;height:36px;border-radius:12px;"></div>
+                        <div class="boot-bone-soft boot-hide-sm" style="width:112px;height:36px;border-radius:12px;"></div>
                         <div class="boot-bone-soft" style="width:36px;height:36px;border-radius:12px;"></div>
                         <div class="boot-bone-soft" style="width:36px;height:36px;border-radius:12px;"></div>
-                        <div class="boot-bone-soft" style="width:36px;height:36px;border-radius:12px;"></div>
-                        <div class="boot-bone" style="width:108px;height:36px;border-radius:12px;"></div>
+                        <div class="boot-bone" style="width:44px;height:36px;border-radius:12px;"></div>
                     </div>
                 </div>
                 <div class="boot-grid">

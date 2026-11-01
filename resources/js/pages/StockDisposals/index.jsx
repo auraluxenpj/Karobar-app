@@ -388,7 +388,7 @@ export default function StockDisposalsIndex() {
       <GlassCard className="overflow-hidden">
         {/* Status Tabs */}
         <div
-          className={`flex flex-wrap items-center gap-2 px-4 py-3 border-b ${
+          className={`flex overflow-x-auto whitespace-nowrap no-scrollbar sm:flex-wrap items-center gap-2 px-4 py-3 border-b ${
             isDark ? "border-slate-700 bg-slate-800/40" : "border-gray-200 bg-gray-50/80"
           }`}
         >
@@ -423,7 +423,7 @@ export default function StockDisposalsIndex() {
 
         {/* Filter Bar */}
         <div
-          className={`p-3.5 border-b grid grid-cols-1 md:grid-cols-4 gap-3 items-center ${
+          className={`p-3.5 border-b grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 items-center ${
             isDark ? "border-slate-700 bg-slate-800/20" : "border-gray-200 bg-white"
           }`}
         >
@@ -471,7 +471,7 @@ export default function StockDisposalsIndex() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
             <CalendarDaysIcon className="w-4 h-4 text-slate-400 shrink-0" />
             <input
               type="date"
@@ -928,7 +928,7 @@ export default function StockDisposalsIndex() {
                 </div>
               </label>
 
-              <div className="flex justify-end gap-2.5 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setFinalizingDisposal(null)}
@@ -1011,7 +1011,7 @@ export default function StockDisposalsIndex() {
                 />
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setRestoringDisposal(null)}

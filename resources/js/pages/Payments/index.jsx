@@ -428,33 +428,33 @@ export default function PaymentsPage() {
 
       {/* ── KPI Cards ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <GlassCard className="p-4">
+        <GlassCard className="p-4 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <ArrowTrendingDownIcon className="w-4 h-4 text-emerald-500" />
-            <p className="text-xs uppercase tracking-wide font-medium text-emerald-600 dark:text-emerald-400">Received (Customers)</p>
+            <ArrowTrendingDownIcon className="w-4 h-4 text-emerald-500 shrink-0" />
+            <p className="text-xs uppercase tracking-wide font-medium truncate text-emerald-600 dark:text-emerald-400">Received (Customers)</p>
           </div>
-          <p className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+          <p className="text-lg sm:text-2xl font-bold font-mono truncate text-emerald-600 dark:text-emerald-400">
             {formatCurrency(kpi.customerTotal)}
           </p>
         </GlassCard>
-        <GlassCard className="p-4">
+        <GlassCard className="p-4 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <ArrowTrendingUpIcon className="w-4 h-4 text-red-500" />
-            <p className="text-xs uppercase tracking-wide font-medium text-red-600 dark:text-red-400">Paid (Suppliers)</p>
+            <ArrowTrendingUpIcon className="w-4 h-4 text-red-500 shrink-0" />
+            <p className="text-xs uppercase tracking-wide font-medium truncate text-red-600 dark:text-red-400">Paid (Suppliers)</p>
           </div>
-          <p className="text-2xl font-bold font-mono text-red-600 dark:text-red-400">
+          <p className="text-lg sm:text-2xl font-bold font-mono truncate text-red-600 dark:text-red-400">
             {formatCurrency(kpi.supplierTotal)}
           </p>
         </GlassCard>
-        <GlassCard className="p-4">
-          <p className={`text-xs uppercase tracking-wide mb-1 font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Net Cash Flow</p>
-          <p className={`text-2xl font-bold font-mono ${kpi.net >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+        <GlassCard className="p-4 min-w-0">
+          <p className={`text-xs uppercase tracking-wide mb-1 font-medium truncate ${isDark ? "text-slate-400" : "text-slate-500"}`}>Net Cash Flow</p>
+          <p className={`text-lg sm:text-2xl font-bold font-mono truncate ${kpi.net >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
             {kpi.net >= 0 ? "+" : ""}{formatCurrency(kpi.net)}
           </p>
         </GlassCard>
-        <GlassCard className="p-4">
-          <p className={`text-xs uppercase tracking-wide mb-1 font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Reversals (shown)</p>
-          <p className={`text-2xl font-bold ${kpi.reversals > 0 ? "text-amber-600 dark:text-amber-400" : isDark ? "text-slate-300" : "text-slate-700"}`}>
+        <GlassCard className="p-4 min-w-0">
+          <p className={`text-xs uppercase tracking-wide mb-1 font-medium truncate ${isDark ? "text-slate-400" : "text-slate-500"}`}>Reversals (shown)</p>
+          <p className={`text-lg sm:text-2xl font-bold truncate ${kpi.reversals > 0 ? "text-amber-600 dark:text-amber-400" : isDark ? "text-slate-300" : "text-slate-700"}`}>
             {kpi.reversals}
           </p>
         </GlassCard>
@@ -528,7 +528,7 @@ export default function PaymentsPage() {
         </button>
 
         {/* Date range */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <CalendarDaysIcon className={`w-4 h-4 ${isDark ? "text-slate-400" : "text-slate-400"}`} />
           <input
             type="date"
@@ -931,11 +931,11 @@ export default function PaymentsPage() {
                 </div>
               ) : (
                 <div
-                  className={`rounded-xl border overflow-hidden max-h-64 overflow-y-auto ${
+                  className={`rounded-xl border overflow-x-auto max-h-64 overflow-y-auto ${
                     isDark ? "border-slate-700" : "border-gray-200"
                   }`}
                 >
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full text-left text-xs min-w-[540px]">
                     <thead
                       className={`sticky top-0 border-b ${
                         isDark ? "bg-slate-800 text-slate-300 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"
@@ -1007,11 +1007,11 @@ export default function PaymentsPage() {
               )}
 
               <div
-                className={`p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-4 ${
+                className={`p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
                   isDark ? "bg-slate-800/60 border-slate-700" : "bg-gray-50 border-gray-200"
                 }`}
               >
-                <div className="flex items-center gap-6 text-xs">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs">
                   <div>
                     <span className="block uppercase tracking-wider text-slate-400">Allocating Now</span>
                     <span className="text-base font-bold font-mono text-blue-600 dark:text-blue-400">

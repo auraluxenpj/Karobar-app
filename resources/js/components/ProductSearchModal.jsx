@@ -380,7 +380,7 @@ export default function ProductSearchModal({ isOpen, onClose }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl flex flex-col rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden animate-in zoom-in-95 duration-150 max-h-[85vh]"
+        className="w-full max-w-3xl flex flex-col rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden animate-in zoom-in-95 duration-150 max-h-[85dvh]"
         onKeyDown={handleKeyDown}
       >
         {/* Top Search Header */}
@@ -392,7 +392,7 @@ export default function ProductSearchModal({ isOpen, onClose }) {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search products by name, generic/formula, barcode, brand, or supplier... (Alt+P)"
-            className="flex-1 bg-transparent text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
+            className="flex-1 bg-transparent text-base sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
             autoComplete="off"
             spellCheck="false"
           />
@@ -455,7 +455,7 @@ export default function ProductSearchModal({ isOpen, onClose }) {
         </div>
 
         {/* Content Body: Left Results List, Right Details Pane */}
-        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.2fr)_minmax(0,340px)] min-h-[350px] max-h-[58vh] overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1.2fr)_minmax(0,340px)] min-h-[350px] max-h-[58dvh] overflow-hidden">
           {/* Left Results List */}
           <div className="overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
             {loading && (

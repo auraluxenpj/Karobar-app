@@ -1665,7 +1665,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
             </div>
           </div>
 
-          <div className="flex items-center ml-auto gap-2.5">
+          <div className="flex flex-wrap items-center ml-auto gap-2">
             {!saleId && (
               <InvoiceDraftIndicator
                 saveStatus={draftHook.saveStatus}
@@ -1902,27 +1902,27 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
               </div>
             </div>
             <div ref={itemsScrollRef} className={`sale-entry-items flex-1 overflow-auto relative ${isDark ? "border-slate-700 bg-slate-800" : "border-gray-200 bg-white"}`}>
-              <table className="w-full min-w-[780px] text-[11px] table-fixed border-collapse" autoComplete="off">
+              <table className="invoice-repeater-table w-full min-w-[780px] text-[11px] lg:table-fixed border-collapse" autoComplete="off">
               <thead className={`sticky top-0 z-20 ${isDark ? "bg-slate-800/95 backdrop-blur-xs border-slate-700" : "bg-white/95 backdrop-blur-xs border-gray-200"} border-b`}>
                 <tr className="[&>th]:text-left">
                   <th className={`w-8 text-center ${isDark ? "text-rose-400" : "text-red-600"}`}>DEL</th>
                   <th className="w-7 text-center sale-th-readonly">#</th>
-                  <th className="sale-th-editable">Product *</th>
-                  <th className="text-center sale-th-readonly" title="Pack Size (Auto)">PSize</th>
-                  <th className="sale-th-editable">Batch</th>
-                  <th className="text-center sale-th-readonly" title="Expiry Date (Auto)">Expiry</th>
-                  <th className="text-center sale-th-readonly" title="Available Units (Auto)">Avail</th>
-                  <th className="text-center sale-th-editable">Qty *</th>
-                  <th className="text-center sale-th-readonly" title="Unit Sale Price (Auto)">Price</th>
-                  <th className="text-center sale-th-editable">Disc %</th>
-                  <th className="text-center sale-th-readonly" title="Row Sub Total (Auto)">Sub Total</th>
+                  <th className="min-w-[200px] sale-th-editable">Product *</th>
+                  <th className="min-w-[76px] text-center sale-th-readonly" title="Pack Size (Auto)">PSize</th>
+                  <th className="min-w-[130px] sale-th-editable">Batch</th>
+                  <th className="min-w-[76px] text-center sale-th-readonly" title="Expiry Date (Auto)">Expiry</th>
+                  <th className="min-w-[76px] text-center sale-th-readonly" title="Available Units (Auto)">Avail</th>
+                  <th className="min-w-[76px] text-center sale-th-editable">Qty *</th>
+                  <th className="min-w-[76px] text-center sale-th-readonly" title="Unit Sale Price (Auto)">Price</th>
+                  <th className="min-w-[76px] text-center sale-th-editable">Disc %</th>
+                  <th className="min-w-[76px] text-center sale-th-readonly" title="Row Sub Total (Auto)">Sub Total</th>
                   <th className="w-8 text-center">+</th>
                 </tr>
               </thead>
               <tbody className="[&>tr>td]:py-1.5 [&>tr>td]:px-1">
                 {form.items.map((it, i) => (
-                  <tr key={it.id} id={invoiceErrors.rowId(i)} aria-invalid={invoiceErrors.rowMessages(i).length > 0 || undefined} className={`${invoiceErrors.rowMessages(i).length ? "invoice-row-invalid" : ""} border-b ${isDark ? "border-slate-700/80" : "border-gray-100"}`}>
-                    <td className="text-center">
+                  <tr key={it.id} id={invoiceErrors.rowId(i)} aria-invalid={invoiceErrors.rowMessages(i).length > 0 || undefined} className={`invoice-repeater-row ${invoiceErrors.rowMessages(i).length ? "invoice-row-invalid" : ""} border-b ${isDark ? "border-slate-700/80" : "border-gray-100"}`}>
+                    <td className="invoice-cell-del text-center">
                       <button
                         type="button"
                         tabIndex={-1}
@@ -1933,9 +1933,9 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                         <TrashIcon aria-hidden="true" />
                       </button>
                     </td>
-                    <td className={`text-center font-semibold text-[11px] ${isDark ? "text-slate-400" : "text-gray-500"}`}>{i + 1}</td>
+                    <td data-label="Item #" className={`invoice-cell-index text-center font-semibold text-[11px] ${isDark ? "text-slate-400" : "text-gray-500"}`}>{i + 1}</td>
 
-                    <td>
+                    <td data-label="Product *" className="invoice-cell-product">
                       <InvoiceRowError messages={invoiceErrors.rowMessages(i)} />
                       <div
                         ref={(el) => (productRefs.current[i] = el)}
@@ -1978,7 +1978,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                       </div>
                     </td>
 
-                    <td className="text-center">
+                    <td data-label="Pack Size" className="text-center">
                       <input
                         type="text"
                         readOnly
@@ -1990,7 +1990,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                       />
                     </td>
 
-                    <td>
+                    <td data-label="Batch">
                       <div ref={(el) => (batchRefs.current[i] = el)} onFocus={() => setFocusedRowIndex(i)}>
                         <BatchSearchInput
                           value={it.batch_number ? it.batch_number : (it.is_unbatched ? "[Unbatched Stock]" : "")}
@@ -2011,7 +2011,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                       </div>
                     </td>
 
-                    <td className="text-center">
+                    <td data-label="Expiry" className="text-center">
                       <input
                         type="text"
                         value={it.expiry ?? ""}
@@ -2023,7 +2023,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                       />
                     </td>
 
-                    <td className="text-center">
+                    <td data-label="Available" className="text-center">
                       <input
                         type="text"
                         readOnly
@@ -2035,7 +2035,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                       />
                     </td>
 
-                    <td className="text-center">
+                    <td data-label="Qty *" className="text-center">
                       <input
                         ref={(el) => (qtyRefs.current[i] = el)}
                         type="text"
@@ -2063,7 +2063,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                       />
                     </td>
 
-                    <td className="text-center">
+                    <td data-label="Unit Price" className="text-center">
                       <input
                         ref={(el) => (priceRefs.current[i] = el)}
                         type="text"
@@ -2076,7 +2076,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                       />
                     </td>
 
-                    <td className="text-center">
+                    <td data-label="Disc %" className="text-center">
                       <input
                         ref={(el) => (discRefs.current[i] = el)}
                         type="text"
@@ -2107,7 +2107,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                       />
                     </td>
 
-                    <td className="text-center">
+                    <td data-label="Sub Total" className="invoice-cell-subtotal text-center">
                       <input
                         type="text"
                         readOnly
@@ -2119,7 +2119,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                       />
                     </td>
 
-                    <td className="text-center">
+                    <td className="invoice-cell-add text-center">
                       <button
                         type="button"
                         onClick={addRow}

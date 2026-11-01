@@ -451,7 +451,7 @@ export default function AccountsModal({ isOpen, onClose, onAccountUpdated, onOpe
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl shadow-2xl border transition-all duration-200 overflow-hidden ${
+        className={`w-full max-w-4xl max-h-[92dvh] flex flex-col rounded-2xl shadow-2xl border transition-all duration-200 overflow-hidden ${
           isDark
             ? "bg-slate-900/95 border-slate-700/80 text-slate-100"
             : "bg-white/95 border-slate-200 text-slate-900"
@@ -459,7 +459,7 @@ export default function AccountsModal({ isOpen, onClose, onAccountUpdated, onOpe
       >
         {/* Header */}
         <div
-          className={`flex items-center justify-between px-6 py-4 border-b shrink-0 ${
+          className={`flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b shrink-0 ${
             isDark ? "border-slate-800 bg-slate-900" : "border-slate-100 bg-slate-50/50"
           }`}
         >
@@ -592,7 +592,7 @@ export default function AccountsModal({ isOpen, onClose, onAccountUpdated, onOpe
         )}
 
         {/* Tab Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
             <div className="space-y-4">
@@ -828,7 +828,7 @@ export default function AccountsModal({ isOpen, onClose, onAccountUpdated, onOpe
           {activeTab === "statement" && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="w-64">
+                <div className="w-full sm:w-64">
                   <Select
                     options={accountOptions}
                     value={accountOptions.find((o) => o.value === selectedAccountId) || null}
@@ -838,7 +838,7 @@ export default function AccountsModal({ isOpen, onClose, onAccountUpdated, onOpe
                   />
                 </div>
 
-                <div className="relative w-64">
+                <div className="relative w-full sm:w-64">
                   <MagnifyingGlassIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"

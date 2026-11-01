@@ -189,7 +189,7 @@ export default function PaymentHistoryModal({
                   No payment vouchers recorded yet for this {partyType}.
                 </div>
               ) : (
-                <div className={`rounded-xl border overflow-hidden ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                <div className={`rounded-xl border overflow-x-auto ${isDark ? "border-slate-700" : "border-gray-200"}`}>
                   <table className="w-full text-left text-xs">
                     <thead className={`border-b ${isDark ? "bg-slate-800 text-slate-300 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
                       <tr>

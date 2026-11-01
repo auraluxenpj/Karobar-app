@@ -475,35 +475,35 @@ export default function AccountsPage() {
 
       {/* ── KPI Strip ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <GlassCard className="p-4">
-          <p className={`text-xs uppercase tracking-wide mb-1 font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+        <GlassCard className="p-4 min-w-0">
+          <p className={`text-xs uppercase tracking-wide mb-1 font-medium truncate ${isDark ? "text-slate-400" : "text-slate-500"}`}>
             Total Balance
           </p>
-          <p className={`text-2xl font-bold font-mono ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+          <p className={`text-lg sm:text-2xl font-bold font-mono truncate ${isDark ? "text-slate-100" : "text-slate-800"}`}>
             {formatCurrency(totalBalance)}
           </p>
         </GlassCard>
-        <GlassCard className="p-4">
-          <p className="text-xs uppercase tracking-wide mb-1 font-medium text-emerald-600 dark:text-emerald-400">
+        <GlassCard className="p-4 min-w-0">
+          <p className="text-xs uppercase tracking-wide mb-1 font-medium truncate text-emerald-600 dark:text-emerald-400">
             Cash Accounts
           </p>
-          <p className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+          <p className="text-lg sm:text-2xl font-bold font-mono truncate text-emerald-600 dark:text-emerald-400">
             {formatCurrency(accounts.filter(a => a.type === "cash").reduce((s, a) => s + parseFloat(a.current_balance || 0), 0))}
           </p>
         </GlassCard>
-        <GlassCard className="p-4">
-          <p className="text-xs uppercase tracking-wide mb-1 font-medium text-blue-600 dark:text-blue-400">
+        <GlassCard className="p-4 min-w-0">
+          <p className="text-xs uppercase tracking-wide mb-1 font-medium truncate text-blue-600 dark:text-blue-400">
             Bank Accounts
           </p>
-          <p className="text-2xl font-bold font-mono text-blue-600 dark:text-blue-400">
+          <p className="text-lg sm:text-2xl font-bold font-mono truncate text-blue-600 dark:text-blue-400">
             {formatCurrency(accounts.filter(a => a.type === "bank").reduce((s, a) => s + parseFloat(a.current_balance || 0), 0))}
           </p>
         </GlassCard>
-        <GlassCard className="p-4">
-          <p className={`text-xs uppercase tracking-wide mb-1 font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+        <GlassCard className="p-4 min-w-0">
+          <p className={`text-xs uppercase tracking-wide mb-1 font-medium truncate ${isDark ? "text-slate-400" : "text-slate-500"}`}>
             Active Accounts
           </p>
-          <p className={`text-2xl font-bold ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+          <p className={`text-lg sm:text-2xl font-bold truncate ${isDark ? "text-slate-100" : "text-slate-800"}`}>
             {accounts.filter(a => a.is_active !== false).length}
           </p>
         </GlassCard>
@@ -589,7 +589,7 @@ export default function AccountsPage() {
                 </div>
 
                 {/* Quick action buttons */}
-                <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-slate-200/30 dark:border-slate-700/30">
+                <div className="flex flex-wrap items-center gap-1.5 mt-3 pt-3 border-t border-slate-200/30 dark:border-slate-700/30">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -731,7 +731,7 @@ export default function AccountsPage() {
 
           {/* Transaction table */}
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[640px]">
               <thead>
                 <tr className={`border-b text-xs font-semibold uppercase tracking-wide ${isDark ? "border-slate-700 bg-slate-800/60 text-slate-400" : "border-slate-200 bg-slate-50 text-slate-500"}`}>
                   <th className="py-3 px-4 text-left">Date</th>
@@ -796,7 +796,7 @@ export default function AccountsPage() {
 
           {/* Statement pagination */}
           {!loadingTxns && txnTotal > txnPerPage && (
-            <div className={`flex items-center justify-between gap-3 px-4 py-3 border-t text-xs ${isDark ? "border-slate-700 text-slate-400" : "border-slate-200 text-slate-500"}`}>
+            <div className={`flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t text-xs ${isDark ? "border-slate-700 text-slate-400" : "border-slate-200 text-slate-500"}`}>
               <span>Showing {(txnPage - 1) * txnPerPage + 1}–{Math.min(txnPage * txnPerPage, txnTotal)} of {txnTotal}</span>
               <div className="flex items-center gap-1">
                 <button onClick={() => setTxnPage(1)} disabled={txnPage <= 1} className="p-1 rounded disabled:opacity-30 hover:bg-slate-200 dark:hover:bg-slate-700"><ChevronDoubleLeftIcon className="w-4 h-4" /></button>
@@ -817,8 +817,8 @@ export default function AccountsPage() {
       {/* Create/Edit Account Modal */}
       {modalMode === "create" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) setModalMode(null); }}>
-          <GlassCard className="w-full max-w-lg shadow-2xl">
-            <div className={`flex items-center justify-between px-6 py-4 border-b ${isDark ? "border-slate-700" : "border-slate-200"}`}>
+          <GlassCard className="w-full max-w-lg max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl">
+            <div className={`flex items-center justify-between pb-4 border-b ${isDark ? "border-slate-700" : "border-slate-200"}`}>
               <div className="flex items-center gap-2">
                 <BuildingLibraryIcon className="w-5 h-5 text-blue-500" />
                 <h3 className={`font-bold text-base ${isDark ? "text-slate-100" : "text-slate-800"}`}>
@@ -829,7 +829,7 @@ export default function AccountsPage() {
                 <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleFormSubmit} className="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
+            <form onSubmit={handleFormSubmit} className="pt-4 space-y-4">
               {/* Quick Preset Selector */}
               {(presets.banks.length > 0 || presets.wallets.length > 0) && (
                 <div>
@@ -925,8 +925,8 @@ export default function AccountsPage() {
       {/* Transfer Modal */}
       {modalMode === "transfer" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) setModalMode(null); }}>
-          <GlassCard className="w-full max-w-md shadow-2xl">
-            <div className={`flex items-center justify-between px-6 py-4 border-b ${isDark ? "border-slate-700" : "border-slate-200"}`}>
+          <GlassCard className="w-full max-w-md max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl">
+            <div className={`flex items-center justify-between pb-4 border-b ${isDark ? "border-slate-700" : "border-slate-200"}`}>
               <div className="flex items-center gap-2">
                 <ArrowsRightLeftIcon className="w-5 h-5 text-blue-500" />
                 <h3 className={`font-bold text-base ${isDark ? "text-slate-100" : "text-slate-800"}`}>Transfer Funds</h3>
@@ -935,7 +935,7 @@ export default function AccountsPage() {
                 <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleTransfer} className="p-6 space-y-4">
+            <form onSubmit={handleTransfer} className="pt-4 space-y-4">
               <div>
                 <label className={labelCls}>From Account *</label>
                 <Select options={accountOptions} value={transferFrom} onChange={setTransferFrom} styles={selectStyles} placeholder="Select source…" isClearable />
@@ -968,8 +968,8 @@ export default function AccountsPage() {
       {/* Adjust Modal */}
       {modalMode === "adjust" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={e => { if (e.target === e.currentTarget) setModalMode(null); }}>
-          <GlassCard className="w-full max-w-md shadow-2xl">
-            <div className={`flex items-center justify-between px-6 py-4 border-b ${isDark ? "border-slate-700" : "border-slate-200"}`}>
+          <GlassCard className="w-full max-w-md max-h-[90dvh] overflow-y-auto p-4 sm:p-6 shadow-2xl">
+            <div className={`flex items-center justify-between pb-4 border-b ${isDark ? "border-slate-700" : "border-slate-200"}`}>
               <div className="flex items-center gap-2">
                 <ArrowUpRightIcon className="w-5 h-5 text-blue-500" />
                 <h3 className={`font-bold text-base ${isDark ? "text-slate-100" : "text-slate-800"}`}>Manual Adjustment</h3>
@@ -978,14 +978,14 @@ export default function AccountsPage() {
                 <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleAdjust} className="p-6 space-y-4">
+            <form onSubmit={handleAdjust} className="pt-4 space-y-4">
               <div>
                 <label className={labelCls}>Account *</label>
                 <Select options={accountOptions} value={adjustAccount} onChange={setAdjustAccount} styles={selectStyles} placeholder="Select account…" isClearable />
               </div>
               <div>
                 <label className={labelCls}>Adjustment Type *</label>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   {[
                     { value: "deposit", label: "Deposit (Add)" },
                     { value: "withdrawal", label: "Withdrawal (Deduct)" },

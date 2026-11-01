@@ -601,19 +601,20 @@ export default function ExpensesIndex() {
           </div>
 
           {/* Date Range Inputs */}
-          <div className="lg:col-span-3 flex items-center gap-1.5">
+          <div className="lg:col-span-3 grid grid-cols-2 gap-1.5">
             <input
               type="date"
               value={filters.from}
               onChange={(e) => setFilters({ ...filters, from: e.target.value })}
-              className="w-1/2 px-2.5 py-1.5 text-xs rounded-xl border border-gray-200/80 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="From date"
+              className="w-full px-2.5 py-1.5 text-xs rounded-xl border border-gray-200/80 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <span className="text-xs text-gray-400">to</span>
             <input
               type="date"
               value={filters.to}
               onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-              className="w-1/2 px-2.5 py-1.5 text-xs rounded-xl border border-gray-200/80 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              aria-label="To date"
+              className="w-full px-2.5 py-1.5 text-xs rounded-xl border border-gray-200/80 dark:border-slate-700 bg-white/50 dark:bg-slate-800/50 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>

@@ -1689,13 +1689,13 @@ const handleSelectChange = async (field, value) => {
 // ===== render =====
   return (
     <div className="relative w-full h-full">
-      <form className={`purchase-entry purchase-return-form h-[calc(100vh-130px)] flex flex-col ${isDark ? "bg-slate-900" : "bg-white"}`} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false}>
+      <form className={`purchase-entry purchase-return-form h-auto lg:h-[calc(100dvh-130px)] flex flex-col ${isDark ? "bg-slate-900" : "bg-white"}`} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false}>
         <InvoiceErrorSummary errors={invoiceErrors} />
 {/* ================= HEADER ================= */}
         <div className="purchase-entry-header sticky top-0 z-20">
           {/* Branded Banner */}
           <div
-            className="purchase-entry-banner px-4 py-2.5 flex items-center justify-between gap-3"
+            className="purchase-entry-banner px-4 py-2.5 flex flex-wrap items-center justify-between gap-3"
 
           >
             <div className="flex items-center gap-3">
@@ -1743,7 +1743,7 @@ const handleSelectChange = async (field, value) => {
           <div className="purchase-entry-details px-3 py-2">
             <div className="grid grid-cols-12 gap-2 items-end">
               {/* Posted Number */}
-              <div className="col-span-2">
+              <div className="col-span-6 sm:col-span-3 lg:col-span-2">
                 <label className="block text-[9px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Posted #</label>
                 <input
                   name="posted_number"
@@ -1758,7 +1758,7 @@ const handleSelectChange = async (field, value) => {
               </div>
 
               {/* Date */}
-              <div className="col-span-2">
+              <div className="col-span-6 sm:col-span-3 lg:col-span-2">
                 <label className="block text-[9px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Date</label>
                 <input
                   name="date"
@@ -1770,7 +1770,7 @@ const handleSelectChange = async (field, value) => {
               </div>
 
               {/* Supplier trigger button */}
-              <div className="col-span-4">
+              <div className="col-span-12 sm:col-span-6 lg:col-span-4">
                 <label className="block text-[9px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Supplier *</label>
                 <button
                   type="button"
@@ -1796,7 +1796,7 @@ const handleSelectChange = async (field, value) => {
               </div>
 
               {/* Purchase Invoice trigger button */}
-              <div className="col-span-4">
+              <div className="col-span-12 sm:col-span-6 lg:col-span-4">
                 <label className="block text-[9px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Purchase Invoice (optional)</label>
                 <button
                   type="button"
@@ -1839,7 +1839,7 @@ const handleSelectChange = async (field, value) => {
         <div className="purchase-entry-items flex-1 min-h-0 overflow-auto p-1">
           <h2 className="text-xs font-bold mb-1 text-gray-900 dark:text-gray-100">Items (↑↓ arrows to navigate rows)</h2>
 
-          <table className="w-full border-collapse text-[11px]">
+          <table className="invoice-repeater-table w-full border-collapse text-[11px]">
             <thead className="sticky top-0 bg-gray-100 dark:bg-slate-700 z-5">
               <tr>
                 <th rowSpan={2} className="border w-6 bg-gray-200 dark:bg-slate-600 text-gray-900 dark:text-gray-100">#</th>
@@ -1866,20 +1866,23 @@ const handleSelectChange = async (field, value) => {
 
             <tbody>
               {form.items.map((item, i) => (
-                <tr key={item.id} id={invoiceErrors.rowId(i)} aria-invalid={invoiceErrors.rowMessages(i).length > 0 || undefined} className={`text-center odd:bg-white even:bg-gray-50 dark:odd:bg-slate-700/30 dark:even:bg-slate-700/50 ${invoiceErrors.rowMessages(i).length ? "invoice-row-invalid" : ""}`}>
+                <tr key={item.id} id={invoiceErrors.rowId(i)} aria-invalid={invoiceErrors.rowMessages(i).length > 0 || undefined} className={`invoice-repeater-row text-center odd:bg-white even:bg-gray-50 dark:odd:bg-slate-700/30 dark:even:bg-slate-700/50 ${invoiceErrors.rowMessages(i).length ? "invoice-row-invalid" : ""}`}>
                   {/* Remove */}
-                  <td className="border">
-                    <button
-                      type="button"
-                      onClick={() => removeItem(i)} aria-label="Remove item" title="Remove item"
-                      className="products-row-action products-row-delete"
-                    >
-                      <TrashIcon aria-hidden="true" />
-                    </button>
+                  <td className="invoice-cell-index-actions border">
+                    <div className="flex items-center justify-between lg:justify-center gap-1.5">
+                      <span className="lg:hidden text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Item #{i + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(i)} aria-label="Remove item" title="Remove item"
+                        className="products-row-action products-row-delete"
+                      >
+                        <TrashIcon aria-hidden="true" />
+                      </button>
+                    </div>
                   </td>
 
                   {/* Product Search */}
-                  <td colSpan={1} className="border text-left w-[200px]">
+                  <td colSpan={1} data-label="Product *" className="invoice-cell-product border text-left w-[200px]">
                     <div
                       ref={(el) => (productSearchRefs.current[i] = el)}
                       onFocusCapture={() => { if (!form.purchase_invoice_id) refreshProducts(""); }}
@@ -1896,7 +1899,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Pack Size */}
-                  <td className="border w-14">
+                  <td data-label="Pack Size" className="border w-14">
                     <input
                       type="number"
                       readOnly
@@ -1906,7 +1909,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Batch */}
-                  <td className="border w-16">
+                  <td data-label="Batch" className="border w-16">
                     <div className={rowErrors[i]?.batch ? "ring-2 ring-red-500 rounded-sm" : ""}>
                       <BatchSearchInput
                         ref={(el) => {
@@ -1939,7 +1942,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Expiry */}
-                  <td className="border w-20">
+                  <td data-label="Expiry" className="border w-20">
                     <input
                       type="text"
                       readOnly
@@ -1949,7 +1952,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Available Units */}
-                  <td className="border w-20">
+                  <td data-label={form.purchase_invoice_id ? "Returnable" : "Available (Units)"} className="border w-20">
                     <input
                       type="number"
                       readOnly
@@ -1959,7 +1962,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Return Pack Qty */}
-                  <td className="border">
+                  <td data-label="Return Pack Qty" className="border">
                     <input
                       ref={(el) => (packQuantityRefs.current[i] = el)}
                       type="text"
@@ -1971,7 +1974,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Return Unit Qty */}
-                  <td className="border">
+                  <td data-label="Return Unit Qty" className="border">
                     <input
                       type="text"
                       value={item.return_unit_quantity === 0 ? "" : item.return_unit_quantity}
@@ -1981,7 +1984,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Pack Purchase Price */}
-                  <td className="border">
+                  <td data-label="Pack Cost" className="border">
                     <input
                       ref={(el) => (packPurchasePriceRefs.current[i] = el)}
                       type="text"
@@ -1993,7 +1996,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Unit Purchase Price */}
-                  <td className="border">
+                  <td data-label="Unit Cost" className="border">
                     <input
                       type="text"
                       value={item.unit_purchase_price === 0 ? "" : item.unit_purchase_price}
@@ -2003,7 +2006,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Item Discount Percentage */}
-                  <td className="border">
+                  <td data-label="Disc %" className="border">
                     <input
                       ref={(el) => (itemDiscountRefs.current[i] = el)}
                       type="text"
@@ -2015,7 +2018,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Sub Total */}
-                  <td className="border">
+                  <td data-label="Sub Total" className="invoice-cell-subtotal border">
                     <input
                       type="number"
                       readOnly
@@ -2025,7 +2028,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Add */}
-                  <td className="border">
+                  <td className="invoice-cell-add border">
                     <button
                       type="button"
                       onClick={addItem} aria-label="Add item" title="Add item"
@@ -2041,8 +2044,8 @@ const handleSelectChange = async (field, value) => {
         </div>
 
 {/* ================= FOOTER ================= */}
-        <div className={`purchase-entry-footer sticky bottom-0 p-2 z-10 ${isDark ? "bg-slate-800 border-t border-slate-700" : "bg-white border-t border-gray-200"}`}>
-          <div className="grid grid-cols-6 gap-2 text-xs">
+        <div className={`purchase-entry-footer lg:sticky lg:bottom-0 p-2 z-10 ${isDark ? "bg-slate-800 border-t border-slate-700" : "bg-white border-t border-gray-200"}`}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
             <div className={`p-1.5 rounded-lg border ${isDark ? "border-slate-700 bg-slate-700/40" : "border-gray-200 bg-gray-50"}`}>
               <label className={`block text-[10px] ${isDark ? "text-slate-400" : "text-gray-600"}`}>Gross Total</label>
               <input

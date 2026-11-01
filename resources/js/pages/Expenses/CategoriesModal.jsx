@@ -106,9 +106,9 @@ export default function CategoriesModal({ isOpen, onClose, categories, onRefresh
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-white/20 dark:border-slate-800 shadow-2xl backdrop-blur-xl">
+      <div className="relative w-full max-w-2xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6 rounded-2xl bg-white/95 dark:bg-slate-900/95 border border-white/20 dark:border-slate-800 shadow-2xl backdrop-blur-xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-slate-800/80 bg-gradient-to-r from-blue-50/50 via-transparent to-transparent dark:from-blue-950/20">
+        <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-slate-800/80">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
               <TagIcon className="w-5 h-5" />
@@ -127,7 +127,7 @@ export default function CategoriesModal({ isOpen, onClose, categories, onRefresh
         </div>
 
         {/* Body */}
-        <div className="p-6 max-h-[75vh] overflow-y-auto space-y-6">
+        <div className="py-4 space-y-6">
           {/* Add Category Form */}
           <form onSubmit={handleCreate} className="p-4 rounded-xl bg-gray-50/70 dark:bg-slate-800/40 border border-gray-200/60 dark:border-slate-700/60 space-y-3">
             <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-slate-300">
@@ -229,7 +229,7 @@ export default function CategoriesModal({ isOpen, onClose, categories, onRefresh
                   ) : (
                     <>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-sm text-gray-900 dark:text-white truncate">
                             {cat.name}
                           </span>

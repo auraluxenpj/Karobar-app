@@ -333,9 +333,11 @@ useEffect(() => {
 
   // selection helpers (operate on current page rows)
   const pageAllChecked = rows.length > 0 && rows.every((p) => selectedIds.has(p.id));
+  const allOnPageSelected = pageAllChecked;
   const pageIndeterminate = rows.some((p) => selectedIds.has(p.id)) && !pageAllChecked;
 
-  const togglePageAll = (checked) => {
+  const togglePageAll = (checkedOrEvent) => {
+    const checked = typeof checkedOrEvent === "boolean" ? checkedOrEvent : Boolean(checkedOrEvent?.target?.checked);
     setSelectedIds((prev) => {
       const copy = new Set(prev);
       if (checked) rows.forEach((p) => copy.add(p.id));
@@ -628,7 +630,17 @@ useEffect(() => {
             <thead>
               <tr className="text-left">
                 <th scope="col" className="w-12 pb-2 pl-3">
-                  <span className="products-column-label">#</span>
+                  <input
+                    type="checkbox"
+                    checked={allOnPageSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = pageIndeterminate;
+                    }}
+                    onChange={togglePageAll}
+                    aria-label="Select all products on page"
+                    className="h-4 w-4 cursor-pointer rounded-full border-gray-300"
+                    style={{ accentColor: themeColors.primary }}
+                  />
                 </th>
                 <th scope="col" className="pb-2 pl-3">
                   <span className="products-column-label">Product</span>
@@ -830,7 +842,7 @@ useEffect(() => {
         </div>
 
         {/* Pagination */}
-        <div className="products-pagination">
+        <div className="products-pagination flex-wrap justify-center sm:justify-between gap-2">
           <span className="text-xs text-gray-500 dark:text-gray-400">
             Page <span className="font-medium text-gray-700 dark:text-gray-200">{page}</span> of{" "}
             <span className="font-medium text-gray-700 dark:text-gray-200">{lastPage}</span> · {total} total

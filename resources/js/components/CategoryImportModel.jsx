@@ -109,9 +109,9 @@ export default function CategoryImportModal({ open, onClose, onImported }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white dark:bg-slate-800 w-[min(700px,95vw)] rounded-2xl shadow-xl overflow-hidden">
-        <div className="px-6 py-4 border-b flex items-center justify-between dark:border-slate-600">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
+      <div className="bg-white dark:bg-slate-800 w-[min(1000px,95vw)] max-h-[92dvh] flex flex-col rounded-2xl shadow-xl overflow-hidden">
+        <div className="px-4 sm:px-6 py-4 border-b flex items-center justify-between shrink-0 dark:border-slate-600">
           <h2 className="text-xl font-semibold dark:text-white">Import Categories (CSV)</h2>
           <button 
             className="px-3 py-1 rounded-sm border hover:bg-gray-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
@@ -121,7 +121,7 @@ export default function CategoryImportModal({ open, onClose, onImported }) {
           </button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-6">
           {!res ? (
             <div className="space-y-3">
               <label className="block text-sm font-medium dark:text-slate-200">
@@ -215,7 +215,7 @@ export default function CategoryImportModal({ open, onClose, onImported }) {
           )}
         </div>
 
-        <div className="px-6 py-4 border-t flex items-center justify-between dark:border-slate-600">
+        <div className="px-4 sm:px-6 py-4 border-t flex flex-wrap gap-3 items-center justify-between shrink-0 dark:border-slate-600">
           {!res ? (
             <>
               <div className="text-sm text-gray-600 dark:text-slate-400">

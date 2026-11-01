@@ -30,7 +30,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-[#2C5364] via-[#203A43] to-[#0F2027] p-4 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-linear-to-br from-[#2C5364] via-[#203A43] to-[#0F2027] p-4 relative overflow-hidden">
       {/* Animated Background Shapes */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-[#639EA0] rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
@@ -40,18 +40,20 @@ export default function ForgotPassword() {
       </div>
 
       {/* Back to Login Link */}
-      <Link
-        to="/"
-        className="absolute top-6 left-6 z-10 flex items-center gap-2 text-white/60 hover:text-white transition-colors group"
-      >
-        <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-        </svg>
-        <span className="text-sm font-medium">Back to Login</span>
-      </Link>
+      <div className="w-full max-w-md mb-4 z-10">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors group"
+        >
+          <svg className="w-5 h-5 transform group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          <span className="text-sm font-medium">Back to Login</span>
+        </Link>
+      </div>
 
       {/* Forgot Password Card */}
-      <div className="relative bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl max-w-md w-full p-8 ring-1 ring-white/20 animate-fade-in-up">
+      <div className="relative bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl max-w-md w-full p-5 sm:p-8 ring-1 ring-white/20 animate-fade-in-up">
         {/* Decorative gradient border at top */}
         <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-1 bg-linear-to-r from-[#639EA0] to-[#4A8082] rounded-full"></div>
 

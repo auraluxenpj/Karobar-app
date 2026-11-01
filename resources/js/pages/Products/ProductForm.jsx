@@ -268,7 +268,7 @@ const ProductFormFields = forwardRef(({
   return (
     <div className="product-form-fields">
       {/* Image - moved to top, compact */}
-      <div className="flex gap-3 items-start">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-start">
         <div className="w-32 shrink-0">
           <label className="block text-xs font-medium mb-1 dark:text-slate-300">Image</label>
           <div className="rounded-xl bg-white/60 dark:bg-slate-700/60 backdrop-blur-xs ring-1 ring-gray-200/60 dark:ring-slate-600/60 p-1.5">
@@ -286,7 +286,7 @@ const ProductFormFields = forwardRef(({
         </div>
         
         {/* Code / Barcode inline */}
-        <div className="flex-1 grid grid-cols-2 gap-2">
+        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div>
             <label className="block text-xs font-medium mb-1 dark:text-slate-300" htmlFor="product-product_code">Product Code</label>
             <GlassInput type="text" id="product-product_code" name="product_code" value={form.product_code || ""} disabled className="w-full bg-white/70 dark:bg-slate-700/70 text-sm h-8 dark:text-slate-200" />
@@ -1586,7 +1586,7 @@ export default function ProductForm({ initialData = null, onSubmitSuccess }) {
             </div>
 
             {/* Spacious Stock Breakdown Pills */}
-            <div className="grid grid-cols-3 gap-3 sm:min-w-[360px]">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:min-w-[360px]">
               <div className="px-3.5 py-2 rounded-xl bg-gray-100/80 dark:bg-slate-800/80 border border-gray-200/70 dark:border-slate-700/70 text-center">
                 <span className="block text-[10px] uppercase tracking-wider font-bold text-gray-500 dark:text-slate-400">
                   Total Stock

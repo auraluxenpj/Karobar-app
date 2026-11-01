@@ -908,7 +908,7 @@ return (
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Date range statement filter */}
-            <div className="flex items-center gap-1.5 text-xs">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs">
               <span className="text-gray-500 dark:text-gray-400 font-medium">Statement Range:</span>
               <input
                 type="date"
@@ -1474,16 +1474,16 @@ return (
                       }}
                       className="w-full"
                     />
-                    <div className="flex justify-between">
-                      <button className={`min-w-[90px] px-4 py-2 text-sm font-medium ${btnOutlined.className}`} style={btnOutlined.style} onClick={() => setDeleteStep(1)} disabled={deleting}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <button className={`px-4 py-2 text-sm font-medium ${btnOutlined.className}`} style={btnOutlined.style} onClick={() => setDeleteStep(1)} disabled={deleting}>
                         ← Back
                       </button>
-                      <div className="flex gap-2">
-                        <button className={`min-w-[100px] px-4 py-2 text-sm font-medium ${btnOutlined.className}`} style={btnOutlined.style} onClick={closeDeleteModal} disabled={deleting}>
+                      <div className="flex flex-wrap gap-2 flex-1 sm:flex-initial justify-end">
+                        <button className={`px-4 py-2 text-sm font-medium ${btnOutlined.className}`} style={btnOutlined.style} onClick={closeDeleteModal} disabled={deleting}>
                           Cancel
                         </button>
                         <button
-                          className={`min-w-[170px] px-4 py-2 text-sm font-semibold transition-all duration-200 disabled:opacity-60 ${btnDanger.className}`}
+                          className={`flex-1 sm:flex-initial px-4 py-2 text-sm font-semibold transition-all duration-200 disabled:opacity-60 ${btnDanger.className}`}
                           style={btnDanger.style}
                           onClick={confirmAndDelete}
                           disabled={deleting || password.trim() === ""}

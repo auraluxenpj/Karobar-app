@@ -529,7 +529,7 @@ export default function ShareDocumentModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-4xl rounded-2xl border shadow-2xl overflow-hidden transition-all ${
+        className={`w-full max-w-4xl max-h-[92dvh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden transition-all ${
           isDark
             ? "bg-slate-800 border-slate-700 text-slate-100"
             : "bg-white border-gray-200 text-gray-900"
@@ -537,7 +537,7 @@ export default function ShareDocumentModal({
       >
         {/* Compact Modal Header with Inline WhatsApp / Email Mode Switcher */}
         <div
-          className={`flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b ${
+          className={`flex flex-wrap items-center justify-between gap-3 px-4 sm:px-6 py-3 border-b shrink-0 ${
             isDark ? "border-slate-700 bg-slate-900/50" : "border-gray-200 bg-gray-50"
           }`}
         >
@@ -691,7 +691,7 @@ export default function ShareDocumentModal({
         )}
 
         {/* Body Content (2-Column Wide & Short Layout) */}
-        <div className="px-5 py-4 max-h-[68vh] overflow-y-auto">
+        <div className="flex-1 min-h-0 px-4 sm:px-6 py-4 max-h-[68dvh] overflow-y-auto">
           {loading ? (
             <div className="py-8 flex flex-col items-center justify-center gap-2.5">
               <ArrowPathIcon className="w-6 h-6 animate-spin text-blue-500" />
@@ -1035,7 +1035,7 @@ export default function ShareDocumentModal({
 
         {/* Compact Unified Modal Footer */}
         <div
-          className={`flex flex-wrap items-center justify-between gap-2.5 px-5 py-3 border-t ${
+          className={`flex flex-wrap items-center justify-between gap-2.5 px-4 sm:px-6 py-3 border-t shrink-0 ${
             isDark ? "border-slate-700 bg-slate-900/50" : "border-gray-200 bg-gray-50"
           }`}
         >

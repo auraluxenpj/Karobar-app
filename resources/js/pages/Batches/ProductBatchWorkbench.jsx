@@ -807,7 +807,7 @@ export default function ProductBatchWorkbench() {
         </div>
 
         {/* Keyboard Shortcut Keycaps */}
-        <div className="flex items-center flex-wrap gap-1.5 text-[11px]">
+        <div className="hidden lg:flex items-center flex-wrap gap-1.5 text-[11px]">
           {[
             { keys: "Alt + F / F2", label: "Search Product" },
             { keys: "Alt + B", label: "Batch #" },
@@ -993,7 +993,7 @@ export default function ProductBatchWorkbench() {
                         onClick={() =>
                           loadProductAndBatches(p, { focusBatchInput: true })
                         }
-                        className={`w-full px-3.5 py-2.5 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer ${
+                        className={`w-full px-3.5 py-2.5 text-left flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors cursor-pointer ${
                           isHighlighted
                             ? "bg-blue-50 dark:bg-blue-950/60"
                             : isCurrent
@@ -1509,7 +1509,7 @@ export default function ProductBatchWorkbench() {
             </div>
 
             {/* Submit & Reset Actions */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-200/60 dark:border-slate-700/60">
               <div className="text-[11px] text-slate-500 dark:text-slate-400">
                 Tip: In Quantity, type <code className="font-mono font-bold">2p</code> to auto-calculate{" "}
                 <code className="font-mono">2 × pack size</code>. Press{" "}

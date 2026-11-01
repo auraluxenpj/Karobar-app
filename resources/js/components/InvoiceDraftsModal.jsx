@@ -187,7 +187,7 @@ export default function InvoiceDraftsModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`relative w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden border transition-colors ${
+        className={`relative w-full max-w-2xl max-h-[85dvh] flex flex-col rounded-2xl shadow-2xl overflow-hidden border transition-colors ${
           isDark
             ? "bg-slate-900 border-slate-700/80 text-slate-100"
             : "bg-white border-gray-200 text-gray-900"
@@ -233,7 +233,7 @@ export default function InvoiceDraftsModal({
 
         {/* Search Bar & Actions */}
         <div
-          className={`p-4 border-b flex items-center gap-3 ${
+          className={`p-4 border-b flex flex-wrap items-center gap-3 ${
             isDark ? "bg-slate-800/30 border-slate-800/60" : "bg-gray-50/50 border-gray-100"
           }`}
         >
@@ -307,7 +307,7 @@ export default function InvoiceDraftsModal({
                           : "bg-white hover:bg-gray-50 border-gray-200 shadow-xs")
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className={`font-semibold text-sm truncate ${isDark ? "text-white" : "text-gray-900"}`}>
@@ -389,7 +389,7 @@ export default function InvoiceDraftsModal({
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
                       {isConfirming ? (
                         <div className={`flex items-center gap-1 p-1 rounded-lg border ${
                           isDark ? "bg-red-950/80 border-red-800" : "bg-red-50 border-red-200"

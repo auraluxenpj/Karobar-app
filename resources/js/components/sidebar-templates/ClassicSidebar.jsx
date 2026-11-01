@@ -815,7 +815,7 @@ export default function ClassicSidebar({
               {!effectiveCollapsed && (
                 <div className="flex flex-col min-w-0">
                   <span className="workspace-brand-name leading-tight">{brandName}</span>
-                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 hidden lg:flex items-center gap-1">
                     <span
                       className={`inline-block w-1.5 h-1.5 rounded-full ${
                         isPinned ? "bg-blue-500" : "bg-emerald-500"
@@ -838,7 +838,7 @@ export default function ClassicSidebar({
                     : "Pin sidebar open permanently"
                 }
                 aria-label={isPinned ? "Switch to auto-hide dock" : "Pin sidebar"}
-                className={`p-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer shrink-0 ${
+                className={`hidden lg:inline-flex p-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer shrink-0 ${
                   isPinned
                     ? "bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20"
                     : "bg-slate-500/8 border-slate-200/80 dark:border-slate-700/80 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-500/15"
@@ -849,6 +849,19 @@ export default function ClassicSidebar({
                 ) : (
                   <LockOpenIcon className="w-4 h-4" aria-hidden="true" />
                 )}
+              </button>
+            )}
+
+            {/* Mobile Drawer Close Button */}
+            {!effectiveCollapsed && onRequestCloseDock && (
+              <button
+                type="button"
+                onClick={onRequestCloseDock}
+                title="Close navigation menu"
+                aria-label="Close navigation menu"
+                className="lg:hidden p-1.5 rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-slate-500/8 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-all cursor-pointer shrink-0"
+              >
+                <XMarkIcon className="w-4 h-4" aria-hidden="true" />
               </button>
             )}
           </div>
@@ -868,7 +881,7 @@ export default function ClassicSidebar({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Filter menu... (/)"
                   aria-label="Filter navigation menu"
-                  className="w-full h-8.5 pl-8 pr-7 text-sm font-semibold rounded-xl bg-slate-500/8 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all"
+                  className="w-full h-8.5 pl-8 pr-7 text-base sm:text-sm font-semibold rounded-xl bg-slate-500/8 dark:bg-slate-800/70 border border-slate-200/70 dark:border-slate-700/70 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all"
                 />
                 {searchQuery && (
                   <button
@@ -1211,7 +1224,7 @@ export default function ClassicSidebar({
         </nav>
 
         {/* Footer */}
-        <div className="workspace-sidebar-footer">
+        <div className="workspace-sidebar-footer hidden lg:block">
           {isPinned ? (
             <div className="flex items-center gap-1">
               <button

@@ -235,7 +235,7 @@ export default function ShowStockAdjustment() {
           z-index: 2;
         }
         @container (width < 640px) {
-          .sa-table, .sa-table thead, .sa-table tbody, .sa-table tr, .sa-table th, .sa-table td {
+          .sa-table, .sa-table thead, .sa-table tbody, .sa-table tbody tr, .sa-table tbody th, .sa-table tbody td, .sa-table tfoot, .sa-table tfoot tr {
             display: block;
           }
           .sa-table thead {
@@ -252,46 +252,53 @@ export default function ShowStockAdjustment() {
             inset-block-start: 0;
             z-index: 2;
           }
-          .sa-table td {
+          .sa-table tbody td {
             display: flex;
             justify-content: space-between;
             align-items: center;
             text-align: end;
           }
-          .sa-table td:nth-child(2)::before {
+          .sa-table tbody td:nth-child(2)::before {
             content: var(--label-2) ": " / var(--label-2);
             font-weight: 600;
             opacity: 0.75;
           }
-          .sa-table td:nth-child(3)::before {
+          .sa-table tbody td:nth-child(3)::before {
             content: var(--label-3) ": " / var(--label-3);
             font-weight: 600;
             opacity: 0.75;
           }
-          .sa-table td:nth-child(4)::before {
+          .sa-table tbody td:nth-child(4)::before {
             content: var(--label-4) ": " / var(--label-4);
             font-weight: 600;
             opacity: 0.75;
           }
-          .sa-table td:nth-child(5)::before {
+          .sa-table tbody td:nth-child(5)::before {
             content: var(--label-5) ": " / var(--label-5);
             font-weight: 600;
             opacity: 0.75;
           }
-          .sa-table td:nth-child(6)::before {
+          .sa-table tbody td:nth-child(6)::before {
             content: var(--label-6) ": " / var(--label-6);
             font-weight: 600;
             opacity: 0.75;
           }
-          .sa-table td:nth-child(7)::before {
+          .sa-table tbody td:nth-child(7)::before {
             content: var(--label-7) ": " / var(--label-7);
             font-weight: 600;
             opacity: 0.75;
           }
-          .sa-table td:nth-child(8)::before {
+          .sa-table tbody td:nth-child(8)::before {
             content: var(--label-8) ": " / var(--label-8);
             font-weight: 600;
             opacity: 0.75;
+          }
+          .sa-table tfoot tr {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 0.75rem;
           }
         }
         @media print {

@@ -418,7 +418,7 @@ export default function StocktakeSession() {
 
       {/* Progress Bar */}
       <GlassCard className="p-4">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3.5">
           <div className="flex-1">
             <div className="flex justify-between text-xs font-medium mb-1.5">
               <span className={isDark ? "text-slate-300" : "text-slate-600"}>
@@ -437,7 +437,7 @@ export default function StocktakeSession() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
             <button
               type="button"
               onClick={() => setShareOpen(true)}
@@ -600,7 +600,155 @@ export default function StocktakeSession() {
             <p className="text-sm mt-1 opacity-70">Click "Start Session" to snapshot inventory and begin counting.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            {/* Mobile Handheld Counting Card List */}
+            <div className={`md:hidden divide-y ${isDark ? "divide-slate-800" : "divide-slate-100"}`}>
+              {filteredItems.length === 0 ? (
+                <div className="py-10 text-center text-slate-400 text-sm">
+                  No items match your filter.
+                </div>
+              ) : (
+                filteredItems.map((item, idx) => {
+                  const input = countInputs[item.id] || { value: "", saved: false };
+                  const isSaving = savingItem === item.id;
+                  const isCounted = item.status === "counted";
+                  const variance = isCounted
+                    ? (parseFloat(item.counted_qty) - parseFloat(item.system_qty)).toFixed(2)
+                    : null;
+                  const hasVariance = variance !== null && parseFloat(variance) !== 0;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-4 space-y-3 transition-colors ${
+                        isCounted
+                          ? isDark
+                            ? "bg-emerald-900/10"
+                            : "bg-emerald-50/50"
+                          : ""
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-mono ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                              #{idx + 1}
+                            </span>
+                            <span className={`font-semibold text-sm truncate ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+                              {item.product?.name || "—"}
+                            </span>
+                          </div>
+                          <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+                            {item.product?.rack && (
+                              <span className="font-medium">Rack: {item.product.rack}</span>
+                            )}
+                            <span className="font-mono">
+                              Batch: {item.batch_number || "—"}
+                            </span>
+                            <span>
+                              Exp: {item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : "—"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {isCounted ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 shrink-0">
+                            <CheckCircleIcon className="w-3.5 h-3.5" />
+                            Counted
+                          </span>
+                        ) : (
+                          <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
+                            isDark ? "bg-slate-700 text-slate-400" : "bg-slate-100 text-slate-500"
+                          }`}>
+                            Pending
+                          </span>
+                        )}
+                      </div>
+
+                      {!session.is_blind && (
+                        <div className="flex items-center justify-between text-xs pt-1">
+                          <span className={isDark ? "text-slate-400" : "text-slate-500"}>
+                            System Qty:{" "}
+                            <strong className={`font-mono ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+                              {item.system_qty !== null && item.system_qty !== undefined
+                                ? Number(item.system_qty).toFixed(2)
+                                : "—"}
+                            </strong>
+                          </span>
+                          {isCounted && (
+                            <span className={`font-bold font-mono ${
+                              hasVariance
+                                ? parseFloat(variance) > 0
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-red-600 dark:text-red-400"
+                                : isDark ? "text-slate-400" : "text-slate-500"
+                            }`}>
+                              Variance: {parseFloat(variance) > 0 ? "+" : ""}{variance}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          ref={(el) => {
+                            if (el && el.offsetParent !== null) {
+                              inputRefs.current[item.id] = el;
+                            }
+                          }}
+                          type="number"
+                          min="0"
+                          step="1"
+                          disabled={isReadonly || isSaving}
+                          value={input.value}
+                          onChange={(e) =>
+                            setCountInputs((prev) => ({
+                              ...prev,
+                              [item.id]: { value: e.target.value, saved: false },
+                            }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleSaveCount(item);
+                            }
+                          }}
+                          placeholder={session.is_blind ? "Enter physical count…" : "Enter counted qty…"}
+                          className={`flex-1 min-h-[44px] text-sm font-mono rounded-xl border px-3 py-2 focus:outline-none focus:ring-2 transition-colors ${
+                            isDark
+                              ? "bg-slate-800 border-slate-600 text-slate-100 focus:ring-blue-500/40"
+                              : "bg-white border-slate-300 text-slate-900 focus:ring-blue-500/40"
+                          } ${isReadonly ? "opacity-60 cursor-not-allowed" : ""}`}
+                        />
+                        {!isReadonly && (
+                          <button
+                            onClick={() => handleSaveCount(item)}
+                            disabled={isSaving || input.value === ""}
+                            className={`min-h-[44px] px-4 rounded-xl text-xs font-bold transition-colors disabled:opacity-40 shrink-0 ${
+                              isCounted && !isSaving && input.value === String(item.counted_qty)
+                                ? isDark
+                                  ? "bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60"
+                                  : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                                : btnPrimary.className
+                            }`}
+                            style={
+                              !(isCounted && !isSaving && input.value === String(item.counted_qty))
+                                ? btnPrimary.style
+                                : {}
+                            }
+                          >
+                            {isSaving ? "…" : isCounted && input.value === String(item.counted_qty) ? "Saved ✓" : "Save ✓"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className={`border-b text-xs font-semibold uppercase tracking-wide ${
@@ -687,7 +835,11 @@ export default function StocktakeSession() {
                         {/* Physical Count Input */}
                         <td className="py-2.5 px-4 text-right">
                           <input
-                            ref={(el) => { inputRefs.current[item.id] = el; }}
+                            ref={(el) => {
+                              if (el && (el.offsetParent !== null || !inputRefs.current[item.id])) {
+                                inputRefs.current[item.id] = el;
+                              }
+                            }}
                             type="number"
                             min="0"
                             step="1"
@@ -775,6 +927,7 @@ export default function StocktakeSession() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </GlassCard>
 

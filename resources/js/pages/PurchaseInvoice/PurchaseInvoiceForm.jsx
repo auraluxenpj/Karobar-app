@@ -1549,8 +1549,7 @@ const contRect = container.getBoundingClientRect();
 
   return (
     <form
-      className="purchase-entry flex flex-col h-full"
-      style={{ minHeight: "calc(100vh - 130px)", maxHeight: "calc(100vh - 130px)" }}
+      className="purchase-entry flex flex-col h-auto lg:h-[calc(100dvh-130px)]"
       autoComplete="off" // disable browser suggestions globally
     >
       <InvoiceErrorSummary errors={invoiceErrors} />
@@ -1650,7 +1649,7 @@ const contRect = container.getBoundingClientRect();
         <div className="purchase-entry-details px-3 py-1 border-b">
           <div className="grid grid-cols-12 gap-1.5 items-end">
             {/* Posted Number - col 1 */}
-            <div className="col-span-1">
+            <div className="col-span-6 sm:col-span-3 lg:col-span-1">
               <label className="flex items-center justify-between text-[9px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-0.5">
                 <span className="truncate">Posted #</span>
                 <span className="text-[8px] font-medium lowercase opacity-75">auto</span>
@@ -1668,7 +1667,7 @@ const contRect = container.getBoundingClientRect();
             </div>
 
             {/* Date - col 2 */}
-            <div className="col-span-2">
+            <div className="col-span-6 sm:col-span-3 lg:col-span-2">
               <label className="block text-[9px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-0.5">Date</label>
               <input
                 type="date"
@@ -1681,7 +1680,7 @@ const contRect = container.getBoundingClientRect();
             </div>
 
             {/* Supplier - col 3 */}
-            <div className="col-span-3">
+            <div className="col-span-12 sm:col-span-6 lg:col-span-3">
               <label className="block text-[9px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-0.5">Supplier *</label>
               <button
                 type="button"
@@ -1710,7 +1709,7 @@ const contRect = container.getBoundingClientRect();
             </div>
 
             {/* Invoice Number - col 1 */}
-            <div className="col-span-1">
+            <div className="col-span-4 sm:col-span-3 lg:col-span-1">
               <label className="block text-[9px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-0.5">Invoice #</label>
               <input
                 ref={invoiceNumberRef}
@@ -1727,7 +1726,7 @@ const contRect = container.getBoundingClientRect();
             </div>
 
             {/* Invoice Amount - col 1 */}
-            <div className="col-span-1">
+            <div className="col-span-4 sm:col-span-3 lg:col-span-1">
               <label className="block text-[9px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-0.5">Bill Amt</label>
               <input
                 ref={invoiceAmountRef}
@@ -1745,7 +1744,7 @@ const contRect = container.getBoundingClientRect();
             </div>
 
             {/* Difference - col 1 */}
-            <div className="col-span-1">
+            <div className="col-span-4 sm:col-span-2 lg:col-span-1">
               <label className="flex items-center justify-between text-[9px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-0.5">
                 <span className="truncate">Diff</span>
                 <span className="text-[8px] font-medium lowercase opacity-75">auto</span>
@@ -1770,7 +1769,7 @@ const contRect = container.getBoundingClientRect();
             </div>
 
             {/* Remarks - col 3 (same row!) */}
-            <div className="col-span-3">
+            <div className="col-span-12 sm:col-span-4 lg:col-span-3">
               <label className="block text-[9px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-0.5">Remarks</label>
               <input
                 type="text"
@@ -1858,9 +1857,9 @@ const contRect = container.getBoundingClientRect();
             </span>
           </div>
         </div>
-        <label className="flex items-center gap-1.5 text-[11px] shrink-0">
+        <label className="flex flex-wrap items-center gap-1.5 text-[11px] w-full sm:w-auto shrink-0">
           <span className="font-medium text-gray-600 dark:text-slate-300">Arrange products</span>
-          <div className="w-52 text-left">
+          <div className="w-full sm:w-52 text-left">
             <Select
               aria-label="Purchase invoice arrangement on save"
               options={[
@@ -1894,7 +1893,7 @@ const contRect = container.getBoundingClientRect();
       </div>
       {/* ================= ITEMS SECTION ================= */}
       <div ref={itemsScrollRef} className="purchase-entry-items flex-1 min-h-0 overflow-auto pt-1 px-2 pb-4" autoComplete="off">
-        <table className="w-full border-collapse text-[11px]">
+        <table className="invoice-repeater-table w-full border-collapse text-[11px]">
           <thead className="sticky top-0 bg-gray-100 dark:bg-slate-700 z-5">
             <tr>
               <th rowSpan={2} className="border w-7 purchase-th-readonly">#</th>
@@ -1955,30 +1954,33 @@ const contRect = container.getBoundingClientRect();
                     </tr>
                   );
                 })()}
-              <tr key={rowKey} id={invoiceErrors.rowId(i)} data-dnd-row={item.product_id ? i : undefined} aria-invalid={invoiceErrors.rowMessages(i).length > 0 || undefined} className={`text-center ${invoiceErrors.rowMessages(i).length ? "invoice-row-invalid" : ""} ${item.product_id ? dnd.rowDropClass(i) : ""} ${item.product_id && dnd.isDragging(i) ? "dnd-dragging" : ""}`}>
+              <tr key={rowKey} id={invoiceErrors.rowId(i)} data-dnd-row={item.product_id ? i : undefined} aria-invalid={invoiceErrors.rowMessages(i).length > 0 || undefined} className={`invoice-repeater-row text-center ${invoiceErrors.rowMessages(i).length ? "invoice-row-invalid" : ""} ${item.product_id ? dnd.rowDropClass(i) : ""} ${item.product_id && dnd.isDragging(i) ? "dnd-dragging" : ""}`}>
                 {/* Drag handle / Remove */}
-                <td className="border">
-                  <div className="flex items-center justify-center gap-0.5">
-                    {item.product_id && (
-                      <button type="button" className="invoice-drag-handle" onPointerDown={e => dnd.startRowDrag(e, i, product_name || `Item ${i + 1}`)} onKeyDown={e => dnd.keyMoveRow(e, i)} aria-label={`Move ${product_name || `item ${i + 1}`}. Drag, or use arrow up and down keys.`} title="Drag to reorder">
-                        <DragGripIcon />
+                <td className="invoice-cell-index-actions border">
+                  <div className="flex items-center justify-between lg:justify-center gap-1.5">
+                    <span className="lg:hidden text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Item #{i + 1}</span>
+                    <div className="flex items-center gap-1.5">
+                      {item.product_id && (
+                        <button type="button" className="invoice-drag-handle" onPointerDown={e => dnd.startRowDrag(e, i, product_name || `Item ${i + 1}`)} onKeyDown={e => dnd.keyMoveRow(e, i)} aria-label={`Move ${product_name || `item ${i + 1}`}. Drag, or use arrow up and down keys.`} title="Drag to reorder">
+                          <DragGripIcon />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => removeItem(i)}
+                        className="products-row-action products-row-delete"
+                        aria-label={`Remove item ${i + 1}`}
+                        title="Remove item"
+                      >
+                        <TrashIcon aria-hidden="true" className="w-4 h-4" />
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => removeItem(i)}
-                      className="products-row-action products-row-delete"
-                      aria-label={`Remove item ${i + 1}`}
-                      title="Remove item"
-                    >
-                      <TrashIcon aria-hidden="true" className="w-4 h-4" />
-                    </button>
+                    </div>
                   </div>
                 </td>
 
                 {/* Product Search Input */}
-                <td colSpan={1} className="border text-left w-[200px]">
+                <td colSpan={1} data-label="Product *" className="invoice-cell-product border text-left w-[200px]">
                   <InvoiceRowError messages={invoiceErrors.rowMessages(i)} />
                   <div ref={(el) => (productSearchRefs.current[i] = el)}>
                     <ProductSearchInput
@@ -2092,7 +2094,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Pack Size (Read-only) */}
-                <td className="border w-14">
+                <td data-label="Pack Size" className="border w-14">
                   <input
                     type="text"
                     readOnly
@@ -2105,7 +2107,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Batch */}
-                <td className="border min-w-[130px] w-32">
+                <td data-label="Batch" className="border min-w-[130px] w-32">
                   <BatchSearchInput
                     ref={(el) => (batchRefs.current[i] = el)}
                     mode="purchase"
@@ -2128,7 +2130,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Expiry */}
-                <td className="border w-28">
+                <td data-label="Expiry" className="border w-28">
                   <input
                     ref={(el) => (expiryRefs.current[i] = el)}
                     type="date"
@@ -2141,7 +2143,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Pack Qty */}
-                <td className="border">
+                <td data-label="Pack Qty" className="border">
                   <input
                     ref={(el) => (packQuantityRefs.current[i] = el)}
                     type="text"
@@ -2157,7 +2159,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Unit Qty */}
-                <td className="border">
+                <td data-label="Unit Qty" className="border">
                   <input
                     type="text"
                     inputMode="decimal"
@@ -2170,7 +2172,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Pack Purchase */}
-                <td className="border">
+                <td data-label="Pack Cost" className="border">
                   <input
                     ref={(el) => (packPurchasePriceRefs.current[i] = el)}
                     type="text"
@@ -2186,7 +2188,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Unit Purchase */}
-                <td className="border">
+                <td data-label="Unit Cost" className="border">
                   <input
                     type="text"
                     inputMode="decimal"
@@ -2199,7 +2201,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Disc% */}
-                <td className="border">
+                <td data-label="Disc %" className="border">
                   <input
                     ref={(el) => (itemDiscountRefs.current[i] = el)}
                     type="text"
@@ -2217,7 +2219,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Pack Bonus */}
-                <td className="border">
+                <td data-label="Pack Bonus" className="border">
                   <input
                     ref={(el) => (packBonusRefs.current[i] = el)}
                     type="text"
@@ -2233,7 +2235,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Unit Bonus */}
-                <td className="border">
+                <td data-label="Unit Bonus" className="border">
                   <input
                     type="text"
                     inputMode="decimal"
@@ -2246,7 +2248,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Pack Sale */}
-                <td className="border">
+                <td data-label="Pack Sale" className="border">
                   <input
                     ref={(el) => (packSalePriceRefs.current[i] = el)}
                     type="text"
@@ -2262,7 +2264,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Unit Sale */}
-                <td className="border">
+                <td data-label="Unit Sale" className="border">
                   <input
                     type="text"
                     inputMode="decimal"
@@ -2275,7 +2277,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Wholesale Pack Sale */}
-                <td className={`border ${!hasWholesale ? 'hidden' : ''}`}>
+                <td data-label="W.S. Pack" className={`border ${!hasWholesale ? 'hidden' : ''}`}>
                   <input
                     ref={(el) => (wholeSalePackPriceRefs.current[i] = el)}
                     type="text"
@@ -2291,7 +2293,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Wholesale Unit Sale */}
-                <td className={`border ${!hasWholesale ? 'hidden' : ''}`}>
+                <td data-label="W.S. Unit" className={`border ${!hasWholesale ? 'hidden' : ''}`}>
                   <input
                     ref={(el) => (wholeSaleUnitPriceRefs.current[i] = el)}
                     type="text"
@@ -2307,7 +2309,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Margin % (Read-only) */}
-                <td className="border">
+                <td data-label="Margin %" className="border">
                   <input
                     type="text"
                     readOnly
@@ -2320,7 +2322,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* W.S. Margin % (Read-only) */}
-                <td className={`border ${!hasWholesale ? 'hidden' : ''}`}>
+                <td data-label="W.S. Mrg %" className={`border ${!hasWholesale ? 'hidden' : ''}`}>
                   <input
                     type="text"
                     readOnly
@@ -2333,7 +2335,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Avg Price (Read-only) */}
-                <td className="border">
+                <td data-label="Avg Cost" className="border">
                   <input
                     type="text"
                     value={item.avg_price ?? ""}
@@ -2346,7 +2348,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Sub Total (Read-only computed badge) */}
-                <td className="border w-24">
+                <td data-label="Sub Total" className="invoice-cell-subtotal border w-24">
                   <input
                     type="text"
                     value={item.sub_total ?? ""}
@@ -2359,7 +2361,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Quantity (hidden) */}
-                <td className="border" style={{ display: "none" }}>
+                <td className="border hidden" style={{ display: "none" }}>
                   <input
                     type="number"
                     readOnly
@@ -2371,11 +2373,11 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Add */}
-                <td className="border w-7">
+                <td className="invoice-cell-add border w-7">
                   <button
                     type="button"
                     onClick={addItem}
-                    className="products-row-action"
+                    className="products-row-action products-row-add"
                     aria-label="Add item"
                     title="Add item"
                   >
@@ -2391,7 +2393,7 @@ const contRect = container.getBoundingClientRect();
       </div>
 
       {/* ================= COMPACT 2-ROW FOOTER SECTION (TITLES NEXT TO FIELDS) ================= */}
-      <div className="purchase-entry-footer sticky bottom-0 z-10 border-t shadow-[0_-4px_16px_-6px_rgba(0,0,0,0.18)]" autoComplete="off">
+      <div className="purchase-entry-footer lg:sticky lg:bottom-0 z-10 border-t shadow-[0_-4px_16px_-6px_rgba(0,0,0,0.18)]" autoComplete="off">
         <div className="px-3 py-1.5 space-y-1">
           {/* ---- Row 1: Adjustments (Disc / Tax) + Computed Totals ---- */}
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">

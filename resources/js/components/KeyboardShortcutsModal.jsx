@@ -266,7 +266,7 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl border transition-all duration-200 overflow-hidden ${
+        className={`w-full max-w-3xl max-h-[90dvh] flex flex-col rounded-2xl shadow-2xl border transition-all duration-200 overflow-hidden ${
           isDark
             ? "bg-slate-900 border-slate-700/80 text-slate-100"
             : "bg-white border-slate-200 text-slate-900"
@@ -323,7 +323,7 @@ export default function KeyboardShortcutsModal({ isOpen, onClose }) {
             value={filterQuery}
             onChange={(e) => setFilterQuery(e.target.value)}
             placeholder="Search shortcuts (e.g. invoice, product, drawer)..."
-            className="flex-1 bg-transparent text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
+            className="flex-1 bg-transparent text-base sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
           />
           {filterQuery && (
             <button

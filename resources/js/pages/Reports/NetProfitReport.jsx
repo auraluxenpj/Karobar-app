@@ -204,7 +204,7 @@ export default function NetProfitReport() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
           {canExport && (
             <>
               <button
@@ -311,71 +311,71 @@ export default function NetProfitReport() {
 
         {/* Executive KPI Cards */}
         {kpis && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {/* Net Revenue */}
-            <div className="p-5 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-gray-100 dark:border-slate-800 shadow-sm backdrop-blur-xl">
-              <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">
+            <div className="p-4 sm:p-5 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-gray-100 dark:border-slate-800 shadow-sm backdrop-blur-xl min-w-0">
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400 truncate">
                 Net Sales Revenue
               </div>
-              <div className="text-2xl font-black text-gray-900 dark:text-white mt-1.5">
+              <div className="text-lg sm:text-2xl font-black text-gray-900 dark:text-white mt-1.5 truncate">
                 {formatCurrency(kpis.net_sales)}
               </div>
-              <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-1">
+              <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-1 truncate">
                 Invoiced: {formatCurrency(kpis.invoiced_sales)} • Ret: -{formatCurrency(kpis.returns_amount)}
               </div>
             </div>
 
             {/* Gross Profit */}
-            <div className="p-5 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-gray-100 dark:border-slate-800 shadow-sm backdrop-blur-xl">
-              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">
-                <span>Gross Profit</span>
-                <span className="font-mono text-emerald-600 dark:text-emerald-400">{kpis.gross_margin_pct}%</span>
+            <div className="p-4 sm:p-5 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-gray-100 dark:border-slate-800 shadow-sm backdrop-blur-xl min-w-0">
+              <div className="flex items-center justify-between gap-1 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">
+                <span className="truncate">Gross Profit</span>
+                <span className="font-mono text-emerald-600 dark:text-emerald-400 shrink-0">{kpis.gross_margin_pct}%</span>
               </div>
-              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1.5">
+              <div className="text-lg sm:text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1.5 truncate">
                 {formatCurrency(kpis.gross_profit)}
               </div>
-              <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-1">
+              <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-1 truncate">
                 COGS: {formatCurrency(kpis.cost_of_goods_sold)}
               </div>
             </div>
 
             {/* Total Expenses */}
-            <div className="p-5 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-gray-100 dark:border-slate-800 shadow-sm backdrop-blur-xl">
-              <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400">
+            <div className="p-4 sm:p-5 rounded-2xl bg-white/80 dark:bg-slate-900/80 border border-gray-100 dark:border-slate-800 shadow-sm backdrop-blur-xl min-w-0">
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-slate-400 truncate">
                 Operating Expenses (OpEx)
               </div>
-              <div className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1.5">
+              <div className="text-lg sm:text-2xl font-black text-rose-600 dark:text-rose-400 mt-1.5 truncate">
                 {formatCurrency(kpis.total_expenses)}
               </div>
-              <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-1">
+              <div className="text-[11px] text-gray-400 dark:text-slate-500 mt-1 truncate">
                 Across {report?.expenses_by_category?.length || 0} categories
               </div>
             </div>
 
             {/* Net Operating Profit */}
             <div
-              className={`p-5 rounded-2xl border shadow-sm backdrop-blur-xl ${
+              className={`p-4 sm:p-5 rounded-2xl border shadow-sm backdrop-blur-xl min-w-0 ${
                 kpis.is_profitable
                   ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/80 dark:border-emerald-800/50"
                   : "bg-rose-50/50 dark:bg-rose-950/20 border-rose-200/80 dark:border-rose-800/50"
               }`}
             >
-              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider">
-                <span className={kpis.is_profitable ? "text-emerald-800 dark:text-emerald-300" : "text-rose-800 dark:text-rose-300"}>
+              <div className="flex items-center justify-between gap-1 text-xs font-semibold uppercase tracking-wider">
+                <span className={`truncate ${kpis.is_profitable ? "text-emerald-800 dark:text-emerald-300" : "text-rose-800 dark:text-rose-300"}`}>
                   Net Operating Profit
                 </span>
-                <span className="font-mono font-bold">
+                <span className="font-mono font-bold shrink-0">
                   {kpis.is_profitable ? `+${kpis.net_margin_pct}%` : `${kpis.net_margin_pct}%`}
                 </span>
               </div>
               <div
-                className={`text-2xl font-black mt-1.5 ${
+                className={`text-lg sm:text-2xl font-black mt-1.5 truncate ${
                   kpis.is_profitable ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                 }`}
               >
                 {formatCurrency(kpis.net_profit)}
               </div>
-              <div className="text-[11px] opacity-80 mt-1">
+              <div className="text-[11px] opacity-80 mt-1 truncate">
                 {kpis.is_profitable ? "✓ Profitable operation" : "⚠ Operating at a loss"}
               </div>
             </div>
@@ -458,7 +458,7 @@ export default function NetProfitReport() {
               {/* Bottomline Net Profit */}
               <div className="pt-4 pb-2">
                 <div
-                  className={`flex justify-between items-center p-4 rounded-xl ${
+                  className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 p-4 rounded-xl ${
                     kpis.is_profitable
                       ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30"
                       : "bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30"

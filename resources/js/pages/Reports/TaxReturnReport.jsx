@@ -372,8 +372,8 @@ export default function TaxReturnReport() {
 
       {/* Filter Bar with react-select */}
       <div className="p-4 rounded-2xl bg-white/85 dark:bg-slate-900/85 border border-gray-200/80 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-80">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="w-full sm:w-80">
             <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">
               Report Section (react-select)
             </label>
@@ -387,7 +387,7 @@ export default function TaxReturnReport() {
             />
           </div>
 
-          <div className="w-64">
+          <div className="w-full sm:w-64">
             <label className="block text-[10px] font-bold uppercase text-gray-400 mb-1">
               Invoice Tax Filter (react-select)
             </label>
@@ -421,7 +421,7 @@ export default function TaxReturnReport() {
               className="h-9 px-2.5 text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white"
             />
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {[
               ["today", "Today"],
               ["this_month", "This Month"],
@@ -530,92 +530,94 @@ export default function TaxReturnReport() {
               </h2>
             </div>
 
-            <table className="w-full text-xs sm:text-sm border-collapse">
-              <thead>
-                <tr className="bg-gray-50/60 dark:bg-slate-800/40 border-b border-gray-200/60 dark:border-slate-800 text-[11px] font-bold uppercase text-gray-500">
-                  <th className="py-3 px-5 text-left">Return Box & Statutory Description</th>
-                  <th className="py-3 px-5 text-right">Invoices</th>
-                  <th className="py-3 px-5 text-right">Taxable / Exempt Base</th>
-                  <th className="py-3 px-5 text-right">Tax Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
-                <tr>
-                  <td className="py-3 px-5 font-medium">
-                    Box 1 — Taxable Sales Supplies (Retail & Wholesale)
-                  </td>
-                  <td className="py-3 px-5 text-right font-mono">{s.taxable_sales_count}</td>
-                  <td className="py-3 px-5 text-right font-mono">{formatCurrency(s.taxable_sales_base)}</td>
-                  <td className="py-3 px-5 text-right font-mono font-bold text-amber-600">
-                    {formatCurrency(s.output_tax_collected)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-3 px-5 font-medium">
-                    Box 2 — Zero-Rated / Exempt Supplies (Essential Medicines & Non-Taxable)
-                  </td>
-                  <td className="py-3 px-5 text-right font-mono">{s.exempt_sales_count}</td>
-                  <td className="py-3 px-5 text-right font-mono">{formatCurrency(s.exempt_sales_base)}</td>
-                  <td className="py-3 px-5 text-right font-mono">{formatCurrency(0)}</td>
-                </tr>
-                <tr>
-                  <td className="py-3 px-5 font-medium">
-                    Box 3 — Less: Sales Returns / Credit Notes Issued
-                  </td>
-                  <td className="py-3 px-5 text-right font-mono">—</td>
-                  <td className="py-3 px-5 text-right font-mono">-{formatCurrency(s.sale_returns_base)}</td>
-                  <td className="py-3 px-5 text-right font-mono text-emerald-600">
-                    -{formatCurrency(s.sale_returns_tax_reversed)}
-                  </td>
-                </tr>
-                <tr className="bg-amber-50/50 dark:bg-amber-950/20 font-bold">
-                  <td colSpan={3} className="py-3 px-5">
-                    Total Net Output Tax Payable on Sales (A)
-                  </td>
-                  <td className="py-3 px-5 text-right font-mono">{formatCurrency(s.net_output_tax)}</td>
-                </tr>
-                <tr>
-                  <td className="py-3 px-5 font-medium">
-                    Box 4 — Taxable Purchases from Registered Suppliers (Input Tax Credit)
-                  </td>
-                  <td className="py-3 px-5 text-right font-mono">{s.taxable_purchases_count}</td>
-                  <td className="py-3 px-5 text-right font-mono">{formatCurrency(s.taxable_purchases_base)}</td>
-                  <td className="py-3 px-5 text-right font-mono font-bold text-blue-600">
-                    {formatCurrency(s.input_tax_paid)}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="py-3 px-5 font-medium">
-                    Box 5 — Less: Purchase Returns / Debit Notes Issued to Suppliers
-                  </td>
-                  <td className="py-3 px-5 text-right font-mono">—</td>
-                  <td className="py-3 px-5 text-right font-mono">-{formatCurrency(s.purchase_returns_base)}</td>
-                  <td className="py-3 px-5 text-right font-mono text-rose-600">
-                    -{formatCurrency(s.purchase_returns_tax_reversed)}
-                  </td>
-                </tr>
-                <tr className="bg-blue-50/50 dark:bg-blue-950/20 font-bold">
-                  <td colSpan={3} className="py-3 px-5">
-                    Total Net Input Tax Credit Claimable (B)
-                  </td>
-                  <td className="py-3 px-5 text-right font-mono">{formatCurrency(s.net_input_tax)}</td>
-                </tr>
-                <tr>
-                  <td colSpan={3} className="py-3 px-5 font-medium">
-                    Box 6 — Less: Statutory Tax Challans Paid in Period (C)
-                  </td>
-                  <td className="py-3 px-5 text-right font-mono">-{formatCurrency(s.tax_challans_paid)}</td>
-                </tr>
-                <tr className="bg-slate-900 text-white font-bold">
-                  <td colSpan={3} className="py-3.5 px-5">
-                    NET STATUTORY TAX PAYABLE / (CARRY-FORWARD CREDIT) (A − B − C)
-                  </td>
-                  <td className="py-3.5 px-5 text-right font-mono text-base">
-                    {formatCurrency(s.net_tax_payable)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs sm:text-sm border-collapse min-w-[580px]">
+                <thead>
+                  <tr className="bg-gray-50/60 dark:bg-slate-800/40 border-b border-gray-200/60 dark:border-slate-800 text-[11px] font-bold uppercase text-gray-500">
+                    <th className="py-3 px-5 text-left">Return Box & Statutory Description</th>
+                    <th className="py-3 px-5 text-right">Invoices</th>
+                    <th className="py-3 px-5 text-right">Taxable / Exempt Base</th>
+                    <th className="py-3 px-5 text-right">Tax Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                  <tr>
+                    <td className="py-3 px-5 font-medium">
+                      Box 1 — Taxable Sales Supplies (Retail & Wholesale)
+                    </td>
+                    <td className="py-3 px-5 text-right font-mono">{s.taxable_sales_count}</td>
+                    <td className="py-3 px-5 text-right font-mono">{formatCurrency(s.taxable_sales_base)}</td>
+                    <td className="py-3 px-5 text-right font-mono font-bold text-amber-600">
+                      {formatCurrency(s.output_tax_collected)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-5 font-medium">
+                      Box 2 — Zero-Rated / Exempt Supplies (Essential Medicines & Non-Taxable)
+                    </td>
+                    <td className="py-3 px-5 text-right font-mono">{s.exempt_sales_count}</td>
+                    <td className="py-3 px-5 text-right font-mono">{formatCurrency(s.exempt_sales_base)}</td>
+                    <td className="py-3 px-5 text-right font-mono">{formatCurrency(0)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-5 font-medium">
+                      Box 3 — Less: Sales Returns / Credit Notes Issued
+                    </td>
+                    <td className="py-3 px-5 text-right font-mono">—</td>
+                    <td className="py-3 px-5 text-right font-mono">-{formatCurrency(s.sale_returns_base)}</td>
+                    <td className="py-3 px-5 text-right font-mono text-emerald-600">
+                      -{formatCurrency(s.sale_returns_tax_reversed)}
+                    </td>
+                  </tr>
+                  <tr className="bg-amber-50/50 dark:bg-amber-950/20 font-bold">
+                    <td colSpan={3} className="py-3 px-5">
+                      Total Net Output Tax Payable on Sales (A)
+                    </td>
+                    <td className="py-3 px-5 text-right font-mono">{formatCurrency(s.net_output_tax)}</td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-5 font-medium">
+                      Box 4 — Taxable Purchases from Registered Suppliers (Input Tax Credit)
+                    </td>
+                    <td className="py-3 px-5 text-right font-mono">{s.taxable_purchases_count}</td>
+                    <td className="py-3 px-5 text-right font-mono">{formatCurrency(s.taxable_purchases_base)}</td>
+                    <td className="py-3 px-5 text-right font-mono font-bold text-blue-600">
+                      {formatCurrency(s.input_tax_paid)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="py-3 px-5 font-medium">
+                      Box 5 — Less: Purchase Returns / Debit Notes Issued to Suppliers
+                    </td>
+                    <td className="py-3 px-5 text-right font-mono">—</td>
+                    <td className="py-3 px-5 text-right font-mono">-{formatCurrency(s.purchase_returns_base)}</td>
+                    <td className="py-3 px-5 text-right font-mono text-rose-600">
+                      -{formatCurrency(s.purchase_returns_tax_reversed)}
+                    </td>
+                  </tr>
+                  <tr className="bg-blue-50/50 dark:bg-blue-950/20 font-bold">
+                    <td colSpan={3} className="py-3 px-5">
+                      Total Net Input Tax Credit Claimable (B)
+                    </td>
+                    <td className="py-3 px-5 text-right font-mono">{formatCurrency(s.net_input_tax)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={3} className="py-3 px-5 font-medium">
+                      Box 6 — Less: Statutory Tax Challans Paid in Period (C)
+                    </td>
+                    <td className="py-3 px-5 text-right font-mono">-{formatCurrency(s.tax_challans_paid)}</td>
+                  </tr>
+                  <tr className="bg-slate-900 text-white font-bold">
+                    <td colSpan={3} className="py-3.5 px-5">
+                      NET STATUTORY TAX PAYABLE / (CARRY-FORWARD CREDIT) (A − B − C)
+                    </td>
+                    <td className="py-3.5 px-5 text-right font-mono text-base">
+                      {formatCurrency(s.net_tax_payable)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Tax Rate Tier Breakdown */}
@@ -626,38 +628,40 @@ export default function TaxReturnReport() {
                   Breakdown by Statutory Tax Rate (%)
                 </h3>
               </div>
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 dark:bg-slate-800/50 text-[10px] font-bold uppercase text-gray-500">
-                    <th className="py-2.5 px-4 text-left">Tax Rate Tier</th>
-                    <th className="py-2.5 px-4 text-right">Sales Docs</th>
-                    <th className="py-2.5 px-4 text-right">Sales Base</th>
-                    <th className="py-2.5 px-4 text-right">Output Tax</th>
-                    <th className="py-2.5 px-4 text-right">Purchase Docs</th>
-                    <th className="py-2.5 px-4 text-right">Purchase Base</th>
-                    <th className="py-2.5 px-4 text-right">Input Tax</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
-                  {report.rate_breakdown.map((tier, idx) => (
-                    <tr key={idx}>
-                      <td className="py-2.5 px-4 font-mono font-bold">
-                        {Number(tier.rate).toFixed(2)}%
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono">{tier.sales_docs}</td>
-                      <td className="py-2.5 px-4 text-right font-mono">{formatCurrency(tier.sales_base)}</td>
-                      <td className="py-2.5 px-4 text-right font-mono font-semibold text-amber-600">
-                        {formatCurrency(tier.output_tax)}
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono">{tier.purchase_docs}</td>
-                      <td className="py-2.5 px-4 text-right font-mono">{formatCurrency(tier.purchase_base)}</td>
-                      <td className="py-2.5 px-4 text-right font-mono font-semibold text-blue-600">
-                        {formatCurrency(tier.input_tax)}
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse min-w-[600px]">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-slate-800/50 text-[10px] font-bold uppercase text-gray-500">
+                      <th className="py-2.5 px-4 text-left">Tax Rate Tier</th>
+                      <th className="py-2.5 px-4 text-right">Sales Docs</th>
+                      <th className="py-2.5 px-4 text-right">Sales Base</th>
+                      <th className="py-2.5 px-4 text-right">Output Tax</th>
+                      <th className="py-2.5 px-4 text-right">Purchase Docs</th>
+                      <th className="py-2.5 px-4 text-right">Purchase Base</th>
+                      <th className="py-2.5 px-4 text-right">Input Tax</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                    {report.rate_breakdown.map((tier, idx) => (
+                      <tr key={idx}>
+                        <td className="py-2.5 px-4 font-mono font-bold">
+                          {Number(tier.rate).toFixed(2)}%
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono">{tier.sales_docs}</td>
+                        <td className="py-2.5 px-4 text-right font-mono">{formatCurrency(tier.sales_base)}</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-semibold text-amber-600">
+                          {formatCurrency(tier.output_tax)}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono">{tier.purchase_docs}</td>
+                        <td className="py-2.5 px-4 text-right font-mono">{formatCurrency(tier.purchase_base)}</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-semibold text-blue-600">
+                          {formatCurrency(tier.input_tax)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -766,30 +770,32 @@ export default function TaxReturnReport() {
                 Customer-Wise Output Tax Annexure (Annex-C)
               </h3>
             </div>
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-slate-800/50 text-[10px] font-bold uppercase text-gray-500">
-                  <th className="py-2.5 px-4 text-left">Customer</th>
-                  <th className="py-2.5 px-4 text-left">Tax ID</th>
-                  <th className="py-2.5 px-4 text-right">Docs</th>
-                  <th className="py-2.5 px-4 text-right">Taxable Base</th>
-                  <th className="py-2.5 px-4 text-right">Output Tax</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
-                {(report?.customer_annexure || []).map((row, idx) => (
-                  <tr key={idx}>
-                    <td className="py-2.5 px-4 font-medium">{row.party_name}</td>
-                    <td className="py-2.5 px-4 font-mono">{row.party_tax_number}</td>
-                    <td className="py-2.5 px-4 text-right font-mono">{row.doc_count}</td>
-                    <td className="py-2.5 px-4 text-right font-mono">{formatCurrency(row.taxable_amount)}</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold text-amber-600">
-                      {formatCurrency(row.tax_amount)}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse min-w-[480px]">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-slate-800/50 text-[10px] font-bold uppercase text-gray-500">
+                    <th className="py-2.5 px-4 text-left">Customer</th>
+                    <th className="py-2.5 px-4 text-left">Tax ID</th>
+                    <th className="py-2.5 px-4 text-right">Docs</th>
+                    <th className="py-2.5 px-4 text-right">Taxable Base</th>
+                    <th className="py-2.5 px-4 text-right">Output Tax</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                  {(report?.customer_annexure || []).map((row, idx) => (
+                    <tr key={idx}>
+                      <td className="py-2.5 px-4 font-medium">{row.party_name}</td>
+                      <td className="py-2.5 px-4 font-mono">{row.party_tax_number}</td>
+                      <td className="py-2.5 px-4 text-right font-mono">{row.doc_count}</td>
+                      <td className="py-2.5 px-4 text-right font-mono">{formatCurrency(row.taxable_amount)}</td>
+                      <td className="py-2.5 px-4 text-right font-mono font-bold text-amber-600">
+                        {formatCurrency(row.tax_amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="rounded-2xl bg-white/85 dark:bg-slate-900/85 border border-gray-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
@@ -798,30 +804,32 @@ export default function TaxReturnReport() {
                 Supplier-Wise Input Tax Annexure (Annex-A)
               </h3>
             </div>
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-slate-800/50 text-[10px] font-bold uppercase text-gray-500">
-                  <th className="py-2.5 px-4 text-left">Supplier</th>
-                  <th className="py-2.5 px-4 text-left">Tax ID</th>
-                  <th className="py-2.5 px-4 text-right">Docs</th>
-                  <th className="py-2.5 px-4 text-right">Taxable Base</th>
-                  <th className="py-2.5 px-4 text-right">Input Tax</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
-                {(report?.supplier_annexure || []).map((row, idx) => (
-                  <tr key={idx}>
-                    <td className="py-2.5 px-4 font-medium">{row.party_name}</td>
-                    <td className="py-2.5 px-4 font-mono">{row.party_tax_number}</td>
-                    <td className="py-2.5 px-4 text-right font-mono">{row.doc_count}</td>
-                    <td className="py-2.5 px-4 text-right font-mono">{formatCurrency(row.taxable_amount)}</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold text-blue-600">
-                      {formatCurrency(row.tax_amount)}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse min-w-[480px]">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-slate-800/50 text-[10px] font-bold uppercase text-gray-500">
+                    <th className="py-2.5 px-4 text-left">Supplier</th>
+                    <th className="py-2.5 px-4 text-left">Tax ID</th>
+                    <th className="py-2.5 px-4 text-right">Docs</th>
+                    <th className="py-2.5 px-4 text-right">Taxable Base</th>
+                    <th className="py-2.5 px-4 text-right">Input Tax</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                  {(report?.supplier_annexure || []).map((row, idx) => (
+                    <tr key={idx}>
+                      <td className="py-2.5 px-4 font-medium">{row.party_name}</td>
+                      <td className="py-2.5 px-4 font-mono">{row.party_tax_number}</td>
+                      <td className="py-2.5 px-4 text-right font-mono">{row.doc_count}</td>
+                      <td className="py-2.5 px-4 text-right font-mono">{formatCurrency(row.taxable_amount)}</td>
+                      <td className="py-2.5 px-4 text-right font-mono font-bold text-blue-600">
+                        {formatCurrency(row.tax_amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

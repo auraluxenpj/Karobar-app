@@ -327,7 +327,7 @@ export default function PurchaseReturnsIndex() {
         />
 
         {/* Hero Top */}
-        <div className="relative flex items-center justify-between px-5 py-4">
+        <div className="relative flex flex-wrap items-center justify-between gap-2 px-5 py-4">
           <div className="flex items-center gap-3">
             <div
               className="p-2.5 rounded-xl shadow-inner"
@@ -342,7 +342,7 @@ export default function PurchaseReturnsIndex() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => {
                 if (controllerRef.current) controllerRef.current.abort();
@@ -588,7 +588,7 @@ export default function PurchaseReturnsIndex() {
         </div>
 
         {/* Compact Pagination */}
-        <div className="px-3 py-2 flex items-center justify-between border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 text-xs">
+        <div className="px-3 py-2 flex flex-wrap items-center justify-between gap-2 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 text-xs">
           <span className="text-gray-500 dark:text-gray-400">
             Page {page} of {pageCount} ({filtered.length} total)
           </span>
@@ -685,7 +685,7 @@ export default function PurchaseReturnsIndex() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50/80 dark:bg-slate-800/80">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-b border-gray-200 dark:border-slate-700 bg-gray-50/80 dark:bg-slate-800/80">
               <div className="flex items-center gap-3">
                 <div
                   className="p-2 rounded-xl text-white"
@@ -702,7 +702,7 @@ export default function PurchaseReturnsIndex() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {viewingReturn && (
                   <>
                     <button
@@ -790,7 +790,7 @@ export default function PurchaseReturnsIndex() {
                   </div>
 
                   {/* Items Table */}
-                  <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
+                  <div className="border border-gray-200 dark:border-slate-700 rounded-xl overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead className="bg-gray-100 dark:bg-slate-700/70 text-gray-600 dark:text-gray-300 uppercase">
                         <tr>

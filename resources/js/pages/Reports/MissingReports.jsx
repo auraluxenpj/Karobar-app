@@ -658,7 +658,7 @@ export default function MissingReports({ type }) {
                                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-normal">Limit Exceeded</span>
                                 )}
                               </summary>
-                              <div className="mt-2 min-w-[50rem] p-2 bg-gray-50 dark:bg-slate-800 rounded border border-gray-200 dark:border-slate-700">
+                              <div className="mt-2 max-w-[calc(100vw-4rem)] sm:max-w-none overflow-x-auto p-2 bg-gray-50 dark:bg-slate-800 rounded border border-gray-200 dark:border-slate-700">
                                 <h4 className="text-xs font-semibold mb-1 text-gray-700 dark:text-gray-300">Overdue Unpaid Invoices:</h4>
                                 <table className="report-table">
                                   <thead>
@@ -816,7 +816,7 @@ export default function MissingReports({ type }) {
                                 <span className="text-[10px] px-1 py-0.2 rounded bg-red-100 text-red-700 font-normal">Limit Exceeded</span>
                               )}
                             </summary>
-                            <div className="mt-2 min-w-[50rem] p-2 bg-gray-50 dark:bg-slate-800 rounded border border-gray-200 dark:border-slate-700">
+                            <div className="mt-2 max-w-[calc(100vw-4rem)] sm:max-w-none overflow-x-auto p-2 bg-gray-50 dark:bg-slate-800 rounded border border-gray-200 dark:border-slate-700">
                               <table className="report-table">
                                 <thead>
                                   <tr>
@@ -945,7 +945,7 @@ export default function MissingReports({ type }) {
                 <tr key={row.id}>
                   {report.columns.map(([field, , isMoney]) => <td key={field} className={isMoney ? "report-num" : ""}>{isMoney ? money(row[field]) : field === "item_count" ? row.item_count ?? row.items?.length ?? 0 : field === "quantity" ? row.quantity ?? row.items?.reduce((sum, item) => sum + number(item.quantity ?? item.return_unit_quantity), 0) ?? 0 : row[field] || "—"}</td>)}
                   <td><details><summary className="cursor-pointer">View items ({row.items?.length || 0})</summary>
-                    <div className="mt-2 min-w-[32rem]">
+                    <div className="mt-2 max-w-[calc(100vw-4rem)] sm:max-w-none overflow-x-auto">
                       <table className="report-table"><thead><tr><th>Product</th><th>Batch</th><th className="report-num">Qty</th><th className="report-num">Unit price</th><th className="report-num">Line total</th></tr></thead>
                         <tbody>{(row.items || []).map((item) => <tr key={item.id}><td>{item.product_name || "—"}<span className="block text-xs opacity-70">{item.product_code}</span></td><td>{item.batch || "—"}</td><td className="report-num">{number(item.quantity ?? item.return_unit_quantity).toLocaleString()}</td><td className="report-num">{money(item.sale_price ?? item.unit_purchase_price)}</td><td className="report-num">{money(item.sub_total)}</td></tr>)}</tbody>
                       </table>
