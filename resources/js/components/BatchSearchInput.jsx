@@ -237,10 +237,11 @@ const BatchSearchInput = forwardRef(
     };
 
     return (
-      <div ref={wrapperRef} className="batch-search-trigger relative w-full">
+      <div ref={wrapperRef} className="batch-search-trigger relative w-full min-w-0">
         <input
           ref={inputRef}
           type="text"
+          size={1}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -254,7 +255,8 @@ const BatchSearchInput = forwardRef(
           onClick={() => setShowDropdown(true)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="border w-full h-7 text-xs px-2 rounded-md bg-white dark:bg-slate-700 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-400/40 dark:focus:ring-indigo-400/40"
+          title={query || undefined}
+          className="border w-full min-w-0 h-7 text-[11px] px-1.5 truncate rounded-md bg-white dark:bg-slate-700 border-gray-300 dark:border-slate-600 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-blue-400/40 dark:focus:ring-indigo-400/40"
           placeholder={placeholder || defaultPlaceholder}
         />
         {showDropdown && filtered.length > 0 && (

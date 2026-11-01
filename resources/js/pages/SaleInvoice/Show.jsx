@@ -721,31 +721,31 @@ export default function SaleInvoiceShow() {
           <div ref={itemsScrollRef} className={`sale-entry-items flex-1 overflow-auto border-2 rounded-sm relative ${isDark ? "border-slate-700 bg-slate-800" : "border-gray-200 bg-white"}`}>
             <table className="invoice-repeater-table w-full text-[11px] lg:table-fixed border-collapse print-table">
               <thead className={`sticky top-0 z-20 ${isDark ? "bg-slate-800/90 backdrop-blur-xs" : "bg-white/80 backdrop-blur-xs"} border-b ${isDark ? "border-slate-700" : "border-gray-200/70"}`}>
-                <tr className="[&>th]:py-1.5 [&>th]:px-2 [&>th]:text-left">
-                  <th className={`w-8 text-center border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-500 border-gray-200"}`}>#</th>
-                  <th className={`w-[180px] border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Product</th>
-                  <th className={`w-14 text-center border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>PSize</th>
-                  <th className={`w-24 border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Batch</th>
-                  <th className={`w-20 text-center border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Expiry</th>
-                  <th className={`w-16 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Avail</th>
+                <tr className="[&>th]:py-1.5 [&>th]:px-1.5 [&>th]:text-left">
+                  <th className={`w-7 text-center border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-500 border-gray-200"}`}>#</th>
+                  <th className={`w-[30%] min-w-[220px] border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Product</th>
+                  <th className={`w-11 text-center border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>PSize</th>
+                  <th className={`w-18 border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Batch</th>
+                  <th className={`w-[74px] text-center border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Expiry</th>
+                  <th className={`w-14 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Avail</th>
                   {inv?.sale_type === "wholesale" ? (
                     <>
-                      <th className={`w-13 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Pack.Q</th>
-                      <th className={`w-13 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Unit.Q</th>
-                      <th className={`w-13 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Pack.B</th>
-                      <th className={`w-13 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Unit.B</th>
-                      <th className={`w-15 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Tot.U</th>
-                      <th className={`w-20 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Pack.P</th>
-                      <th className={`w-20 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Unit.P</th>
+                      <th className={`w-12 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Pack.Q</th>
+                      <th className={`w-12 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Unit.Q</th>
+                      <th className={`w-12 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Pack.B</th>
+                      <th className={`w-12 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Unit.B</th>
+                      <th className={`w-13 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Tot.U</th>
+                      <th className={`w-16 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Pack.P</th>
+                      <th className={`w-16 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Unit.P</th>
                     </>
                   ) : (
                     <>
-                      <th className={`w-16 text-right border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Qty</th>
-                      <th className={`w-20 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Price</th>
+                      <th className={`w-14 text-right border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Qty</th>
+                      <th className={`w-18 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Price</th>
                     </>
                   )}
-                  <th className={`w-16 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Disc%</th>
-                  <th className={`w-24 text-right ${isDark ? "text-slate-300" : "text-gray-700"}`}>Sub Total</th>
+                  <th className={`w-13 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Disc%</th>
+                  <th className={`w-20 text-right ${isDark ? "text-slate-300" : "text-gray-700"}`}>Sub Total</th>
                 </tr>
               </thead>
               <tbody className={`[&>tr>td]:py-1.5 [&>tr>td]:px-2 ${isDark ? "[&>tr]:border-slate-700 [&>tr>td]:text-slate-200" : "[&>tr]:border-gray-200 [&>tr>td]:text-gray-800"}`}>
@@ -789,7 +789,7 @@ export default function SaleInvoiceShow() {
                       <td data-label="Product" className={`invoice-cell-product text-left font-medium lg:truncate border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{it.product?.name ?? it.product_id}</td>
                       <td data-label="Pack Size" className={`text-center font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{fmt(it.pack_size) || "—"}</td>
                       <td data-label="Batch" className={`text-left font-mono lg:truncate border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{fmt(it.batch_number) || "—"}</td>
-                      <td data-label="Expiry" className={`text-center font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{fmt(it.expiry) || "—"}</td>
+                      <td data-label="Expiry" title={it.expiry ? String(it.expiry).trim().slice(0, 10) : undefined} className={`text-center font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{it.expiry ? String(it.expiry).trim().slice(0, 10).replace(/^(\d{4})-(\d{2})(?:-\d{2})?$/, "$2/$1") : "—"}</td>
                       <td data-label="Available" className={`text-right font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{fmt(it.current_quantity) || "0"}</td>
                       {inv?.sale_type === "wholesale" ? (
                         <>

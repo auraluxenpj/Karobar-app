@@ -1905,18 +1905,18 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
               <table className="invoice-repeater-table w-full min-w-[780px] text-[11px] lg:table-fixed border-collapse" autoComplete="off">
               <thead className={`sticky top-0 z-20 ${isDark ? "bg-slate-800/95 backdrop-blur-xs border-slate-700" : "bg-white/95 backdrop-blur-xs border-gray-200"} border-b`}>
                 <tr className="[&>th]:text-left">
-                  <th className={`w-8 text-center ${isDark ? "text-rose-400" : "text-red-600"}`}>DEL</th>
-                  <th className="w-7 text-center sale-th-readonly">#</th>
-                  <th className="min-w-[200px] sale-th-editable">Product *</th>
-                  <th className="min-w-[76px] text-center sale-th-readonly" title="Pack Size (Auto)">PSize</th>
-                  <th className="min-w-[130px] sale-th-editable">Batch</th>
-                  <th className="min-w-[76px] text-center sale-th-readonly" title="Expiry Date (Auto)">Expiry</th>
-                  <th className="min-w-[76px] text-center sale-th-readonly" title="Available Units (Auto)">Avail</th>
-                  <th className="min-w-[76px] text-center sale-th-editable">Qty *</th>
-                  <th className="min-w-[76px] text-center sale-th-readonly" title="Unit Sale Price (Auto)">Price</th>
-                  <th className="min-w-[76px] text-center sale-th-editable">Disc %</th>
-                  <th className="min-w-[76px] text-center sale-th-readonly" title="Row Sub Total (Auto)">Sub Total</th>
-                  <th className="w-8 text-center">+</th>
+                  <th className={`w-7 text-center ${isDark ? "text-rose-400" : "text-red-600"}`}>DEL</th>
+                  <th className="w-6 text-center sale-th-readonly">#</th>
+                  <th className="min-w-[240px] w-[34%] sale-th-editable">Product *</th>
+                  <th className="w-12 text-center sale-th-readonly" title="Pack Size (Auto)">PSize</th>
+                  <th className="w-20 sale-th-editable">Batch</th>
+                  <th className="w-[80px] text-center sale-th-readonly" title="Expiry Date (Auto)">Expiry</th>
+                  <th className="w-14 text-center sale-th-readonly" title="Available Units (Auto)">Avail</th>
+                  <th className="w-16 text-center sale-th-editable">Qty *</th>
+                  <th className="w-18 text-center sale-th-readonly" title="Unit Sale Price (Auto)">Price</th>
+                  <th className="w-14 text-center sale-th-editable">Disc %</th>
+                  <th className="w-22 text-center sale-th-readonly" title="Row Sub Total (Auto)">Sub Total</th>
+                  <th className="w-7 text-center">+</th>
                 </tr>
               </thead>
               <tbody className="[&>tr>td]:py-1.5 [&>tr>td]:px-1">
@@ -2014,12 +2014,14 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                     <td data-label="Expiry" className="text-center">
                       <input
                         type="text"
-                        value={it.expiry ?? ""}
+                        value={it.expiry ? String(it.expiry).trim().slice(0, 10).replace(/^(\d{4})-(\d{2})(?:-\d{2})?$/, "$2/$1") : ""}
+                        title={it.expiry ? String(it.expiry).trim().slice(0, 10) : undefined}
                         readOnly
+                        size={1}
                         tabIndex={-1}
                         placeholder="—"
                         autoComplete="off"
-                        className="sale-readonly-field w-full h-7 rounded-md px-1 text-center font-mono text-[10.5px]"
+                        className="sale-readonly-field w-full min-w-0 h-7 rounded-md px-0.5 text-center font-mono text-[10.5px]"
                       />
                     </td>
 

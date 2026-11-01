@@ -1477,18 +1477,18 @@ const handleSelectChange = async (field, value) => {
           <table className="invoice-repeater-table w-full min-w-[560px] text-[11px] lg:table-fixed border-collapse" autoComplete="off">
               <thead className={`sticky top-0 z-20 ${isDark ? "bg-slate-800/90 backdrop-blur-xs border-slate-700" : "bg-white/80 backdrop-blur-xs border-gray-200/70"} border-b`}>
                 <tr className="[&>th]:py-1 [&>th]:px-1 [&>th]:text-left">
-                  <th className={`w-7 text-center ${isDark ? "text-rose-400" : "text-red-600"}`}>DEL</th>
-                  <th className={`w-7 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>#</th>
-                  <th className={`w-[180px] ${isDark ? "text-slate-400" : "text-gray-600"}`}>Product</th>
-                  <th className={`w-14 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>PSize</th>
-                  <th className={`w-24 ${isDark ? "text-slate-400" : "text-gray-600"}`}>Batch</th>
-                  <th className={`w-15 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>Expiry</th>
-                  <th className={`w-18 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>{form.sale_invoice_id ? "Returnable" : "Avail"}</th>
-                  <th className={`w-25 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>Return Qty</th>
-                  <th className={`w-22 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>Price</th>
-                  <th className={`w-18 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>Disc%</th>
-                  <th className={`w-26 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>Sub Total</th>
-                  <th className="w-7 text-center">+</th>
+                  <th className={`w-6 text-center ${isDark ? "text-rose-400" : "text-red-600"}`}>DEL</th>
+                  <th className={`w-6 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>#</th>
+                  <th className={`w-[32%] min-w-[220px] ${isDark ? "text-slate-400" : "text-gray-600"}`}>Product</th>
+                  <th className={`w-11 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>PSize</th>
+                  <th className={`w-18 ${isDark ? "text-slate-400" : "text-gray-600"}`}>Batch</th>
+                  <th className={`w-[74px] text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>Expiry</th>
+                  <th className={`w-15 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>{form.sale_invoice_id ? "Returnable" : "Avail"}</th>
+                  <th className={`w-18 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>Return Qty</th>
+                  <th className={`w-18 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>Price</th>
+                  <th className={`w-14 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>Disc%</th>
+                  <th className={`w-22 text-center ${isDark ? "text-slate-400" : "text-gray-600"}`}>Sub Total</th>
+                  <th className="w-6 text-center">+</th>
                 </tr>
               </thead>
             <tbody className="[&>tr>td]:py-1 [&>tr>td]:px-0.2">
@@ -1538,10 +1538,13 @@ const handleSelectChange = async (field, value) => {
                     </td>
                     <td data-label="Expiry" className="text-center">
                       <input
-                        type="date"
+                        type="text"
                         readOnly
-                        value={String(item.expiry || "").slice(0, 10)}
-                        className={`w-full h-6 border rounded px-1 text-center text-[11px] ${
+                        size={1}
+                        placeholder="—"
+                        title={item.expiry ? String(item.expiry).trim().slice(0, 10) : undefined}
+                        value={item.expiry ? String(item.expiry).trim().slice(0, 10).replace(/^(\d{4})-(\d{2})(?:-\d{2})?$/, "$2/$1") : ""}
+                        className={`w-full min-w-0 h-6 border rounded px-0.5 text-center font-mono text-[10.5px] ${
                           isDark
                             ? "border-slate-600 bg-slate-700 text-slate-300"
                             : "border-gray-200 bg-gray-100 text-gray-700"

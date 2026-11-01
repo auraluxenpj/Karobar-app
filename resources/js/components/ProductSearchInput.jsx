@@ -483,14 +483,15 @@ const stopResize = () => {
     return (
       <>
 {/* Trigger Input — shows selected product like other selects */}
-        <div className="product-search-trigger relative w-full">
+        <div className="product-search-trigger relative w-full min-w-0">
           <input
             ref={triggerRef}
             type="text"
+            size={1}
             value={display}
             readOnly
             placeholder="Search product…"
-            className={`w-full h-7 text-xs px-2 rounded-md text-left cursor-pointer transition-all border pr-6 ${className} ${
+            className={`w-full min-w-0 h-7 text-xs px-2 rounded-md text-left truncate cursor-pointer transition-all border pr-5 ${className} ${
                 selectedProduct
                   ? "border-blue-400 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 font-semibold"
                   : "border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500"

@@ -1839,28 +1839,43 @@ const handleSelectChange = async (field, value) => {
         <div className="purchase-entry-items flex-1 min-h-0 overflow-auto p-1">
           <h2 className="text-xs font-bold mb-1 text-gray-900 dark:text-gray-100">Items (↑↓ arrows to navigate rows)</h2>
 
-          <table className="invoice-repeater-table w-full border-collapse text-[11px]">
+          <table className="invoice-repeater-table w-full lg:table-fixed border-collapse text-[11px]">
+            <colgroup>
+              <col className="w-6" />
+              <col className="w-auto min-w-[230px]" />
+              <col className="w-11" />
+              <col className="w-[74px]" />
+              <col className="w-[74px]" />
+              <col className="w-16" />
+              <col className="w-12" />
+              <col className="w-12" />
+              <col className="w-14" />
+              <col className="w-14" />
+              <col className="w-12" />
+              <col className="w-18" />
+              <col className="w-6" />
+            </colgroup>
             <thead className="sticky top-0 bg-gray-100 dark:bg-slate-700 z-5">
               <tr>
                 <th rowSpan={2} className="border w-6 bg-gray-200 dark:bg-slate-600 text-gray-900 dark:text-gray-100">#</th>
-                <th rowSpan={2} colSpan={1} className="border w-[80px] bg-gray-200 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Product</th>
+                <th rowSpan={2} colSpan={1} className="border w-[30%] min-w-[230px] bg-gray-200 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Product</th>
                 <th colSpan={4} className="border bg-gray-200 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Pack Size / Batch / Expiry / Available Qty</th>
                 <th colSpan={2} className="border bg-gray-200 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Return Qty (Pack / Unit)</th>
                 <th colSpan={2} className="border bg-gray-200 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Purchase Price (P / U)</th>
                 <th colSpan={1} className="border bg-gray-200 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Disc %</th>
-                <th rowSpan={2} className="border w-16 bg-gray-200 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Sub Total</th>
+                <th rowSpan={2} className="border w-18 bg-gray-200 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Sub Total</th>
                 <th rowSpan={2} className="border w-6 bg-gray-200 dark:bg-slate-600 text-gray-900 dark:text-gray-100">+</th>
               </tr>
               <tr>
-                <th className="border w-14 bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">PSize</th>
-                <th className="border w-16 bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Batch</th>
-                <th className="border w-20 bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Exp</th>
-                <th className="border w-20 bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">{form.purchase_invoice_id ? "Returnable Qty" : "Avail.Q (Units)"}</th>
+                <th className="border w-11 bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">PSize</th>
+                <th className="border w-[74px] bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Batch</th>
+                <th className="border w-[74px] bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Exp</th>
+                <th className="border w-16 bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">{form.purchase_invoice_id ? "Returnable Qty" : "Avail.Q (Units)"}</th>
                 <th className="border w-12 bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Pack.Q</th>
                 <th className="border w-12 bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Unit.Q</th>
                 <th className="border w-14 bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Pack.P</th>
                 <th className="border w-14 bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Unit.P</th>
-                <th className="border w-14 bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Disc%</th>
+                <th className="border w-12 bg-gray-100 dark:bg-slate-600 text-gray-900 dark:text-gray-100">Disc%</th>
               </tr>
             </thead>
 
@@ -1882,7 +1897,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Product Search */}
-                  <td colSpan={1} data-label="Product *" className="invoice-cell-product border text-left w-[200px]">
+                  <td colSpan={1} data-label="Product *" className="invoice-cell-product border text-left w-[28%] min-w-[220px]">
                     <div
                       ref={(el) => (productSearchRefs.current[i] = el)}
                       onFocusCapture={() => { if (!form.purchase_invoice_id) refreshProducts(""); }}
@@ -1899,7 +1914,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Pack Size */}
-                  <td data-label="Pack Size" className="border w-14">
+                  <td data-label="Pack Size" className="border w-11">
                     <input
                       type="number"
                       readOnly
@@ -1909,7 +1924,7 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Batch */}
-                  <td data-label="Batch" className="border w-16">
+                  <td data-label="Batch" className="border w-[74px]">
                     <div className={rowErrors[i]?.batch ? "ring-2 ring-red-500 rounded-sm" : ""}>
                       <BatchSearchInput
                         ref={(el) => {
@@ -1942,17 +1957,19 @@ const handleSelectChange = async (field, value) => {
                   </td>
 
                   {/* Expiry */}
-                  <td data-label="Expiry" className="border w-20">
+                  <td data-label="Expiry" className="border w-[74px]">
                     <input
                       type="text"
                       readOnly
-                      value={item.expiry || ""}
-                      className="border bg-gray-100 dark:bg-slate-600 w-full h-6 text-[11px] px-1 text-gray-900 dark:text-gray-100"
+                      size={1}
+                      title={item.expiry ? String(item.expiry).trim().slice(0, 10) : undefined}
+                      value={item.expiry ? String(item.expiry).trim().slice(0, 10).replace(/^(\d{4})-(\d{2})(?:-\d{2})?$/, "$2/$1") : ""}
+                      className="border bg-gray-100 dark:bg-slate-600 w-full min-w-0 h-6 text-[10.5px] px-0.5 text-center font-mono text-gray-900 dark:text-gray-100"
                     />
                   </td>
 
                   {/* Available Units */}
-                  <td data-label={form.purchase_invoice_id ? "Returnable" : "Available (Units)"} className="border w-20">
+                  <td data-label={form.purchase_invoice_id ? "Returnable" : "Available (Units)"} className="border w-16">
                     <input
                       type="number"
                       readOnly

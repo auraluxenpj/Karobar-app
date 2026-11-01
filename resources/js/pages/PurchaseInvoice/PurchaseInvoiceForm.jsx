@@ -1893,40 +1893,63 @@ const contRect = container.getBoundingClientRect();
       </div>
       {/* ================= ITEMS SECTION ================= */}
       <div ref={itemsScrollRef} className="purchase-entry-items flex-1 min-h-0 overflow-auto pt-1 px-2 pb-4" autoComplete="off">
-        <table className="invoice-repeater-table w-full border-collapse text-[11px]">
+        <table className={`invoice-repeater-table w-full lg:table-fixed ${hasWholesale ? 'lg:min-w-[1180px]' : 'lg:min-w-[1040px]'} border-collapse text-[11px]`}>
+          <colgroup>
+            <col className="w-7" />
+            <col className="w-auto min-w-[230px]" />
+            <col className="w-10" />
+            <col className="w-[74px]" />
+            <col className="w-[98px]" />
+            <col className="w-11" />
+            <col className="w-11" />
+            <col className="w-13" />
+            <col className="w-13" />
+            <col className="w-10" />
+            <col className="w-10" />
+            <col className="w-10" />
+            <col className="w-13" />
+            <col className="w-13" />
+            <col className={!hasWholesale ? 'hidden' : 'w-13'} />
+            <col className={!hasWholesale ? 'hidden' : 'w-13'} />
+            <col className="w-11" />
+            <col className={!hasWholesale ? 'hidden' : 'w-11'} />
+            <col className="w-13" />
+            <col className="w-18" />
+            <col className="w-6" />
+          </colgroup>
           <thead className="sticky top-0 bg-gray-100 dark:bg-slate-700 z-5">
             <tr>
               <th rowSpan={2} className="border w-7 purchase-th-readonly">#</th>
-              <th rowSpan={2} colSpan={1} className="border w-[180px] purchase-th-editable">Product *</th>
-              <th colSpan={3} className="border">Pack Size / Batch / Expiry</th>
+              <th rowSpan={2} colSpan={1} className="border w-[26%] min-w-[230px] purchase-th-editable">Product *</th>
+              <th colSpan={3} className="border w-[212px]">Pack Size / Batch / Expiry</th>
               <th colSpan={2} className="border purchase-th-editable">Qty (Pack / Unit)</th>
               <th colSpan={2} className="border purchase-th-editable">Purchase Price (P / U)</th>
               <th colSpan={3} className="border purchase-th-editable">Disc % / Bonus (P / U)</th>
               <th colSpan={2} className="border purchase-th-editable">Sale Price (P / U)</th>
               <th colSpan={2} className={`border purchase-th-editable ${!hasWholesale ? 'hidden' : ''}`}>Wholesale Price (P / U)</th>
               <th colSpan={hasWholesale ? 4 : 3} className="border purchase-th-readonly">Margin % {hasWholesale && '/ W.S.Mrg%'} / Avg / Sub Total</th>
-              <th rowSpan={2} className="border w-7">+</th>
+              <th rowSpan={2} className="border w-6">+</th>
             </tr>
 
             <tr>
-              <th className="border w-14 purchase-th-readonly" title="Pack Size (Auto)">PSize</th>
-              <th className="border min-w-[130px] w-32 purchase-th-editable">Batch</th>
-              <th className="border w-28 purchase-th-editable">Exp</th>
-              <th className="border w-14 purchase-th-editable">Pack.Q</th>
-              <th className="border w-14 purchase-th-editable">Unit.Q</th>
-              <th className="border w-16 purchase-th-editable">Pack.P</th>
-              <th className="border w-16 purchase-th-editable">Unit.P</th>
-              <th className="border w-14 purchase-th-editable">Disc%</th>
-              <th className="border w-14 purchase-th-editable">PBonus</th>
-              <th className="border w-14 purchase-th-editable">UBonus</th>
-              <th className="border w-16 purchase-th-editable">Pack.S</th>
-              <th className="border w-16 purchase-th-editable">Unit.S</th>
-              <th className={`border w-16 purchase-th-editable ${!hasWholesale ? 'hidden' : ''}`}>W.S.Pack</th>
-              <th className={`border w-16 purchase-th-editable ${!hasWholesale ? 'hidden' : ''}`}>W.S.Unit</th>
-              <th className="border w-14 purchase-th-readonly" title="Retail Margin % (Auto)">Margin%</th>
-              <th className={`border w-14 purchase-th-readonly ${!hasWholesale ? 'hidden' : ''}`} title="Wholesale Margin % (Auto)">W.S.Mrg%</th>
-              <th className="border w-18 purchase-th-readonly" title="Average Unit Cost (Auto)">Avg</th>
-              <th className="border w-24 purchase-th-readonly" title="Row Sub Total (Auto)">Sub Total</th>
+              <th className="border w-10 purchase-th-readonly" title="Pack Size (Auto)">PSize</th>
+              <th className="border w-[74px] purchase-th-editable">Batch</th>
+              <th className="border w-[98px] min-w-[98px] purchase-th-editable">Exp</th>
+              <th className="border w-11 purchase-th-editable">Pack.Q</th>
+              <th className="border w-11 purchase-th-editable">Unit.Q</th>
+              <th className="border w-13 purchase-th-editable">Pack.P</th>
+              <th className="border w-13 purchase-th-editable">Unit.P</th>
+              <th className="border w-10 purchase-th-editable">Disc%</th>
+              <th className="border w-10 purchase-th-editable">PBonus</th>
+              <th className="border w-10 purchase-th-editable">UBonus</th>
+              <th className="border w-13 purchase-th-editable">Pack.S</th>
+              <th className="border w-13 purchase-th-editable">Unit.S</th>
+              <th className={`border w-13 purchase-th-editable ${!hasWholesale ? 'hidden' : ''}`}>W.S.Pack</th>
+              <th className={`border w-13 purchase-th-editable ${!hasWholesale ? 'hidden' : ''}`}>W.S.Unit</th>
+              <th className="border w-11 purchase-th-readonly" title="Retail Margin % (Auto)">Margin%</th>
+              <th className={`border w-11 purchase-th-readonly ${!hasWholesale ? 'hidden' : ''}`} title="Wholesale Margin % (Auto)">W.S.Mrg%</th>
+              <th className="border w-13 purchase-th-readonly" title="Average Unit Cost (Auto)">Avg</th>
+              <th className="border w-18 purchase-th-readonly" title="Row Sub Total (Auto)">Sub Total</th>
             </tr>
           </thead>
 
@@ -1980,7 +2003,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Product Search Input */}
-                <td colSpan={1} data-label="Product *" className="invoice-cell-product border text-left w-[200px]">
+                <td colSpan={1} data-label="Product *" className="invoice-cell-product border text-left w-[26%] min-w-[230px]">
                   <InvoiceRowError messages={invoiceErrors.rowMessages(i)} />
                   <div ref={(el) => (productSearchRefs.current[i] = el)}>
                     <ProductSearchInput
@@ -2094,20 +2117,20 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Pack Size (Read-only) */}
-                <td data-label="Pack Size" className="border w-14">
+                <td data-label="Pack Size" className="border w-10">
                   <input
                     type="text"
                     readOnly
                     tabIndex={-1}
                     placeholder="—"
                     value={item.pack_size ?? ""}
-                    className="purchase-readonly-field w-full h-7 text-[11px] px-1.5 text-center font-mono"
+                    className="purchase-readonly-field w-full h-7 text-[11px] px-1 text-center font-mono"
                     {...antiFill}
                   />
                 </td>
 
                 {/* Batch */}
-                <td data-label="Batch" className="border min-w-[130px] w-32">
+                <td data-label="Batch" className="border w-[74px]">
                   <BatchSearchInput
                     ref={(el) => (batchRefs.current[i] = el)}
                     mode="purchase"
@@ -2125,19 +2148,20 @@ const contRect = container.getBoundingClientRect();
                       .map((it) => (it.batch ? String(it.batch).trim() : it.is_unbatched ? "__unbatched__" : ""))}
                     onChange={(val, batchObj) => handleBatchSelect(i, val, batchObj)}
                     onKeyDown={(e) => handleKeyDown(e, "batch", i)}
-                    placeholder="Batch or unassigned..."
+                    placeholder="Batch..."
                   />
                 </td>
 
                 {/* Expiry */}
-                <td data-label="Expiry" className="border w-28">
+                <td data-label="Expiry" className="border w-[98px] min-w-[98px]">
                   <input
                     ref={(el) => (expiryRefs.current[i] = el)}
                     type="date"
                     value={item.expiry ?? ""}
+                    title={item.expiry || undefined}
                     onChange={(e) => handleItemChange(i, "expiry", e.target.value)}
                     onKeyDown={(e) => handleKeyDown(e, "expiry", i)}
-                    className="border w-full h-7 text-[11px] px-1 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 font-mono"
+                    className="border w-full min-w-0 h-7 text-[10.5px] px-0.5 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 font-mono"
                     {...antiFill}
                   />
                 </td>
@@ -2348,14 +2372,14 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Sub Total (Read-only computed badge) */}
-                <td data-label="Sub Total" className="invoice-cell-subtotal border w-24">
+                <td data-label="Sub Total" className="invoice-cell-subtotal border w-20">
                   <input
                     type="text"
                     value={item.sub_total ?? ""}
                     readOnly
                     tabIndex={-1}
                     placeholder="0.00"
-                    className="purchase-readonly-field purchase-subtotal-field w-full h-7 text-[11px] px-2 text-right font-mono"
+                    className="purchase-readonly-field purchase-subtotal-field w-full h-7 text-[11px] px-1.5 text-right font-mono"
                     {...antiFill}
                   />
                 </td>
@@ -2373,7 +2397,7 @@ const contRect = container.getBoundingClientRect();
                 </td>
 
                 {/* Add */}
-                <td className="invoice-cell-add border w-7">
+                <td className="invoice-cell-add border w-6">
                   <button
                     type="button"
                     onClick={addItem}

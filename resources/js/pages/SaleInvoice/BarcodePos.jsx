@@ -1186,12 +1186,12 @@ export default function BarcodePos() {
                 >
                   <tr>
                     <th className="py-2.5 px-3 w-8 text-center">#</th>
-                    <th className="py-2.5 px-3">Product Name</th>
-                    <th className="py-2.5 px-3 w-36">Batch (FEFO)</th>
-                    <th className="py-2.5 px-3 w-28 text-center">Quantity</th>
-                    <th className="py-2.5 px-3 w-24 text-right">Unit Price</th>
-                    <th className="py-2.5 px-3 w-20 text-right">Disc %</th>
-                    <th className="py-2.5 px-3 w-28 text-right">Subtotal</th>
+                    <th className="py-2.5 px-3 min-w-[220px]">Product Name</th>
+                    <th className="py-2.5 px-2 w-28">Batch (FEFO)</th>
+                    <th className="py-2.5 px-2 w-24 text-center">Quantity</th>
+                    <th className="py-2.5 px-2 w-20 text-right">Unit Price</th>
+                    <th className="py-2.5 px-2 w-16 text-right">Disc %</th>
+                    <th className="py-2.5 px-3 w-24 text-right">Subtotal</th>
                     <th className="py-2.5 px-2 w-10 text-center">Del</th>
                   </tr>
                 </thead>
@@ -1326,8 +1326,8 @@ export default function BarcodePos() {
                           </td>
 
                           {/* React Select Batch Picker */}
-                          <td data-label="Batch (FEFO)" className="py-2 px-3">
-                            <div className="w-full lg:w-36">
+                          <td data-label="Batch (FEFO)" className="py-2 px-2">
+                            <div className="w-full lg:w-28">
                               <Select
                                 options={batchOptions}
                                 value={

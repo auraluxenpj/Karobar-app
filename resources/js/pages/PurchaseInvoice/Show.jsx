@@ -486,11 +486,33 @@ return (
       <div className="purchase-show-items purchase-entry-items flex-1 min-h-0 overflow-auto p-1" autoComplete="off">
         <h2 className="text-xs font-bold mb-1 dark:text-gray-200">Items</h2>
 
-        <table className="invoice-repeater-table w-full border-collapse text-[11px]">
+        <table className="invoice-repeater-table w-full lg:table-fixed border-collapse text-[11px]">
+          <colgroup>
+            <col className="w-6" />
+            <col className="w-auto min-w-[220px]" />
+            <col className="w-10" />
+            <col className="w-16" />
+            <col className="w-[74px]" />
+            <col className="w-11" />
+            <col className="w-11" />
+            <col className="w-13" />
+            <col className="w-13" />
+            <col className="w-11" />
+            <col className="w-11" />
+            <col className="w-11" />
+            <col className="w-13" />
+            <col className="w-13" />
+            <col className="w-13" />
+            <col className="w-13" />
+            <col className="w-11" />
+            <col className="w-11" />
+            <col className="w-13" />
+            <col className="w-18" />
+          </colgroup>
           <thead className="sticky top-0 bg-gray-100 dark:bg-slate-700 z-5">
             <tr>
               <th rowSpan={2} className="border w-6 dark:border-slate-600 dark:text-gray-200">#</th>
-              <th rowSpan={2} colSpan={1} className="border w-[80px] dark:border-slate-600 dark:text-gray-200">Product</th>
+              <th rowSpan={2} colSpan={1} className="border w-[24%] min-w-[220px] dark:border-slate-600 dark:text-gray-200">Product</th>
               <th colSpan={3} className="border dark:border-slate-600 dark:text-gray-200">Pack Size / Batch / Expiry</th>
               <th colSpan={2} className="border dark:border-slate-600 dark:text-gray-200">Qty (Pack / Unit)</th>
               <th colSpan={2} className="border dark:border-slate-600 dark:text-gray-200">Purchase Price (P / U)</th>
@@ -501,24 +523,24 @@ return (
             </tr>
 
             <tr>
-              <th className="border w-14 dark:border-slate-600 dark:text-gray-200">PSize</th>
+              <th className="border w-10 dark:border-slate-600 dark:text-gray-200">PSize</th>
               <th className="border w-16 dark:border-slate-600 dark:text-gray-200">Batch</th>
-              <th className="border w-20 dark:border-slate-600 dark:text-gray-200">Exp</th>
-              <th className="border w-12 dark:border-slate-600 dark:text-gray-200">Pack.Q</th>
-              <th className="border w-12 dark:border-slate-600 dark:text-gray-200">Unit.Q</th>
-              <th className="border w-14 dark:border-slate-600 dark:text-gray-200">Pack.P</th>
-              <th className="border w-14 dark:border-slate-600 dark:text-gray-200">Unit.P</th>
-              <th className="border w-14 dark:border-slate-600 dark:text-gray-200">Disc%</th>
-              <th className="border w-14 dark:border-slate-600 dark:text-gray-200">PBonus</th>
-              <th className="border w-14 dark:border-slate-600 dark:text-gray-200">UBonus</th>
-              <th className="border w-14 dark:border-slate-600 dark:text-gray-200">Pack.S</th>
-              <th className="border w-14 dark:border-slate-600 dark:text-gray-200">Unit.S</th>
-              <th className="border w-14 dark:border-slate-600 dark:text-gray-200">W.S.Pack</th>
-              <th className="border w-14 dark:border-slate-600 dark:text-gray-200">W.S.Unit</th>
-              <th className="border w-14 dark:border-slate-600 dark:text-gray-200">Margin%</th>
-              <th className="border w-14 dark:border-slate-600 dark:text-gray-200">W.S.Mrg%</th>
-              <th className="border w-16 dark:border-slate-600 dark:text-gray-200">Avg</th>
-              <th className="border w-20 dark:border-slate-600 dark:text-gray-200">Sub Total</th>
+              <th className="border w-[74px] dark:border-slate-600 dark:text-gray-200">Exp</th>
+              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">Pack.Q</th>
+              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">Unit.Q</th>
+              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">Pack.P</th>
+              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">Unit.P</th>
+              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">Disc%</th>
+              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">PBonus</th>
+              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">UBonus</th>
+              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">Pack.S</th>
+              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">Unit.S</th>
+              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">W.S.Pack</th>
+              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">W.S.Unit</th>
+              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">Margin%</th>
+              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">W.S.Mrg%</th>
+              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">Avg</th>
+              <th className="border w-18 dark:border-slate-600 dark:text-gray-200">Sub Total</th>
             </tr>
           </thead>
 
@@ -539,7 +561,7 @@ return (
                     <td data-label="Product" className="invoice-cell-product border px-1 text-left dark:border-slate-600">{fmt(item.product?.name ?? item.product_id)}</td>
                     <td data-label="Pack Size" className="border px-1 dark:border-slate-600">{fmt(item.pack_size)}</td>
                     <td data-label="Batch" className="border px-1 dark:border-slate-600">{fmt(item.batch)}</td>
-                    <td data-label="Expiry" className="border px-1 dark:border-slate-600">{fmt(item.expiry)}</td>
+                    <td data-label="Expiry" title={item.expiry ? String(item.expiry).trim().slice(0, 10) : undefined} className="border px-1 font-mono dark:border-slate-600">{item.expiry ? String(item.expiry).trim().slice(0, 10).replace(/^(\d{4})-(\d{2})(?:-\d{2})?$/, "$2/$1") : "—"}</td>
                     <td data-label="Pack Qty" className="border px-1 dark:border-slate-600">{fmt(item.pack_quantity)}</td>
                     <td data-label="Unit Qty" className="border px-1 dark:border-slate-600">{fmt(item.unit_quantity)}</td>
                     <td data-label="Pack Cost" className="border px-1 dark:border-slate-600">{fmt(item.pack_purchase_price)}</td>

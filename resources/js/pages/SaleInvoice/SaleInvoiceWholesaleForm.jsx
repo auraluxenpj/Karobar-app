@@ -2285,77 +2285,77 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                   >
                     <tr className="[&>th]:text-left">
                       <th
-                        className={`w-7 text-center ${
+                        className={`w-6 text-center ${
                           isDark ? "text-rose-400" : "text-red-600"
                         }`}
                       >
                         DEL
                       </th>
-                      <th className="w-7 text-center sale-th-readonly">#</th>
-                      <th className="min-w-[200px] w-[22%] sale-th-editable">Product *</th>
-                      <th className="min-w-[76px] w-12 text-center sale-th-readonly" title="Pack Size (Auto)">
+                      <th className="w-6 text-center sale-th-readonly">#</th>
+                      <th className="min-w-[220px] w-[25%] sale-th-editable">Product *</th>
+                      <th className="w-10 text-center sale-th-readonly" title="Pack Size (Auto)">
                         PSize
                       </th>
-                      <th className="min-w-[130px] w-[11%] sale-th-editable">Batch</th>
-                      <th className="min-w-[76px] w-21 text-center sale-th-readonly" title="Expiry Date (Auto)">
+                      <th className="w-18 sale-th-editable">Batch</th>
+                      <th className="w-[74px] text-center sale-th-readonly" title="Expiry Date (Auto)">
                         Expiry
                       </th>
                       <th
-                        className="min-w-[76px] w-23 text-center sale-th-readonly"
+                        className="w-16 text-center sale-th-readonly"
                         title="Available Stock in Packs & Units (Auto)"
                       >
                         Avail (P/U)
                       </th>
                       <th
-                        className="min-w-[76px] w-15 text-center sale-th-editable"
+                        className="w-12 text-center sale-th-editable"
                         title="Number of Full Packs"
                       >
                         Pack.Q
                       </th>
                       <th
-                        className="min-w-[76px] w-15 text-center sale-th-editable"
+                        className="w-12 text-center sale-th-editable"
                         title="Number of Loose Units"
                       >
                         Unit.Q
                       </th>
                       <th
-                        className="min-w-[76px] w-14 text-center sale-th-editable"
+                        className="w-11 text-center sale-th-editable"
                         title="Free Bonus Packs (deducted from stock, not billed)"
                       >
                         Pack.B
                       </th>
                       <th
-                        className="min-w-[76px] w-14 text-center sale-th-editable"
+                        className="w-11 text-center sale-th-editable"
                         title="Free Bonus Loose Units (deducted from stock, not billed)"
                       >
                         Unit.B
                       </th>
                       <th
-                        className="min-w-[76px] w-15 text-center sale-th-readonly"
+                        className="w-13 text-center sale-th-readonly"
                         title="Total Billed Units (Pack.Q × PSize + Unit.Q)"
                       >
                         Tot.U
                       </th>
                       <th
-                        className="min-w-[76px] w-21 text-center sale-th-editable"
+                        className="w-16 text-center sale-th-editable"
                         title="Wholesale Pack Price (Synced with Unit Price)"
                       >
                         Pack.P *
                       </th>
                       <th
-                        className="min-w-[76px] w-20 text-center sale-th-editable"
+                        className="w-16 text-center sale-th-editable"
                         title="Wholesale Unit Price (Synced with Pack Price)"
                       >
                         Unit.P *
                       </th>
-                      <th className="min-w-[76px] w-15 text-center sale-th-editable">Disc %</th>
+                      <th className="w-12 text-center sale-th-editable">Disc %</th>
                       <th
-                        className="min-w-[76px] w-24 text-center sale-th-readonly"
+                        className="w-20 text-center sale-th-readonly"
                         title="Row Sub Total (Auto)"
                       >
                         Sub Total
                       </th>
-                      <th className="w-7 text-center">+</th>
+                      <th className="w-6 text-center">+</th>
                     </tr>
                   </thead>
                   <tbody className="[&>tr>td]:py-1.5 [&>tr>td]:px-1">
@@ -2478,12 +2478,14 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           <td data-label="Expiry" className="text-center">
                             <input
                               type="text"
-                              value={it.expiry ?? ""}
+                              value={it.expiry ? String(it.expiry).trim().slice(0, 10).replace(/^(\d{4})-(\d{2})(?:-\d{2})?$/, "$2/$1") : ""}
+                              title={it.expiry ? String(it.expiry).trim().slice(0, 10) : undefined}
                               readOnly
+                              size={1}
                               tabIndex={-1}
                               placeholder="—"
                               autoComplete="off"
-                              className="sale-readonly-field w-full h-7 rounded-md px-1 text-center font-mono text-[10px]"
+                              className="sale-readonly-field w-full min-w-0 h-7 rounded-md px-0.5 text-center font-mono text-[10.5px]"
                             />
                           </td>
 
