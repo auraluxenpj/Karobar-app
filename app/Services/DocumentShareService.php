@@ -35,6 +35,7 @@ class DocumentShareService
         'stock_disposal',
         'cash_drawer_session',
         'stocktake_session',
+        'regular_refill_reminder',
     ];
 
     public const SUPPORTED_PDF_DESIGNS = [
@@ -830,6 +831,446 @@ class DocumentShareService
     }
 
     /**
+     * Build bilingual (English & Urdu) WhatsApp refill reminder messages for a Regular Customer.
+     *
+     * @return array{english: string, urdu: string, message: string, language: string}
+     */
+    public function formatRegularCustomerReminder(Customer $customer, ?string $language = null): array
+    {
+        $customer->loadMissing('regularItems.product');
+        $setting = Setting::first();
+        $storeName = trim((string) ($setting?->store_name ?: 'Karobar Pharmacy'));
+        $storePhone = trim((string) ($setting?->phone_number ?: ''));
+        $customerName = trim((string) ($customer->name ?: 'Valued Customer'));
+
+        $cycle = strtolower((string) ($customer->refill_cycle ?: 'monthly'));
+        $customDays = max(1, (int) ($customer->refill_custom_days ?: 30));
+
+        $cycleLabelEn = match ($cycle) {
+            'weekly'   => 'Weekly',
+            'biweekly' => 'Bi-Weekly (14-Day)',
+            'custom'   => "{$customDays}-Day",
+            default    => 'Monthly',
+        };
+
+        $cycleLabelUr = match ($cycle) {
+            'weekly'   => 'ہفتہ وار',
+            'biweekly' => 'پندرہ روزہ',
+            'custom'   => "{$customDays} روزہ",
+            default    => 'ماہانہ',
+        };
+
+        $dueDateFormatted = $customer->next_refill_date
+            ? \Carbon\Carbon::parse($customer->next_refill_date)->format('d M Y')
+            : now()->format('d M Y');
+
+        $itemsEn = [];
+        $itemsUr = [];
+
+        foreach ($customer->regularItems as $idx => $item) {
+            $num = $idx + 1;
+            $prodName = $item->product?->name ?: "Product #{$item->product_id}";
+            $packSize = max(1, (int) ($item->product?->pack_size ?? 1));
+            $rawPackQty = (float) ($item->pack_quantity ?? 0);
+            $rawUnitQty = (int) ($item->unit_quantity ?? 0);
+
+            $totalUnits = $rawUnitQty > 0
+                ? $rawUnitQty
+                : max(1, (int) round($rawPackQty * $packSize));
+
+            if ($packSize > 1 && $totalUnits % $packSize === 0) {
+                $packs = (int) ($totalUnits / $packSize);
+                $qtyTextEn = $packs . ($packs === 1 ? ' Pack' : ' Packs') . " ({$totalUnits} Units)";
+                $qtyTextUr = "{$packs} پیک ({$totalUnits} عدد)";
+            } else {
+                $qtyTextEn = $totalUnits . ($totalUnits === 1 ? ' Unit' : ' Units');
+                $qtyTextUr = "{$totalUnits} عدد";
+            }
+
+            $note = trim((string) ($item->dosage_notes ?? ''));
+
+            $itemsEn[] = "  {$num}. *{$prodName}* — {$qtyTextEn}" . ($note !== '' ? " ({$note})" : '');
+            $itemsUr[] = "  {$num}. *{$prodName}* — {$qtyTextUr}" . ($note !== '' ? " ({$note})" : '');
+        }
+
+        $itemsBlockEn = !empty($itemsEn)
+            ? "\n*Prepared Medicines / Products:*\n" . implode("\n", $itemsEn) . "\n"
+            : '';
+
+        $itemsBlockUr = !empty($itemsUr)
+            ? "\n*تیار شدہ ادویات / اشیاء:*\n" . implode("\n", $itemsUr) . "\n"
+            : '';
+
+        $notesLineEn = trim((string) ($customer->regular_notes ?? '')) !== ''
+            ? "\n*Note:* " . trim((string) $customer->regular_notes)
+            : '';
+        $notesLineUr = trim((string) ($customer->regular_notes ?? '')) !== ''
+            ? "\n*نوٹ:* " . trim((string) $customer->regular_notes)
+            : '';
+
+        $storePhoneLineEn = $storePhone !== '' ? "\nContact: {$storePhone}" : '';
+        $storePhoneLineUr = $storePhone !== '' ? "\nرابطہ نمبر: {$storePhone}" : '';
+
+        $english = "*{$storeName} — {$cycleLabelEn} Medicine / Product Reminder*\n\n"
+            . "Dear *{$customerName}*,\n"
+            . "We hope you are in good health. This is a friendly prior reminder that your *{$cycleLabelEn}* medicines / products are ready for collection at *{$storeName}*."
+            . $itemsBlockEn
+            . "\n*Scheduled Collection Date:* {$dueDateFormatted}"
+            . $notesLineEn . "\n\n"
+            . "Please do not forget to collect them at your convenience, or reply to this message if you need any changes.\n"
+            . "Thank you!"
+            . $storePhoneLineEn;
+
+        $urdu = "*{$storeName} — {$cycleLabelUr} ادویات / اشیاء کی یاد دہانی*\n\n"
+            . "محترم *{$customerName}*،\n"
+            . "السلام علیکم! آپ کو مطلع کیا جاتا ہے کہ آپ کی *{$cycleLabelUr}* ادویات / اشیاء *{$storeName}* پر تیار ہیں اور وصولی کے لیے دستیاب ہیں:"
+            . $itemsBlockUr
+            . "\n*تاریخِ وصولی:* {$dueDateFormatted}"
+            . $notesLineUr . "\n\n"
+            . "براہِ کرم اپنی ادویات / اشیاء وقت پر وصول کرنا نہ بھولیں۔ کسی بھی تبدیلی کی صورت میں اس پیغام کا جواب دیں۔\n"
+            . "شکریہ!"
+            . $storePhoneLineUr;
+
+        $resolvedLang = strtolower(trim((string) ($language ?: ($customer->reminder_language ?: 'english'))));
+        if (!in_array($resolvedLang, ['english', 'urdu'], true)) {
+            $resolvedLang = 'english';
+        }
+
+        return [
+            'language' => $resolvedLang,
+            'english'  => $english,
+            'urdu'     => $urdu,
+            'message'  => $resolvedLang === 'urdu' ? $urdu : $english,
+        ];
+    }
+
+    /**
+     * Send a direct WhatsApp text message (e.g. Regular Customer Refill Reminder) via the active WhatsApp Agent/Gateway,
+     * with automatic wa.me fallback if the gateway is offline or not enabled.
+     */
+    public function sendWhatsAppTextMessage(string $rawPhone, string $message): array
+    {
+        $normalizedPhone = $this->normalizePhone($rawPhone);
+        if ($normalizedPhone === '') {
+            throw new InvalidArgumentException('Customer does not have a valid WhatsApp phone number.');
+        }
+
+        $trimmedMessage = trim($message);
+        if ($trimmedMessage === '') {
+            throw new InvalidArgumentException('Reminder message text cannot be empty.');
+        }
+
+        $waMeUrl = 'https://wa.me/' . $normalizedPhone . '?text=' . rawurlencode($trimmedMessage);
+
+        if ($this->isWhatsAppApiConfigured()) {
+            $provider = $this->resolveWhatsAppProvider();
+            try {
+                $apiResult = $this->dispatchTextViaWhatsAppApi(
+                    provider: $provider,
+                    normalizedPhone: $normalizedPhone,
+                    message: $trimmedMessage
+                );
+
+                return [
+                    'status'           => 'sent_via_api',
+                    'mode'             => 'cloud_api',
+                    'provider'         => $provider,
+                    'whatsapp_msg_id'  => $apiResult['message_id'] ?? null,
+                    'normalized_phone' => $normalizedPhone,
+                    'wa_me_url'        => $waMeUrl,
+                    'message'          => "WhatsApp reminder sent directly to +{$normalizedPhone} via {$provider}!",
+                ];
+            } catch (\Throwable $apiEx) {
+                $autoFallback = (bool) config('services.whatsapp.auto_fallback', true);
+                if (!$autoFallback) {
+                    throw $apiEx;
+                }
+
+                return [
+                    'status'           => 'wa_me_fallback',
+                    'mode'             => 'wa_me_fallback',
+                    'provider'         => $provider,
+                    'api_error'        => $apiEx->getMessage(),
+                    'normalized_phone' => $normalizedPhone,
+                    'wa_me_url'        => $waMeUrl,
+                    'message'          => "WhatsApp Agent was not reachable ({$apiEx->getMessage()}). Opening WhatsApp chat directly.",
+                ];
+            }
+        }
+
+        return [
+            'status'           => 'wa_me_fallback',
+            'mode'             => 'wa_me_fallback',
+            'provider'         => 'wa_me',
+            'normalized_phone' => $normalizedPhone,
+            'wa_me_url'        => $waMeUrl,
+            'message'          => "WhatsApp reminder prepared for +{$normalizedPhone}.",
+        ];
+    }
+
+    /**
+     * Dispatch a text message through the configured WhatsApp API / Agent provider.
+     *
+     * @return array{message_id: ?string, provider: string}
+     */
+    public function dispatchTextViaWhatsAppApi(string $provider, string $normalizedPhone, string $message): array
+    {
+        $token = trim((string) config('services.whatsapp.access_token', ''));
+        $phoneOrInstanceId = trim((string) config('services.whatsapp.phone_number_id', ''));
+        $version = trim((string) config('services.whatsapp.api_version', 'v20.0')) ?: 'v20.0';
+        $customUrl = trim((string) config('services.whatsapp.api_url', ''));
+
+        // 1. Built-in Karobar Free WhatsApp Agent (Node.js + @whiskeysockets/baileys)
+        if ($provider === 'local_agent') {
+            $baseUrl = rtrim($customUrl !== '' ? $customUrl : 'http://127.0.0.1:3001', '/');
+            $baseUrl = preg_replace('#/(send-document|send-text)$#', '', $baseUrl);
+            $endpoint = "{$baseUrl}/send-text";
+
+            $response = $this->executeWhatsAppHttp(function ($http) use ($token, $endpoint, $normalizedPhone, $message) {
+                if ($token !== '') {
+                    $http = $http->withHeaders(['X-Api-Key' => $token]);
+                }
+
+                return $http->post($endpoint, [
+                    'phone'   => $normalizedPhone,
+                    'text'    => $message,
+                    'message' => $message,
+                ]);
+            });
+
+            // If an older whatsapp-agent.mjs daemon is running in memory before /send-text was added,
+            // fall back to /send-document with a generated PDF reminder slip.
+            if ($response->status() === 404) {
+                $fallbackPdf = Pdf::loadHTML(
+                    '<html><body style="font-family: DejaVu Sans, sans-serif; padding: 28px; font-size: 12px; color: #0f172a;">'
+                    . '<h3 style="margin-bottom: 10px;">Medicine / Product Readiness Reminder</h3>'
+                    . '<pre style="white-space: pre-wrap; font-family: DejaVu Sans, sans-serif; line-height: 1.5;">' . e($message) . '</pre>'
+                    . '</body></html>'
+                )->setPaper('a4', 'portrait')->output();
+
+                return $this->dispatchPdfViaWhatsAppApi(
+                    provider: 'local_agent',
+                    normalizedPhone: $normalizedPhone,
+                    pdfBytes: $fallbackPdf,
+                    filename: 'Medicine_Readiness_Reminder.pdf',
+                    caption: $message
+                );
+            }
+
+            if (!$response->successful() || $response->json('ok') === false) {
+                $err = $response->json('message') ?? $response->body();
+                throw new RuntimeException('Built-in Free WhatsApp Agent error: ' . $err);
+            }
+
+            return [
+                'provider'   => 'local_agent',
+                'message_id' => (string) ($response->json('message_id') ?? 'local_agent_text_sent'),
+            ];
+        }
+
+        // 2. WAHA (WhatsApp HTTP API)
+        if ($provider === 'waha') {
+            $baseUrl = rtrim($customUrl !== '' ? $customUrl : 'http://localhost:3000', '/');
+            $baseUrl = preg_replace('#/api/(sendFile|sendText)$#', '', $baseUrl);
+            $endpoint = "{$baseUrl}/api/sendText";
+            $sessionName = $phoneOrInstanceId !== '' ? $phoneOrInstanceId : 'default';
+
+            $response = $this->executeWhatsAppHttp(function ($http) use ($token, $endpoint, $sessionName, $normalizedPhone, $message) {
+                if ($token !== '') {
+                    $http = $http->withHeaders(['X-Api-Key' => $token]);
+                }
+
+                return $http->post($endpoint, [
+                    'session' => $sessionName,
+                    'chatId'  => $normalizedPhone . '@c.us',
+                    'text'    => $message,
+                ]);
+            });
+
+            if (!$response->successful()) {
+                $err = $response->json('message') ?? $response->json('error') ?? $response->body();
+                throw new RuntimeException('WAHA WhatsApp API error: ' . $err);
+            }
+
+            return [
+                'provider'   => 'waha',
+                'message_id' => (string) ($response->json('id') ?? $response->json('key.id') ?? 'waha_text_sent'),
+            ];
+        }
+
+        // 3. Evolution API
+        if ($provider === 'evolution_api') {
+            $baseUrl = rtrim($customUrl !== '' ? $customUrl : 'http://localhost:8080', '/');
+            $instance = $phoneOrInstanceId !== '' ? $phoneOrInstanceId : 'default';
+            $baseUrl = preg_replace('#/message/(sendMedia|sendText)/.*$#', '', $baseUrl);
+            $endpoint = "{$baseUrl}/message/sendText/{$instance}";
+
+            $response = $this->executeWhatsAppHttp(function ($http) use ($token, $endpoint, $normalizedPhone, $message) {
+                if ($token !== '') {
+                    $http = $http->withHeaders(['apikey' => $token]);
+                }
+
+                return $http->post($endpoint, [
+                    'number' => $normalizedPhone,
+                    'text'   => $message,
+                ]);
+            });
+
+            if (!$response->successful()) {
+                $err = $response->json('response.message') ?? $response->json('message') ?? $response->body();
+                if (is_array($err)) {
+                    $err = json_encode($err);
+                }
+                throw new RuntimeException('Evolution API error: ' . $err);
+            }
+
+            return [
+                'provider'   => 'evolution_api',
+                'message_id' => (string) ($response->json('key.id') ?? $response->json('id') ?? 'evolution_text_sent'),
+            ];
+        }
+
+        if ($provider === 'whapi_cloud') {
+            $endpoint = rtrim($customUrl !== '' ? $customUrl : 'https://gate.whapi.cloud', '/') . '/messages/text';
+            $response = $this->executeWhatsAppHttp(fn ($http) => $http
+                ->withToken($token)
+                ->post($endpoint, [
+                    'to'   => $normalizedPhone,
+                    'body' => $message,
+                ])
+            );
+
+            if (!$response->successful() || $response->json('error')) {
+                $err = $response->json('error.message') ?? $response->json('message') ?? $response->body();
+                throw new RuntimeException('Whapi.Cloud API error: ' . $err);
+            }
+
+            return [
+                'provider'   => 'whapi_cloud',
+                'message_id' => (string) ($response->json('message.id') ?? $response->json('id') ?? 'whapi_text_sent'),
+            ];
+        }
+
+        if ($provider === 'wasender') {
+            $endpoint = rtrim($customUrl !== '' ? $customUrl : 'https://www.wasenderapi.com', '/') . '/api/send-message';
+            $response = $this->executeWhatsAppHttp(fn ($http) => $http
+                ->withToken($token)
+                ->post($endpoint, [
+                    'phone' => '+' . $normalizedPhone,
+                    'text'  => $message,
+                ])
+            );
+
+            if (!$response->successful() || $response->json('success') === false) {
+                $err = $response->json('message') ?? $response->json('error') ?? $response->body();
+                throw new RuntimeException('WasenderAPI error: ' . $err);
+            }
+
+            return [
+                'provider'   => 'wasender',
+                'message_id' => (string) ($response->json('data.msgId') ?? $response->json('id') ?? 'wasender_text_sent'),
+            ];
+        }
+
+        if ($provider === 'ultramsg') {
+            $cleanInstance = preg_replace('/^instance/i', '', $phoneOrInstanceId) ?: $phoneOrInstanceId;
+            $instancePath = 'instance' . $cleanInstance;
+            $endpoint = rtrim($customUrl !== '' ? $customUrl : 'https://api.ultramsg.com', '/') . "/{$instancePath}/messages/chat";
+
+            $response = $this->executeWhatsAppHttp(fn ($http) => $http
+                ->asForm()
+                ->post($endpoint, [
+                    'token' => $token,
+                    'to'    => '+' . $normalizedPhone,
+                    'body'  => $message,
+                ])
+            );
+
+            if (!$response->successful() || !empty($response->json('error'))) {
+                throw new RuntimeException('UltraMsg error: ' . $response->body());
+            }
+
+            return [
+                'provider'   => 'ultramsg',
+                'message_id' => (string) ($response->json('id') ?? 'ultramsg_text_sent'),
+            ];
+        }
+
+        if ($provider === 'green_api') {
+            $cleanInstance = preg_replace('/^waInstance/i', '', $phoneOrInstanceId) ?: $phoneOrInstanceId;
+            $baseUrl = rtrim($customUrl !== '' ? $customUrl : 'https://api.green-api.com', '/');
+            $endpoint = "{$baseUrl}/waInstance{$cleanInstance}/sendMessage/{$token}";
+
+            $response = $this->executeWhatsAppHttp(fn ($http) => $http
+                ->post($endpoint, [
+                    'chatId'  => $normalizedPhone . '@c.us',
+                    'message' => $message,
+                ])
+            );
+
+            if (!$response->successful() || empty($response->json('idMessage'))) {
+                throw new RuntimeException('Green-API error: ' . $response->body());
+            }
+
+            return [
+                'provider'   => 'green_api',
+                'message_id' => (string) $response->json('idMessage'),
+            ];
+        }
+
+        if ($provider === 'custom_http') {
+            if ($customUrl === '') {
+                throw new RuntimeException('Custom WhatsApp API endpoint URL is not configured.');
+            }
+
+            $response = $this->executeWhatsAppHttp(function ($http) use ($token, $customUrl, $normalizedPhone, $message) {
+                if ($token !== '') {
+                    $http = $http->withToken($token);
+                }
+                return $http->post($customUrl, [
+                    'to'      => $normalizedPhone,
+                    'phone'   => '+' . $normalizedPhone,
+                    'message' => $message,
+                    'text'    => $message,
+                ]);
+            });
+
+            if (!$response->successful()) {
+                throw new RuntimeException('Custom WhatsApp API error (HTTP ' . $response->status() . '): ' . $response->body());
+            }
+
+            return [
+                'provider'   => 'custom_http',
+                'message_id' => (string) ($response->json('id') ?? $response->json('message_id') ?? 'custom_text_sent'),
+            ];
+        }
+
+        // Default: Official Meta WhatsApp Cloud API ('meta_cloud')
+        $msgResponse = $this->executeWhatsAppHttp(fn ($http) => $http
+            ->withToken($token)
+            ->post("https://graph.facebook.com/{$version}/{$phoneOrInstanceId}/messages", [
+                'messaging_product' => 'whatsapp',
+                'recipient_type'    => 'individual',
+                'to'                => $normalizedPhone,
+                'type'              => 'text',
+                'text'              => [
+                    'preview_url' => false,
+                    'body'        => $message,
+                ],
+            ])
+        );
+
+        if (!$msgResponse->successful()) {
+            throw new RuntimeException('Failed to send text via WhatsApp Cloud API: ' . $msgResponse->body());
+        }
+
+        return [
+            'provider'   => 'meta_cloud',
+            'message_id' => $msgResponse->json('messages.0.id'),
+        ];
+    }
+
+    /**
      * Execute an outbound HTTP call for WhatsApp API with CA-bundle resolution and local SSL fallback.
      */
     protected function executeWhatsAppHttp(callable $callback): \Illuminate\Http\Client\Response
@@ -969,6 +1410,11 @@ class DocumentShareService
             'stock_disposal'  => $this->resolveStockDisposal((int) ($params['id'] ?? 0), $setting, $storeName),
             'cash_drawer_session' => $this->resolveCashDrawerSession((int) ($params['id'] ?? 0), $setting, $storeName),
             'stocktake_session'   => $this->resolveStocktakeSession((int) ($params['id'] ?? 0), $setting, $storeName),
+            'regular_refill_reminder' => $this->resolveRegularRefillReminder(
+                (int) ($params['customer_id'] ?? $params['id'] ?? 0),
+                $setting,
+                $storeName
+            ),
             default           => throw new InvalidArgumentException("Unsupported document type: {$type}"),
         };
     }
@@ -1894,6 +2340,38 @@ class DocumentShareService
             'whatsapp_text'   => implode("\n", $waLines),
             'email_subject'   => $emailSubject,
             'email_body'      => $emailBody,
+        ];
+    }
+
+    private function resolveRegularRefillReminder(int $customerId, ?Setting $setting, string $storeName): array
+    {
+        $customer = Customer::with(['regularItems.product'])->findOrFail($customerId);
+        $custName = $customer->name ?? 'Valued Customer';
+        $safeName = preg_replace('/[^A-Za-z0-9_-]/', '_', $custName) ?: ('Customer_' . $customer->id);
+        $templates = $this->formatRegularCustomerReminder($customer, $customer->reminder_language ?: 'english');
+
+        return [
+            'title'            => "Refill Reminder — {$custName}",
+            'filename'         => "Refill_Reminder_{$safeName}.pdf",
+            'view'             => 'pdf.regular_refill_reminder',
+            'view_data'        => [
+                'customer' => $customer,
+                'setting'  => $setting,
+            ],
+            'party_type'       => 'customer',
+            'party_id'         => $customer->id,
+            'recipient_name'   => $custName,
+            'recipient_phone'  => $customer->phone ?? '',
+            'recipient_email'  => $customer->email ?? '',
+            'whatsapp_text'    => $templates['message'],
+            'whatsapp_text_en' => $templates['english'],
+            'whatsapp_text_ur' => $templates['urdu'],
+            'email_subject'    => "Regular Medicine / Product Readiness Reminder — {$storeName}",
+            'email_subject_en' => "Regular Medicine / Product Readiness Reminder — {$storeName}",
+            'email_subject_ur' => "{$storeName} — ادویات / اشیاء کی یاد دہانی",
+            'email_body'       => $templates['english'],
+            'email_body_en'    => $templates['english'],
+            'email_body_ur'    => $templates['urdu'],
         ];
     }
 }

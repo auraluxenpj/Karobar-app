@@ -77,6 +77,12 @@ class DocumentShareController extends Controller
                     abort(401);
                 }
                 break;
+
+            case 'regular_refill_reminder':
+                $customerId = (int) ($params['customer_id'] ?? $params['id'] ?? 0);
+                $customer = Customer::findOrFail($customerId);
+                $this->authorize('view', $customer);
+                break;
         }
     }
 
@@ -213,16 +219,18 @@ class DocumentShareController extends Controller
     public function sendWhatsApp(Request $request)
     {
         $validated = $request->validate([
-            'type'        => ['required', 'string', Rule::in(DocumentShareService::SUPPORTED_TYPES)],
-            'id'          => ['nullable', 'integer'],
-            'customer_id' => ['nullable', 'integer', 'exists:customers,id'],
-            'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
-            'from'        => ['nullable', 'date'],
-            'to'          => ['nullable', 'date'],
-            'template'    => ['nullable', 'string', Rule::in(DocumentShareService::SUPPORTED_PDF_DESIGNS)],
-            'phone'       => ['nullable', 'string', 'max:50'],
-            'message'     => ['required', 'string', 'max:5000'],
-            'save_phone'  => ['nullable', 'boolean'],
+            'type'          => ['required', 'string', Rule::in(DocumentShareService::SUPPORTED_TYPES)],
+            'id'            => ['nullable', 'integer'],
+            'customer_id'   => ['nullable', 'integer', 'exists:customers,id'],
+            'supplier_id'   => ['nullable', 'integer', 'exists:suppliers,id'],
+            'from'          => ['nullable', 'date'],
+            'to'            => ['nullable', 'date'],
+            'template'      => ['nullable', 'string', Rule::in(DocumentShareService::SUPPORTED_PDF_DESIGNS)],
+            'phone'         => ['nullable', 'string', 'max:50'],
+            'message'       => ['required', 'string', 'max:5000'],
+            'save_phone'    => ['nullable', 'boolean'],
+            'language'      => ['nullable', 'string', 'in:english,urdu'],
+            'advance_cycle' => ['nullable', 'boolean'],
         ]);
 
         $this->authorizeDocumentAccess($validated['type'], $validated);
@@ -235,6 +243,32 @@ class DocumentShareController extends Controller
                 caption: $validated['message'],
                 savePhone: $request->boolean('save_phone')
             );
+
+            if ($validated['type'] === 'regular_refill_reminder' && ($response['status'] ?? '') !== 'qr_required') {
+                CustomerController::ensureRegularCustomerSchema();
+                $customerId = (int) ($validated['customer_id'] ?? $validated['id'] ?? 0);
+                $customer = Customer::with(['regularItems.product:id,name,product_code,quantity,pack_size,unit_sale_price,pack_sale_price'])
+                    ->find($customerId);
+
+                if ($customer) {
+                    $customerCtrl = app(CustomerController::class);
+                    $customer->last_refill_reminded_at = now();
+                    if (!empty($validated['language'])) {
+                        $customer->reminder_language = $validated['language'];
+                    }
+                    if ($request->boolean('advance_cycle')) {
+                        $customer->next_refill_date = $customerCtrl->calculateNextRefillDate($customer);
+                        $customer->last_refill_collected_at = now();
+                    }
+                    $customer->save();
+                    $response['customer'] = $customerCtrl->appendRegularMetadata($customer);
+                }
+
+                $normPhone = $response['normalized_phone'] ?? '';
+                $response['wa_me_url'] = $normPhone !== ''
+                    ? 'https://wa.me/' . $normPhone . '?text=' . rawurlencode($validated['message'])
+                    : 'https://wa.me/?text=' . rawurlencode($validated['message']);
+            }
 
             return response()->json($response);
         } catch (\Throwable $e) {

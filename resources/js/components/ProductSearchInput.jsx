@@ -132,12 +132,37 @@ const MIN_WIDTH = typeof window !== "undefined" && window.innerWidth < 1024
 
     const didRefreshRef = useRef(false);
     const debounceRef = useRef(null);
+    const [internalProducts, setInternalProducts] = useState(null);
+
+    const effectiveRefreshProducts = useMemo(() => {
+      if (typeof onRefreshProducts === "function") {
+        return onRefreshProducts;
+      }
+      return async (q = "") => {
+        try {
+          const { data } = await axios.get("/api/products/search", {
+            params: { q: q || "", limit: 200 },
+          });
+          const list = Array.isArray(data?.data)
+            ? data.data
+            : Array.isArray(data)
+            ? data
+            : [];
+          setInternalProducts(list);
+        } catch {
+          // ignore
+        }
+      };
+    }, [onRefreshProducts]);
 
     const items = useMemo(() => {
+      if (typeof onRefreshProducts !== "function" && Array.isArray(internalProducts)) {
+        return internalProducts;
+      }
       if (Array.isArray(products)) return products;
       if (products && Array.isArray(products.data)) return products.data;
-      return [];
-    }, [products]);
+      return Array.isArray(internalProducts) ? internalProducts : [];
+    }, [products, internalProducts, onRefreshProducts]);
 
     // Clear refs when results change
     useEffect(() => {
@@ -178,7 +203,7 @@ const MIN_WIDTH = typeof window !== "undefined" && window.innerWidth < 1024
 
     useImperativeHandle(ref, () => ({
       focus: () => triggerRef.current?.focus(),
-      refresh: () => onRefreshProducts?.(search),
+      refresh: () => effectiveRefreshProducts?.(search),
       openMenu: () => openModal(),
       closeMenu: () => closeModal(),
     }));
@@ -223,26 +248,26 @@ const MIN_WIDTH = typeof window !== "undefined" && window.innerWidth < 1024
     }, [isOpen]);
 
     useEffect(() => {
-      if (isOpen && onRefreshProducts && !didRefreshRef.current) {
+      if (isOpen && effectiveRefreshProducts && !didRefreshRef.current) {
         didRefreshRef.current = true;
-        Promise.resolve(onRefreshProducts(search)).catch(() => {});
+        Promise.resolve(effectiveRefreshProducts(search)).catch(() => {});
       }
       if (!isOpen) didRefreshRef.current = false;
-    }, [isOpen, onRefreshProducts, search]);
+    }, [isOpen, effectiveRefreshProducts, search]);
 
     useEffect(() => {
-      if (!isOpen || !onRefreshProducts) return undefined;
-      const handler = () => onRefreshProducts?.(search);
+      if (!isOpen || !effectiveRefreshProducts) return undefined;
+      const handler = () => effectiveRefreshProducts?.(search);
       window.addEventListener("product:created", handler);
       return () => window.removeEventListener("product:created", handler);
-    }, [isOpen, onRefreshProducts, search]);
+    }, [isOpen, effectiveRefreshProducts, search]);
 
     useEffect(() => {
-      if (!onRefreshProducts || !isOpen) return;
+      if (!effectiveRefreshProducts || !isOpen) return;
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(() => onRefreshProducts(search), 200);
+      debounceRef.current = setTimeout(() => effectiveRefreshProducts(search), 200);
       return () => clearTimeout(debounceRef.current);
-    }, [search, onRefreshProducts, isOpen]);
+    }, [search, effectiveRefreshProducts, isOpen]);
 
     // Local filter (matches product name only, in typing order / starts-with) — skip when modal is closed
     const filtered = useMemo(() => {
@@ -263,12 +288,12 @@ const MIN_WIDTH = typeof window !== "undefined" && window.innerWidth < 1024
           container.scrollTop + container.clientHeight >=
           container.scrollHeight - 80
         ) {
-          onRefreshProducts?.(search);
+          effectiveRefreshProducts?.(search);
         }
       };
       container.addEventListener("scroll", handleScroll);
       return () => container.removeEventListener("scroll", handleScroll);
-    }, [onRefreshProducts, search, isOpen]);
+    }, [effectiveRefreshProducts, search, isOpen]);
 
     const getPackSize = (p) => p?.pack_size ?? p?.packSize ?? p?.packsize ?? "";
     const getSupplierName = (p) => p?.supplier?.name || p?.supplier_name || "";

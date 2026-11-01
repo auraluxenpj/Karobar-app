@@ -142,7 +142,11 @@ Route::middleware(['auth:sanctum', 'licensed', 'token.expiry'])->group(function 
     Route::apiResource('brands', BrandController::class);
 
     Route::get('/customers/export', [CustomerController::class, 'export'])->name('customers.export');
+    Route::post('/customers/send-bulk-refill-reminders', [CustomerController::class, 'sendBulkRefillReminders']);
     Route::get('/customers/{customer}/credit-summary', [CustomerController::class, 'creditSummary']);
+    Route::get('/customers/{customer}/refill-reminder-preview', [CustomerController::class, 'refillReminderPreview']);
+    Route::post('/customers/{customer}/send-refill-reminder', [CustomerController::class, 'sendRefillReminder']);
+    Route::post('/customers/{customer}/advance-refill-cycle', [CustomerController::class, 'advanceRefillCycle']);
     Route::apiResource('customers', CustomerController::class);
 
     Route::get('/suppliers/export', [SupplierController::class, 'export']);

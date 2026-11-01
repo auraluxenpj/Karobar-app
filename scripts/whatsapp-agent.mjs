@@ -461,6 +461,69 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Send Text Message (Refill Reminders, Notifications, etc.)
+  if (req.method === "POST" && pathname === "/send-text") {
+    try {
+      const body = await parseJsonBody(req);
+      const rawPhone = String(body.phone || body.to || "").replace(/\D+/g, "");
+      const text = String(body.text || body.message || "").trim();
+
+      if (!rawPhone) {
+        sendJson(res, 422, {
+          ok: false,
+          message: "Recipient phone number is required.",
+        });
+        return;
+      }
+
+      if (!text) {
+        sendJson(res, 422, {
+          ok: false,
+          message: "Message text is required.",
+        });
+        return;
+      }
+
+      if (connectionStatus !== "connected" || !sock) {
+        sendJson(res, 422, {
+          ok: false,
+          status: connectionStatus,
+          message:
+            "Built-in Free WhatsApp Agent is not linked yet. Open Settings -> WhatsApp API and scan the QR code with your phone.",
+        });
+        return;
+      }
+
+      let targetJid = `${rawPhone}@s.whatsapp.net`;
+
+      try {
+        const [lookup] = await sock.onWhatsApp(rawPhone);
+        if (lookup?.exists && lookup?.jid) {
+          targetJid = lookup.jid;
+        }
+      } catch {
+        // Proceed with standard JID if lookup times out
+      }
+
+      const sentMsg = await sock.sendMessage(targetJid, {
+        text,
+      });
+
+      sendJson(res, 200, {
+        ok: true,
+        sent: true,
+        message_id: sentMsg?.key?.id || null,
+        recipient: targetJid,
+      });
+    } catch (err) {
+      sendJson(res, 500, {
+        ok: false,
+        message: `Failed to send text via Local WhatsApp Agent: ${err?.message || err}`,
+      });
+    }
+    return;
+  }
+
   // Logout & unlink current WhatsApp session
   if (req.method === "POST" && pathname === "/logout") {
     try {

@@ -316,15 +316,20 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
   /* -------- effects -------- */
   useEffect(() => {
     (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const regularCustomerId = params.get("regular_customer_id");
+
       await Promise.all([fetchCustomers(), fetchProducts()]);
       if (saleId) {
         await fetchSale();
+      } else if (regularCustomerId) {
+        focusedOnce.current = true;
+        await loadRegularCustomerItems(regularCustomerId);
       }
       // focus first product on brand new form (unless resuming a draft from URL)
       setTimeout(() => {
-        const params = new URLSearchParams(window.location.search);
         const hasDraftInUrl = Boolean(params.get("draft_id"));
-        if (hasDraftInUrl) {
+        if (hasDraftInUrl || regularCustomerId) {
           focusedOnce.current = true;
           return;
         }
@@ -590,6 +595,258 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
     } catch {
       setBatchesByProduct((m) => ({ ...m, [key]: [] }));
       return [];
+    }
+  };
+
+  const loadRegularCustomerItems = async (regularCustomerId) => {
+    try {
+      const { data: customer } = await axios.get(`/api/customers/${regularCustomerId}`);
+      if (!customer || !customer.id) return;
+
+      setCustomers((prev) => {
+        const exists = prev.some((c) => String(c.id) === String(customer.id));
+        return exists ? prev : [customer, ...prev];
+      });
+
+      const rawItems = customer.regular_items || customer.regularItems || [];
+      if (!Array.isArray(rawItems) || rawItems.length === 0) {
+        setForm((prev) => ({
+          ...prev,
+          customer_id: customer.id,
+          patient_name: customer.name || prev.patient_name || "",
+        }));
+        toast("Customer selected, but no regular products are attached to their profile.", {
+          icon: "ℹ️",
+        });
+        return;
+      }
+
+      const loadedProducts = [];
+      const builtRows = [];
+
+      for (const regItem of rawItems) {
+        const productId = Number(regItem.product_id || 0);
+        if (!productId) continue;
+
+        let prodData = regItem.product || null;
+        try {
+          const { data: freshProd } = await axios.get(`/api/products/${productId}`);
+          if (freshProd?.id) {
+            prodData = freshProd;
+          }
+        } catch {
+          // fallback to regItem.product
+        }
+
+        if (prodData?.id) {
+          loadedProducts.push(prodData);
+          setProductDataCache((prev) => ({
+            ...prev,
+            [productId]: {
+              pack_purchase_price: prodData?.pack_purchase_price || 0,
+              unit_sale_price: prodData?.unit_sale_price || 0,
+              margin:
+                prodData?.margin ||
+                prodData?.margin_percentage ||
+                prodData?.default_margin ||
+                "",
+            },
+          }));
+        }
+
+        const packSize = Math.max(
+          1,
+          Number(prodData?.pack_size ?? regItem.pack_size ?? 1)
+        );
+        const neededUnits =
+          Number(regItem.unit_quantity || 0) > 0
+            ? Number(regItem.unit_quantity)
+            : Math.max(
+                1,
+                Math.round(Number(regItem.pack_quantity || 0) * packSize)
+              );
+
+        const baseAvailable = Number(
+          prodData?.quantity ??
+            prodData?.available_units ??
+            regItem.on_hand_units ??
+            0
+        );
+        const defaultUnitPrice =
+          Number(prodData?.unit_sale_price || 0) ||
+          (Number(prodData?.pack_sale_price || 0) > 0
+            ? Number((Number(prodData.pack_sale_price) / packSize).toFixed(2))
+            : 0);
+        const isNarcotic = prodData?.narcotic === "yes";
+
+        const batchList = await fetchBatches(productId);
+        const assignedBatches = (batchList || []).filter(
+          (b) =>
+            !b.is_unbatched &&
+            b.batch_number &&
+            String(b.batch_number).trim() !== ""
+        );
+        const hasAssignedBatches = assignedBatches.length > 0;
+        const hasBatches = Array.isArray(batchList) && batchList.length > 0;
+
+        const candidateBatches = hasBatches
+          ? [
+              ...batchList.filter(
+                (b) => !b.is_unbatched && !b.is_expired && b.available_units > 0
+              ),
+              ...batchList.filter(
+                (b) => b.is_unbatched && b.available_units > 0
+              ),
+              ...batchList.filter(
+                (b) => !b.is_unbatched && b.is_expired && b.available_units > 0
+              ),
+            ]
+          : [];
+
+        if (
+          candidateBatches.length > 1 &&
+          candidateBatches[0].available_units < neededUnits
+        ) {
+          let remaining = neededUnits;
+          for (
+            let bIdx = 0;
+            bIdx < candidateBatches.length && remaining > 0;
+            bIdx++
+          ) {
+            const b = candidateBatches[bIdx];
+            const isLastCandidate = bIdx === candidateBatches.length - 1;
+            const takeQty = isLastCandidate
+              ? remaining
+              : Math.min(
+                  remaining,
+                  Math.max(0, Number(b.available_units || 0))
+                );
+            if (takeQty <= 0) continue;
+            remaining -= takeQty;
+
+            const isUnbatched = Boolean(b.is_unbatched);
+            const effPrice =
+              !isUnbatched && Number(b.unit_sale_price) > 0
+                ? Number(b.unit_sale_price)
+                : defaultUnitPrice;
+
+            builtRows.push(
+              recalcItem(
+                {
+                  id: generateRowId(),
+                  product_id: productId,
+                  product_name: prodData?.name || "",
+                  product: prodData,
+                  pack_size: packSize,
+                  price: effPrice,
+                  batch_number: isUnbatched ? "" : b.batch_number || "",
+                  is_unbatched: isUnbatched,
+                  expiry: isUnbatched ? "" : b.expiry || b.expiry_date || "",
+                  current_quantity: String(b.available_units ?? baseAvailable),
+                  quantity: String(takeQty),
+                  item_discount_percentage: "",
+                  sub_total: "",
+                  is_narcotic: isNarcotic,
+                  is_custom_price: false,
+                },
+                "product_select"
+              )
+            );
+          }
+        } else {
+          const fefoBatch =
+            candidateBatches[0] || (hasBatches ? batchList[0] : null);
+          const allocatedIsUnbatched = !hasAssignedBatches
+            ? true
+            : Boolean(fefoBatch?.is_unbatched);
+          const allocatedBatchNumber =
+            !hasAssignedBatches || allocatedIsUnbatched
+              ? ""
+              : fefoBatch?.batch_number || "";
+          const allocatedExpiry =
+            !hasAssignedBatches || allocatedIsUnbatched
+              ? ""
+              : fefoBatch?.expiry || fefoBatch?.expiry_date || "";
+          const batchAvailable = fefoBatch?.available_units ?? baseAvailable;
+          const effPrice =
+            !allocatedIsUnbatched &&
+            fefoBatch &&
+            Number(fefoBatch.unit_sale_price) > 0
+              ? Number(fefoBatch.unit_sale_price)
+              : defaultUnitPrice;
+
+          builtRows.push(
+            recalcItem(
+              {
+                id: generateRowId(),
+                product_id: productId,
+                product_name: prodData?.name || "",
+                product: prodData,
+                pack_size: packSize,
+                price: effPrice,
+                batch_number: allocatedBatchNumber,
+                is_unbatched: allocatedIsUnbatched,
+                expiry: allocatedExpiry,
+                current_quantity: String(batchAvailable),
+                quantity: String(neededUnits),
+                item_discount_percentage: "",
+                sub_total: "",
+                is_narcotic: isNarcotic,
+                is_custom_price: false,
+              },
+              "product_select"
+            )
+          );
+        }
+      }
+
+      if (loadedProducts.length > 0) {
+        upsertProducts(loadedProducts);
+      }
+
+      if (builtRows.length > 0) {
+        setForm((prev) => {
+          const next = recalcFooter(
+            {
+              ...prev,
+              customer_id: customer.id,
+              patient_name: customer.name || prev.patient_name || "",
+              remarks: customer.regular_notes || prev.remarks || "",
+              items: builtRows,
+            },
+            "items"
+          );
+          if (prev.invoice_type !== "credit") {
+            next.total_receive = next.total ?? "";
+          }
+          return next;
+        });
+
+        toast.success(
+          `Shifted ${builtRows.length} regular item(s) for ${customer.name} into Retail Sale Invoice!`
+        );
+
+        const lastIdx = Math.max(0, builtRows.length - 1);
+        setFocusedRowIndex(lastIdx);
+        setTimeout(() => {
+          const el = qtyRefs.current[lastIdx];
+          if (el && typeof el.focus === "function") {
+            el.focus();
+            el.select?.();
+          }
+        }, 80);
+      }
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message || "Failed to load regular customer items"
+      );
+    } finally {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("product-search:close"));
+        setTimeout(() => {
+          window.__isResumingInvoiceDraft = false;
+        }, 400);
+      }
     }
   };
 

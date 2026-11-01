@@ -5,7 +5,8 @@ import toast from "react-hot-toast";
 // Immediately flag draft resumption if ?draft_id is in URL so search modals don't pop open on mount
 if (typeof window !== "undefined") {
   try {
-    if (new URLSearchParams(window.location.search).get("draft_id")) {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("draft_id") || sp.get("regular_customer_id")) {
       window.__isResumingInvoiceDraft = true;
     }
   } catch {}

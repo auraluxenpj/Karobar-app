@@ -119,6 +119,7 @@ export default function DashboardLayout({ children }) {
     "/suppliers": "Suppliers",
     "/suppliers/create": "Add Supplier",
     "/customers": "Customers",
+    "/customers/create": "Add Customer",
     "/products": "Products",
     "/products/create": "Add Product",
     "/categories": "Categories",
@@ -193,6 +194,7 @@ export default function DashboardLayout({ children }) {
     if (/^\/products\/\d+\/edit$/.test(cleanPath)) return "Edit Product";
     if (/^\/brands\/\d+\/edit$/.test(cleanPath)) return "Edit Brand";
     if (/^\/suppliers\/\d+\/edit$/.test(cleanPath)) return "Edit Supplier";
+    if (/^\/customers\/\d+\/edit$/.test(cleanPath)) return "Edit Customer";
     if (/^\/stock-adjustments\/\d+$/.test(cleanPath)) return "Stock Adjustment Details";
     if (/^\/stocktake-sessions\/\d+\/review$/.test(cleanPath)) return "Stocktake Variance Review";
     if (/^\/stocktake-sessions\/\d+$/.test(cleanPath)) return "Stocktake Session";

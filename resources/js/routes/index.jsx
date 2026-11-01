@@ -38,7 +38,10 @@ const Profile = registerLazy(() => import("../pages/Profile.jsx"), ["/profile"])
 const Suppliers = registerLazy(() => import("../pages/Suppliers/index.jsx"), ["/suppliers"]);
 const CreateSupplier = registerLazy(() => import("../pages/Suppliers/Create.jsx"), ["/suppliers/create"]);
 const EditSupplier = registerLazy(() => import("../pages/Suppliers/Edit.jsx"));
-const Customers = registerLazy(() => import("../pages/Customers.jsx"), ["/customers"]);
+const Customers = registerLazy(() => import("../pages/Customers/index.jsx"), ["/customers"]);
+const CreateCustomer = registerLazy(() => import("../pages/Customers/Create.jsx"), ["/customers/create"]);
+const EditCustomer = registerLazy(() => import("../pages/Customers/Edit.jsx"));
+const ShowCustomer = registerLazy(() => import("../pages/Customers/Show.jsx"));
 const Categories = registerLazy(() => import("../pages/Categories.jsx"), ["/categories"]);
 const Brands = registerLazy(() => import("../pages/Brands/index.jsx"), ["/brands"]);
 const CreateBrand = registerLazy(() => import("../pages/Brands/Create.jsx"), ["/brands/create"]);
@@ -198,6 +201,9 @@ export default function AppRoutes() {
           <Route path="/suppliers/create" element={<CreateSupplier />} />
           <Route path="/suppliers/:id/edit" element={<EditSupplier />} />
           <Route path="/customers" element={<Customers />} />
+          <Route path="/customers/create" element={<CreateCustomer />} />
+          <Route path="/customers/:id/edit" element={<EditCustomer />} />
+          <Route path="/customers/:id" element={<ShowCustomer />} />
 
           {/* Catalog Masters */}
           <Route path="/categories" element={<Categories />} />

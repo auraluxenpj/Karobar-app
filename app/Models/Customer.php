@@ -16,11 +16,26 @@ class Customer extends Model
         'credit_limit',
         'credit_days',
         'credit_status',
+        'is_regular',
+        'refill_cycle',
+        'refill_custom_days',
+        'reminder_lead_days',
+        'next_refill_date',
+        'last_refill_reminded_at',
+        'last_refill_collected_at',
+        'reminder_language',
+        'regular_notes',
     ];
 
     protected $casts = [
-        'credit_limit' => 'decimal:2',
-        'credit_days'  => 'integer',
+        'credit_limit'             => 'decimal:2',
+        'credit_days'              => 'integer',
+        'is_regular'               => 'boolean',
+        'refill_custom_days'       => 'integer',
+        'reminder_lead_days'       => 'integer',
+        'next_refill_date'         => 'date:Y-m-d',
+        'last_refill_reminded_at'  => 'datetime',
+        'last_refill_collected_at' => 'datetime',
     ];
 
     public static function isWalkInName(?string $name): bool
@@ -92,5 +107,10 @@ class Customer extends Model
     public function wholeSalePrices()
     {
         return $this->hasMany(\App\Models\CustomerWholeSalePrice::class);
+    }
+
+    public function regularItems()
+    {
+        return $this->hasMany(\App\Models\CustomerRegularItem::class);
     }
 }
