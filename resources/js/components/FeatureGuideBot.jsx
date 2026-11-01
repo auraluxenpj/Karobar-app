@@ -329,10 +329,17 @@ function ScreenElementInspector({ guide, lang, onSetLang, isDark }) {
     clearElementHighlight();
   }, [clearElementHighlight]);
 
-  // Clear inspect mode and any open popover on route change
+  // Clear inspect mode and any open popover only when the route actually changes after mount
+  const prevRouteKeyRef = useRef(
+    `${location.pathname}|${location.search}|${location.hash}`
+  );
   useEffect(() => {
-    setInspectMode(false);
-    dismissPopover();
+    const nextKey = `${location.pathname}|${location.search}|${location.hash}`;
+    if (prevRouteKeyRef.current !== nextKey) {
+      prevRouteKeyRef.current = nextKey;
+      setInspectMode(false);
+      dismissPopover();
+    }
   }, [location.pathname, location.search, location.hash, setInspectMode, dismissPopover]);
 
   // Clear any previous popover when entering inspect mode
@@ -460,7 +467,9 @@ function ScreenElementInspector({ guide, lang, onSetLang, isDark }) {
       const directControl = rawTarget.closest?.(
         "button, a, input, select, textarea, [role='button'], [role='tab'], [role='switch'], [role='combobox'], .react-select__control, .rs__control"
       );
-      if (directControl) return directControl;
+      if (directControl && !directControl.classList?.contains("workspace-dock-trigger")) {
+        return directControl;
+      }
 
       // 2. Labels & Table Headers
       const labelOrTh = rawTarget.closest?.("label, th");
@@ -497,6 +506,14 @@ function ScreenElementInspector({ guide, lang, onSetLang, isDark }) {
           }
         }
         cursor = cursor.parentElement;
+      }
+
+      if (
+        rawTarget.matches?.(
+          ".workspace-shell, .workspace-main, .workspace-content, .workspace-page, .workspace-sidebar-slot, .workspace-topbar-slot, .workspace-dock-trigger, .workspace-dock-floating, main, header, aside, nav"
+        )
+      ) {
+        return null;
       }
 
       return rawTarget;
@@ -713,45 +730,48 @@ function ScreenElementInspector({ guide, lang, onSetLang, isDark }) {
     <>
       {/* =================================================================== */}
       {/* SIMPLE BASELINE CURSOR (Replaces OS cursor 1:1 at tip hotspot 4,3)  */}
+      {/* Wrapped in a viewport-clipped fixed layer so it never overflows right */}
       {/* =================================================================== */}
       {inspectMode && (
         <div
-          ref={stalkerElRef}
           aria-hidden="true"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            zIndex: 1000002,
-            pointerEvents: "none",
-            willChange: "transform",
-            transform: `translate3d(${stalkerPosRef.current.x - 4}px, ${
-              stalkerPosRef.current.y - 3
-            }px, 0)`,
-          }}
-          className="select-none"
+          className="fixed inset-0 z-[1000002] pointer-events-none overflow-hidden select-none"
         >
-          {/* Simple Baseline Pointer Arrow (Tip anchored at 4px, 3px) */}
-          <CursorBuddyAvatar
-            className="w-6 h-6 drop-shadow-xs"
-            fullBody={true}
-            speaking={Boolean(hoveredControlLabel)}
-          />
+          <div
+            ref={stalkerElRef}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              pointerEvents: "none",
+              willChange: "transform",
+              transform: `translate3d(${stalkerPosRef.current.x - 4}px, ${
+                stalkerPosRef.current.y - 3
+              }px, 0)`,
+            }}
+          >
+            {/* Simple Baseline Pointer Arrow (Tip anchored at 4px, 3px) */}
+            <CursorBuddyAvatar
+              className="w-6 h-6 drop-shadow-xs"
+              fullBody={true}
+              speaking={Boolean(hoveredControlLabel)}
+            />
 
-          {/* Compact Label Badge Tucked Beside the Cursor Tail only when hovering a control */}
-          {hoveredControlLabel && (
-            <div
-              dir={isUr ? "rtl" : "ltr"}
-              lang={isUr ? "ur" : "en"}
-              className={`ml-5 -mt-1 px-2 py-0.5 rounded-lg text-[10px] font-extrabold whitespace-nowrap shadow-md border bg-slate-900/95 text-amber-300 border-amber-400/70 ${
-                isUr ? "guide-bot-urdu-inline" : ""
-              }`}
-            >
-              {isUr
-                ? `کلک کریں: ${hoveredControlLabel}`
-                : `Click to explain: ${hoveredControlLabel}`}
-            </div>
-          )}
+            {/* Compact Label Badge Tucked Beside the Cursor Tail only when hovering a control */}
+            {hoveredControlLabel && (
+              <div
+                dir={isUr ? "rtl" : "ltr"}
+                lang={isUr ? "ur" : "en"}
+                className={`ml-5 -mt-1 px-2 py-0.5 rounded-lg text-[10px] font-extrabold whitespace-nowrap shadow-md border bg-slate-900/95 text-amber-300 border-amber-400/70 ${
+                  isUr ? "guide-bot-urdu-inline" : ""
+                }`}
+              >
+                {isUr
+                  ? `کلک کریں: ${hoveredControlLabel}`
+                  : `Click to explain: ${hoveredControlLabel}`}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -999,9 +1019,6 @@ function ScreenElementInspector({ guide, lang, onSetLang, isDark }) {
   );
 }
 
-const INTERACTIVE_OBSTACLE_SELECTOR =
-  'input, select, textarea, button, [role="button"], [role="combobox"], [contenteditable="true"], .react-select__control';
-
 // Stationary tricks performed along the bottom
 const STATIONARY_TRICKS = [
   { id: "rubiks", durationMs: 3600, badge: "Solving Cube 🧩" },
@@ -1045,10 +1062,8 @@ const TRICK_BADGES = {
  * - Roams freely along the bottom of the app with a cute walking cycle, full Cube body,
  *   and an autonomous Finite State Machine that performs 8 entertaining tricks:
  *   ('backflip', 'dance', 'hoverboard', 'juggle', 'shades', 'charge', 'scan', 'sleep' + 'wake').
- * - Never runs away from the user's cursor so it is always easy to watch and click.
- * - Avoids covering fields/buttons by picking open floor slots and stepping aside only if
- *   an overlapping input/control is focused.
- * - When clicked, opens the Guide Bot popup and disappears ("goes away") while the popup is open.
+ * - Portaled to `document.body` inside a viewport-clipped fixed container so it never affects
+ *   layout or causes horizontal overflow.
  */
 function RoamingCubeCompanion({ onOpen, screenTitle }) {
   const mascotBtnRef = useRef(null);
@@ -1067,6 +1082,7 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
   const lastTrickRef = useRef("dance");
   const lastUserActivityRef = useRef(Date.now());
   const stepCounterRef = useRef(0);
+  const sidebarBoundsCacheRef = useRef({ minX: 28, ts: 0 });
 
   const [state, setState] = useState(() => {
     const startX =
@@ -1095,9 +1111,6 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
     });
   }, []);
 
-  /**
-   * Picks a random stationary trick without repeating the previous trick back-to-back.
-   */
   const pickNextTrick = useCallback(() => {
     const candidates = STATIONARY_TRICKS.filter((t) => t.id !== lastTrickRef.current);
     const chosen =
@@ -1106,96 +1119,57 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
     return chosen;
   }, []);
 
-  /**
-   * Scans the viewport bottom to find safe X coordinates (and bottomOffset) that do not
-   * cover any visible button, input, select, or textarea.
-   */
   const findSafeSpot = useCallback((avoidX = null, currentX = stateRef.current.x) => {
     if (typeof window === "undefined" || typeof document === "undefined") {
       return { x: 320, bottomOffset: 6 };
     }
 
     const vw = window.innerWidth;
-    const vh = window.innerHeight;
     const cubeW = 68;
-    const cubeH = 78;
+    const now = Date.now();
 
-    // Respect left sidebar if present
-    let minX = 28;
-    const sidebarEl = document.querySelector(".workspace-sidebar");
-    if (sidebarEl) {
-      const sbRect = sidebarEl.getBoundingClientRect();
-      if (sbRect.width > 0 && sbRect.right > 0 && sbRect.left >= 0 && sbRect.right < vw * 0.5) {
-        minX = Math.max(28, Math.ceil(sbRect.right + 20));
+    if (now - sidebarBoundsCacheRef.current.ts > 4000) {
+      let minX = 28;
+      const sidebarEl = document.querySelector(".workspace-sidebar");
+      if (sidebarEl) {
+        const sbRect = sidebarEl.getBoundingClientRect();
+        if (sbRect.width > 0 && sbRect.right > 0 && sbRect.left >= 0 && sbRect.right < vw * 0.5) {
+          minX = Math.max(28, Math.ceil(sbRect.right + 20));
+        }
       }
-    }
-    const maxX = Math.max(minX + 40, vw - cubeW - 28);
-
-    // Collect visible interactive elements in the lower 160px of the viewport
-    const allNodes = Array.from(document.querySelectorAll(INTERACTIVE_OBSTACLE_SELECTOR));
-    const obstacles = [];
-    for (let i = 0; i < allNodes.length; i++) {
-      const el = allNodes[i];
-      if (el.closest("[data-roaming-cube]")) continue;
-      const r = el.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0 || r.width > vw * 0.85) continue;
-      if (r.bottom < vh - 160 || r.top > vh) continue;
-      obstacles.push(r);
+      sidebarBoundsCacheRef.current = { minX, ts: now };
     }
 
-    const candidateBottomOffsets = [6, 62];
-    for (const bOffset of candidateBottomOffsets) {
-      const boxTop = vh - bOffset - cubeH;
-      const boxBottom = vh - bOffset;
-      const safeSlots = [];
+    const minX = sidebarBoundsCacheRef.current.minX;
+    const maxX = Math.max(minX + 40, vw - cubeW - 48);
 
-      for (let candX = minX; candX <= maxX; candX += 32) {
-        const boxLeft = candX - 8;
-        const boxRight = candX + cubeW + 8;
+    const safeSlots = [];
+    for (let candX = minX; candX <= maxX; candX += 36) {
+      safeSlots.push(candX);
+    }
 
-        const hitsObstacle = obstacles.some(
-          (r) =>
-            r.right >= boxLeft &&
-            r.left <= boxRight &&
-            r.bottom >= boxTop &&
-            r.top <= boxBottom
-        );
-
-        if (!hitsObstacle) {
-          safeSlots.push(candX);
+    if (safeSlots.length > 0) {
+      if (typeof avoidX === "number") {
+        const farSlots = safeSlots.filter((sx) => Math.abs(sx + cubeW / 2 - avoidX) >= 140);
+        if (farSlots.length > 0) {
+          farSlots.sort(
+            (a, b) => Math.abs(b + cubeW / 2 - avoidX) - Math.abs(a + cubeW / 2 - avoidX)
+          );
+          return { x: farSlots[0], bottomOffset: 6 };
         }
       }
 
-      if (safeSlots.length > 0) {
-        if (typeof avoidX === "number") {
-          const farSlots = safeSlots.filter((sx) => Math.abs(sx + cubeW / 2 - avoidX) >= 140);
-          if (farSlots.length > 0) {
-            farSlots.sort(
-              (a, b) => Math.abs(b + cubeW / 2 - avoidX) - Math.abs(a + cubeW / 2 - avoidX)
-            );
-            return { x: farSlots[0], bottomOffset: bOffset };
-          }
-        }
-
-        const strollSlots = safeSlots.filter(
-          (sx) => Math.abs(sx - currentX) >= 90 && Math.abs(sx - currentX) <= 360
-        );
-        const pool = strollSlots.length > 0 ? strollSlots : safeSlots;
-        const chosen = pool[Math.floor(Math.random() * pool.length)];
-        return { x: chosen, bottomOffset: bOffset };
-      }
+      const strollSlots = safeSlots.filter(
+        (sx) => Math.abs(sx - currentX) >= 90 && Math.abs(sx - currentX) <= 360
+      );
+      const pool = strollSlots.length > 0 ? strollSlots : safeSlots;
+      const chosen = pool[Math.floor(Math.random() * pool.length)];
+      return { x: chosen, bottomOffset: 6 };
     }
 
-    const fallbackX =
-      typeof avoidX === "number"
-        ? avoidX > (minX + maxX) / 2
-          ? minX
-          : maxX
-        : Math.round((minX + maxX) * 0.62);
-    return { x: fallbackX, bottomOffset: 6 };
+    return { x: Math.round((minX + maxX) * 0.62), bottomOffset: 6 };
   }, []);
 
-  // 1. Continuous, Unbreakable Trick & Strolling State Machine Loop
   useEffect(() => {
     if (typeof window === "undefined") return;
     let isCancelled = false;
@@ -1213,20 +1187,18 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
         if (isCancelled) return;
 
         if (typeof document !== "undefined" && document.hidden) {
-          runCycle(2500);
+          runCycle(3000);
           return;
         }
 
         const cur = stateRef.current;
         if (cur.isVanishing) return;
 
-        // If user is hovering Cube right now, wait briefly and check again
         if (cur.isHovered) {
           runCycle(1200);
           return;
         }
 
-        // Check if user has been inactive for > 45s -> enter cozy nap mode
         const inactiveMs = Date.now() - lastUserActivityRef.current;
         if (inactiveMs > 45000) {
           if (cur.activeTrick !== "sleep") {
@@ -1236,12 +1208,11 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
               activeTrick: "sleep",
             });
           }
-          runCycle(3000);
+          runCycle(3500);
           return;
         }
 
         stepCounterRef.current += 1;
-        // Perform 2 tricks for every 1 stroll so Cube is always entertaining!
         const doStationaryTrick = stepCounterRef.current % 3 !== 0;
 
         if (doStationaryTrick) {
@@ -1258,12 +1229,11 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
             updateState((prev) =>
               prev.activeTrick === trickSpec.id ? { ...prev, activeTrick: null } : prev
             );
-            runCycle(900);
+            runCycle(1100);
           }, trickSpec.durationMs);
           return;
         }
 
-        // Stroll (or glide on neon hoverboard!) to a new safe spot along the bottom
         const nextSpot = findSafeSpot(null, cur.x);
         const dist = Math.abs(nextSpot.x - cur.x);
 
@@ -1278,7 +1248,7 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
           actionEndTimerRef.current = window.setTimeout(() => {
             if (isCancelled) return;
             updateState({ activeTrick: null });
-            runCycle(900);
+            runCycle(1100);
           }, trickSpec.durationMs);
           return;
         }
@@ -1308,13 +1278,11 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
             moveDurationMs: 0,
             activeTrick: null,
           });
-          // Immediately perform a trick upon arriving at the new spot!
-          runCycle(450);
+          runCycle(600);
         }, durationMs);
       }, delayMs);
     };
 
-    // Place in an obstacle-free spot and kick off the first trick cycle
     const initialSpot = findSafeSpot(null, stateRef.current.x);
     updateState({
       x: initialSpot.x,
@@ -1330,12 +1298,15 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
     };
   }, [findSafeSpot, pickNextTrick, updateState]);
 
-  // 2. Wake up from sleep on user activity & step aside ONLY if an overlapping input is focused
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     const recordUserActivity = () => {
-      lastUserActivityRef.current = Date.now();
+      const now = Date.now();
+      if (now - lastUserActivityRef.current < 1500 && stateRef.current.activeTrick !== "sleep") {
+        return;
+      }
+      lastUserActivityRef.current = now;
       if (stateRef.current.activeTrick === "sleep") {
         updateState({
           activeTrick: "wake",
@@ -1361,7 +1332,6 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
       const cubeRight = cur.x + 78;
       const cubeTop = vh - cur.bottomOffset - 86;
 
-      // Only step aside if the focused field actually overlaps Cube's current position
       if (r.bottom >= cubeTop && r.right >= cubeLeft && r.left <= cubeRight) {
         const next = findSafeSpot(r.left + r.width / 2, cur.x);
         const dir = next.x < cur.x ? "left" : "right";
@@ -1381,14 +1351,16 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
 
     window.addEventListener("focusin", handleFocusIn, { passive: true });
     window.addEventListener("keydown", recordUserActivity, { passive: true });
-    window.addEventListener("mousemove", recordUserActivity, { passive: true });
+    window.addEventListener("pointerdown", recordUserActivity, { passive: true });
 
     return () => {
       window.removeEventListener("focusin", handleFocusIn);
       window.removeEventListener("keydown", recordUserActivity);
-      window.removeEventListener("mousemove", recordUserActivity);
+      window.removeEventListener("pointerdown", recordUserActivity);
     };
   }, [findSafeSpot, updateState]);
+
+  if (typeof document === "undefined") return null;
 
   const handleClickMascot = () => {
     updateState({
@@ -1407,60 +1379,64 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
     ? TRICK_BADGES[state.activeTrick]
     : null;
 
-  return (
+  return createPortal(
     <div
       data-roaming-cube="true"
-      className="hidden md:block fixed bottom-0 left-0 z-40 pointer-events-none select-none"
-      style={{
-        transform: `translate3d(${state.x}px, -${state.bottomOffset}px, 0)`,
-        transitionProperty: "transform",
-        transitionDuration: `${state.moveDurationMs}ms`,
-        transitionTimingFunction: "linear",
-      }}
+      className="hidden md:block fixed inset-x-0 bottom-0 h-32 z-40 pointer-events-none overflow-hidden select-none"
     >
-      <button
-        ref={mascotBtnRef}
-        type="button"
-        data-roaming-cube="true"
-        onClick={handleClickMascot}
-        onMouseEnter={() => updateState({ isHovered: true })}
-        onMouseLeave={() => updateState({ isHovered: false })}
-        aria-label="Open Guide Bot"
-        title={screenTitle ? `Guide Bot — Explain ${screenTitle}` : "Click to open Guide Bot"}
-        className={`group relative pointer-events-auto flex flex-col items-center cursor-pointer focus:outline-hidden transition-all duration-200 ${
-          state.isVanishing
-            ? "opacity-0 -translate-y-6 scale-75"
-            : "opacity-100 translate-y-0 scale-100 hover:-translate-y-1"
-        }`}
+      <div
+        className="absolute bottom-0 left-0 pointer-events-none"
+        style={{
+          transform: `translate3d(${state.x}px, -${state.bottomOffset}px, 0)`,
+          transitionProperty: "transform",
+          transitionDuration: `${state.moveDurationMs}ms`,
+          transitionTimingFunction: "linear",
+        }}
       >
-        {/* Trick / Hover Status Pill */}
-        <span
-          className={`mb-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold whitespace-nowrap shadow-md border transition-all duration-200 pointer-events-none ${
-            pillText
-              ? "opacity-100 translate-y-0 scale-100"
-              : "opacity-0 translate-y-1 scale-95"
-          } ${
-            state.isHovered
-              ? "bg-blue-600 text-white border-blue-400"
-              : "bg-slate-900/95 text-white border-slate-700 dark:bg-white/95 dark:text-slate-900 dark:border-slate-200"
+        <button
+          ref={mascotBtnRef}
+          type="button"
+          data-roaming-cube="true"
+          onClick={handleClickMascot}
+          onMouseEnter={() => updateState({ isHovered: true })}
+          onMouseLeave={() => updateState({ isHovered: false })}
+          aria-label="Open Guide Bot"
+          title={screenTitle ? `Guide Bot — Explain ${screenTitle}` : "Click to open Guide Bot"}
+          className={`group relative pointer-events-auto flex flex-col items-center cursor-pointer focus:outline-hidden transition-all duration-200 ${
+            state.isVanishing
+              ? "opacity-0 -translate-y-6 scale-75"
+              : "opacity-100 translate-y-0 scale-100 hover:-translate-y-1"
           }`}
         >
-          {pillText || "Guide Bot ✨"}
-        </span>
+          <span
+            className={`mb-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold whitespace-nowrap shadow-md border transition-all duration-200 pointer-events-none ${
+              pillText
+                ? "opacity-100 translate-y-0 scale-100"
+                : "opacity-0 translate-y-1 scale-95"
+            } ${
+              state.isHovered
+                ? "bg-blue-600 text-white border-blue-400"
+                : "bg-slate-900/95 text-white border-slate-700 dark:bg-white/95 dark:text-slate-900 dark:border-slate-200"
+            }`}
+          >
+            {pillText || "Guide Bot ✨"}
+          </span>
 
-        {/* Full-Body Roaming Cube Mascot with Tricks */}
-        <GuideBotAvatar
-          className="w-[72px] h-[84px] drop-shadow-lg"
-          fullBody={true}
-          walking={state.isWalking}
-          walkDirection={state.walkDirection}
-          waving={state.isHovered}
-          trick={state.activeTrick}
-        />
-      </button>
-    </div>
+          <GuideBotAvatar
+            className="w-[72px] h-[84px] drop-shadow-lg"
+            fullBody={true}
+            walking={state.isWalking}
+            walkDirection={state.walkDirection}
+            waving={state.isHovered}
+            trick={state.activeTrick}
+          />
+        </button>
+      </div>
+    </div>,
+    document.body
   );
 }
+
 export default function FeatureGuideBot({ isOpen, onClose }) {
   const [, setSharedIsOpen] = useGuideBotOpenState();
   const [bottomMascotEnabled] = useBottomMascotEnabledState();

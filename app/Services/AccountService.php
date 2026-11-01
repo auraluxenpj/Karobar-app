@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Account;
 use App\Models\AccountTransaction;
 use App\Models\User;
+use App\Support\SchemaCache;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -30,7 +31,7 @@ class AccountService
      */
     public function syncCashDrawerBalance(?\App\Models\CashDrawerSession $session = null): ?Account
     {
-        if (!Schema::hasTable('accounts') || !Schema::hasTable('cash_drawer_sessions')) {
+        if (!SchemaCache::hasTable('accounts') || !SchemaCache::hasTable('cash_drawer_sessions')) {
             return null;
         }
 
@@ -53,17 +54,26 @@ class AccountService
             ]);
         }
 
-        $openSessions = \App\Models\CashDrawerSession::where('status', 'open')->get();
+        $openSessions = \App\Models\CashDrawerSession::where('status', 'open')
+            ->get(['id', 'opening_balance']);
 
         if ($openSessions->isNotEmpty()) {
+            $sessionIds = $openSessions->pluck('id')->all();
+            $groupedTotals = \App\Models\CashDrawerTransaction::whereIn('session_id', $sessionIds)
+                ->selectRaw('session_id, type, SUM(amount) as total_amount')
+                ->groupBy('session_id', 'type')
+                ->get()
+                ->groupBy('session_id');
+
             $totalOpenDrawers = 0.0;
             foreach ($openSessions as $openSession) {
-                $cashIn = (float) \App\Models\CashDrawerTransaction::where('session_id', $openSession->id)
+                $rows = $groupedTotals->get($openSession->id, collect());
+                $cashIn = (float) $rows
                     ->whereIn('type', \App\Services\CashDrawerService::CASH_IN_TYPES)
-                    ->sum('amount');
-                $cashOut = (float) \App\Models\CashDrawerTransaction::where('session_id', $openSession->id)
+                    ->sum('total_amount');
+                $cashOut = (float) $rows
                     ->whereIn('type', \App\Services\CashDrawerService::CASH_OUT_TYPES)
-                    ->sum('amount');
+                    ->sum('total_amount');
                 $sessionExpected = round((float) $openSession->opening_balance + $cashIn - $cashOut, 2);
                 $totalOpenDrawers = round($totalOpenDrawers + $sessionExpected, 2);
             }

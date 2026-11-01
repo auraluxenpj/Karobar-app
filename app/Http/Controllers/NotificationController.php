@@ -88,8 +88,9 @@ class NotificationController extends Controller
             ->limit($limit)
             ->get();
 
-$countQuery = $buildQuery(DB::table('products as p'));
-        $count = $countQuery->count();
+        $count = $rows->count() < $limit
+            ? $rows->count()
+            : $buildQuery(DB::table('products as p'))->count();
 
         return response()->json([
             'count' => $count,

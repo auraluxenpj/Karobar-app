@@ -885,6 +885,7 @@ body:has(.workspace-shell) { transform: none; }
 /* Theme transition styles */
 html {
   @apply transition-colors duration-300;
+  overflow-x: clip;
 }
 
 body {
@@ -895,6 +896,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   transform: translateZ(0);
   backface-visibility: hidden;
+  overflow-x: clip;
 }
 
 /* Dark mode scrollbar styles */
@@ -4475,7 +4477,6 @@ html:not([data-btn-style]) :is(.theme-btn-success, .products-action-success) {
 }
 
 .guide-bot-dom-highlight {
-  position: relative;
   z-index: 45;
   border-radius: 0.5rem;
   animation: cube-dom-pulse 1.2s ease-in-out infinite;

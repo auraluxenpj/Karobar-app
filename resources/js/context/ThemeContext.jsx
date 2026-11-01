@@ -86,9 +86,29 @@ function applyThemeCssVariables(targetTheme, darkFlag) {
   root.style.setProperty('--color-shadow', targetTheme.shadow_color);
 }
 
+const THEME_CACHE_KEY = 'karobar_active_theme_v1';
+
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(DEFAULT_THEME);
-  const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(THEME_CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          const isDarkSaved = localStorage.getItem('theme_mode') === 'dark';
+          const base = isDarkSaved ? DARK_THEME : DEFAULT_THEME;
+          return { ...base, ...parsed };
+        }
+      } catch {
+        /* ignore */
+      }
+      if (localStorage.getItem('theme_mode') === 'dark') {
+        return DARK_THEME;
+      }
+    }
+    return DEFAULT_THEME;
+  });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isDark, setIsDark] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -271,13 +291,12 @@ export function ThemeProvider({ children }) {
   // Fetch active theme from server
   const fetchTheme = useCallback(async () => {
     try {
-      setLoading(true);
       const { data } = await axios.get('/api/theme-settings/active');
       
       if (data) {
         const savedDark = localStorage.getItem('theme_mode') === 'dark';
         const modeBase = savedDark ? DARK_THEME : DEFAULT_THEME;
-        setTheme({
+        const resolvedTheme = {
           primary_color: data.primary_color || modeBase.primary_color,
           primary_hover: data.primary_hover || modeBase.primary_hover,
           primary_light: savedDark ? modeBase.primary_light : (data.primary_light || modeBase.primary_light),
@@ -299,7 +318,23 @@ export function ThemeProvider({ children }) {
           button_style: data.button_style || modeBase.button_style,
           sidebar_template: data.sidebar_template || modeBase.sidebar_template,
           topbar_template: data.topbar_template || modeBase.topbar_template,
-        });
+        };
+        setTheme(resolvedTheme);
+        try {
+          localStorage.setItem(THEME_CACHE_KEY, JSON.stringify({
+            primary_color: resolvedTheme.primary_color,
+            primary_hover: resolvedTheme.primary_hover,
+            secondary_color: resolvedTheme.secondary_color,
+            secondary_hover: resolvedTheme.secondary_hover,
+            tertiary_color: resolvedTheme.tertiary_color,
+            tertiary_hover: resolvedTheme.tertiary_hover,
+            button_style: resolvedTheme.button_style,
+            sidebar_template: resolvedTheme.sidebar_template,
+            topbar_template: resolvedTheme.topbar_template,
+          }));
+        } catch {
+          /* ignore */
+        }
       }
     } catch (err) {
       console.error('Failed to fetch theme:', err);

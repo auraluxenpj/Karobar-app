@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\CustomerLedger;
 use App\Models\SaleInvoice;
 use App\Models\Setting;
+use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -44,7 +45,7 @@ class CustomerLedgerController extends Controller
         $priorInvoices = SaleInvoice::query()
             ->where('customer_id', $customerId)
             ->where('invoice_type', 'credit')
-            ->whereDate('date', '<', $from)
+            ->where('date', '<', $from)
             ->get([
                 'id', 'invoice_total', 'total', 'grand_total', 'net_total', 'gross_amount', 'sub_total',
                 'total_receive', 'total_recieve', 'received', 'amount_received',
@@ -52,7 +53,7 @@ class CustomerLedgerController extends Controller
 
         $priorAllocated = collect();
         $priorIds = $priorInvoices->pluck('id')->all();
-        if (!empty($priorIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
+        if (!empty($priorIds) && SchemaCache::hasTable('payment_allocations') && SchemaCache::hasTable('payments')) {
             $priorAllocated = \App\Models\PaymentAllocation::query()
                 ->where('invoice_type', 'sale_invoice')
                 ->whereIn('invoice_id', $priorIds)
@@ -86,7 +87,7 @@ class CustomerLedgerController extends Controller
         $priorLedgers = CustomerLedger::query()
             ->where('customer_id', $customerId)
             ->whereIn('entry_type', ['payment', 'manual'])
-            ->whereDate('entry_date', '<', $from)
+            ->where('entry_date', '<', $from)
             ->get();
 
         foreach ($priorLedgers as $pRow) {
@@ -133,12 +134,14 @@ class CustomerLedgerController extends Controller
             ]);
         }
 
+        $toEnd = $to ? ($to . ' 23:59:59') : null;
+
         // ---- Editable rows (payment + manual) ----
         $manualAndPayments = CustomerLedger::query()
             ->where('customer_id', $customerId)
             ->whereIn('entry_type', ['payment','manual'])
-            ->when($from, fn($q)=>$q->whereDate('entry_date','>=',$from))
-            ->when($to,   fn($q)=>$q->whereDate('entry_date','<=',$to))
+            ->when($from, fn($q)=>$q->where('entry_date','>=',$from))
+            ->when($toEnd, fn($q)=>$q->where('entry_date','<=',$toEnd))
             ->orderBy('entry_date')->orderBy('id')
             ->get();
 
@@ -147,8 +150,8 @@ class CustomerLedgerController extends Controller
         $invoices = SaleInvoice::query()
             ->where('customer_id', $customerId)
             ->where('invoice_type', 'credit')
-            ->when($from, fn($q)=>$q->whereDate('date','>=',$from))
-            ->when($to,   fn($q)=>$q->whereDate('date','<=',$to))
+            ->when($from, fn($q)=>$q->where('date','>=',$from))
+            ->when($toEnd, fn($q)=>$q->where('date','<=',$toEnd))
             ->orderBy('date')->orderBy('id')
             ->get([
                 // include generous set; we’ll pick what exists
@@ -162,7 +165,7 @@ class CustomerLedgerController extends Controller
 
         $allocatedByInvoice = collect();
         $invoiceIds = $invoices->pluck('id')->all();
-        if (!empty($invoiceIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
+        if (!empty($invoiceIds) && SchemaCache::hasTable('payment_allocations') && SchemaCache::hasTable('payments')) {
             $allocatedByInvoice = \App\Models\PaymentAllocation::query()
                 ->where('invoice_type', 'sale_invoice')
                 ->whereIn('invoice_id', $invoiceIds)

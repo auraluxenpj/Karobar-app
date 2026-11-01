@@ -48,8 +48,19 @@ class CashDrawerController extends Controller
             'barcode-pos.create',
         ]);
         $session = $this->cashDrawerService->getCurrentSession($request->user());
+        $summaryOnly = $request->boolean('summary_only');
 
         if (!$session) {
+            if ($summaryOnly) {
+                return response()->json([
+                    'is_open'             => false,
+                    'session'             => null,
+                    'summary'             => null,
+                    'last_closed_session' => null,
+                    'last_closed_summary' => null,
+                ]);
+            }
+
             $lastClosed = $this->cashDrawerService->getLastClosedSession($request->user());
             return response()->json([
                 'is_open'             => false,
@@ -57,6 +68,14 @@ class CashDrawerController extends Controller
                 'summary'             => null,
                 'last_closed_session' => $lastClosed,
                 'last_closed_summary' => $lastClosed ? $this->cashDrawerService->getSessionSummary($lastClosed) : null,
+            ]);
+        }
+
+        if ($summaryOnly) {
+            return response()->json([
+                'is_open' => true,
+                'session' => null,
+                'summary' => $this->cashDrawerService->getSessionSummary($session),
             ]);
         }
 

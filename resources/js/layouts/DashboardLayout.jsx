@@ -97,11 +97,11 @@ export default function DashboardLayout({ children }) {
     });
   }, []);
 
-  // Fetch settings from API and sync with localStorage
+  // Fetch lightweight branding from shared /api/sale-system endpoint
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await axios.get("/api/settings");
+        const { data } = await axios.get("/api/sale-system");
         const sn = (data?.store_name || "").trim();
         setAppName(sn || "ERP");
         setLogoUrl(data?.logo_url || null);

@@ -99,7 +99,7 @@ class SaleInvoiceController extends Controller
         // Capture every product before any stock depletion can reset its average.
         $costs ??= $snapshots->productCosts($items);
         $legacy = $originalItems !== null && $originalItems->every(fn ($item) => $item->cost_price_snapshot === null);
-        $itemColumns = array_flip(\Illuminate\Support\Facades\Schema::getColumnListing('sale_invoice_items'));
+        $itemColumns = array_flip(\App\Support\SchemaCache::getColumnListing('sale_invoice_items'));
         foreach ($items as $raw) {
             $matches = $originalItems === null ? collect() : $originalItems->where('product_id', $raw['product_id']);
             $cost = $legacy ? null : ($matches->isNotEmpty() ? $snapshots->originalCost($originalItems, $raw) : $costs->get($raw['product_id'], 0));

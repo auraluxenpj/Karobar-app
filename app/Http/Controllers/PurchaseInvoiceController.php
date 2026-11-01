@@ -205,10 +205,10 @@ class PurchaseInvoiceController extends Controller
                     'posted_number'  => $nextCode,
                     'invoice_type'   => $data['invoice_type'] ?? 'debit',
                 ]);
-                if (\Illuminate\Support\Facades\Schema::hasColumn('purchase_invoices', 'due_date')) {
+                if (\App\Support\SchemaCache::hasColumn('purchase_invoices', 'due_date')) {
                     $createPayload['due_date'] = $dueDate;
                 }
-                if (\Illuminate\Support\Facades\Schema::hasColumn('purchase_invoices', 'payment_method')) {
+                if (\App\Support\SchemaCache::hasColumn('purchase_invoices', 'payment_method')) {
                     $createPayload['payment_method'] = $data['payment_method'] ?? 'cash';
                 } else {
                     unset($createPayload['payment_method']);
@@ -231,7 +231,7 @@ class PurchaseInvoiceController extends Controller
                     $ledger->entry_type        = 'invoice';
                     $ledger->is_manual         = false;
                     $ledger->entry_date        = $data['posted_date'];
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('supplier_ledgers', 'due_date')) {
+                    if (\App\Support\SchemaCache::hasColumn('supplier_ledgers', 'due_date')) {
                         $ledger->due_date      = $dueDate;
                     }
                     $ledger->posted_number     = $nextCode;

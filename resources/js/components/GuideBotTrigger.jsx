@@ -182,19 +182,36 @@ export function GuideBotAvatar({
     return () => window.removeEventListener("guide-bot-mascot-changed", onStyleChange);
   }, []);
 
-  // 1. Smooth Mouse Cursor Eye Tracking
+  // 1. Smooth Mouse Cursor Eye Tracking (throttled + cached rect to avoid 60fps synchronous reflows)
+  const rectCacheRef = useRef({ rect: null, ts: 0 });
+  const shouldTrackMouse = interactive && (fullBody || presenter || isHovered);
+
   useEffect(() => {
-    if (!interactive || typeof window === "undefined") return;
+    if (!shouldTrackMouse || typeof window === "undefined") return;
 
     let rafId = null;
+    let lastTick = 0;
+
+    const invalidateRect = () => {
+      rectCacheRef.current.ts = 0;
+    };
+
     const handleMouseMove = (e) => {
-      if (rafId) return;
+      const now = Date.now();
+      if (now - lastTick < 80 || rafId) return;
+      lastTick = now;
+
       rafId = window.requestAnimationFrame(() => {
         rafId = null;
         const el = svgRef.current;
         if (!el) return;
-        const rect = el.getBoundingClientRect();
-        if (rect.width === 0 && rect.height === 0) return;
+
+        if (!rectCacheRef.current.rect || now - rectCacheRef.current.ts > 600) {
+          rectCacheRef.current.rect = el.getBoundingClientRect();
+          rectCacheRef.current.ts = now;
+        }
+        const rect = rectCacheRef.current.rect;
+        if (!rect || (rect.width === 0 && rect.height === 0)) return;
 
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
@@ -203,57 +220,69 @@ export function GuideBotAvatar({
         const dist = Math.hypot(dx, dy) || 1;
 
         const factor = Math.min(dist / 80, 1);
-        const nx = (dx / dist) * 3.5 * factor;
-        const ny = (dy / dist) * 2.0 * factor;
+        const nx = Number(((dx / dist) * 3.5 * factor).toFixed(2));
+        const ny = Number(((dy / dist) * 2.0 * factor).toFixed(2));
 
-        lastMouseMoveRef.current = Date.now();
-        setGaze({
-          x: Number(nx.toFixed(2)),
-          y: Number(ny.toFixed(2)),
+        lastMouseMoveRef.current = now;
+        setGaze((prev) => {
+          if (Math.abs(prev.x - nx) < 0.35 && Math.abs(prev.y - ny) < 0.35) {
+            return prev;
+          }
+          return { x: nx, y: ny };
         });
       });
     };
 
     window.addEventListener("mousemove", handleMouseMove, { passive: true });
+    window.addEventListener("scroll", invalidateRect, { passive: true });
+    window.addEventListener("resize", invalidateRect, { passive: true });
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("scroll", invalidateRect);
+      window.removeEventListener("resize", invalidateRect);
       if (rafId) window.cancelAnimationFrame(rafId);
     };
-  }, [interactive]);
+  }, [shouldTrackMouse]);
 
   // 2. Autonomous Eye Glancing & Cute Expressions when cursor is idle
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || trick === "sleep") return;
     let idx = 0;
     const frames = presenter ? PRESENTER_FRAMES : IDLE_FRAMES;
 
     const timer = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
       const idleMs = Date.now() - lastMouseMoveRef.current;
       idx = (idx + 1) % frames.length;
       const frame = frames[idx];
 
-      setHappyArcs(frame.happyArcs);
-      setBigSmile(frame.bigSmile);
+      setHappyArcs((prev) => (prev === frame.happyArcs ? prev : frame.happyArcs));
+      setBigSmile((prev) => (prev === frame.bigSmile ? prev : frame.bigSmile));
 
       if (idleMs > 1200) {
+        let nextX = frame.x;
+        let nextY = frame.y;
         if (walking || trick === "hoverboard") {
-          setGaze({
-            x: walkDirection === "left" ? -2.8 : 2.8,
-            y: 0.2,
-          });
+          nextX = walkDirection === "left" ? -2.8 : 2.8;
+          nextY = 0.2;
         } else if (trick === "scan" || trick === "spy") {
-          setGaze({ x: idx % 2 === 0 ? -2.5 : 2.5, y: -1.2 });
+          nextX = idx % 2 === 0 ? -2.5 : 2.5;
+          nextY = -1.2;
         } else if (trick === "juggle") {
-          setGaze({ x: idx % 2 === 0 ? -2.2 : 2.2, y: -1.6 });
+          nextX = idx % 2 === 0 ? -2.2 : 2.2;
+          nextY = -1.6;
         } else if (trick === "rubiks") {
-          setGaze({ x: idx % 2 === 0 ? -1.4 : 1.4, y: 1.9 });
+          nextX = idx % 2 === 0 ? -1.4 : 1.4;
+          nextY = 1.9;
         } else if (trick === "headphones") {
-          setGaze({ x: idx % 2 === 0 ? -1.8 : 1.8, y: -0.4 });
-        } else {
-          setGaze({ x: frame.x, y: frame.y });
+          nextX = idx % 2 === 0 ? -1.8 : 1.8;
+          nextY = -0.4;
         }
+        setGaze((prev) =>
+          prev.x === nextX && prev.y === nextY ? prev : { x: nextX, y: nextY }
+        );
       }
-    }, presenter ? 1500 : 1900);
+    }, presenter ? 2000 : 2800);
 
     return () => window.clearInterval(timer);
   }, [presenter, walking, walkDirection, trick]);
@@ -278,12 +307,13 @@ export function GuideBotAvatar({
 
   // 3. Natural Periodic Eye Blinking
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || trick === "sleep") return;
     let t1 = null;
     let t2 = null;
     let t3 = null;
 
     const triggerBlink = () => {
+      if (typeof document !== "undefined" && document.hidden) return;
       setIsBlinking(true);
       t1 = window.setTimeout(() => {
         setIsBlinking(false);
@@ -296,33 +326,27 @@ export function GuideBotAvatar({
       }, 125);
     };
 
-    const blinkInterval = window.setInterval(triggerBlink, 3000);
+    const blinkInterval = window.setInterval(triggerBlink, 4200);
     return () => {
       window.clearInterval(blinkInterval);
       if (t1) window.clearTimeout(t1);
       if (t2) window.clearTimeout(t2);
       if (t3) window.clearTimeout(t3);
     };
-  }, []);
+  }, [trick]);
 
-  // 4. Animated Talking / Dancing / Charging / Headphones / Rubik's Equalizer Phase
+  // 4. Animated Talking Phase (only run fast interval when actively speaking)
   useEffect(() => {
-    const shouldAnimateBars =
-      speaking ||
-      trick === "dance" ||
-      trick === "charge" ||
-      trick === "juggle" ||
-      trick === "headphones" ||
-      trick === "rubiks";
-    if (!shouldAnimateBars || typeof window === "undefined") {
+    if (!speaking || typeof window === "undefined") {
       setTalkPhase(0);
       return;
     }
     const talkTimer = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
       setTalkPhase((prev) => (prev + 1) % 3);
-    }, trick === "rubiks" ? 210 : 170);
+    }, 220);
     return () => window.clearInterval(talkTimer);
-  }, [speaking, trick]);
+  }, [speaking]);
 
   const activeStyle = forceStyle || mascotStyle;
   const isSleeping = trick === "sleep";
@@ -1647,7 +1671,7 @@ export function InspectElementTopbarButton({ compact = false }) {
 
       {!compact && (
         <span className="hidden xl:inline text-xs font-extrabold tracking-tight">
-          {inspectMode ? "Cursor Active..." : "Explain"}
+          {inspectMode ? "Active" : "Explain"}
         </span>
       )}
 

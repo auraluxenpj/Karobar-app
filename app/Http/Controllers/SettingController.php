@@ -54,6 +54,8 @@ class SettingController extends Controller
         $setting = Setting::first();
 
         return response()->json([
+            'store_name'              => $setting?->store_name ?? 'Karobar App',
+            'logo_url'                => $setting?->logo_url ?? null,
             'sale_system'             => $setting?->sale_system ?? 'retail_wholesale',
             'shop_type'               => $setting?->shop_type ?? 'pharmacy',
             'currency_code'           => $setting?->currency_code ?? 'PKR',

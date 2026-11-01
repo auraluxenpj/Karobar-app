@@ -54,16 +54,24 @@ class DashboardController extends Controller
         ]);
 
         $totalsOnly = $request->boolean('totals_only');
+        $toEnd = $to . ' 23:59:59';
+
+        $applyPurchaseDateRange = function ($q) use ($from, $toEnd) {
+            $q->whereBetween('posted_date', [$from, $toEnd])
+              ->orWhere(function ($fallback) use ($from, $toEnd) {
+                  $fallback->whereNull('posted_date')->whereBetween('created_at', [$from, $toEnd]);
+              });
+        };
 
         if ($totalsOnly) {
-            $salesAgg = SaleInvoice::whereBetween('date', [$from, $to])
+            $salesAgg = SaleInvoice::whereBetween('date', [$from, $toEnd])
                 ->selectRaw("COALESCE(SUM(total), 0) as total, COALESCE(SUM(CASE WHEN invoice_type = 'credit' THEN total ELSE 0 END), 0) as credit_total")
                 ->first();
-            $purchasesAgg = PurchaseInvoice::whereBetween(DB::raw('DATE(COALESCE(posted_date, created_at))'), [$from, $to])
+            $purchasesAgg = PurchaseInvoice::where($applyPurchaseDateRange)
                 ->selectRaw("COALESCE(SUM(total_amount), 0) as total, COALESCE(SUM(CASE WHEN invoice_type = 'credit' THEN total_amount ELSE 0 END), 0) as credit_total")
                 ->first();
-            $saleReturnsTotal = (float) SaleReturn::whereBetween('date', [$from, $to])->sum('total');
-            $purchaseReturnsTotal = (float) PurchaseReturn::whereDate('date', '>=', $from)->whereDate('date', '<=', $to)->sum('total');
+            $saleReturnsTotal = (float) SaleReturn::whereBetween('date', [$from, $toEnd])->sum('total');
+            $purchaseReturnsTotal = (float) PurchaseReturn::whereBetween('date', [$from, $toEnd])->sum('total');
 
             $salesTotal = (float) ($salesAgg->total ?? 0);
             $salesCredit = (float) ($salesAgg->credit_total ?? 0);
@@ -91,29 +99,28 @@ class DashboardController extends Controller
             ]);
         }
 
-        // ---- Single-pass grouped queries (compute both daily series and period totals in 4 queries instead of 10) ----
-        $salesRows = SaleInvoice::selectRaw("DATE(date) as date, COALESCE(SUM(total), 0) as value, COALESCE(SUM(CASE WHEN invoice_type = 'credit' THEN total ELSE 0 END), 0) as credit_value")
-            ->whereBetween('date', [$from, $to])
-            ->groupBy(DB::raw('DATE(date)'))
+        // ---- Single-pass grouped queries (compute both daily series and period totals in 4 SARGable indexed queries) ----
+        $salesRows = SaleInvoice::selectRaw("SUBSTR(date, 1, 10) as date, COALESCE(SUM(total), 0) as value, COALESCE(SUM(CASE WHEN invoice_type = 'credit' THEN total ELSE 0 END), 0) as credit_value")
+            ->whereBetween('date', [$from, $toEnd])
+            ->groupBy(DB::raw('SUBSTR(date, 1, 10)'))
             ->orderBy('date')
             ->get();
 
-        $purchaseRows = PurchaseInvoice::selectRaw("DATE(COALESCE(posted_date, created_at)) as date, COALESCE(SUM(total_amount), 0) as value, COALESCE(SUM(CASE WHEN invoice_type = 'credit' THEN total_amount ELSE 0 END), 0) as credit_value")
-            ->whereBetween(DB::raw('DATE(COALESCE(posted_date, created_at))'), [$from, $to])
-            ->groupBy(DB::raw('DATE(COALESCE(posted_date, created_at))'))
+        $purchaseRows = PurchaseInvoice::selectRaw("SUBSTR(COALESCE(posted_date, created_at), 1, 10) as date, COALESCE(SUM(total_amount), 0) as value, COALESCE(SUM(CASE WHEN invoice_type = 'credit' THEN total_amount ELSE 0 END), 0) as credit_value")
+            ->where($applyPurchaseDateRange)
+            ->groupBy(DB::raw('SUBSTR(COALESCE(posted_date, created_at), 1, 10)'))
             ->orderBy('date')
             ->get();
 
-        $saleReturnRows = SaleReturn::selectRaw('DATE(date) as date, COALESCE(SUM(total), 0) as value')
-            ->whereBetween('date', [$from, $to])
-            ->groupBy(DB::raw('DATE(date)'))
+        $saleReturnRows = SaleReturn::selectRaw('SUBSTR(date, 1, 10) as date, COALESCE(SUM(total), 0) as value')
+            ->whereBetween('date', [$from, $toEnd])
+            ->groupBy(DB::raw('SUBSTR(date, 1, 10)'))
             ->orderBy('date')
             ->get();
 
-        $purchaseReturnRows = PurchaseReturn::selectRaw('DATE(date) as date, COALESCE(SUM(total), 0) as value')
-            ->whereDate('date', '>=', $from)
-            ->whereDate('date', '<=', $to)
-            ->groupBy(DB::raw('DATE(date)'))
+        $purchaseReturnRows = PurchaseReturn::selectRaw('SUBSTR(date, 1, 10) as date, COALESCE(SUM(total), 0) as value')
+            ->whereBetween('date', [$from, $toEnd])
+            ->groupBy(DB::raw('SUBSTR(date, 1, 10)'))
             ->orderBy('date')
             ->get();
 

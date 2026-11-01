@@ -45,16 +45,29 @@ const FALLBACK_CONTEXT = {
   refreshCurrency: async () => {},
 };
 
+const CURRENCY_CACHE_KEY = "karobar_currency_config";
+
 export function CurrencyProvider({ children }) {
-  const [config, setConfig] = useState(DEFAULT_CURRENCY);
-  const [loading, setLoading] = useState(true);
+  const [config, setConfig] = useState(() => {
+    try {
+      const raw = localStorage.getItem(CURRENCY_CACHE_KEY);
+      if (raw) {
+        return { ...DEFAULT_CURRENCY, ...JSON.parse(raw) };
+      }
+    } catch {
+      /* ignore */
+    }
+    return DEFAULT_CURRENCY;
+  });
+  const [loading, setLoading] = useState(false);
   const mountedRef = useRef(true);
 
   const fetchCurrency = useCallback(async () => {
     try {
-      const { data } = await axios.get("/api/currency");
+      // Shares the in-flight deduplicated /api/sale-system request with SaleSystemProvider
+      const { data } = await axios.get("/api/sale-system");
       if (!mountedRef.current) return;
-      setConfig({
+      const nextConfig = {
         currencyCode: data?.currency_code || DEFAULT_CURRENCY.currencyCode,
         currencySymbol: data?.currency_symbol || DEFAULT_CURRENCY.currencySymbol,
         currencyPosition: data?.currency_position || DEFAULT_CURRENCY.currencyPosition,
@@ -62,7 +75,13 @@ export function CurrencyProvider({ children }) {
           typeof data?.currency_decimal_places === "number"
             ? data.currency_decimal_places
             : DEFAULT_CURRENCY.currencyDecimalPlaces,
-      });
+      };
+      setConfig(nextConfig);
+      try {
+        localStorage.setItem(CURRENCY_CACHE_KEY, JSON.stringify(nextConfig));
+      } catch {
+        /* ignore */
+      }
     } catch {
       // Keep defaults on error
     } finally {

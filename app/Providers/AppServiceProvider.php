@@ -22,8 +22,11 @@ class AppServiceProvider extends ServiceProvider
     {
         try {
             if (DB::getDriverName() === 'sqlite') {
-                DB::statement('PRAGMA temp_store = MEMORY;');
-                DB::statement('PRAGMA cache_size = -20000;');
+                DB::unprepared(
+                    "PRAGMA temp_store = MEMORY;\n"
+                    . "PRAGMA cache_size = -65536;\n"
+                    . "PRAGMA mmap_size = 268435456;"
+                );
             }
         } catch (\Throwable) {
             // Ignore when DB connection is not yet initialized

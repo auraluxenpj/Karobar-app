@@ -113,7 +113,9 @@ export default function Topbar({
       return;
     }
     try {
-      const res = await axios.get("/api/cash-drawer/current");
+      const res = await axios.get("/api/cash-drawer/current", {
+        params: { summary_only: 1 },
+      });
       setDrawerStatus({
         isOpen: !!res.data?.is_open,
         expected: Number(res.data?.summary?.expected_balance || 0),
@@ -130,7 +132,9 @@ export default function Topbar({
       return;
     }
     try {
-      const res = await axios.get("/api/accounts");
+      const res = await axios.get("/api/accounts", {
+        params: { summary_only: 1 },
+      });
       setAccountsStatus({
         total_balance: Number(res.data?.total_balance || 0),
         loading: false,
@@ -146,11 +150,9 @@ export default function Topbar({
     fetchAccountsStatus();
     const onDrawerChanged = () => {
       fetchDrawerStatus();
-      fetchAccountsStatus();
     };
     const onAccountsChanged = () => {
       fetchAccountsStatus();
-      fetchDrawerStatus();
     };
     const onStorage = (e) => {
       if (e.key === "cash_drawer_sync" || e.key === "accounts_sync") {
@@ -1078,7 +1080,9 @@ export default function Topbar({
             onClose={() => setShortcutsModalOpen(false)}
           />
         )}
+      </Suspense>
 
+      <Suspense fallback={null}>
         <FeatureGuideBot
           isOpen={guideBotOpen}
           onClose={() => setGuideBotOpen(false)}

@@ -196,9 +196,6 @@ class BatchExpiryController extends Controller
         $enriched = [];
 
         foreach ($allRows as $row) {
-            $expiry = Carbon::parse($row->expiry_date)->startOfDay();
-            $daysRemaining = (int) $today->diffInDays($expiry, false);
-
             // Resolve Brand / Supplier Expiry Return Policy
             $resolvedPolicy = 'before_expiry';
             $resolvedPolicyMonths = 3;
@@ -216,11 +213,12 @@ class BatchExpiryController extends Controller
             }
 
             $intimationMeta = BrandController::evaluateBatchIntimation(
-                $row->expiry_date,
+                (string) $row->expiry_date,
                 $resolvedPolicy,
                 $resolvedPolicyMonths,
                 $resolvedPolicyDays
             );
+            $daysRemaining = (int) $intimationMeta['days_remaining'];
 
             $warningDays = $row->product_warning_days !== null
                 ? (int) $row->product_warning_days
@@ -445,10 +443,15 @@ class BatchExpiryController extends Controller
         $expiredList = [];
         $criticalList = [];
         $warningList = [];
+        $daysMemo = [];
 
         foreach ($rows as $row) {
-            $expiry = Carbon::parse($row->expiry_date)->startOfDay();
-            $daysRemaining = (int) $today->diffInDays($expiry, false);
+            $expKey = (string) $row->expiry_date;
+            if (!array_key_exists($expKey, $daysMemo)) {
+                $expiry = Carbon::parse($expKey)->startOfDay();
+                $daysMemo[$expKey] = (int) $today->diffInDays($expiry, false);
+            }
+            $daysRemaining = $daysMemo[$expKey];
             $warningDays = $row->product_warning_days !== null
                 ? (int) $row->product_warning_days
                 : $globalWarningDays;

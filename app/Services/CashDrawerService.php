@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\CashDrawerSession;
 use App\Models\CashDrawerTransaction;
 use App\Models\User;
+use App\Support\SchemaCache;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -38,11 +39,11 @@ class CashDrawerService
      */
     public function getCurrentSession(?User $user = null): ?CashDrawerSession
     {
-        if (!Schema::hasTable('cash_drawer_sessions')) {
+        if (!SchemaCache::hasTable('cash_drawer_sessions')) {
             return null;
         }
 
-        $query = CashDrawerSession::with(['transactions.user', 'user'])
+        $query = CashDrawerSession::with(['user'])
             ->where('status', 'open');
 
         if ($user) {
@@ -61,7 +62,7 @@ class CashDrawerService
      */
     public function getLastClosedSession(?User $user = null): ?CashDrawerSession
     {
-        if (!Schema::hasTable('cash_drawer_sessions')) {
+        if (!SchemaCache::hasTable('cash_drawer_sessions')) {
             return null;
         }
 
@@ -230,7 +231,11 @@ class CashDrawerService
      */
     public function getSessionSummary(CashDrawerSession $session): array
     {
-        $transactions = CashDrawerTransaction::where('session_id', $session->id)->get();
+        $transactions = $session->relationLoaded('transactions')
+            ? $session->transactions
+            : CashDrawerTransaction::where('session_id', $session->id)
+                ->select(['id', 'session_id', 'type', 'reference_type', 'amount'])
+                ->get();
 
         $cashSales = (float) $transactions->where('type', 'cash_sale')->sum('amount');
         $cashReturns = (float) $transactions->where('type', 'cash_return')->sum('amount');

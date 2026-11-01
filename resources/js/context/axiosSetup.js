@@ -70,6 +70,28 @@ export function clearApiCache(prefix = null) {
   }
 }
 
+const SESSION_CONFIG_MUTATION_REGEX =
+  /\/api\/(settings|theme-settings|preferences|roles|permissions|users|license|login|logout)/;
+
+function invalidateCacheForMutation(mutationUrl = "") {
+  if (!mutationUrl || SESSION_CONFIG_MUTATION_REGEX.test(mutationUrl)) {
+    clearApiCache();
+    return;
+  }
+  inflightGetMap.clear();
+  for (const key of responseCacheMap.keys()) {
+    const parts = key.split("|");
+    const cachedUrl = parts[1] || "";
+    const isStaticSessionConfig = LONG_TTL_PATTERNS.some((rx) => rx.test(cachedUrl));
+    if (!isStaticSessionConfig) {
+      responseCacheMap.delete(key);
+    }
+  }
+}
+
+let notifDebounceTimer = null;
+let drawerDebounceTimer = null;
+
 let isInitialized = false;
 
 export function initAxiosAuth() {
@@ -142,7 +164,7 @@ export function initAxiosAuth() {
       }
       const method = (config?.method || "get").toLowerCase();
       if (["post", "put", "patch", "delete"].includes(method)) {
-        clearApiCache();
+        invalidateCacheForMutation(config?.url || "");
       }
       return config;
     },
@@ -157,7 +179,7 @@ export function initAxiosAuth() {
         const method = (r?.config?.method || "get").toLowerCase();
         const url = r?.config?.url || "";
         if (["post", "put", "patch", "delete"].includes(method)) {
-          clearApiCache();
+          invalidateCacheForMutation(url);
         }
         if (
           ["post", "put", "patch", "delete"].includes(method) &&
@@ -166,9 +188,12 @@ export function initAxiosAuth() {
           ) &&
           !url.includes("/notifications/")
         ) {
-          window.dispatchEvent(
-            new CustomEvent("notifications-changed", { detail: { url, method } })
-          );
+          if (notifDebounceTimer) window.clearTimeout(notifDebounceTimer);
+          notifDebounceTimer = window.setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent("notifications-changed", { detail: { url, method } })
+            );
+          }, 250);
         }
         if (
           ["post", "put", "patch", "delete"].includes(method) &&
@@ -176,8 +201,11 @@ export function initAxiosAuth() {
             url
           )
         ) {
-          window.dispatchEvent(new CustomEvent("cash-drawer-changed"));
-          window.dispatchEvent(new CustomEvent("accounts-changed"));
+          if (drawerDebounceTimer) window.clearTimeout(drawerDebounceTimer);
+          drawerDebounceTimer = window.setTimeout(() => {
+            window.dispatchEvent(new CustomEvent("cash-drawer-changed"));
+            window.dispatchEvent(new CustomEvent("accounts-changed"));
+          }, 200);
         }
       } catch {
         /* ignore event dispatch errors */
