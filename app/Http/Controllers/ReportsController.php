@@ -217,6 +217,7 @@ class ReportsController extends Controller
             },
         ])
             ->whereBetween('posted_date', [$from, $to])
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->when($supplierId, fn($q) => $q->where('supplier_id', $supplierId))
             ->when($productId, fn($q) => $q->whereHas('items', fn($items) => $items->where('product_id', $productId)))
             ->orderBy('posted_date')
@@ -578,7 +579,8 @@ class ReportsController extends Controller
 
             // Build base query for sale_invoices
             $saleQuery = DB::table('sale_invoices as si')
-                ->whereBetween('si.date', [$fromDateStr, $toDateStr]);
+                ->whereBetween('si.date', [$fromDateStr, $toDateStr])
+                ->where(fn ($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'));
 
             // Apply invoice_type filter if not 'all'
             if ($invoiceType !== 'all') {
@@ -613,7 +615,8 @@ class ReportsController extends Controller
             $cogsQuery = DB::table('sale_invoice_items as sii')
                 ->join('sale_invoices as si', 'si.id', '=', 'sii.sale_invoice_id')
                 ->join('products as p', 'p.id', '=', 'sii.product_id')
-                ->whereBetween('si.date', [$fromDateStr, $toDateStr]);
+                ->whereBetween('si.date', [$fromDateStr, $toDateStr])
+                ->where(fn ($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'));
 
             // Apply invoice_type filter if not 'all'
             if ($invoiceType !== 'all') {
@@ -746,7 +749,8 @@ class ReportsController extends Controller
             $to = $req->query('to');
 
             // Build base query for sale invoices
-            $query = SaleInvoice::with(['customer', 'user', 'items.product']);
+            $query = SaleInvoice::with(['customer', 'user', 'items.product'])
+                ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'));
 
             // Filter by specific invoice
             if ($invoiceId) {
@@ -873,7 +877,8 @@ class ReportsController extends Controller
         $to = $req->query('to');
 
         // Build query
-        $query = SaleInvoice::with(['customer', 'items.product']);
+        $query = SaleInvoice::with(['customer', 'items.product'])
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'));
 
         if ($invoiceId) {
             $query->where('id', $invoiceId);
@@ -1021,6 +1026,7 @@ class ReportsController extends Controller
             ])
             // IMPORTANT: filter by posted_date (not date)
             ->whereBetween('posted_date', [$fromDate, $toDate])
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->when($supplierId, fn($q) => $q->where('supplier_id', $supplierId))
             // If product filter is set, ensure we only include invoices that have that product
             ->when($productId, fn($q) => $q->whereHas('items', fn($iq) => $iq->where('product_id', $productId)))
@@ -1101,6 +1107,7 @@ class ReportsController extends Controller
                 },
             ])
             ->whereBetween('posted_date', [$fromDate, $toDate])
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->when($supplierId, fn($q) => $q->where('supplier_id', $supplierId))
             ->when($productId, fn($q) => $q->whereHas('items', fn($iq) => $iq->where('product_id', $productId)))
             ->orderBy('posted_date', 'asc')
@@ -1203,6 +1210,7 @@ class ReportsController extends Controller
             ])
             // Sales filter by `date`
             ->whereBetween('date', [$fromDate, $toDate])
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->when($customerId, fn($q) => $q->where('customer_id', $customerId))
             ->when($productId, fn($q) => $q->whereHas('items', fn($iq) => $iq->where('product_id', $productId)))
             ->orderBy('date', 'asc')
@@ -1276,6 +1284,7 @@ class ReportsController extends Controller
                 },
             ])
             ->whereBetween('date', [$fromDate, $toDate])
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->when($customerId, fn($q) => $q->where('customer_id', $customerId))
             ->when($productId, fn($q) => $q->whereHas('items', fn($iq) => $iq->where('product_id', $productId)))
             ->orderBy('date', 'asc')

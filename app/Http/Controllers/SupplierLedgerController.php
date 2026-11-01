@@ -20,7 +20,7 @@ class SupplierLedgerController extends Controller
             return 0.0;
         }
 
-        $priorRows = SupplierLedger::with(['purchaseInvoice:id,invoice_number,posted_number,total_amount,total_paid'])
+        $priorRows = SupplierLedger::with(['purchaseInvoice:id,invoice_number,posted_number,total_amount,total_paid,status'])
             ->where('supplier_id', $supplierId)
             ->whereDate('entry_date', '<', $from)
             ->get();
@@ -39,6 +39,9 @@ class SupplierLedgerController extends Controller
 
         $openingBalance = 0.0;
         foreach ($priorRows as $pRow) {
+            if ($pRow->entry_type === 'invoice' && $pRow->purchaseInvoice && $pRow->purchaseInvoice->status === 'reversed') {
+                continue;
+            }
             $invTotal = (float) ($pRow->invoice_total ?? 0);
             $paidOnInv = (float) ($pRow->total_paid ?? 0);
             if ($pRow->entry_type === 'invoice' && $pRow->purchaseInvoice) {
@@ -209,18 +212,36 @@ class SupplierLedgerController extends Controller
 
         DB::transaction(function () use ($validated) {
             foreach ($validated['rows'] as $r) {
-                $credit = round(($r['invoice_total'] ?? 0) - ($r['total_paid'] ?? 0), 2);
+                $existing = SupplierLedger::find($r['id']);
+                if (!$existing) {
+                    continue;
+                }
+
+                $isSystemLinked = !empty($existing->payment_id) || !empty($existing->purchase_return_id);
+                $isSystemInvoice = $existing->entry_type === 'invoice' && !$existing->is_manual;
+
+                $invTotal = ($isSystemInvoice || $isSystemLinked)
+                    ? (float) $existing->invoice_total
+                    : (float) ($r['invoice_total'] ?? 0);
+                $totalPaid = ($isSystemInvoice || $isSystemLinked)
+                    ? (float) $existing->total_paid
+                    : (float) ($r['total_paid'] ?? 0);
+                $debited = $isSystemLinked
+                    ? (float) $existing->debited_amount
+                    : (float) ($r['debited_amount'] ?? 0);
+
+                $credit = round($invTotal - $totalPaid, 2);
                 if ($credit < 0) $credit = 0;
 
-                SupplierLedger::where('id', $r['id'])->update([
+                $existing->update([
                     'entry_date'       => $r['entry_date'],
                     'description'      => $r['description'] ?? null,
                     'posted_number'    => $r['posted_number'] ?? null,
                     'invoice_number'   => $r['invoice_number'] ?? null,
-                    'invoice_total'    => $r['invoice_total'] ?? 0,
-                    'total_paid'       => $r['total_paid'] ?? 0,
-                    'debited_amount'   => (float)($r['debited_amount'] ?? 0),
-                    'payment_ref'      => $r['payment_ref'] ?? null,
+                    'invoice_total'    => $invTotal,
+                    'total_paid'       => $totalPaid,
+                    'debited_amount'   => $debited,
+                    'payment_ref'      => $isSystemLinked ? $existing->payment_ref : ($r['payment_ref'] ?? null),
                     'credit_remaining' => $credit,
                 ]);
             }
@@ -265,11 +286,24 @@ class SupplierLedgerController extends Controller
             'supplier_id' => ['required','integer','exists:suppliers,id'],
         ]);
 
+        // Remove any ledger rows pointing to reversed purchase invoices
+        $reversedIds = PurchaseInvoice::query()
+            ->where('supplier_id', $validated['supplier_id'])
+            ->where('status', 'reversed')
+            ->pluck('id')
+            ->all();
+        if (!empty($reversedIds)) {
+            SupplierLedger::where('supplier_id', $validated['supplier_id'])
+                ->whereIn('purchase_invoice_id', $reversedIds)
+                ->delete();
+        }
+
         // NOTE: purchase_invoices has `posted_date` (there is no `invoice_date` column).
         $invoices = PurchaseInvoice::query()
             ->select('id','supplier_id','invoice_number','posted_number','posted_date','total_amount','total_paid')
             ->where('supplier_id', $validated['supplier_id'])
             ->where('invoice_type', 'credit')
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->get();
 
         $allocatedByInvoice = collect();
@@ -346,7 +380,40 @@ class SupplierLedgerController extends Controller
                 return ['already_paid' => true, 'settled' => 0.0, 'invoice' => $invoice];
             }
 
-            // ---- (1) Invoice side: paid now covers the whole bill ----
+            $supplier = Supplier::findOrFail((int) $invoice->supplier_id);
+            $payMethod = $data['payment_method'] ?? 'cash';
+            $entryDate = $data['entry_date'] ?? now()->toDateString();
+            $refLabel = $invoice->posted_number ?: ($invoice->invoice_number ?: "#{$invoice->id}");
+
+            if (Schema::hasTable('payments') && Schema::hasTable('payment_allocations')) {
+                $payment = app(\App\Services\PaymentService::class)->recordSupplierPayment(
+                    $supplier,
+                    [
+                        'payment_date'   => $entryDate,
+                        'amount'         => $balance,
+                        'payment_method' => $payMethod,
+                        'account_id'     => $data['account_id'] ?? null,
+                        'reference'      => "Inv {$refLabel}",
+                        'notes'          => "Settled Purchase Invoice {$refLabel}",
+                        'allocations'    => [
+                            [
+                                'invoice_id' => $invoice->id,
+                                'amount'     => $balance,
+                            ],
+                        ],
+                    ],
+                    $request->user()
+                );
+
+                return [
+                    'already_paid' => false,
+                    'settled'      => $balance,
+                    'invoice'      => $invoice->fresh(),
+                    'payment_id'   => $payment->id,
+                ];
+            }
+
+            // ---- Fallback when payments table is unavailable ----
             $invoice->total_paid = $invoiceTotal;
             $invoice->save();
 
@@ -436,6 +503,7 @@ class SupplierLedgerController extends Controller
             'settled'            => $result['settled'],
             'purchase_invoice_id'=> $result['invoice']->id,
             'posted_number'      => $result['invoice']->posted_number,
+            'payment_id'         => $result['payment_id'] ?? null,
         ]);
     }
 

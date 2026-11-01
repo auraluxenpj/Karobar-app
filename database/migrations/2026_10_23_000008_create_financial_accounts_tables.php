@@ -88,7 +88,7 @@ return new class extends Migration
             });
         }
 
-        // Seed default accounts if table is empty
+        // Seed only Cash in Hand (Drawer) by default; users create additional accounts on demand
         if (Schema::hasTable('accounts') && DB::table('accounts')->count() === 0) {
             $now = now();
             DB::table('accounts')->insert([
@@ -102,58 +102,6 @@ return new class extends Migration
                     'is_active'       => true,
                     'is_default'      => true,
                     'notes'           => 'Primary cash counter / drawer balance',
-                    'created_at'      => $now,
-                    'updated_at'      => $now,
-                ],
-                [
-                    'name'            => 'Main Bank Account',
-                    'type'            => 'bank',
-                    'bank_name'       => 'Bank Account',
-                    'account_number'  => null,
-                    'opening_balance' => 0,
-                    'current_balance' => 0,
-                    'is_active'       => true,
-                    'is_default'      => true,
-                    'notes'           => 'Primary business bank account for transfers',
-                    'created_at'      => $now,
-                    'updated_at'      => $now,
-                ],
-                [
-                    'name'            => 'Card / POS Terminal',
-                    'type'            => 'card',
-                    'bank_name'       => 'POS Merchant',
-                    'account_number'  => null,
-                    'opening_balance' => 0,
-                    'current_balance' => 0,
-                    'is_active'       => true,
-                    'is_default'      => true,
-                    'notes'           => 'Credit / debit card swipe terminal account',
-                    'created_at'      => $now,
-                    'updated_at'      => $now,
-                ],
-                [
-                    'name'            => 'Mobile Wallet (JazzCash / EasyPaisa)',
-                    'type'            => 'mobile_wallet',
-                    'bank_name'       => 'Mobile Wallet',
-                    'account_number'  => null,
-                    'opening_balance' => 0,
-                    'current_balance' => 0,
-                    'is_active'       => true,
-                    'is_default'      => true,
-                    'notes'           => 'Shop mobile digital wallet',
-                    'created_at'      => $now,
-                    'updated_at'      => $now,
-                ],
-                [
-                    'name'            => 'Other Payment Account',
-                    'type'            => 'other',
-                    'bank_name'       => null,
-                    'account_number'  => null,
-                    'opening_balance' => 0,
-                    'current_balance' => 0,
-                    'is_active'       => true,
-                    'is_default'      => true,
-                    'notes'           => 'Other payment channel',
                     'created_at'      => $now,
                     'updated_at'      => $now,
                 ],

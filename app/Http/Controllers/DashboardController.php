@@ -65,9 +65,11 @@ class DashboardController extends Controller
 
         if ($totalsOnly) {
             $salesAgg = SaleInvoice::whereBetween('date', [$from, $toEnd])
+                ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
                 ->selectRaw("COALESCE(SUM(total), 0) as total, COALESCE(SUM(CASE WHEN invoice_type = 'credit' THEN total ELSE 0 END), 0) as credit_total")
                 ->first();
             $purchasesAgg = PurchaseInvoice::where($applyPurchaseDateRange)
+                ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
                 ->selectRaw("COALESCE(SUM(total_amount), 0) as total, COALESCE(SUM(CASE WHEN invoice_type = 'credit' THEN total_amount ELSE 0 END), 0) as credit_total")
                 ->first();
             $saleReturnsTotal = (float) SaleReturn::whereBetween('date', [$from, $toEnd])->sum('total');
@@ -102,12 +104,14 @@ class DashboardController extends Controller
         // ---- Single-pass grouped queries (compute both daily series and period totals in 4 SARGable indexed queries) ----
         $salesRows = SaleInvoice::selectRaw("SUBSTR(date, 1, 10) as date, COALESCE(SUM(total), 0) as value, COALESCE(SUM(CASE WHEN invoice_type = 'credit' THEN total ELSE 0 END), 0) as credit_value")
             ->whereBetween('date', [$from, $toEnd])
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->groupBy(DB::raw('SUBSTR(date, 1, 10)'))
             ->orderBy('date')
             ->get();
 
         $purchaseRows = PurchaseInvoice::selectRaw("SUBSTR(COALESCE(posted_date, created_at), 1, 10) as date, COALESCE(SUM(total_amount), 0) as value, COALESCE(SUM(CASE WHEN invoice_type = 'credit' THEN total_amount ELSE 0 END), 0) as credit_value")
             ->where($applyPurchaseDateRange)
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->groupBy(DB::raw('SUBSTR(COALESCE(posted_date, created_at), 1, 10)'))
             ->orderBy('date')
             ->get();
@@ -233,11 +237,11 @@ public function nearExpiryFilters(Request $request)
             'report.sale-detail.view',
             'report.purchase-detail.view',
         ]);
-        $counts = DB::selectOne('
+        $counts = DB::selectOne("
             SELECT
-                (SELECT COUNT(*) FROM sale_invoices) as sale_invoices,
-                (SELECT COUNT(*) FROM purchase_invoices) as purchase_invoices
-        ');
+                (SELECT COUNT(*) FROM sale_invoices WHERE status IS NULL OR status != 'reversed') as sale_invoices,
+                (SELECT COUNT(*) FROM purchase_invoices WHERE status IS NULL OR status != 'reversed') as purchase_invoices
+        ");
         $saleCount = (int) ($counts->sale_invoices ?? 0);
         $purchaseCount = (int) ($counts->purchase_invoices ?? 0);
         
@@ -408,6 +412,7 @@ public function nearExpiryFilters(Request $request)
             ->join('products as p', 'p.id', '=', 'sii.product_id')
             ->leftJoin('brands as br', 'br.id', '=', 'p.brand_id')
             ->whereBetween('si.date', [$from, $to])
+            ->where(fn ($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'))
             ->select(
                 DB::raw('COALESCE(br.name, "No Brand") as brand'),
                 DB::raw('SUM(sii.sub_total) as revenue')
@@ -440,6 +445,7 @@ public function nearExpiryFilters(Request $request)
             ->join('sale_invoices as si', 'si.id', '=', 'sii.sale_invoice_id')
             ->join('products as p', 'p.id', '=', 'sii.product_id')
             ->whereBetween('si.date', [$from, $to])
+            ->where(fn ($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'))
             ->select(
                 'p.id',
                 'p.name as product_name',

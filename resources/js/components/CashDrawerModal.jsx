@@ -829,60 +829,125 @@ export default function CashDrawerModal({ isOpen, onClose, onSessionUpdated }) {
                 </div>
               )}
 
-              {/* Recent transactions in this shift */}
+              {/* Recent transactions in this shift — Two Columns: Cash In vs Cash Out */}
               <div className="pt-2">
                 <h4 className="text-xs font-bold uppercase tracking-wider mb-2">
-                  Shift Transactions ({session?.transactions?.length || 0})
+                  Shift Transactions by Column ({session?.transactions?.length || 0})
                 </h4>
-                {session?.transactions?.length > 0 ? (
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                    {sortAndAttachRunningBalance(session.transactions, session.opening_balance).map((tx) => {
-                      const isPlus = CASH_IN_TYPES.includes(tx.type);
-                      return (
-                        <div
-                          key={tx.id}
-                          className={`p-2.5 rounded-lg border flex items-center justify-between text-xs ${
-                            isDark ? "bg-slate-800/30 border-slate-700/50" : "bg-gray-50 border-gray-100"
-                          }`}
-                        >
-                          <div>
-                            <span className={`mr-1.5 font-mono text-[10px] ${isDark ? "text-slate-400" : "text-gray-400"}`}>
-                              #{tx.seq}
-                            </span>
-                            <span className="font-semibold capitalize">
-                              {tx.type.replace("_", " ")}
-                            </span>
-                            {tx.reference_label && (
-                              <span className="ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-500">
-                                {tx.reference_label}{tx.party_name ? ` • ${tx.party_name}` : ""}
-                              </span>
-                            )}
-                            {tx.notes && (
-                              <span className={`ml-2 text-[11px] ${isDark ? "text-slate-400" : "text-gray-500"}`}>
-                                • {tx.notes}
-                              </span>
-                            )}
-                            <div className={`text-[10px] ${isDark ? "text-slate-500" : "text-gray-400"}`}>
-                              {new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className={`font-bold ${isPlus ? "text-emerald-500" : "text-rose-500"}`}>
-                              {isPlus ? "+" : "-"}{formatCurrency(tx.amount)}
-                            </div>
-                            <div className={`text-[10px] font-medium ${isDark ? "text-slate-400" : "text-gray-500"}`}>
-                              Bal: {formatCurrency(tx.balance_after)}
-                            </div>
-                          </div>
+                {(() => {
+                  const ordered = sortAndAttachRunningBalance(session?.transactions || [], session?.opening_balance);
+                  const inTxns = ordered.filter((tx) => CASH_IN_TYPES.includes(tx.type));
+                  const outTxns = ordered.filter((tx) => !CASH_IN_TYPES.includes(tx.type));
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Column 1: Cash In */}
+                      <div className={`rounded-xl border p-2.5 ${isDark ? "border-emerald-800/50 bg-emerald-950/10" : "border-emerald-200 bg-emerald-50/30"}`}>
+                        <div className="flex items-center justify-between text-[11px] font-bold uppercase text-emerald-600 dark:text-emerald-400 pb-1.5 mb-2 border-b border-emerald-200/60 dark:border-slate-700">
+                          <span>Cash In ({inTxns.length})</span>
+                          <span>+{formatCurrency(summary.total_cash_in)}</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className={`text-xs italic ${isDark ? "text-slate-500" : "text-gray-400"}`}>
-                    No transactions recorded in this shift yet.
-                  </p>
-                )}
+                        {inTxns.length > 0 ? (
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                            {inTxns.map((tx) => (
+                              <div
+                                key={tx.id}
+                                className={`p-2 rounded-lg border flex items-start justify-between gap-2 text-xs ${
+                                  isDark ? "bg-slate-800/50 border-slate-700/60" : "bg-white border-emerald-100"
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-1">
+                                    <span className="font-semibold capitalize text-emerald-700 dark:text-emerald-300">
+                                      {(tx.category_label || tx.type || "").replace("_", " ")}
+                                    </span>
+                                    {tx.reference_label && (
+                                      <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-500">
+                                        {tx.reference_label}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {tx.party_name && (
+                                    <div className={`text-[11px] truncate ${isDark ? "text-slate-300" : "text-gray-700"}`}>
+                                      {tx.party_name}
+                                    </div>
+                                  )}
+                                  {tx.notes && (
+                                    <div className={`text-[10px] truncate ${isDark ? "text-slate-400" : "text-gray-500"}`}>
+                                      {tx.notes}
+                                    </div>
+                                  )}
+                                  <div className={`text-[10px] ${isDark ? "text-slate-500" : "text-gray-400"}`}>
+                                    {new Date(tx.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                  </div>
+                                </div>
+                                <div className="text-right font-mono font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+                                  +{formatCurrency(tx.amount)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className={`text-[11px] italic py-4 text-center ${isDark ? "text-slate-500" : "text-gray-400"}`}>
+                            No Cash In entries yet.
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Column 2: Cash Out */}
+                      <div className={`rounded-xl border p-2.5 ${isDark ? "border-rose-800/50 bg-rose-950/10" : "border-rose-200 bg-rose-50/30"}`}>
+                        <div className="flex items-center justify-between text-[11px] font-bold uppercase text-rose-600 dark:text-rose-400 pb-1.5 mb-2 border-b border-rose-200/60 dark:border-slate-700">
+                          <span>Cash Out ({outTxns.length})</span>
+                          <span>−{formatCurrency(summary.total_cash_out)}</span>
+                        </div>
+                        {outTxns.length > 0 ? (
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                            {outTxns.map((tx) => (
+                              <div
+                                key={tx.id}
+                                className={`p-2 rounded-lg border flex items-start justify-between gap-2 text-xs ${
+                                  isDark ? "bg-slate-800/50 border-slate-700/60" : "bg-white border-rose-100"
+                                }`}
+                              >
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-1">
+                                    <span className="font-semibold capitalize text-rose-700 dark:text-rose-300">
+                                      {(tx.category_label || tx.type || "").replace("_", " ")}
+                                    </span>
+                                    {tx.reference_label && (
+                                      <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-500">
+                                        {tx.reference_label}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {tx.party_name && (
+                                    <div className={`text-[11px] truncate ${isDark ? "text-slate-300" : "text-gray-700"}`}>
+                                      {tx.party_name}
+                                    </div>
+                                  )}
+                                  {tx.notes && (
+                                    <div className={`text-[10px] truncate ${isDark ? "text-slate-400" : "text-gray-500"}`}>
+                                      {tx.notes}
+                                    </div>
+                                  )}
+                                  <div className={`text-[10px] ${isDark ? "text-slate-500" : "text-gray-400"}`}>
+                                    {new Date(tx.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                  </div>
+                                </div>
+                                <div className="text-right font-mono font-bold text-rose-600 dark:text-rose-400 shrink-0">
+                                  −{formatCurrency(tx.amount)}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className={`text-[11px] italic py-4 text-center ${isDark ? "text-slate-500" : "text-gray-400"}`}>
+                            No Cash Out entries yet.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* View Full Detailed Report Button */}
@@ -1262,11 +1327,11 @@ export default function CashDrawerModal({ isOpen, onClose, onSessionUpdated }) {
                         </div>
                       </div>
 
-                      {/* Transaction Audit Ledger */}
+                      {/* Transaction Audit Ledger — Two Columns: Cash In vs Cash Out */}
                       <div className="space-y-2 pt-1">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <h4 className="text-xs font-bold uppercase tracking-wider">
-                            Transaction Audit Trail ({filteredTxns.length}{filteredTxns.length !== repTxns.length ? ` of ${repTxns.length}` : ""})
+                            Two-Column Transaction Audit Trail ({filteredTxns.length}{filteredTxns.length !== repTxns.length ? ` of ${repTxns.length}` : ""})
                           </h4>
                           <div className="relative">
                             <input
@@ -1284,76 +1349,113 @@ export default function CashDrawerModal({ isOpen, onClose, onSessionUpdated }) {
                           </div>
                         </div>
 
-                        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-slate-700 max-h-64 overflow-y-auto">
-                          <table className="w-full text-left text-xs">
-                            <thead className={`sticky top-0 z-10 border-b text-[11px] uppercase tracking-wider font-semibold ${
-                              isDark ? "bg-slate-800 border-slate-700 text-slate-300" : "bg-gray-100 border-gray-200 text-gray-600"
-                            }`}>
-                              <tr>
-                                <th className="p-2.5 pl-3">#</th>
-                                <th className="p-2.5">Time</th>
-                                <th className="p-2.5">Type</th>
-                                <th className="p-2.5">Reference & Party / Notes</th>
-                                <th className="p-2.5">Cashier</th>
-                                <th className="p-2.5 text-right">Amount</th>
-                                <th className="p-2.5 pr-3 text-right">Balance</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-slate-800 text-[11px]">
-                              {filteredTxns.length > 0 ? (
-                                filteredTxns.map((tx, idx) => {
-                                  const isPlus = CASH_IN_TYPES.includes(tx.type);
-                                  return (
-                                    <tr key={tx.id} className={isDark ? "hover:bg-slate-800/40" : "hover:bg-gray-50/80"}>
-                                      <td className="p-2.5 pl-3 font-mono text-gray-400">#{tx.seq ?? idx + 1}</td>
-                                      <td className="p-2.5 whitespace-nowrap text-gray-500 dark:text-slate-400">
-                                        {new Date(tx.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                      </td>
-                                      <td className="p-2.5 whitespace-nowrap">
-                                        <span className={`px-2 py-0.5 rounded-full font-semibold capitalize ${
-                                          isPlus
-                                            ? "bg-emerald-500/10 text-emerald-500"
-                                            : "bg-rose-500/10 text-rose-500"
-                                        }`}>
-                                          {(tx.type || "").replace("_", " ")}
-                                        </span>
-                                      </td>
-                                      <td className="p-2.5 max-w-xs truncate">
-                                        <div className="flex flex-col">
-                                          {tx.reference_label && (
-                                            <span className="font-semibold text-blue-600 dark:text-blue-400">
-                                              {tx.reference_label}{tx.party_name ? ` • ${tx.party_name}` : ""}
-                                            </span>
-                                          )}
-                                          <span className="font-medium text-gray-700 dark:text-slate-200 truncate">
-                                            {tx.notes || tx.category_label || (!tx.reference_label && tx.reference_type ? `${tx.reference_type.split("\\").pop()} #${tx.reference_id || ""}` : "—")}
-                                          </span>
-                                        </div>
-                                      </td>
-                                      <td className="p-2.5 text-gray-500 dark:text-slate-400 whitespace-nowrap">
-                                        {tx.user?.name || "Cashier"}
-                                      </td>
-                                      <td className={`p-2.5 text-right font-bold whitespace-nowrap ${
-                                        isPlus ? "text-emerald-500" : "text-rose-500"
-                                      }`}>
-                                        {isPlus ? "+" : "-"}{formatCurrency(tx.amount)}
-                                      </td>
-                                      <td className="p-2.5 pr-3 text-right font-bold whitespace-nowrap text-gray-700 dark:text-slate-200">
-                                        {formatCurrency(tx.balance_after)}
-                                      </td>
+                        {(() => {
+                          const inReportTxns = filteredTxns.filter((tx) => CASH_IN_TYPES.includes(tx.type));
+                          const outReportTxns = filteredTxns.filter((tx) => !CASH_IN_TYPES.includes(tx.type));
+                          return (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {/* Column 1: Cash In Table */}
+                              <div className="overflow-x-auto rounded-xl border border-emerald-200 dark:border-slate-700 max-h-64 overflow-y-auto">
+                                <table className="w-full text-left text-xs border-separate border-spacing-0">
+                                  <thead className={`sticky top-0 z-10 border-b text-[11px] uppercase tracking-wider font-semibold ${
+                                    isDark ? "bg-slate-800 text-emerald-400" : "bg-emerald-50 text-emerald-800"
+                                  }`}>
+                                    <tr>
+                                      <th className="p-2.5 pl-3 border-b border-emerald-200 dark:border-slate-700">Time</th>
+                                      <th className="p-2.5 border-b border-emerald-200 dark:border-slate-700">Cash In Point & Reference</th>
+                                      <th className="p-2.5 pr-3 text-right border-b border-emerald-200 dark:border-slate-700">Cash In (+)</th>
                                     </tr>
-                                  );
-                                })
-                              ) : (
-                                <tr>
-                                  <td colSpan={7} className="p-6 text-center text-gray-400 italic">
-                                    No transactions match the criteria.
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100 dark:divide-slate-800 text-[11px]">
+                                    {inReportTxns.length > 0 ? (
+                                      inReportTxns.map((tx) => (
+                                        <tr key={tx.id} className={isDark ? "hover:bg-slate-800/40" : "hover:bg-gray-50/80"}>
+                                          <td className="p-2.5 pl-3 whitespace-nowrap text-gray-500 dark:text-slate-400">
+                                            {new Date(tx.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                          </td>
+                                          <td className="p-2.5">
+                                            <div className="flex flex-col">
+                                              <span className="font-bold text-emerald-600 dark:text-emerald-400 capitalize">
+                                                {(tx.category_label || tx.type || "").replace("_", " ")}
+                                              </span>
+                                              {tx.reference_label && (
+                                                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                                                  {tx.reference_label}{tx.party_name ? ` • ${tx.party_name}` : ""}
+                                                </span>
+                                              )}
+                                              <span className="text-gray-600 dark:text-slate-300 truncate max-w-[200px]">
+                                                {tx.notes || "—"}
+                                              </span>
+                                            </div>
+                                          </td>
+                                          <td className="p-2.5 pr-3 text-right font-mono font-bold whitespace-nowrap text-emerald-600 dark:text-emerald-400">
+                                            +{formatCurrency(tx.amount)}
+                                          </td>
+                                        </tr>
+                                      ))
+                                    ) : (
+                                      <tr>
+                                        <td colSpan={3} className="p-6 text-center text-gray-400 italic">
+                                          No Cash In transactions.
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              {/* Column 2: Cash Out Table */}
+                              <div className="overflow-x-auto rounded-xl border border-rose-200 dark:border-slate-700 max-h-64 overflow-y-auto">
+                                <table className="w-full text-left text-xs border-separate border-spacing-0">
+                                  <thead className={`sticky top-0 z-10 border-b text-[11px] uppercase tracking-wider font-semibold ${
+                                    isDark ? "bg-slate-800 text-rose-400" : "bg-rose-50 text-rose-800"
+                                  }`}>
+                                    <tr>
+                                      <th className="p-2.5 pl-3 border-b border-rose-200 dark:border-slate-700">Time</th>
+                                      <th className="p-2.5 border-b border-rose-200 dark:border-slate-700">Cash Out Point & Reference</th>
+                                      <th className="p-2.5 pr-3 text-right border-b border-rose-200 dark:border-slate-700">Cash Out (−)</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-100 dark:divide-slate-800 text-[11px]">
+                                    {outReportTxns.length > 0 ? (
+                                      outReportTxns.map((tx) => (
+                                        <tr key={tx.id} className={isDark ? "hover:bg-slate-800/40" : "hover:bg-gray-50/80"}>
+                                          <td className="p-2.5 pl-3 whitespace-nowrap text-gray-500 dark:text-slate-400">
+                                            {new Date(tx.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                          </td>
+                                          <td className="p-2.5">
+                                            <div className="flex flex-col">
+                                              <span className="font-bold text-rose-600 dark:text-rose-400 capitalize">
+                                                {(tx.category_label || tx.type || "").replace("_", " ")}
+                                              </span>
+                                              {tx.reference_label && (
+                                                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                                                  {tx.reference_label}{tx.party_name ? ` • ${tx.party_name}` : ""}
+                                                </span>
+                                              )}
+                                              <span className="text-gray-600 dark:text-slate-300 truncate max-w-[200px]">
+                                                {tx.notes || "—"}
+                                              </span>
+                                            </div>
+                                          </td>
+                                          <td className="p-2.5 pr-3 text-right font-mono font-bold whitespace-nowrap text-rose-600 dark:text-rose-400">
+                                            −{formatCurrency(tx.amount)}
+                                          </td>
+                                        </tr>
+                                      ))
+                                    ) : (
+                                      <tr>
+                                        <td colSpan={3} className="p-6 text-center text-gray-400 italic">
+                                          No Cash Out transactions.
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   );

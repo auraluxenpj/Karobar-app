@@ -367,9 +367,10 @@ class ExpenseService
         $from = Carbon::parse($fromDate)->toDateString();
         $to   = Carbon::parse($toDate)->toDateString();
 
-        // 1. Sales Totals
+        // 1. Sales Totals (excluding reversed invoices)
         $salesData = DB::table('sale_invoices as si')
             ->whereBetween('si.date', [$from, $to])
+            ->where(fn ($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'))
             ->selectRaw('
                 COUNT(si.id) as total_invoices,
                 SUM(COALESCE(si.gross_amount, 0)) as gross_sales,
@@ -393,11 +394,12 @@ class ExpenseService
         $totalReturns = round((float) ($returnsData->total_returns_amount ?? 0), 2);
         $netSales = round(max(0.0, $totalSales - $totalReturns), 2);
 
-        // 3. Cost of Goods Sold (COGS)
+        // 3. Cost of Goods Sold (COGS) (excluding reversed invoices)
         $cogsSales = (float) DB::table('sale_invoice_items as sii')
             ->join('sale_invoices as si', 'si.id', '=', 'sii.sale_invoice_id')
             ->join('products as p', 'p.id', '=', 'sii.product_id')
             ->whereBetween('si.date', [$from, $to])
+            ->where(fn ($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'))
             ->sum(DB::raw('COALESCE(sii.quantity, 0) * COALESCE(sii.cost_price_snapshot, CASE WHEN p.avg_price IS NULL OR p.avg_price = 0 THEN COALESCE(p.unit_purchase_price, 0) ELSE p.avg_price END)'));
 
         $cogsReturns = (float) DB::table('sale_return_items as sri')

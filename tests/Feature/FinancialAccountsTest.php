@@ -87,8 +87,7 @@ class FinancialAccountsTest extends TestCase
         $this->assertArrayHasKey('total_balance', $res->json());
 
         $names = collect($res->json('accounts'))->pluck('name')->all();
-        $this->assertContains('Cash in Hand (Drawer)', $names);
-        $this->assertContains('Main Bank Account', $names);
+        $this->assertEquals(['Cash in Hand (Drawer)'], $names);
     }
 
     public function test_can_create_new_bank_account_with_opening_balance(): void
@@ -196,7 +195,10 @@ class FinancialAccountsTest extends TestCase
             'unit_sale_price'     => 500,
         ]);
 
-        $bankAcc = Account::where('type', 'bank')->first();
+        $bankAcc = Account::firstOrCreate(
+            ['type' => 'bank', 'name' => 'Main Bank Account'],
+            ['opening_balance' => 0, 'current_balance' => 0, 'is_active' => true, 'is_default' => false]
+        );
         $initialBankBalance = (float)$bankAcc->current_balance;
 
         // Post sale invoice paying via Bank Transfer
@@ -258,7 +260,10 @@ class FinancialAccountsTest extends TestCase
             'current_quantity'    => 20,
         ]);
 
-        $walletAcc = Account::where('type', 'mobile_wallet')->first();
+        $walletAcc = Account::firstOrCreate(
+            ['type' => 'mobile_wallet', 'name' => 'Mobile Wallet'],
+            ['opening_balance' => 20000, 'current_balance' => 20000, 'is_active' => true, 'is_default' => false]
+        );
         $walletAcc->current_balance = 20000;
         $walletAcc->save();
 
@@ -343,7 +348,10 @@ class FinancialAccountsTest extends TestCase
         $invRes->assertStatus(201);
         $invoiceId = $invRes->json('id');
 
-        $cardAcc = Account::where('type', 'card')->first();
+        $cardAcc = Account::firstOrCreate(
+            ['type' => 'card', 'name' => 'Card / POS Terminal'],
+            ['opening_balance' => 0, 'current_balance' => 0, 'is_active' => true, 'is_default' => false]
+        );
         $initialCardBalance = (float)$cardAcc->current_balance;
 
         // Record payment of 3000 via card
@@ -375,7 +383,10 @@ class FinancialAccountsTest extends TestCase
 
         $this->actingAs($user);
 
-        $bank = Account::where('type', 'bank')->first();
+        $bank = Account::firstOrCreate(
+            ['type' => 'bank', 'name' => 'Main Bank Account'],
+            ['opening_balance' => 0, 'current_balance' => 0, 'is_active' => true, 'is_default' => false]
+        );
         $startBal = (float)$bank->current_balance;
 
         // Direct deposit (e.g. Bank profit or owner deposit)
@@ -423,7 +434,10 @@ class FinancialAccountsTest extends TestCase
             'unit_sale_price'     => 200,
         ]);
 
-        $bankAcc = Account::where('type', 'bank')->first();
+        $bankAcc = Account::firstOrCreate(
+            ['type' => 'bank', 'name' => 'Main Bank Account'],
+            ['opening_balance' => 0, 'current_balance' => 0, 'is_active' => true, 'is_default' => false]
+        );
         $startBal = (float)$bankAcc->current_balance;
 
         // Create debit sale via bank transfer
@@ -536,7 +550,15 @@ class FinancialAccountsTest extends TestCase
 
         $this->actingAs($user);
 
-        $res = $this->postJson('/api/accounts/seed-defaults');
+        // By default, seed-defaults only ensures Cash in Hand (Drawer) is present
+        $resDefault = $this->postJson('/api/accounts/seed-defaults');
+        $resDefault->assertOk();
+        $defaultAccounts = collect($resDefault->json('summary.accounts'));
+        $this->assertCount(1, $defaultAccounts);
+        $this->assertTrue($defaultAccounts->contains('name', 'Cash in Hand (Drawer)'));
+
+        // Explicit opt-in seeds preset Pakistani accounts
+        $res = $this->postJson('/api/accounts/seed-defaults', ['include_presets' => true]);
         $res->assertOk();
 
         $accounts = collect($res->json('summary.accounts'));
@@ -1013,7 +1035,10 @@ class FinancialAccountsTest extends TestCase
         $this->assertEquals(12000.0, (float) $suppLedger->json('summary.net_balance'));
 
         // 2. Post-Dated Cheque (PDC) Lifecycle: pending -> deposited -> cleared (and bounce test)
-        $bankAcc = Account::where('type', 'bank')->firstOrFail();
+        $bankAcc = Account::firstOrCreate(
+            ['type' => 'bank', 'name' => 'Meezan Bank'],
+            ['opening_balance' => 0, 'current_balance' => 0, 'is_active' => true, 'is_default' => false]
+        );
         $initialBankBal = (float) $bankAcc->current_balance;
 
         $pdcRes = $this->postJson('/api/payments', [
@@ -1160,5 +1185,264 @@ class FinancialAccountsTest extends TestCase
         // Total received on invoice = 400 (split tender) + 200 (applied credit) = 600 (fully settled)
         $this->assertEquals(600.0, (float) $splitInvoice->total_receive);
         $this->assertEquals((float) $splitInvoice->total, (float) $splitInvoice->total_receive);
+    }
+
+    public function test_multi_shift_close_and_reopen_preserves_cash_in_hand_ledger_and_per_user_isolation(): void
+    {
+        $cashierA = User::forceCreate([
+            'name'     => 'Cashier Alpha',
+            'email'    => 'alpha@example.com',
+            'password' => bcrypt('secret123'),
+        ]);
+        $cashierB = User::forceCreate([
+            'name'     => 'Cashier Beta',
+            'email'    => 'beta@example.com',
+            'password' => bcrypt('secret123'),
+        ]);
+
+        $this->actingAs($cashierA);
+
+        // 1. Cashier A opens shift with Rs. 5,000 float
+        $openRes = $this->postJson('/api/cash-drawer/open', [
+            'opening_balance' => 5000,
+            'notes'           => 'Morning shift',
+        ])->assertStatus(201);
+
+        $cashAcc = Account::where('type', 'cash')->where('is_default', true)->firstOrFail();
+        $this->assertEquals(5000.0, (float) $cashAcc->fresh()->current_balance);
+
+        // 2. Cashier B checks current session -> must be isolated (is_open = false) and cannot close Cashier A's shift
+        $this->actingAs($cashierB);
+        $bCurrent = $this->getJson('/api/cash-drawer/current')->assertOk();
+        $this->assertFalse($bCurrent->json('is_open'));
+        $this->assertNull($bCurrent->json('last_closed_session'));
+
+        $this->postJson('/api/cash-drawer/close', [
+            'closing_balance_actual' => 5000,
+        ])->assertStatus(422);
+
+        // 3. Switch back to Cashier A, record manual cash_in (+300) and close shift with Rs. 5,250 actual (Rs. 50 shortage)
+        $this->actingAs($cashierA);
+        $this->postJson('/api/cash-drawer/transaction', [
+            'type'   => 'cash_in',
+            'amount' => 300,
+            'notes'  => 'Petty cash top-up',
+        ])->assertOk();
+
+        // Cash in Hand account immediately reflects +300 manual cash_in = 5,300
+        $this->assertEquals(5300.0, (float) $cashAcc->fresh()->current_balance);
+
+        // Close shift with 5,250 actual count (shortage of 50)
+        $this->postJson('/api/cash-drawer/close', [
+            'closing_balance_actual' => 5250,
+            'notes'                  => 'Rs. 50 shortage at close',
+        ])->assertOk();
+
+        // Cash in Hand (Drawer) must preserve the 5,250 physical balance (not wipe to 0!)
+        $this->assertEquals(5250.0, (float) $cashAcc->fresh()->current_balance);
+
+        // Calling getAccountsWithSummary() must NOT overwrite the 5,250 balance
+        $accountsRes = $this->getJson('/api/accounts')->assertOk();
+        $cashRow = collect($accountsRes->json('accounts'))->firstWhere('id', $cashAcc->id);
+        $this->assertEquals(5250.0, (float) $cashRow['current_balance']);
+
+        // 4. Reopen next shift carrying over the 5,250 balance -> must NOT double-deposit 5,250!
+        $this->postJson('/api/cash-drawer/open', [
+            'opening_balance' => 5250,
+            'notes'           => 'Afternoon shift carryover',
+        ])->assertStatus(201);
+        $this->assertEquals(5250.0, (float) $cashAcc->fresh()->current_balance);
+    }
+
+    public function test_reversing_split_tender_and_credit_allocated_sale_invoice_unwinds_allocations_and_refunds_exact_accounts(): void
+    {
+        $user = User::forceCreate([
+            'name'     => 'Split Reversal User',
+            'email'    => 'splitrev@example.com',
+            'password' => bcrypt('secret123'),
+        ]);
+        $this->actingAs($user);
+
+        $drawerSession = app(CashDrawerService::class)->openSession($user, 2000);
+        $cashAcc = Account::where('type', 'cash')->where('is_default', true)->firstOrFail();
+        $bankAcc = Account::firstOrCreate(
+            ['type' => 'bank', 'name' => 'Main Bank Account'],
+            ['opening_balance' => 0, 'current_balance' => 0, 'is_active' => true, 'is_default' => false]
+        );
+
+        $customer = Customer::create(['name' => 'Split Reversal Customer']);
+        \Illuminate\Support\Facades\DB::table('categories')->insertOrIgnore(['id' => 1, 'name' => 'General Cat']);
+        \Illuminate\Support\Facades\DB::table('brands')->insertOrIgnore(['id' => 1, 'name' => 'General Brand']);
+
+        $product = Product::create([
+            'category_id'         => 1,
+            'brand_id'            => 1,
+            'name'                => 'Azithromycin 500mg',
+            'product_code'        => 'AZI-500',
+            'barcode'             => 'BC-AZI-500',
+            'pack_size'           => 10,
+            'quantity'            => 100,
+            'unit_purchase_price' => 20,
+            'unit_sale_price'     => 30,
+        ]);
+
+        // 1. Customer pays Rs. 200 advance via Bank Transfer
+        $advRes = $this->postJson('/api/payments', [
+            'party_type'     => 'customer',
+            'party_id'       => $customer->id,
+            'payment_date'   => now()->toDateString(),
+            'amount'         => 200,
+            'payment_method' => 'bank_transfer',
+            'account_id'     => $bankAcc->id,
+        ])->assertStatus(201);
+        $advPaymentId = $advRes->json('payment.id');
+
+        $cashBeforeSale = (float) $cashAcc->fresh()->current_balance;
+        $bankBeforeSale = (float) $bankAcc->fresh()->current_balance;
+        $drawerBeforeSale = (float) $drawerSession->fresh()->closing_balance_expected;
+
+        // 2. Create Rs. 600 sale: apply Rs. 200 advance credit + split tender (Rs. 250 Cash + Rs. 150 Bank)
+        $saleRes = $this->postJson('/api/sale-invoices', [
+            'customer_id'         => $customer->id,
+            'sale_type'           => 'retail',
+            'invoice_type'        => 'debit',
+            'date'                => now()->toDateString(),
+            'payment_method'      => 'cash',
+            'gross_amount'        => 600,
+            'total'               => 600,
+            'total_receive'       => 400,
+            'apply_credit_amount' => 200,
+            'split_payments'      => [
+                ['payment_method' => 'cash', 'account_id' => $cashAcc->id, 'amount' => 250],
+                ['payment_method' => 'bank_transfer', 'account_id' => $bankAcc->id, 'amount' => 150],
+            ],
+            'items'               => [
+                [
+                    'product_id' => $product->id,
+                    'quantity'   => 20,
+                    'price'      => 30,
+                    'sub_total'  => 600,
+                ],
+            ],
+        ])->assertStatus(201);
+
+        $saleId = $saleRes->json('id');
+        $this->assertEquals($cashBeforeSale + 250.0, (float) $cashAcc->fresh()->current_balance);
+        $this->assertEquals($bankBeforeSale + 150.0, (float) $bankAcc->fresh()->current_balance);
+        $this->assertEquals($drawerBeforeSale + 250.0, (float) $drawerSession->fresh()->closing_balance_expected);
+        $this->assertEquals(0.0, (float) \App\Models\Payment::findOrFail($advPaymentId)->unapplied_amount);
+
+        // 3. Reverse the sale invoice
+        $this->postJson("/api/sale-invoices/{$saleId}/reverse", [
+            'reason' => 'Customer cancelled entire order',
+        ])->assertOk();
+
+        // Advance payment must have its Rs. 200 unapplied credit restored!
+        $advPaymentFresh = \App\Models\Payment::findOrFail($advPaymentId);
+        $this->assertEquals(200.0, (float) $advPaymentFresh->unapplied_amount);
+        $this->assertEquals(0.0, (float) $advPaymentFresh->allocated_amount);
+
+        // Cash account & drawer must be refunded ONLY Rs. 250, and Bank account refunded ONLY Rs. 150!
+        $this->assertEquals($cashBeforeSale, (float) $cashAcc->fresh()->current_balance);
+        $this->assertEquals($bankBeforeSale, (float) $bankAcc->fresh()->current_balance);
+        $this->assertEquals($drawerBeforeSale, (float) $drawerSession->fresh()->closing_balance_expected);
+
+        // Customer ledger net balance must be -200 (the unapplied advance payment), with reversed invoice excluded
+        $custLedgerRes = $this->getJson("/api/customer-ledger?customer_id={$customer->id}")->assertOk();
+        $this->assertEquals(-200.0, (float) $custLedgerRes->json('summary.net_balance'));
+    }
+
+    public function test_settling_invoice_via_ledger_creates_auditable_payment_voucher(): void
+    {
+        $user = User::forceCreate([
+            'name'     => 'Ledger Settle User',
+            'email'    => 'ledgersettle@example.com',
+            'password' => bcrypt('secret123'),
+        ]);
+        $this->actingAs($user);
+
+        $drawerSession = app(CashDrawerService::class)->openSession($user, 1000);
+        $customer = Customer::create(['name' => 'Settle Invoice Customer']);
+
+        $invoice = SaleInvoice::create([
+            'user_id'       => $user->id,
+            'customer_id'   => $customer->id,
+            'invoice_type'  => 'credit',
+            'posted_number' => 'SI-SETTLE-01',
+            'date'          => now()->toDateString(),
+            'gross_amount'  => 750,
+            'total'         => 750,
+            'total_receive' => 250,
+            'status'        => 'posted',
+        ]);
+
+        // Settle remaining Rs. 500 via /api/customer-ledger/settle-invoice
+        $settleRes = $this->postJson('/api/customer-ledger/settle-invoice', [
+            'sale_invoice_id' => $invoice->id,
+            'payment_method'  => 'cash',
+        ])->assertOk();
+
+        $this->assertNotNull($settleRes->json('payment_id'));
+        $this->assertEquals(750.0, (float) $invoice->fresh()->total_receive);
+        $this->assertEquals(1500.0, (float) $drawerSession->fresh()->closing_balance_expected);
+    }
+
+    public function test_deleting_credit_sale_invoice_with_upfront_cash_payment_reconciles_both_drawer_and_account(): void
+    {
+        $user = User::forceCreate([
+            'name'     => 'Delete Credit Sale User',
+            'email'    => 'delcreditsale@example.com',
+            'password' => bcrypt('secret123'),
+        ]);
+        $this->actingAs($user);
+
+        $drawerSession = app(CashDrawerService::class)->openSession($user, 3000);
+        $cashAcc = Account::where('type', 'cash')->where('is_default', true)->firstOrFail();
+
+        $customer = Customer::create(['name' => 'Credit Upfront Customer']);
+        \Illuminate\Support\Facades\DB::table('categories')->insertOrIgnore(['id' => 1, 'name' => 'General Cat']);
+        \Illuminate\Support\Facades\DB::table('brands')->insertOrIgnore(['id' => 1, 'name' => 'General Brand']);
+
+        $product = Product::create([
+            'category_id'         => 1,
+            'brand_id'            => 1,
+            'name'                => 'Cefixime 400mg',
+            'product_code'        => 'CEF-400',
+            'barcode'             => 'BC-CEF-400',
+            'pack_size'           => 10,
+            'quantity'            => 100,
+            'unit_purchase_price' => 30,
+            'unit_sale_price'     => 50,
+        ]);
+
+        // Create Rs. 500 credit sale invoice with Rs. 200 upfront cash payment
+        $saleRes = $this->postJson('/api/sale-invoices', [
+            'customer_id'    => $customer->id,
+            'sale_type'      => 'retail',
+            'invoice_type'   => 'credit',
+            'date'           => now()->toDateString(),
+            'payment_method' => 'cash',
+            'gross_amount'   => 500,
+            'total'          => 500,
+            'total_receive'  => 200,
+            'items'          => [
+                [
+                    'product_id' => $product->id,
+                    'quantity'   => 10,
+                    'price'      => 50,
+                    'sub_total'  => 500,
+                ],
+            ],
+        ])->assertStatus(201);
+
+        $saleId = $saleRes->json('id');
+        $this->assertEquals(3200.0, (float) $drawerSession->fresh()->closing_balance_expected);
+        $this->assertEquals(3200.0, (float) $cashAcc->fresh()->current_balance);
+
+        // Delete the credit sale invoice (default mode = 'none') -> both drawer and cash account must return to 3,000!
+        $this->deleteJson("/api/sale-invoices/{$saleId}")->assertOk();
+
+        $this->assertEquals(3000.0, (float) $drawerSession->fresh()->closing_balance_expected);
+        $this->assertEquals(3000.0, (float) $cashAcc->fresh()->current_balance);
     }
 }

@@ -17,6 +17,7 @@ import {
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
   SparklesIcon,
+  TrashIcon,
 } from "@heroicons/react/24/solid";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { useTheme } from "@/context/ThemeContext.jsx";
@@ -225,18 +226,19 @@ export default function AccountsModal({ isOpen, onClose, onAccountUpdated, onOpe
     if (onAccountUpdated) onAccountUpdated();
   };
 
-  // Seed popular default accounts
-  const handleSeedDefaults = async () => {
+  // Delete an unused or zero-balance non-default account
+  const handleDeleteAccount = async (acc) => {
+    if (!window.confirm(`Delete account "${acc.name}"?`)) return;
     setSubmitting(true);
     setErrorMsg("");
     setSuccessMsg("");
     try {
-      const res = await axios.post("/api/accounts/seed-defaults");
-      setSuccessMsg(res.data?.message || "Standard Pakistani accounts loaded!");
+      await axios.delete(`/api/accounts/${acc.id}`);
+      setSuccessMsg(`Account "${acc.name}" deleted.`);
       await fetchAccounts();
       notifyChange();
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Failed to load standard accounts.");
+      setErrorMsg(err.response?.data?.message || "Failed to delete account.");
     } finally {
       setSubmitting(false);
     }
@@ -662,20 +664,39 @@ export default function AccountsModal({ isOpen, onClose, onAccountUpdated, onOpe
                           </div>
                         </div>
 
-                        {/* Quick Statement button */}
-                        <button
-                          onClick={() => {
-                            setSelectedAccountId(acc.id);
-                            setActiveTab("statement");
-                          }}
-                          className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
-                            isDark
-                              ? "border-slate-700 text-slate-300 hover:bg-slate-700"
-                              : "border-slate-200 text-slate-600 hover:bg-slate-100"
-                          }`}
-                        >
-                          Statement
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          {/* Quick Statement button */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedAccountId(acc.id);
+                              setActiveTab("statement");
+                            }}
+                            className={`text-xs font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
+                              isDark
+                                ? "border-slate-700 text-slate-300 hover:bg-slate-700"
+                                : "border-slate-200 text-slate-600 hover:bg-slate-100"
+                            }`}
+                          >
+                            Statement
+                          </button>
+                          {!(acc.type === "cash" && acc.is_default) && acc.code !== "cash_drawer" && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAccount(acc)}
+                              disabled={submitting}
+                              className={`p-1.5 rounded-lg border transition-colors ${
+                                isDark
+                                  ? "border-slate-700 text-slate-400 hover:bg-rose-900/40 hover:text-rose-400"
+                                  : "border-slate-200 text-slate-500 hover:bg-rose-50 hover:text-rose-600"
+                              }`}
+                              title="Delete account"
+                              aria-label={`Delete ${acc.name}`}
+                            >
+                              <TrashIcon className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -691,24 +712,19 @@ export default function AccountsModal({ isOpen, onClose, onAccountUpdated, onOpe
                 <div className="flex items-center gap-2">
                   <SparklesIcon className="w-4 h-4 text-amber-500 shrink-0" />
                   <span className={`text-xs ${isDark ? "text-slate-400" : "text-slate-600"}`}>
-                    Need standard Pakistani bank accounts and digital wallets?
+                    By default, only <strong>Cash in Hand (Drawer)</strong> is active. Add bank or wallet accounts as needed.
                   </span>
-                  <button
-                    onClick={handleSeedDefaults}
-                    disabled={submitting}
-                    className="text-xs font-bold text-blue-500 hover:underline inline-flex items-center gap-1"
-                  >
-                    Load Standard PK Accounts (Meezan, HBL, JazzCash, Easypaisa)
-                  </button>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => setActiveTab("transfer")}
                     className="px-3 py-1.5 text-xs font-bold rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow-xs"
                   >
                     Transfer Funds
                   </button>
                   <button
+                    type="button"
                     onClick={() => setActiveTab("create")}
                     className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
                   >

@@ -35,9 +35,9 @@ class CashDrawerService
     ];
 
     /**
-     * Get currently active open session for a user or system.
+     * Get currently active open session for a user (or system when $strictUser is false / $user is null).
      */
-    public function getCurrentSession(?User $user = null): ?CashDrawerSession
+    public function getCurrentSession(?User $user = null, bool $strictUser = true): ?CashDrawerSession
     {
         if (!SchemaCache::hasTable('cash_drawer_sessions')) {
             return null;
@@ -51,9 +51,12 @@ class CashDrawerService
             if ($userSession) {
                 return $userSession;
             }
+            if ($strictUser) {
+                return null;
+            }
         }
 
-        // Fallback to the latest active open session
+        // Fallback to the latest active open session only when no user context is provided or strictUser is false
         return $query->latest('opened_at')->first();
     }
 
@@ -73,6 +76,10 @@ class CashDrawerService
             $userClosed = (clone $query)->where('user_id', $user->id)->latest('closed_at')->latest('id')->first();
             if ($userClosed) {
                 return $userClosed;
+            }
+            // If another user currently has an open drawer, do not suggest carrying over a closed session float
+            if (CashDrawerSession::where('status', 'open')->exists()) {
+                return null;
             }
         }
 
@@ -98,6 +105,9 @@ class CashDrawerService
 
             $opening = max(round($openingBalance, 2), 0);
 
+            $otherOpenExpected = (float) CashDrawerSession::where('status', 'open')
+                ->sum('closing_balance_expected');
+
             $session = CashDrawerSession::create([
                 'user_id'                  => $user->id,
                 'opened_at'                => Carbon::now(),
@@ -110,7 +120,27 @@ class CashDrawerService
             ]);
 
             if (Schema::hasTable('accounts')) {
-                app(AccountService::class)->syncCashDrawerBalance($session);
+                $accountService = app(AccountService::class);
+                $cashAccount = $accountService->syncCashDrawerBalance($session);
+                if ($cashAccount) {
+                    $safeOpeningReserve = max((float) ($cashAccount->opening_balance ?? 0), 0.0);
+                    $availableCarryover = max(
+                        0.0,
+                        round((float) $cashAccount->current_balance - $safeOpeningReserve - $otherOpenExpected, 2)
+                    );
+                    $floatToDeposit = max(0.0, round($opening - $availableCarryover, 2));
+
+                    if ($floatToDeposit > 0.001) {
+                        $accountService->deposit(
+                            $cashAccount,
+                            $floatToDeposit,
+                            'cash_drawer_open',
+                            $session->id,
+                            "Cash drawer opening float (Session #{$session->id})",
+                            $user
+                        );
+                    }
+                }
             }
 
             return $session->load('user');
@@ -163,6 +193,37 @@ class CashDrawerService
             ]);
 
             $this->recalculateExpectedBalance($lockedSession);
+
+            // When a manual drawer transaction ('manual') or direct unreferenced drawer transaction (null)
+            // is recorded, log the corresponding AccountTransaction on the default Cash Account so
+            // Treasury and Cash Drawer stay 100% synchronized.
+            if (($refType === 'manual' || $refType === null) && Schema::hasTable('accounts')) {
+                $accountService = app(AccountService::class);
+                $cashAccount = $accountService->syncCashDrawerBalance($lockedSession);
+                if ($cashAccount) {
+                    $actor = $user ?? auth()->user();
+                    $desc = $notes ?: ($type === 'cash_in' ? 'Manual Cash In' : 'Manual Cash Out');
+                    if (in_array($type, self::CASH_IN_TYPES, true)) {
+                        $accountService->deposit(
+                            $cashAccount,
+                            $amount,
+                            'cash_drawer_manual',
+                            $txn->id,
+                            $refType === 'manual' ? "Manual Cash In: {$desc}" : $desc,
+                            $actor
+                        );
+                    } elseif (in_array($type, self::CASH_OUT_TYPES, true)) {
+                        $accountService->withdraw(
+                            $cashAccount,
+                            $amount,
+                            'cash_drawer_manual',
+                            $txn->id,
+                            $refType === 'manual' ? "Manual Cash Out: {$desc}" : $desc,
+                            $actor
+                        );
+                    }
+                }
+            }
 
             return $txn;
         });
@@ -221,6 +282,33 @@ class CashDrawerService
                 'difference'               => $difference,
                 'notes'                    => $combinedNotes ?: null,
             ]);
+
+            if (abs($difference) > 0.001 && Schema::hasTable('accounts')) {
+                $accountService = app(AccountService::class);
+                $cashAccount = $accountService->syncCashDrawerBalance($lockedSession);
+                if ($cashAccount) {
+                    $actor = auth()->user() ?? $lockedSession->user;
+                    if ($difference > 0) {
+                        $accountService->deposit(
+                            $cashAccount,
+                            $difference,
+                            'cash_drawer_variance',
+                            $lockedSession->id,
+                            "Cash drawer close overage (Session #{$lockedSession->id})",
+                            $actor
+                        );
+                    } else {
+                        $accountService->withdraw(
+                            $cashAccount,
+                            abs($difference),
+                            'cash_drawer_variance',
+                            $lockedSession->id,
+                            "Cash drawer close shortage (Session #{$lockedSession->id})",
+                            $actor
+                        );
+                    }
+                }
+            }
 
             return $lockedSession->fresh(['transactions.user', 'user']);
         });
@@ -534,6 +622,47 @@ class CashDrawerService
     }
 
     /**
+     * Resolve the actual direct cash portion collected on a sale invoice (accounting for split payments).
+     */
+    protected function resolveDirectCashForSaleInvoice(\App\Models\SaleInvoice $invoice): float
+    {
+        $invTotal = (float) ($invoice->total ?? $invoice->grand_total ?? $invoice->gross_amount ?? 0);
+        $rawReceived = (float) ($invoice->total_receive ?? 0);
+        if (($invoice->invoice_type ?? 'debit') === 'debit' && $rawReceived <= 0) {
+            $rawReceived = $invTotal;
+        }
+        $rawReceived = round($rawReceived, 2);
+
+        if ($rawReceived <= 0) {
+            return 0.0;
+        }
+
+        // Check if AccountTransactions exist for this invoice (e.g., split payments across cash & non-cash accounts)
+        if (Schema::hasTable('account_transactions') && Schema::hasTable('accounts')) {
+            $acctTxns = \App\Models\AccountTransaction::with('account:id,type')
+                ->whereIn('reference_type', ['sale_invoice', 'sale_invoice_update'])
+                ->where('reference_id', $invoice->id)
+                ->get();
+
+            if ($acctTxns->isNotEmpty()) {
+                $cashNet = 0.0;
+                foreach ($acctTxns as $t) {
+                    if (($t->account?->type ?? '') === 'cash') {
+                        $delta = in_array($t->type, ['deposit', 'transfer_in', 'opening_balance'], true)
+                            ? (float) $t->amount
+                            : -(float) $t->amount;
+                        $cashNet = round($cashNet + $delta, 2);
+                    }
+                }
+                return max(0.0, min($cashNet, $rawReceived));
+            }
+        }
+
+        $payMethod = $invoice->payment_method ?? 'cash';
+        return $payMethod === 'cash' ? $rawReceived : 0.0;
+    }
+
+    /**
      * Handle cash drawer effect when a sale invoice is deleted.
      */
     public function handleSaleInvoiceDeletion(
@@ -546,22 +675,11 @@ class CashDrawerService
         }
 
         $session = $this->getCurrentSession($user);
-        if (!$session || $session->status !== 'open') {
+        if (!$session || $session->status !== 'open' || $mode === 'credit') {
             return null;
         }
 
-        $payMethod = $invoice->payment_method ?? 'cash';
-        if ($payMethod !== 'cash') {
-            return null;
-        }
-
-        $invTotal = (float)($invoice->total ?? $invoice->grand_total ?? $invoice->gross_amount ?? 0);
-        $cashReceived = (float)($invoice->total_receive ?? 0);
-        if (($invoice->invoice_type ?? 'debit') === 'debit' && $cashReceived <= 0) {
-            $cashReceived = $invTotal;
-        }
-        $cashReceived = round($cashReceived, 2);
-
+        $cashReceived = $this->resolveDirectCashForSaleInvoice($invoice);
         if ($cashReceived <= 0) {
             return null;
         }
@@ -585,7 +703,7 @@ class CashDrawerService
                 return null;
             }
 
-            // Pre-shift invoice: if refund mode or cash sale, cash was refunded out of drawer
+            // Pre-shift invoice: if not store-credit mode and cash was received, refund out of drawer
             if ($mode === 'refund' || ($invoice->invoice_type ?? 'debit') === 'debit') {
                 return $this->recordTransaction(
                     $lockedSession,
@@ -619,18 +737,7 @@ class CashDrawerService
             return null;
         }
 
-        $payMethod = $invoice->payment_method ?? 'cash';
-        if ($payMethod !== 'cash') {
-            return null;
-        }
-
-        $invTotal = (float)($invoice->total ?? $invoice->grand_total ?? $invoice->gross_amount ?? 0);
-        $cashReceived = (float)($invoice->total_receive ?? 0);
-        if (($invoice->invoice_type ?? 'debit') === 'debit' && $cashReceived <= 0) {
-            $cashReceived = $invTotal;
-        }
-        $cashReceived = round($cashReceived, 2);
-
+        $cashReceived = $this->resolveDirectCashForSaleInvoice($invoice);
         if ($cashReceived <= 0) {
             return null;
         }

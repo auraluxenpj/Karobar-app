@@ -108,47 +108,56 @@ class AccountController extends Controller
     }
 
     /**
-     * Seed popular default Pakistani accounts if not present.
+     * Ensure the default Cash in Hand (Drawer) account is present.
+     * Additional bank/wallet accounts are created by the user on demand.
      */
-    public function seedDefaults(): JsonResponse
+    public function seedDefaults(Request $request): JsonResponse
     {
         $this->authorizeAccountAction('account.create');
         $seeded = [];
-        $popular = [
-            ['code' => 'meezan', 'name' => 'Meezan Bank', 'bank_name' => 'Meezan Bank Limited', 'type' => 'bank', 'icon' => 'meezan', 'color' => '#005b41', 'notes' => 'Primary Islamic bank account'],
-            ['code' => 'hbl', 'name' => 'HBL (Habib Bank)', 'bank_name' => 'Habib Bank Limited', 'type' => 'bank', 'icon' => 'hbl', 'color' => '#00835f', 'notes' => 'Commercial bank account'],
-            ['code' => 'jazzcash', 'name' => 'JazzCash Business', 'bank_name' => 'JazzCash', 'type' => 'mobile_wallet', 'icon' => 'jazzcash', 'color' => '#dc2626', 'notes' => 'Mobile wallet for retail customer transfers'],
-            ['code' => 'easypaisa', 'name' => 'Easypaisa Business', 'bank_name' => 'Easypaisa', 'type' => 'mobile_wallet', 'icon' => 'easypaisa', 'color' => '#16a34a', 'notes' => 'Mobile wallet for digital payments'],
-            ['code' => 'sadapay', 'name' => 'SadaPay Business', 'bank_name' => 'SadaPay', 'type' => 'mobile_wallet', 'icon' => 'sadapay', 'color' => '#0d9488', 'notes' => 'Digital fintech account'],
-        ];
 
-        foreach ($popular as $item) {
-            $existing = Account::where('code', $item['code'])
-                ->orWhere(function ($q) use ($item) {
-                    $q->where('name', $item['name'])->where('type', $item['type']);
-                })->first();
+        $cashDrawer = $this->accountService->syncCashDrawerBalance();
+        if ($cashDrawer && $cashDrawer->wasRecentlyCreated) {
+            $seeded[] = $cashDrawer;
+        }
 
-            if (!$existing) {
-                $acc = Account::create([
-                    'name'            => $item['name'],
-                    'code'            => $item['code'],
-                    'icon'            => $item['icon'],
-                    'color'           => $item['color'],
-                    'type'            => $item['type'],
-                    'bank_name'       => $item['bank_name'],
-                    'account_number'  => null,
-                    'opening_balance' => 0,
-                    'current_balance' => 0,
-                    'is_active'       => true,
-                    'is_default'      => false,
-                    'notes'           => $item['notes'],
-                ]);
-                $seeded[] = $acc;
+        if ($request->boolean('include_presets')) {
+            $popular = [
+                ['code' => 'meezan', 'name' => 'Meezan Bank', 'bank_name' => 'Meezan Bank Limited', 'type' => 'bank', 'icon' => 'meezan', 'color' => '#005b41', 'notes' => 'Primary Islamic bank account'],
+                ['code' => 'hbl', 'name' => 'HBL (Habib Bank)', 'bank_name' => 'Habib Bank Limited', 'type' => 'bank', 'icon' => 'hbl', 'color' => '#00835f', 'notes' => 'Commercial bank account'],
+                ['code' => 'jazzcash', 'name' => 'JazzCash Business', 'bank_name' => 'JazzCash', 'type' => 'mobile_wallet', 'icon' => 'jazzcash', 'color' => '#dc2626', 'notes' => 'Mobile wallet for retail customer transfers'],
+                ['code' => 'easypaisa', 'name' => 'Easypaisa Business', 'bank_name' => 'Easypaisa', 'type' => 'mobile_wallet', 'icon' => 'easypaisa', 'color' => '#16a34a', 'notes' => 'Mobile wallet for digital payments'],
+                ['code' => 'sadapay', 'name' => 'SadaPay Business', 'bank_name' => 'SadaPay', 'type' => 'mobile_wallet', 'icon' => 'sadapay', 'color' => '#0d9488', 'notes' => 'Digital fintech account'],
+            ];
+
+            foreach ($popular as $item) {
+                $existing = Account::where('code', $item['code'])
+                    ->orWhere(function ($q) use ($item) {
+                        $q->where('name', $item['name'])->where('type', $item['type']);
+                    })->first();
+
+                if (!$existing) {
+                    $acc = Account::create([
+                        'name'            => $item['name'],
+                        'code'            => $item['code'],
+                        'icon'            => $item['icon'],
+                        'color'           => $item['color'],
+                        'type'            => $item['type'],
+                        'bank_name'       => $item['bank_name'],
+                        'account_number'  => null,
+                        'opening_balance' => 0,
+                        'current_balance' => 0,
+                        'is_active'       => true,
+                        'is_default'      => false,
+                        'notes'           => $item['notes'],
+                    ]);
+                    $seeded[] = $acc;
+                }
             }
         }
 
         return response()->json([
-            'message' => count($seeded) > 0 ? "Created " . count($seeded) . " standard accounts" : "Standard accounts are already configured",
+            'message' => count($seeded) > 0 ? "Created " . count($seeded) . " default account(s)" : "Default Cash in Hand account is ready",
             'seeded'  => $seeded,
             'summary' => $this->accountService->getSummary(),
         ]);
@@ -251,27 +260,29 @@ class AccountController extends Controller
     }
 
     /**
-     * Delete an account if it is not a system default and has no non-opening transactions.
+     * Delete an account if it is not the primary Cash in Hand (Drawer) account and has a zero balance.
      */
     public function destroy(int $id): JsonResponse
     {
         $this->authorizeAccountAction(['account.delete', 'account.update']);
         $account = Account::findOrFail($id);
 
-        if ($account->is_default || $account->code === 'cash_drawer') {
+        if ($account->code === 'cash_drawer' || ($account->type === 'cash' && $account->is_default)) {
             return response()->json([
-                'message' => 'Cannot delete the default system account.',
+                'message' => 'Cannot delete the default Cash in Hand (Drawer) system account.',
             ], 422);
         }
 
-        $nonOpeningTxns = AccountTransaction::where('account_id', $account->id)
-            ->where('type', '!=', 'opening_balance')
-            ->exists();
-
-        if ($nonOpeningTxns) {
+        if (abs((float) $account->current_balance) >= 0.01) {
             return response()->json([
-                'message' => 'Cannot delete an account that has recorded financial transactions. Deactivate it instead.',
+                'message' => 'Cannot delete an account with a non-zero balance (' . number_format((float) $account->current_balance, 2) . '). Transfer or withdraw the remaining balance first.',
             ], 422);
+        }
+
+        foreach (['sale_invoices', 'purchase_invoices', 'payments', 'sale_returns', 'purchase_returns', 'expenses'] as $tbl) {
+            if (\Illuminate\Support\Facades\Schema::hasTable($tbl) && \Illuminate\Support\Facades\Schema::hasColumn($tbl, 'account_id')) {
+                \Illuminate\Support\Facades\DB::table($tbl)->where('account_id', $account->id)->update(['account_id' => null]);
+            }
         }
 
         AccountTransaction::where('account_id', $account->id)->delete();

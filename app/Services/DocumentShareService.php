@@ -1592,37 +1592,53 @@ class DocumentShareService
         if ($hasInvoiceDate) $selectCols[] = 'invoice_date';
         if ($hasInvoiceNo)   $selectCols[] = 'invoice_no';
 
-        $invoices = SaleInvoice::query()
+        $rawInvoices = SaleInvoice::query()
             ->where('customer_id', $customer->id)
             ->where('invoice_type', 'credit')
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->when($from, fn ($q) => $q->whereDate($dateColumn, '>=', $from))
             ->when($to, fn ($q) => $q->whereDate($dateColumn, '<=', $to))
             ->orderBy($dateColumn)
             ->orderBy('id')
-            ->get($selectCols)
-            ->map(function ($inv) use ($hasInvoiceDate, $hasInvoiceNo) {
-                $t = (float) ($inv->invoice_total ?? $inv->total ?? $inv->grand_total ?? $inv->net_total ?? $inv->gross_amount ?? $inv->sub_total ?? 0);
-                $rawR = (float) ($inv->total_receive ?? $inv->total_recieve ?? $inv->received ?? $inv->amount_received ?? 0);
-                $r = min($rawR, $t);
-                $rawDate = $hasInvoiceDate ? ($inv->invoice_date ?? $inv->date) : $inv->date;
-                $entryDate = $rawDate ? Carbon::parse($rawDate)->format('Y-m-d') : null;
-                $invoiceNumber = $hasInvoiceNo ? ($inv->invoice_no ?? null) : null;
+            ->get($selectCols);
 
-                return (object) [
-                    'id'              => $inv->id,
-                    'entry_type'      => 'invoice',
-                    'is_manual'       => false,
-                    'entry_date'      => $entryDate,
-                    'posted_number'   => $inv->posted_number,
-                    'invoice_number'  => $invoiceNumber,
-                    'invoice_total'   => $t,
-                    'total_received'  => $r,
-                    'credited_amount' => 0.0,
-                    'payment_amount'  => 0.0,
-                    'payment_ref'     => null,
-                    'description'     => 'Sale Invoice ' . ($inv->posted_number ?? ('#' . $inv->id)),
-                ];
-            });
+        $allocatedByInvoice = collect();
+        $invIds = $rawInvoices->pluck('id')->all();
+        if (!empty($invIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
+            $allocatedByInvoice = \App\Models\PaymentAllocation::query()
+                ->where('invoice_type', 'sale_invoice')
+                ->whereIn('invoice_id', $invIds)
+                ->whereHas('payment', fn ($q) => $q->where('status', 'posted'))
+                ->selectRaw('invoice_id, SUM(amount) as total_allocated')
+                ->groupBy('invoice_id')
+                ->pluck('total_allocated', 'invoice_id');
+        }
+
+        $invoices = $rawInvoices->map(function ($inv) use ($hasInvoiceDate, $hasInvoiceNo, $allocatedByInvoice) {
+            $t = (float) ($inv->invoice_total ?? $inv->total ?? $inv->grand_total ?? $inv->net_total ?? $inv->gross_amount ?? $inv->sub_total ?? 0);
+            $rawR = (float) ($inv->total_receive ?? $inv->total_recieve ?? $inv->received ?? $inv->amount_received ?? 0);
+            $allocated = (float) ($allocatedByInvoice[$inv->id] ?? 0);
+            $directR = max(0.0, $rawR - $allocated);
+            $r = min($directR, $t);
+            $rawDate = $hasInvoiceDate ? ($inv->invoice_date ?? $inv->date) : $inv->date;
+            $entryDate = $rawDate ? Carbon::parse($rawDate)->format('Y-m-d') : null;
+            $invoiceNumber = $hasInvoiceNo ? ($inv->invoice_no ?? null) : null;
+
+            return (object) [
+                'id'              => $inv->id,
+                'entry_type'      => 'invoice',
+                'is_manual'       => false,
+                'entry_date'      => $entryDate,
+                'posted_number'   => $inv->posted_number,
+                'invoice_number'  => $invoiceNumber,
+                'invoice_total'   => $t,
+                'total_received'  => $r,
+                'credited_amount' => 0.0,
+                'payment_amount'  => 0.0,
+                'payment_ref'     => null,
+                'description'     => 'Sale Invoice ' . ($inv->posted_number ?? ('#' . $inv->id)),
+            ];
+        });
 
         $manualAndPayments = CustomerLedger::query()
             ->where('customer_id', $customer->id)
@@ -1658,16 +1674,32 @@ class DocumentShareService
         // Compute opening brought-forward balance prior to $from
         $openingBalance = 0.0;
         if (!empty($from)) {
-            $priorInv = SaleInvoice::query()
+            $priorInvRows = SaleInvoice::query()
                 ->where('customer_id', $customer->id)
                 ->where('invoice_type', 'credit')
+                ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
                 ->whereDate($dateColumn, '<', $from)
-                ->get($selectCols)
-                ->sum(function ($inv) {
-                    $t = (float) ($inv->invoice_total ?? $inv->total ?? $inv->grand_total ?? $inv->net_total ?? $inv->gross_amount ?? $inv->sub_total ?? 0);
-                    $rawR = (float) ($inv->total_receive ?? $inv->total_recieve ?? $inv->received ?? $inv->amount_received ?? 0);
-                    return max(0.0, $t - min($rawR, $t));
-                });
+                ->get($selectCols);
+
+            $priorAllocated = collect();
+            $priorIds = $priorInvRows->pluck('id')->all();
+            if (!empty($priorIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
+                $priorAllocated = \App\Models\PaymentAllocation::query()
+                    ->where('invoice_type', 'sale_invoice')
+                    ->whereIn('invoice_id', $priorIds)
+                    ->whereHas('payment', fn ($q) => $q->where('status', 'posted'))
+                    ->selectRaw('invoice_id, SUM(amount) as total_allocated')
+                    ->groupBy('invoice_id')
+                    ->pluck('total_allocated', 'invoice_id');
+            }
+
+            $priorInv = $priorInvRows->sum(function ($inv) use ($priorAllocated) {
+                $t = (float) ($inv->invoice_total ?? $inv->total ?? $inv->grand_total ?? $inv->net_total ?? $inv->gross_amount ?? $inv->sub_total ?? 0);
+                $rawR = (float) ($inv->total_receive ?? $inv->total_recieve ?? $inv->received ?? $inv->amount_received ?? 0);
+                $allocated = (float) ($priorAllocated[$inv->id] ?? 0);
+                $directR = max(0.0, $rawR - $allocated);
+                return max(0.0, $t - min($directR, $t));
+            });
 
             $priorManual = CustomerLedger::query()
                 ->where('customer_id', $customer->id)
@@ -1986,12 +2018,28 @@ class DocumentShareService
         $invoices = SaleInvoice::query()
             ->where('customer_id', $customerId)
             ->where('invoice_type', 'credit')
-            ->get(['total', 'total_receive']);
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
+            ->get(['id', 'total', 'total_receive']);
 
-        $invDelta = $invoices->sum(function ($inv) {
+        $allocatedByInvoice = collect();
+        $invIds = $invoices->pluck('id')->all();
+        if (!empty($invIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
+            $allocatedByInvoice = \App\Models\PaymentAllocation::query()
+                ->where('invoice_type', 'sale_invoice')
+                ->whereIn('invoice_id', $invIds)
+                ->whereHas('payment', fn ($q) => $q->where('status', 'posted'))
+                ->selectRaw('invoice_id, SUM(amount) as total_allocated')
+                ->groupBy('invoice_id')
+                ->pluck('total_allocated', 'invoice_id');
+        }
+
+        $invDelta = $invoices->sum(function ($inv) use ($allocatedByInvoice) {
             $t = (float) ($inv->total ?? 0);
-            $r = min((float) ($inv->total_receive ?? 0), $t);
-            return max(0, $t - $r);
+            $rawR = (float) ($inv->total_receive ?? 0);
+            $allocated = (float) ($allocatedByInvoice[$inv->id] ?? 0);
+            $directR = max(0.0, $rawR - $allocated);
+            $r = min($directR, $t);
+            return max(0.0, $t - $r);
         });
 
         $manualRows = CustomerLedger::query()

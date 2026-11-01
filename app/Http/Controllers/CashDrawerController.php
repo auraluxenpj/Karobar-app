@@ -149,36 +149,6 @@ class CashDrawerController extends Controller
             $request->user()
         );
 
-        $cashAccount = app(\App\Services\AccountService::class)->getDefaultAccount('cash');
-        if ($cashAccount && $txn) {
-            if ($data['type'] === 'cash_in') {
-                $acctTxn = app(\App\Services\AccountService::class)->deposit(
-                    $cashAccount,
-                    (float) $data['amount'],
-                    'cash_drawer_manual',
-                    $txn->id,
-                    "Manual Cash In: {$data['notes']}",
-                    $request->user()
-                );
-            } else {
-                $acctTxn = app(\App\Services\AccountService::class)->withdraw(
-                    $cashAccount,
-                    (float) $data['amount'],
-                    'cash_drawer_manual',
-                    $txn->id,
-                    "Manual Cash Out: {$data['notes']}",
-                    $request->user()
-                );
-            }
-            $this->cashDrawerService->recalculateExpectedBalance($session->fresh());
-            if ($acctTxn) {
-                $syncedBalance = (float) ($cashAccount->fresh()?->current_balance ?? $acctTxn->balance_after);
-                if (abs((float) $acctTxn->balance_after - $syncedBalance) > 0.001) {
-                    $acctTxn->update(['balance_after' => $syncedBalance]);
-                }
-            }
-        }
-
         if ($txn) {
             $txn->load('user');
             $this->cashDrawerService->enrichTransactions(collect([$txn]));
@@ -198,11 +168,19 @@ class CashDrawerController extends Controller
     {
         $this->authorizeDrawerAction('cash-drawer.close');
         $data = $request->validate([
+            'session_id'             => 'nullable|integer|exists:cash_drawer_sessions,id',
             'closing_balance_actual' => 'required|numeric|min:0',
             'notes'                  => 'nullable|string|max:500',
         ]);
 
-        $session = $this->cashDrawerService->getCurrentSession($request->user());
+        if (!empty($data['session_id'])) {
+            $session = CashDrawerSession::where('status', 'open')->find($data['session_id']);
+            if ($session && (int) $session->user_id !== (int) $request->user()?->id && !$request->user()?->hasRole(['Admin', 'admin', 'super-admin'])) {
+                abort(403, 'You are not authorized to close another user\'s cash drawer session.');
+            }
+        } else {
+            $session = $this->cashDrawerService->getCurrentSession($request->user(), true);
+        }
 
         if (!$session) {
             return response()->json([

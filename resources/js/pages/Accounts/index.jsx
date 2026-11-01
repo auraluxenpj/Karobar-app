@@ -35,25 +35,31 @@ import AccountIcon from "@/components/AccountIcon.jsx";
 
 // ─── Transaction type labels ──────────────────────────────────────────────────
 const TXN_TYPE_LABELS = {
+  opening_balance: "Opening Balance",
   deposit: "Deposit",
   withdrawal: "Withdrawal",
   transfer_in: "Transfer In",
   transfer_out: "Transfer Out",
+  adjustment: "Adjustment",
 };
 
 const TXN_TYPE_COLORS = {
+  opening_balance: "text-emerald-600 dark:text-emerald-400",
   deposit: "text-emerald-600 dark:text-emerald-400",
   withdrawal: "text-red-600 dark:text-red-400",
   transfer_in: "text-blue-600 dark:text-blue-400",
   transfer_out: "text-amber-600 dark:text-amber-400",
+  adjustment: "text-indigo-600 dark:text-indigo-400",
 };
 
 const TXN_TYPE_OPTIONS = [
   { value: "", label: "All Types" },
+  { value: "opening_balance", label: "Opening Balance" },
   { value: "deposit", label: "Deposits" },
   { value: "withdrawal", label: "Withdrawals" },
   { value: "transfer_in", label: "Transfers In" },
   { value: "transfer_out", label: "Transfers Out" },
+  { value: "adjustment", label: "Adjustments" },
 ];
 
 const ACCOUNT_TYPE_ICONS = {
@@ -433,17 +439,6 @@ export default function AccountsPage() {
             </button>
             <button
               type="button"
-              onClick={handleSeedDefaults}
-              disabled={seedingDefaults}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg ${btnSecondary.className}`}
-              style={btnSecondary.style}
-              title="Create standard Pakistani Bank & Mobile Wallet accounts"
-            >
-              <SparklesIcon className="w-3.5 h-3.5" />
-              {seedingDefaults ? "Seeding…" : "Seed Standard Accounts"}
-            </button>
-            <button
-              type="button"
               onClick={() => { setAdjustAccount(null); setAdjustType("deposit"); setAdjustAmount(""); setAdjustReason(""); setModalMode("adjust"); }}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg ${btnSecondary.className}`}
               style={btnSecondary.style}
@@ -650,7 +645,7 @@ export default function AccountsPage() {
                   >
                     <PencilSquareIcon className="w-3.5 h-3.5" />
                   </button>
-                  {!account.is_default && account.code !== "cash_drawer" && (
+                  {!(account.type === "cash" && account.is_default) && account.code !== "cash_drawer" && (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -759,7 +754,11 @@ export default function AccountsPage() {
                   </tr>
                 ) : (
                   transactions.map(txn => {
-                    const isCredit = txn.type === "deposit" || txn.type === "transfer_in";
+                    const isCredit =
+                      txn.type === "deposit" ||
+                      txn.type === "transfer_in" ||
+                      txn.type === "opening_balance" ||
+                      (txn.type === "adjustment" && parseFloat(txn.amount) >= 0);
                     return (
                       <tr key={txn.id} className={`transition-colors ${isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50/70"}`}>
                         <td className={`py-2.5 px-4 text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>

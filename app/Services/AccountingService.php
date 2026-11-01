@@ -389,7 +389,7 @@ class AccountingService
 
         $periodCogs = round(max(0.0, $cogsSales - $cogsReturns), 2);
 
-        // 8. Period Inventory Shrinkage / Disposals
+        // 8. Period Inventory Shrinkage / Disposals (COA 5200)
         $disposalLoss = 0.0;
         if (Schema::hasTable('stock_disposals')) {
             $costCol = Schema::hasColumn('stock_disposals', 'total_cost_value') ? 'total_cost_value' : 'total_cost';
@@ -400,15 +400,38 @@ class AccountingService
                     ->sum(DB::raw("COALESCE({$costCol}, 0)"));
             }
         }
+        if (Schema::hasTable('expenses') && Schema::hasTable('expense_categories')) {
+            $shrinkageQuery = DB::table('expenses as e')
+                ->join('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
+                ->whereBetween('e.date', [$from, $to])
+                ->whereNull('e.deleted_at')
+                ->whereIn('ec.code', ['stock_disposal_writeoff', 'stock_shrinkage_writeoff']);
+
+            if (Schema::hasTable('stock_disposals') && Schema::hasColumn('stock_disposals', 'expense_id')) {
+                $shrinkageQuery->whereNotExists(function ($sub) {
+                    $sub->select(DB::raw(1))
+                        ->from('stock_disposals as sd')
+                        ->whereColumn('sd.expense_id', 'e.id')
+                        ->where('sd.status', 'disposed');
+                });
+            }
+
+            $disposalLoss += (float) $shrinkageQuery->sum('e.amount');
+        }
         $periodShrinkage = round(max(0.0, $disposalLoss), 2);
 
-        // 9. Period Operating Expenses
+        // 9. Period Operating Expenses (COA 5300 — excluding non-cash inventory disposal/shrinkage write-offs already in 5200)
         $periodExpenses = 0.0;
         if (Schema::hasTable('expenses')) {
-            $periodExpenses = round((float) DB::table('expenses')
-                ->whereBetween('date', [$from, $to])
-                ->whereNull('deleted_at')
-                ->sum('amount'), 2);
+            $expQuery = DB::table('expenses as e')
+                ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
+                ->whereBetween('e.date', [$from, $to])
+                ->whereNull('e.deleted_at')
+                ->where(function ($q) {
+                    $q->whereNull('ec.code')
+                      ->orWhereNotIn('ec.code', ['stock_disposal_writeoff', 'stock_shrinkage_writeoff']);
+                });
+            $periodExpenses = round((float) $expQuery->sum('e.amount'), 2);
         }
 
         return [
@@ -708,19 +731,38 @@ class AccountingService
         $from = Carbon::parse($fromDate)->toDateString();
         $to = Carbon::parse($toDate)->toDateString();
 
-        // 1. Operating Cash Inflows: Immediate cash received on Sale Invoices + Customer Payment Vouchers
-        $cashOnSales = (float) DB::table('sale_invoices')
+        // 1. Operating Cash Inflows: Direct tender received on Sale Invoices (excluding allocations) + Cash/Bank Customer Payment Vouchers
+        $rawCashOnSales = (float) DB::table('sale_invoices')
             ->whereBetween('date', [$from, $to])
             ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->sum(DB::raw("CASE WHEN COALESCE(invoice_type, 'debit') = 'debit' AND COALESCE(total_receive, 0) <= 0 THEN COALESCE(total, 0) ELSE COALESCE(total_receive, 0) END"));
 
+        $allocatedOnPeriodSales = 0.0;
+        if (Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
+            $allocatedOnPeriodSales = (float) DB::table('payment_allocations as pa')
+                ->join('sale_invoices as si', function ($join) {
+                    $join->on('si.id', '=', 'pa.invoice_id')
+                         ->where('pa.invoice_type', '=', 'sale_invoice');
+                })
+                ->join('payments as p', 'p.id', '=', 'pa.payment_id')
+                ->whereBetween('si.date', [$from, $to])
+                ->where(fn ($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'))
+                ->where('p.status', 'posted')
+                ->sum('pa.amount');
+        }
+        $cashOnSales = max(0.0, round($rawCashOnSales - $allocatedOnPeriodSales, 2));
+
         $customerPaymentReceipts = 0.0;
         if (Schema::hasTable('payments')) {
-            $customerPaymentReceipts = (float) DB::table('payments')
+            $custPayQuery = DB::table('payments')
                 ->where('party_type', 'customer')
-                ->whereBetween('payment_date', [$from, $to])
+                ->whereBetween(DB::raw('DATE(payment_date)'), [$from, $to])
                 ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
-                ->sum('amount');
+                ->where(fn ($q) => $q->whereNull('payment_method')->orWhere('payment_method', '!=', 'credit_note'));
+            if (Schema::hasColumn('payments', 'cheque_status')) {
+                $custPayQuery->where(fn ($q) => $q->whereNull('cheque_status')->orWhere('cheque_status', 'cleared'));
+            }
+            $customerPaymentReceipts = (float) $custPayQuery->sum('amount');
         }
 
         $purchaseReturnCashRefunds = (float) DB::table('purchase_returns')
@@ -728,19 +770,38 @@ class AccountingService
             ->where('settlement_mode', 'cash_refund')
             ->sum('total');
 
-        // 2. Operating Cash Outflows: Immediate cash paid on Purchase Invoices + Supplier Payment Vouchers + Operating Expenses + Sale Return Refunds
-        $cashOnPurchases = (float) DB::table('purchase_invoices')
+        // 2. Operating Cash Outflows: Direct tender paid on Purchase Invoices (excluding allocations) + Cash/Bank Supplier Payment Vouchers + Cash Operating Expenses + Sale Return Refunds
+        $rawCashOnPurchases = (float) DB::table('purchase_invoices')
             ->whereBetween(DB::raw('DATE(posted_date)'), [$from, $to])
             ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->sum(DB::raw('COALESCE(total_paid, 0)'));
 
+        $allocatedOnPeriodPurchases = 0.0;
+        if (Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
+            $allocatedOnPeriodPurchases = (float) DB::table('payment_allocations as pa')
+                ->join('purchase_invoices as pi', function ($join) {
+                    $join->on('pi.id', '=', 'pa.invoice_id')
+                         ->where('pa.invoice_type', '=', 'purchase_invoice');
+                })
+                ->join('payments as p', 'p.id', '=', 'pa.payment_id')
+                ->whereBetween(DB::raw('DATE(pi.posted_date)'), [$from, $to])
+                ->where(fn ($q) => $q->whereNull('pi.status')->orWhere('pi.status', '!=', 'reversed'))
+                ->where('p.status', 'posted')
+                ->sum('pa.amount');
+        }
+        $cashOnPurchases = max(0.0, round($rawCashOnPurchases - $allocatedOnPeriodPurchases, 2));
+
         $supplierPayments = 0.0;
         if (Schema::hasTable('payments')) {
-            $supplierPayments = (float) DB::table('payments')
+            $suppPayQuery = DB::table('payments')
                 ->where('party_type', 'supplier')
-                ->whereBetween('payment_date', [$from, $to])
+                ->whereBetween(DB::raw('DATE(payment_date)'), [$from, $to])
                 ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
-                ->sum('amount');
+                ->where(fn ($q) => $q->whereNull('payment_method')->orWhere('payment_method', '!=', 'credit_note'));
+            if (Schema::hasColumn('payments', 'cheque_status')) {
+                $suppPayQuery->where(fn ($q) => $q->whereNull('cheque_status')->orWhere('cheque_status', 'cleared'));
+            }
+            $supplierPayments = (float) $suppPayQuery->sum('amount');
         }
 
         $saleReturnCashRefunds = (float) DB::table('sale_returns')
@@ -750,10 +811,15 @@ class AccountingService
 
         $operatingExpensesPaid = 0.0;
         if (Schema::hasTable('expenses')) {
-            $operatingExpensesPaid = (float) DB::table('expenses')
-                ->whereBetween('date', [$from, $to])
-                ->whereNull('deleted_at')
-                ->sum('amount');
+            $operatingExpensesPaid = (float) DB::table('expenses as e')
+                ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
+                ->whereBetween('e.date', [$from, $to])
+                ->whereNull('e.deleted_at')
+                ->where(function ($q) {
+                    $q->whereNull('ec.code')
+                      ->orWhereNotIn('ec.code', ['stock_disposal_writeoff', 'stock_shrinkage_writeoff']);
+                })
+                ->sum('e.amount');
         }
 
         // 3. Investing & Financing from Journal Entries
@@ -979,7 +1045,7 @@ class AccountingService
                 ->leftJoin('expense_categories as ec', 'ec.id', '=', 'e.expense_category_id')
                 ->whereBetween('e.date', [$from, $to])
                 ->whereNull('e.deleted_at')
-                ->select('e.*', 'ec.name as category_name')
+                ->select('e.*', 'ec.name as category_name', 'ec.code as category_code')
                 ->orderByDesc('e.date')
                 ->orderByDesc('e.id')
                 ->limit(100)
@@ -987,6 +1053,7 @@ class AccountingService
 
             foreach ($expenses as $exp) {
                 $amt = round((float) $exp->amount, 2);
+                $isWriteOff = in_array($exp->category_code ?? '', ['stock_disposal_writeoff', 'stock_shrinkage_writeoff'], true);
                 $entries[] = [
                     'id'               => 'EXP-' . $exp->id,
                     'raw_id'           => $exp->id,
@@ -994,17 +1061,71 @@ class AccountingService
                     'entry_number'     => $exp->expense_number ?: ('EXP-' . $exp->id),
                     'entry_date'       => substr((string) $exp->date, 0, 10),
                     'source_type'      => 'expense',
-                    'source_label'     => 'OPERATING EXPENSE',
+                    'source_label'     => $isWriteOff ? 'INVENTORY WRITE-OFF' : 'OPERATING EXPENSE',
                     'reference_number' => $exp->reference_number,
                     'description'      => ($exp->category_name ?: 'Expense') . ($exp->payee ? " — {$exp->payee}" : ''),
                     'total_debit'      => $amt,
                     'total_credit'     => $amt,
                     'status'           => 'posted',
                     'created_by_name'  => 'Auto-Posted',
-                    'lines'            => [
-                        ['account_code' => '5300', 'account_name' => 'Store Operating Expenses', 'description' => $exp->category_name ?: 'Operating Expense', 'debit' => $amt, 'credit' => 0.0],
-                        ['account_code' => '1010', 'account_name' => 'Cash & Bank Equivalents', 'description' => ucfirst($exp->payment_method ?: 'cash'), 'debit' => 0.0, 'credit' => $amt],
-                    ],
+                    'lines'            => $isWriteOff
+                        ? [
+                            ['account_code' => '5200', 'account_name' => 'Inventory Shrinkage, Expiry & Damage Write-Off', 'description' => $exp->category_name ?: 'Inventory Write-Off', 'debit' => $amt, 'credit' => 0.0],
+                            ['account_code' => '1300', 'account_name' => 'Merchandise Inventory', 'description' => $exp->reference_number ?: 'Stock Write-Off', 'debit' => 0.0, 'credit' => $amt],
+                        ]
+                        : [
+                            ['account_code' => '5300', 'account_name' => 'Store Operating Expenses', 'description' => $exp->category_name ?: 'Operating Expense', 'debit' => $amt, 'credit' => 0.0],
+                            ['account_code' => '1010', 'account_name' => 'Cash & Bank Equivalents', 'description' => ucfirst($exp->payment_method ?: 'cash'), 'debit' => 0.0, 'credit' => $amt],
+                        ],
+                ];
+            }
+        }
+
+        // 5. System Auto-Generated Double-Entry Postings from Payment Vouchers
+        if (in_array($sourceFilter, ['all', 'payment'], true) && Schema::hasTable('payments')) {
+            $payments = DB::table('payments as p')
+                ->leftJoin('customers as c', function ($join) {
+                    $join->on('c.id', '=', 'p.party_id')->where('p.party_type', '=', 'customer');
+                })
+                ->leftJoin('suppliers as s', function ($join) {
+                    $join->on('s.id', '=', 'p.party_id')->where('p.party_type', '=', 'supplier');
+                })
+                ->whereBetween(DB::raw('DATE(p.payment_date)'), [$from, $to])
+                ->where(fn ($q) => $q->whereNull('p.status')->orWhere('p.status', '!=', 'reversed'))
+                ->where(fn ($q) => $q->whereNull('p.payment_method')->orWhere('p.payment_method', '!=', 'credit_note'))
+                ->select('p.*', 'c.name as customer_name', 's.name as supplier_name')
+                ->orderByDesc('p.payment_date')
+                ->orderByDesc('p.id')
+                ->limit(100)
+                ->get();
+
+            foreach ($payments as $pay) {
+                $amt = round((float) $pay->amount, 2);
+                $isCust = $pay->party_type === 'customer';
+                $partyName = $isCust ? ($pay->customer_name ?: 'Customer') : ($pay->supplier_name ?: 'Supplier');
+                $entries[] = [
+                    'id'               => 'PAY-' . $pay->id,
+                    'raw_id'           => $pay->id,
+                    'is_manual'        => false,
+                    'entry_number'     => $pay->payment_number ?: ('PAY-' . $pay->id),
+                    'entry_date'       => substr((string) $pay->payment_date, 0, 10),
+                    'source_type'      => 'payment',
+                    'source_label'     => $isCust ? 'CUSTOMER RECEIPT' : 'SUPPLIER PAYMENT',
+                    'reference_number' => $pay->reference,
+                    'description'      => ($isCust ? "Receipt from {$partyName}" : "Payment to {$partyName}") . ($pay->notes ? " — {$pay->notes}" : ''),
+                    'total_debit'      => $amt,
+                    'total_credit'     => $amt,
+                    'status'           => 'posted',
+                    'created_by_name'  => 'Auto-Posted',
+                    'lines'            => $isCust
+                        ? [
+                            ['account_code' => '1010', 'account_name' => 'Cash & Bank Equivalents', 'description' => ucfirst(str_replace('_', ' ', $pay->payment_method ?: 'cash')), 'debit' => $amt, 'credit' => 0.0],
+                            ['account_code' => '1200', 'account_name' => 'Accounts Receivable', 'description' => $partyName, 'debit' => 0.0, 'credit' => $amt],
+                        ]
+                        : [
+                            ['account_code' => '2100', 'account_name' => 'Accounts Payable', 'description' => $partyName, 'debit' => $amt, 'credit' => 0.0],
+                            ['account_code' => '1010', 'account_name' => 'Cash & Bank Equivalents', 'description' => ucfirst(str_replace('_', ' ', $pay->payment_method ?: 'cash')), 'debit' => 0.0, 'credit' => $amt],
+                        ],
                 ];
             }
         }

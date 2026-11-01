@@ -94,12 +94,45 @@ class PaymentController extends Controller
             });
         }
 
+        $hasChequeStatus = \Illuminate\Support\Facades\Schema::hasColumn('payments', 'cheque_status');
+
+        $cashCustomerTotal = (float) (clone $query)
+            ->where('status', 'posted')
+            ->where('party_type', 'customer')
+            ->where('payment_method', '!=', 'credit_note')
+            ->when($hasChequeStatus, function ($q) {
+                $q->where(function ($sub) {
+                    $sub->whereNull('cheque_status')->orWhere('cheque_status', 'cleared');
+                });
+            })
+            ->sum('amount');
+
+        $cashSupplierTotal = (float) (clone $query)
+            ->where('status', 'posted')
+            ->where('party_type', 'supplier')
+            ->where('payment_method', '!=', 'credit_note')
+            ->when($hasChequeStatus, function ($q) {
+                $q->where(function ($sub) {
+                    $sub->whereNull('cheque_status')->orWhere('cheque_status', 'cleared');
+                });
+            })
+            ->sum('amount');
+
+        $reversalsCount = (int) (clone $query)->where('status', 'reversed')->count();
+
         $query->orderBy('payment_date', 'desc')->orderBy('id', 'desc');
 
         $perPage = (int)($request->per_page ?? 15);
         $paginated = $query->paginate($perPage);
+        $payload = $paginated->toArray();
+        $payload['summary'] = [
+            'customer_total' => round($cashCustomerTotal, 2),
+            'supplier_total' => round($cashSupplierTotal, 2),
+            'net_cash_flow'  => round($cashCustomerTotal - $cashSupplierTotal, 2),
+            'reversals'      => $reversalsCount,
+        ];
 
-        return response()->json($paginated);
+        return response()->json($payload);
     }
 
     /**

@@ -106,7 +106,10 @@ class ReturnSettlementModeTest extends TestCase
         ]);
 
         Account::where('type', 'cash')->update(['current_balance' => 50000]);
-        Account::where('type', 'bank')->update(['current_balance' => 100000]);
+        Account::firstOrCreate(
+            ['type' => 'bank', 'name' => 'Main Bank Account'],
+            ['opening_balance' => 100000, 'current_balance' => 100000, 'is_active' => true, 'is_default' => false]
+        )->update(['current_balance' => 100000]);
     }
 
     public function test_sale_return_against_credit_invoice_credits_customer_ledger_without_touching_cash_drawer_or_accounts(): void

@@ -45,6 +45,7 @@ class CustomerLedgerController extends Controller
         $priorInvoices = SaleInvoice::query()
             ->where('customer_id', $customerId)
             ->where('invoice_type', 'credit')
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->where('date', '<', $from)
             ->get([
                 'id', 'invoice_total', 'total', 'grand_total', 'net_total', 'gross_amount', 'sub_total',
@@ -146,10 +147,11 @@ class CustomerLedgerController extends Controller
             ->get();
 
         // ---- Invoice rows (read-through from sale_invoices) ----
-        // Only include credit invoices in the ledger
+        // Only include non-reversed credit invoices in the ledger
         $invoices = SaleInvoice::query()
             ->where('customer_id', $customerId)
             ->where('invoice_type', 'credit')
+            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->when($from, fn($q)=>$q->where('date','>=',$from))
             ->when($toEnd, fn($q)=>$q->where('date','<=',$toEnd))
             ->orderBy('date')->orderBy('id')
@@ -391,16 +393,18 @@ class CustomerLedgerController extends Controller
                     abort(422, 'Cannot update invoice rows');
                 }
 
+                $isSystemLinked = !empty($row->payment_id) || !empty($row->sale_return_id);
+
                 $row->entry_date      = $r['entry_date'];
                 $row->posted_number   = $r['posted_number']  ?? null;
 
-                if ($row->entry_type === 'manual') {
+                if ($row->entry_type === 'manual' && !$isSystemLinked) {
                     $row->invoice_total     = (float)($r['invoice_total']  ?? 0);
                     $row->total_received    = (float)($r['total_received'] ?? 0);
                     $row->balance_remaining = max($row->invoice_total - $row->total_received, 0);
                 }
 
-                if ($row->entry_type === 'payment' || $row->is_manual) {
+                if (($row->entry_type === 'payment' || $row->is_manual) && !$isSystemLinked) {
                     $row->credited_amount = (float)($r['credited_amount'] ?? 0);
                     $row->payment_ref     = $r['payment_ref'] ?? null;
                 }
@@ -484,7 +488,40 @@ class CustomerLedgerController extends Controller
                 return ['already_paid' => true, 'settled' => 0.0, 'invoice' => $invoice];
             }
 
-            // ---- (1) Invoice side: received now covers the whole bill ----
+            $postedNumber = $this->str($invoice->posted_number ?? null, $invoice->invoice_no ?? null);
+            $customer = Customer::findOrFail((int) $invoice->customer_id);
+            $payMethod = $data['payment_method'] ?? 'cash';
+            $entryDate = $data['entry_date'] ?? now()->toDateString();
+
+            if (Schema::hasTable('payments') && Schema::hasTable('payment_allocations')) {
+                $payment = app(\App\Services\PaymentService::class)->recordCustomerPayment(
+                    $customer,
+                    [
+                        'payment_date'   => $entryDate,
+                        'amount'         => $balance,
+                        'payment_method' => $payMethod,
+                        'account_id'     => $data['account_id'] ?? null,
+                        'reference'      => 'Inv #' . ($postedNumber ?? $invoice->id),
+                        'notes'          => 'Settled Sale Invoice ' . ($postedNumber ?? "#{$invoice->id}"),
+                        'allocations'    => [
+                            [
+                                'invoice_id' => $invoice->id,
+                                'amount'     => $balance,
+                            ],
+                        ],
+                    ],
+                    Auth::user()
+                );
+
+                return [
+                    'already_paid' => false,
+                    'settled'      => round($balance, 2),
+                    'invoice'      => $invoice->fresh(),
+                    'payment_id'   => $payment->id,
+                ];
+            }
+
+            // ---- Fallback when payments table is unavailable ----
             $invoice->total_receive = $invoiceTotal;
             $invoice->save();
 
@@ -572,6 +609,7 @@ class CustomerLedgerController extends Controller
             'settled'         => $result['settled'],
             'sale_invoice_id' => $result['invoice']->id,
             'posted_number'   => $this->str($result['invoice']->posted_number ?? null, $result['invoice']->invoice_no ?? null),
+            'payment_id'      => $result['payment_id'] ?? null,
         ]);
     }
 
@@ -593,9 +631,21 @@ class CustomerLedgerController extends Controller
         }
 
         DB::transaction(function () use ($customerId) {
-            // Only rebuild credit invoices
+            // Remove any ledger rows pointing to reversed invoices
+            $reversedIds = SaleInvoice::where('customer_id', $customerId)
+                ->where('status', 'reversed')
+                ->pluck('id')
+                ->all();
+            if (!empty($reversedIds)) {
+                CustomerLedger::where('customer_id', $customerId)
+                    ->whereIn('sale_invoice_id', $reversedIds)
+                    ->delete();
+            }
+
+            // Only rebuild non-reversed credit invoices
             $invoices = SaleInvoice::where('customer_id', $customerId)
                 ->where('invoice_type', 'credit')
+                ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
                 ->get([
                     'id','invoice_no','posted_number','date',
                     'invoice_total','total','grand_total','net_total','gross_amount','sub_total',
@@ -777,10 +827,11 @@ class CustomerLedgerController extends Controller
     if ($hasInvoiceNo)   $selectCols[] = 'invoice_no';
 
     // -------- 1) Read-through INVOICE rows from sale_invoices --------
-    // Only include credit invoices in the ledger
+    // Only include non-reversed credit invoices in the ledger
     $rawInvoices = \App\Models\SaleInvoice::query()
         ->where('customer_id', $customer->id)
         ->where('invoice_type', 'credit')
+        ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
         ->when($from, fn($q) => $q->whereDate($dateColumn, '>=', $from))
         ->when($to,   fn($q) => $q->whereDate($dateColumn, '<=', $to))
         ->orderBy($dateColumn)

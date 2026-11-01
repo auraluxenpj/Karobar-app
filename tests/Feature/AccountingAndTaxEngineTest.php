@@ -214,4 +214,91 @@ class AccountingAndTaxEngineTest extends TestCase
         $afterChallanRes->assertJsonPath('summary.net_tax_payable', 0);
         $afterChallanRes->assertJsonPath('summary.status', 'settled');
     }
+
+    public function test_stock_writeoff_not_double_counted_and_cash_flow_excludes_credit_notes_and_allocated_payments(): void
+    {
+        $customer = Customer::create(['name' => 'CashFlow Audit Customer']);
+
+        // 1. Create a Stock Disposal Write-off Expense of Rs. 400
+        $disposalCat = \App\Models\ExpenseCategory::firstOrCreate(
+            ['code' => 'stock_disposal_writeoff'],
+            ['name' => 'Stock Disposal / Damage Write-off', 'is_system' => true, 'is_active' => true]
+        );
+        \App\Models\Expense::create([
+            'expense_number'      => 'EXP-DISP-001',
+            'expense_category_id' => $disposalCat->id,
+            'date'                => now()->toDateString(),
+            'amount'              => 400,
+            'payment_method'      => 'none',
+            'description'         => 'Expired batch write-off',
+            'user_id'             => $this->admin->id,
+        ]);
+
+        // 2. Create a credit SaleInvoice of Rs. 1,000 (0 direct cash at sale)
+        $invoice = SaleInvoice::create([
+            'user_id'       => $this->admin->id,
+            'customer_id'   => $customer->id,
+            'posted_number' => 'SI-CF-001',
+            'status'        => 'posted',
+            'invoice_type'  => 'credit',
+            'date'          => now()->toDateString(),
+            'gross_amount'  => 1000,
+            'total'         => 1000,
+            'total_receive' => 0,
+        ]);
+
+        // 3. Allocate a Rs. 600 Cash Payment to SI-CF-001
+        $this->actingAs($this->admin, 'sanctum')
+            ->postJson('/api/payments', [
+                'party_type'     => 'customer',
+                'party_id'       => $customer->id,
+                'payment_date'   => now()->toDateString(),
+                'amount'         => 600,
+                'payment_method' => 'cash',
+                'allocations'    => [
+                    ['invoice_id' => $invoice->id, 'amount' => 600],
+                ],
+            ])
+            ->assertCreated();
+
+        // 4. Also create a non-cash credit_note Payment of Rs. 200 (from a sale return)
+        \App\Models\Payment::create([
+            'payment_number'   => 'RET-CN-TEST-01',
+            'party_type'       => 'customer',
+            'party_id'         => $customer->id,
+            'payment_date'     => now()->toDateString(),
+            'amount'           => 200,
+            'allocated_amount' => 0,
+            'unapplied_amount' => 200,
+            'payment_method'   => 'credit_note',
+            'status'           => 'posted',
+            'created_by'       => $this->admin->id,
+        ]);
+
+        // Verify Accounting Overview:
+        $overviewRes = $this->actingAs($this->admin, 'sanctum')
+            ->getJson('/api/accounting/overview?from=' . now()->startOfMonth()->toDateString() . '&to=' . now()->toDateString())
+            ->assertOk();
+
+        // (a) Trial Balance & Balance Sheet are balanced
+        $overviewRes->assertJsonPath('trial_balance.is_balanced', true);
+        $overviewRes->assertJsonPath('balance_sheet.is_balanced', true);
+
+        // (b) Stock disposal write-off (400) is in 5200 (Shrinkage) and NOT in 5300 (Operating Expenses)
+        $tbRows = collect($overviewRes->json('trial_balance.rows'));
+        $coa5200 = $tbRows->firstWhere('code', '5200');
+        $coa5300 = $tbRows->firstWhere('code', '5300');
+        $this->assertEquals(400.0, (float) ($coa5200['debit'] ?? 0));
+        $this->assertEquals(0.0, (float) ($coa5300['debit'] ?? 0));
+
+        // (c) Cash Flow Statement:
+        // Direct cash on sales = 0 (since 600 on invoice came from PaymentAllocation!)
+        // Customer payments received = 600 (excluding the 200 non-cash credit_note!)
+        // Operating expenses paid = 0 (excluding the 400 non-cash inventory write-off!)
+        $cf = $overviewRes->json('cash_flow.operating');
+        $this->assertEquals(0.0, (float) $cf['cash_from_sales']);
+        $this->assertEquals(600.0, (float) $cf['customer_payment_vouchers']);
+        $this->assertEquals(0.0, (float) $cf['operating_expenses_paid']);
+        $this->assertEquals(600.0, (float) $overviewRes->json('cash_flow.net_cash_change'));
+    }
 }

@@ -180,7 +180,106 @@ function KpiCard({ label, value, sub, color = "text-slate-700 dark:text-slate-20
   );
 }
 
-/** A single transaction row in the ledger table. */
+/** Classify a drawer transaction into its exact inflow or outflow point. */
+function resolveTxnPoint(txn) {
+  const rt = String(txn.reference_type || "");
+  const isExpense = txn.type === "expense" || (txn.type === "cash_out" && (rt.endsWith("Expense") || rt === "expense"));
+  const isAdvance = txn.type === "cash_out" && (rt.endsWith("EmployeeAdvance") || rt === "employee_advance");
+
+  if (txn.type === "cash_sale") {
+    return { key: "cash_sale", label: "Sale Invoice (Cash)", pointBadge: "POS / Sale Bill", isCashIn: true };
+  }
+  if (txn.type === "customer_payment") {
+    return { key: "customer_payment", label: "Customer Udhar Receipt", pointBadge: "Customer Ledger", isCashIn: true };
+  }
+  if (txn.type === "purchase_return") {
+    return { key: "purchase_return", label: "Supplier Return Refund", pointBadge: "Purchase Return", isCashIn: true };
+  }
+  if (txn.type === "cash_in") {
+    return { key: "cash_in", label: "Manual Cash In", pointBadge: "Float / Safe Top-Up", isCashIn: true };
+  }
+  if (txn.type === "cash_purchase") {
+    return { key: "cash_purchase", label: "Purchase Invoice (Cash)", pointBadge: "Purchase / GRN", isCashIn: false };
+  }
+  if (txn.type === "cash_return") {
+    return { key: "cash_return", label: "Sale Return Refund", pointBadge: "Customer Return", isCashIn: false };
+  }
+  if (txn.type === "supplier_payment") {
+    return { key: "supplier_payment", label: "Supplier Ledger Payment", pointBadge: "Supplier Ledger", isCashIn: false };
+  }
+  if (isExpense) {
+    return { key: "expense", label: "Operating Shop Expense", pointBadge: "Shop Expense", isCashIn: false };
+  }
+  if (isAdvance) {
+    return { key: "staff_advance", label: "Staff Salary Advance", pointBadge: "HR / Payroll", isCashIn: false };
+  }
+  return { key: "cash_out", label: "Manual Cash Out", pointBadge: "Manual / Safe Drop", isCashIn: false };
+}
+
+/** Compact transaction row used inside the Two-Column (Cash In / Cash Out) tables. */
+function TwoColumnTxnRow({ txn, index, formatCurrency, isDark }) {
+  const point = resolveTxnPoint(txn);
+  const isCashIn = point.isCashIn;
+  const Icon = TYPE_ICONS[txn.type] || DocumentTextIcon;
+  const refInfo = resolveTxnReference(txn);
+
+  return (
+    <tr className={`border-b transition-colors ${isDark ? "border-slate-700/80 hover:bg-slate-800/50" : "border-slate-100 hover:bg-slate-50/80"}`}>
+      <td className="px-3.5 py-3 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap align-top">
+        <div className="font-mono text-[11px] text-slate-400">#{index}</div>
+        <div>{fmtDateTime(txn.created_at)}</div>
+        {txn.user?.name && (
+          <div className="text-[11px] text-slate-400 mt-0.5">By {txn.user.name}</div>
+        )}
+      </td>
+      <td className="px-3.5 py-3 align-top">
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wide ${
+              isCashIn
+                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+            }`}>
+              <Icon className="w-3.5 h-3.5 shrink-0" />
+              {point.pointBadge}
+            </span>
+            {refInfo.url ? (
+              <Link
+                to={refInfo.url}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 transition-colors"
+                title={`Open ${refInfo.label}`}
+              >
+                {refInfo.label} ↗
+              </Link>
+            ) : (
+              <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                {refInfo.label}
+              </span>
+            )}
+          </div>
+          <div className={`text-xs font-semibold ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+            {point.label}
+            {refInfo.party ? (
+              <span className="font-normal text-slate-500 dark:text-slate-400"> · {refInfo.party}</span>
+            ) : null}
+          </div>
+          {(txn.notes || refInfo.category) && (
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              {txn.notes || refInfo.category}
+            </div>
+          )}
+        </div>
+      </td>
+      <td className={`px-3.5 py-3 text-right font-mono text-sm font-bold whitespace-nowrap align-top ${
+        isCashIn ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+      }`}>
+        {isCashIn ? `+${formatCurrency(txn.amount)}` : `−${formatCurrency(txn.amount)}`}
+      </td>
+    </tr>
+  );
+}
+
+/** A single transaction row in the chronological running ledger table. */
 function TxnRow({ txn, index, formatCurrency, isDark }) {
   const isCashIn = CASH_IN_TYPES.includes(txn.type);
   const Icon = TYPE_ICONS[txn.type] || DocumentTextIcon;
@@ -247,27 +346,171 @@ function TxnRow({ txn, index, formatCurrency, isDark }) {
   );
 }
 
-/** Inline ledger panel for a single session (used both in current and history). */
-function SessionLedger({ session, summary, transactions, formatCurrency, isDark, activeCategoryFilter = null }) {
+/** Inline ledger panel for a single session (Two-Column Cash In vs. Cash Out by default, plus Chronological view). */
+function SessionLedger({
+  session,
+  summary,
+  transactions,
+  formatCurrency,
+  isDark,
+  activeCategoryFilter = null,
+  onSelectCategory = null,
+  onQuickTxn = null,
+}) {
+  const [viewMode, setViewMode] = useState("two_column"); // "two_column" | "chronological"
+  const [localFilter, setLocalFilter] = useState(null);
+
   if (!session) return null;
+
+  const effectiveFilter = onSelectCategory ? activeCategoryFilter : localFilter;
+  const setCategoryFilter = onSelectCategory || setLocalFilter;
 
   const enriched = useMemo(
     () => attachRunningBalance(transactions || [], session.opening_balance),
     [transactions, session.opening_balance]
   );
 
-  const visibleTxns = useMemo(() => {
-    if (!activeCategoryFilter) return enriched;
-    return enriched.filter((t) => {
-      const rt = String(t.reference_type || "");
-      const isExpense = t.type === "expense" || (t.type === "cash_out" && (rt.endsWith("Expense") || rt === "expense"));
-      const isAdvance = t.type === "cash_out" && (rt.endsWith("EmployeeAdvance") || rt === "employee_advance");
-      if (activeCategoryFilter === "expense") return isExpense;
-      if (activeCategoryFilter === "staff_advance") return isAdvance;
-      if (activeCategoryFilter === "cash_out") return t.type === "cash_out" && !isExpense && !isAdvance;
-      return t.type === activeCategoryFilter;
-    });
-  }, [enriched, activeCategoryFilter]);
+  const matchFilter = useCallback((t, filterKey) => {
+    if (!filterKey) return true;
+    return resolveTxnPoint(t).key === filterKey;
+  }, []);
+
+  const visibleTxns = useMemo(
+    () => enriched.filter((t) => matchFilter(t, effectiveFilter)),
+    [enriched, effectiveFilter, matchFilter]
+  );
+
+  const allCashInTxns = useMemo(
+    () => enriched.filter((t) => CASH_IN_TYPES.includes(t.type)),
+    [enriched]
+  );
+  const allCashOutTxns = useMemo(
+    () => enriched.filter((t) => !CASH_IN_TYPES.includes(t.type)),
+    [enriched]
+  );
+
+  const inFilterSet = ["cash_sale", "customer_payment", "purchase_return", "cash_in"];
+  const outFilterSet = ["cash_purchase", "cash_return", "supplier_payment", "expense", "staff_advance", "cash_out"];
+
+  const filteredCashInTxns = useMemo(() => {
+    if (!effectiveFilter || !inFilterSet.includes(effectiveFilter)) return allCashInTxns;
+    return allCashInTxns.filter((t) => matchFilter(t, effectiveFilter));
+  }, [allCashInTxns, effectiveFilter, matchFilter]);
+
+  const filteredCashOutTxns = useMemo(() => {
+    if (!effectiveFilter || !outFilterSet.includes(effectiveFilter)) return allCashOutTxns;
+    return allCashOutTxns.filter((t) => matchFilter(t, effectiveFilter));
+  }, [allCashOutTxns, effectiveFilter, matchFilter]);
+
+  // Compute point-by-point totals & transaction counts
+  const pointStats = useMemo(() => {
+    const stats = {
+      cash_sale: { sum: 0, count: 0 },
+      customer_payment: { sum: 0, count: 0 },
+      purchase_return: { sum: 0, count: 0 },
+      cash_in: { sum: 0, count: 0 },
+      cash_purchase: { sum: 0, count: 0 },
+      cash_return: { sum: 0, count: 0 },
+      supplier_payment: { sum: 0, count: 0 },
+      expense: { sum: 0, count: 0 },
+      staff_advance: { sum: 0, count: 0 },
+      cash_out: { sum: 0, count: 0 },
+    };
+    for (const t of enriched) {
+      const p = resolveTxnPoint(t);
+      const amt = parseFloat(t.amount) || 0;
+      if (stats[p.key]) {
+        stats[p.key].sum += amt;
+        stats[p.key].count += 1;
+      }
+    }
+    return stats;
+  }, [enriched]);
+
+  const openingFloat = parseFloat(session.opening_balance) || 0;
+  const totalCashIn = summary?.total_cash_in !== undefined
+    ? parseFloat(summary.total_cash_in) || 0
+    : allCashInTxns.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+  const totalCashOut = summary?.total_cash_out !== undefined
+    ? parseFloat(summary.total_cash_out) || 0
+    : allCashOutTxns.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+  const expectedBalance = summary?.expected_balance ?? summary?.expected_closing_balance ?? (openingFloat + totalCashIn - totalCashOut);
+
+  const cashInPoints = [
+    {
+      key: "cash_sale",
+      label: "Cash Sales (POS / Invoices)",
+      desc: "Cash received directly on sale bills",
+      val: summary?.cash_sales ?? pointStats.cash_sale.sum,
+      count: pointStats.cash_sale.count,
+    },
+    {
+      key: "customer_payment",
+      label: "Customer Udhar Receipts",
+      desc: "Cash collected from customer ledgers",
+      val: summary?.customer_payments ?? pointStats.customer_payment.sum,
+      count: pointStats.customer_payment.count,
+    },
+    {
+      key: "purchase_return",
+      label: "Supplier Return Refunds",
+      desc: "Cash refunded by suppliers on returns",
+      val: summary?.purchase_returns ?? pointStats.purchase_return.sum,
+      count: pointStats.purchase_return.count,
+    },
+    {
+      key: "cash_in",
+      label: "Manual Cash In / Safe Top-Up",
+      desc: "Added float or cash brought from safe/bank",
+      val: summary?.manual_cash_in ?? pointStats.cash_in.sum,
+      count: pointStats.cash_in.count,
+    },
+  ];
+
+  const cashOutPoints = [
+    {
+      key: "cash_purchase",
+      label: "Cash Purchases (GRN)",
+      desc: "Cash paid directly on purchase bills",
+      val: summary?.cash_purchases ?? pointStats.cash_purchase.sum,
+      count: pointStats.cash_purchase.count,
+    },
+    {
+      key: "cash_return",
+      label: "Customer Sale Return Refunds",
+      desc: "Cash refunded to customers on returns",
+      val: summary?.cash_returns ?? pointStats.cash_return.sum,
+      count: pointStats.cash_return.count,
+    },
+    {
+      key: "supplier_payment",
+      label: "Supplier Ledger Payments",
+      desc: "Cash paid to settle supplier payables",
+      val: summary?.supplier_payments ?? pointStats.supplier_payment.sum,
+      count: pointStats.supplier_payment.count,
+    },
+    {
+      key: "expense",
+      label: "Operating Shop Expenses",
+      desc: "Utility bills, refreshments & store expenses",
+      val: summary?.expenses ?? pointStats.expense.sum,
+      count: pointStats.expense.count,
+    },
+    {
+      key: "staff_advance",
+      label: "Staff Salary Advances",
+      desc: "Cash advances issued to employees",
+      val: summary?.staff_advances ?? pointStats.staff_advance.sum,
+      count: pointStats.staff_advance.count,
+    },
+    {
+      key: "cash_out",
+      label: "Manual Cash Out / Safe Drops",
+      desc: "Cash removed or dropped to safe/bank",
+      val: summary?.manual_cash_out ?? pointStats.cash_out.sum,
+      count: pointStats.cash_out.count,
+    },
+  ];
 
   const isClosed = session.status === "closed";
   const diff = isClosed
@@ -275,102 +518,529 @@ function SessionLedger({ session, summary, transactions, formatCurrency, isDark,
     : null;
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm min-w-[900px]">
-        <thead>
-          <tr className={`text-xs uppercase tracking-wide ${isDark ? "bg-slate-800 text-slate-400" : "bg-slate-50 text-slate-500"}`}>
-            <th className="px-4 py-3 text-center w-10">#</th>
-            <th className="px-4 py-3 text-left">Time</th>
-            <th className="px-4 py-3 text-left">Type & Category</th>
-            <th className="px-4 py-3 text-left">Notes / Description</th>
-            <th className="px-4 py-3 text-left">Document & Party</th>
-            <th className="px-4 py-3 text-right">Cash In (+)</th>
-            <th className="px-4 py-3 text-right">Cash Out (−)</th>
-            <th className="px-4 py-3 text-right">Drawer Balance</th>
-            <th className="px-4 py-3 text-left">By</th>
-          </tr>
-        </thead>
-        <tbody>
-          {/* Opening row */}
-          <tr className={`border-b font-semibold ${isDark ? "border-slate-700 bg-slate-800/50 text-slate-300" : "border-slate-200 bg-blue-50 text-slate-700"}`}>
-            <td className="px-4 py-3 text-center text-xs text-slate-400">—</td>
-            <td className="px-4 py-3 text-xs">{fmtDateTime(session.opened_at)}</td>
-            <td className="px-4 py-3" colSpan={3}>
-              <div className="flex items-center gap-2">
-                <LockOpenIcon className="w-4 h-4 text-blue-500" />
-                <span className="text-blue-600 dark:text-blue-400">Drawer Opened (Initial Float)</span>
-                {session.notes && (
-                  <span className="text-xs font-normal text-slate-500 dark:text-slate-400">— {session.notes}</span>
-                )}
-              </div>
-            </td>
-            <td className="px-4 py-3" />
-            <td className="px-4 py-3" />
-            <td className="px-4 py-3 text-right font-bold">{formatCurrency(session.opening_balance)}</td>
-            <td className="px-4 py-3 text-xs text-slate-400">{session.user?.name || session.opened_by?.name || "—"}</td>
-          </tr>
-
-          {/* Transaction rows */}
-          {visibleTxns.length === 0 ? (
-            <tr>
-              <td colSpan={9} className="px-4 py-8 text-center text-slate-400 text-sm">
-                {activeCategoryFilter
-                  ? "No transactions match the selected category filter in this shift."
-                  : "No transactions recorded in this session yet."}
-              </td>
-            </tr>
-          ) : (
-            visibleTxns.map((txn, i) => (
-              <TxnRow
-                key={txn.id}
-                txn={txn}
-                index={i + 1}
-                formatCurrency={formatCurrency}
-                isDark={isDark}
-              />
-            ))
+    <div>
+      {/* ── Top View Switcher & Active Filter Bar ──────────────────────────── */}
+      <div className={`px-5 py-2.5 border-b flex flex-wrap items-center justify-between gap-2 text-xs ${
+        isDark ? "bg-slate-800/40 border-slate-700" : "bg-slate-50/70 border-slate-200"
+      }`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-slate-500 dark:text-slate-400">Layout:</span>
+          <div className={`inline-flex rounded-lg p-0.5 border ${isDark ? "bg-slate-900 border-slate-700" : "bg-white border-slate-200"}`}>
+            <button
+              type="button"
+              onClick={() => setViewMode("two_column")}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                viewMode === "two_column"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
+            >
+              Two Columns (Cash In vs Cash Out)
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("chronological")}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                viewMode === "chronological"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              }`}
+            >
+              Combined Running Ledger
+            </button>
+          </div>
+          {effectiveFilter && (
+            <button
+              type="button"
+              onClick={() => setCategoryFilter(null)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 hover:opacity-90"
+            >
+              Filter: {TYPE_LABELS[effectiveFilter] || effectiveFilter} ✕
+            </button>
           )}
+        </div>
+        <div className="text-slate-500 dark:text-slate-400">
+          Click any inflow or outflow point card below to filter its transactions
+        </div>
+      </div>
 
-          {/* Closing row (only for closed sessions) */}
-          {isClosed && (
-            <tr className={`border-t-2 font-bold ${isDark ? "border-slate-600 bg-slate-800/60 text-slate-200" : "border-slate-300 bg-amber-50 text-slate-800"}`}>
-              <td className="px-4 py-3 text-center text-xs text-slate-400">—</td>
-              <td className="px-4 py-3 text-xs">{fmtDateTime(session.closed_at)}</td>
-              <td className="px-4 py-3" colSpan={3}>
-                <div className="flex items-center gap-2">
-                  <LockClosedIcon className="w-4 h-4 text-amber-500" />
-                  <span className="text-amber-600 dark:text-amber-400">Drawer Closed</span>
-                  {diff !== null && (
-                    <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${diff < 0 ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" : diff > 0 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400"}`}>
-                      {diff === 0 ? "Balanced" : diff > 0 ? `Surplus ${formatCurrency(Math.abs(diff))}` : `Short ${formatCurrency(Math.abs(diff))}`}
-                    </span>
+      {viewMode === "two_column" ? (
+        <>
+          {/* ── TWO-COLUMN SIDE-BY-SIDE VIEW: LEFT = CASH IN, RIGHT = CASH OUT ── */}
+          <div className={`grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x ${
+            isDark ? "divide-slate-700" : "divide-slate-200"
+          }`}>
+            {/* ════════════════════════════════════════════════════════════════
+                LEFT COLUMN: CASH IN (ALL INFLOW POINTS)
+               ════════════════════════════════════════════════════════════════ */}
+            <div className="flex flex-col min-w-0">
+              {/* Column 1 Header */}
+              <div className={`px-5 py-4 border-b flex flex-wrap items-center justify-between gap-3 ${
+                isDark
+                  ? "bg-emerald-950/30 border-slate-700"
+                  : "bg-emerald-50/70 border-emerald-100"
+              }`}>
+                <div className="flex items-center gap-2.5">
+                  <ArrowUpCircleIcon className="w-6 h-6 text-emerald-500 shrink-0" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                        Column 1 · Cash In (All Points)
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                        {allCashInTxns.length} {allCashInTxns.length === 1 ? "entry" : "entries"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Money coming into the drawer from sales, customer udhar, supplier refunds & float
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <div className="text-[11px] uppercase font-semibold text-slate-400">Total Cash Inflows</div>
+                    <div className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                      +{formatCurrency(totalCashIn)}
+                    </div>
+                  </div>
+                  {onQuickTxn && !isClosed && (
+                    <button
+                      type="button"
+                      onClick={() => onQuickTxn("cash_in")}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-500 transition-colors shadow-sm"
+                    >
+                      <PlusCircleIcon className="w-4 h-4" />
+                      Add Cash In
+                    </button>
                   )}
                 </div>
-              </td>
-              <td className="px-4 py-3 text-right text-xs">
-                <div className="flex flex-col items-end gap-0.5">
-                  <span className="text-slate-500">Expected:</span>
-                  <span className="text-slate-500">Actual:</span>
-                  <span className="text-slate-500">Diff:</span>
+              </div>
+
+              {/* Cash In Points Breakdown Grid */}
+              <div className={`p-4 border-b ${isDark ? "bg-slate-900/30 border-slate-700" : "bg-slate-50/50 border-slate-100"}`}>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Cash In by Source Point (Click to filter)
                 </div>
-              </td>
-              <td className="px-4 py-3" />
-              <td className="px-4 py-3 text-right">
-                <div className="flex flex-col gap-0.5">
-                  <span>{formatCurrency(session.closing_balance_expected)}</span>
-                  <span className={isClosed ? (diff >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400") : ""}>
-                    {formatCurrency(session.closing_balance_actual)}
-                  </span>
-                  <span className={diff < 0 ? "text-red-500" : diff > 0 ? "text-emerald-500" : "text-slate-400"}>
-                    {diff !== null ? (diff >= 0 ? `+${formatCurrency(diff)}` : `−${formatCurrency(Math.abs(diff))}`) : "—"}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {/* Opening Float Card */}
+                  <div className={`flex items-center justify-between px-3 py-2 rounded-lg border sm:col-span-2 ${
+                    isDark ? "border-blue-800/50 bg-blue-950/20" : "border-blue-200 bg-blue-50/60"
+                  }`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <LockOpenIcon className="w-4 h-4 text-blue-500 shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-blue-700 dark:text-blue-300 truncate">
+                          Opening Drawer Float (Shift Start)
+                        </div>
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                          Started {fmtDateTime(session.opened_at)}
+                          {session.notes ? ` · ${session.notes}` : ""}
+                        </div>
+                      </div>
+                    </div>
+                    <span className="font-mono text-sm font-bold text-blue-600 dark:text-blue-400 shrink-0 ml-2">
+                      {formatCurrency(openingFloat)}
+                    </span>
+                  </div>
+
+                  {cashInPoints.map((pt) => {
+                    const isSelected = effectiveFilter === pt.key;
+                    return (
+                      <button
+                        key={pt.key}
+                        type="button"
+                        onClick={() => setCategoryFilter(isSelected ? null : pt.key)}
+                        className={`flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-colors ${
+                          isSelected
+                            ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30 ring-1 ring-emerald-500"
+                            : isDark
+                              ? "border-slate-700/80 bg-slate-800/60 hover:bg-slate-800"
+                              : "border-slate-200/80 bg-white hover:bg-emerald-50/40"
+                        }`}
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className={`text-xs font-semibold truncate ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+                            {pt.label}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate">
+                            {pt.count} {pt.count === 1 ? "entry" : "entries"} · {pt.desc}
+                          </div>
+                        </div>
+                        <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+                          +{formatCurrency(pt.val)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Cash In Transactions List */}
+              <div className="overflow-x-auto max-h-[520px] overflow-y-auto flex-1">
+                <table className="w-full text-sm border-separate border-spacing-0">
+                  <thead className="sticky top-0 z-10">
+                    <tr className={`text-[11px] uppercase tracking-wide ${
+                      isDark ? "bg-slate-800 text-slate-400" : "bg-slate-100 text-slate-500"
+                    }`}>
+                      <th className="px-3.5 py-2.5 text-left w-36 border-b border-slate-200 dark:border-slate-700">Time</th>
+                      <th className="px-3.5 py-2.5 text-left border-b border-slate-200 dark:border-slate-700">Inflow Point, Document & Party</th>
+                      <th className="px-3.5 py-2.5 text-right w-32 border-b border-slate-200 dark:border-slate-700">Cash In (+)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Opening Float Row */}
+                    {(!effectiveFilter || !inFilterSet.includes(effectiveFilter)) && (
+                      <tr className={`border-b font-semibold ${
+                        isDark ? "border-slate-700/80 bg-blue-950/20 text-slate-200" : "border-slate-200 bg-blue-50/40 text-slate-700"
+                      }`}>
+                        <td className="px-3.5 py-2.5 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                          <div className="font-mono text-[11px] text-blue-500">START</div>
+                          <div>{fmtDateTime(session.opened_at)}</div>
+                        </td>
+                        <td className="px-3.5 py-2.5">
+                          <div className="flex items-center gap-1.5">
+                            <LockOpenIcon className="w-4 h-4 text-blue-500 shrink-0" />
+                            <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                              Opening Float in Drawer
+                            </span>
+                          </div>
+                          {session.notes && (
+                            <div className="text-xs font-normal text-slate-500 dark:text-slate-400 mt-0.5">
+                              {session.notes}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right font-mono text-sm font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                          {formatCurrency(openingFloat)}
+                        </td>
+                      </tr>
+                    )}
+
+                    {filteredCashInTxns.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-10 text-center text-slate-400 text-xs">
+                          {effectiveFilter && inFilterSet.includes(effectiveFilter)
+                            ? "No Cash In transactions match the selected inflow point."
+                            : "No Cash In transactions recorded in this shift yet."}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredCashInTxns.map((txn, idx) => (
+                        <TwoColumnTxnRow
+                          key={txn.id}
+                          txn={txn}
+                          index={idx + 1}
+                          formatCurrency={formatCurrency}
+                          isDark={isDark}
+                        />
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Cash In Column Footer */}
+              <div className={`px-5 py-3 border-t mt-auto flex flex-col gap-1 text-xs ${
+                isDark ? "bg-emerald-950/20 border-slate-700" : "bg-emerald-50/50 border-emerald-100"
+              }`}>
+                <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                  <span>Shift Cash Inflows ({allCashInTxns.length}):</span>
+                  <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    +{formatCurrency(totalCashIn)}
                   </span>
                 </div>
-              </td>
-              <td className="px-4 py-3 text-xs text-slate-400">{session.closed_by?.name || session.user?.name || "—"}</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+                <div className="flex items-center justify-between font-bold text-sm text-slate-800 dark:text-white pt-1 border-t border-emerald-200/60 dark:border-slate-700">
+                  <span>Total Cash Available (Float + Cash In):</span>
+                  <span className="font-mono text-emerald-700 dark:text-emerald-300">
+                    {formatCurrency(openingFloat + totalCashIn)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ════════════════════════════════════════════════════════════════
+                RIGHT COLUMN: CASH OUT (ALL OUTFLOW POINTS)
+               ════════════════════════════════════════════════════════════════ */}
+            <div className="flex flex-col min-w-0">
+              {/* Column 2 Header */}
+              <div className={`px-5 py-4 border-b flex flex-wrap items-center justify-between gap-3 ${
+                isDark
+                  ? "bg-red-950/30 border-slate-700"
+                  : "bg-red-50/70 border-red-100"
+              }`}>
+                <div className="flex items-center gap-2.5">
+                  <ArrowDownCircleIcon className="w-6 h-6 text-red-500 shrink-0" />
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold uppercase tracking-wide text-red-700 dark:text-red-300">
+                        Column 2 · Cash Out (All Points)
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200">
+                        {allCashOutTxns.length} {allCashOutTxns.length === 1 ? "entry" : "entries"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Money paid out for purchases, customer returns, suppliers, expenses, advances & safe drops
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <div className="text-[11px] uppercase font-semibold text-slate-400">Total Cash Outflows</div>
+                    <div className="text-lg font-bold font-mono text-red-600 dark:text-red-400">
+                      −{formatCurrency(totalCashOut)}
+                    </div>
+                  </div>
+                  {onQuickTxn && !isClosed && (
+                    <button
+                      type="button"
+                      onClick={() => onQuickTxn("cash_out")}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-500 transition-colors shadow-sm"
+                    >
+                      <MinusCircleIcon className="w-4 h-4" />
+                      Record Cash Out
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Cash Out Points Breakdown Grid */}
+              <div className={`p-4 border-b ${isDark ? "bg-slate-900/30 border-slate-700" : "bg-slate-50/50 border-slate-100"}`}>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Cash Out by Destination Point (Click to filter)
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {cashOutPoints.map((pt) => {
+                    const isSelected = effectiveFilter === pt.key;
+                    return (
+                      <button
+                        key={pt.key}
+                        type="button"
+                        onClick={() => setCategoryFilter(isSelected ? null : pt.key)}
+                        className={`flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-colors ${
+                          isSelected
+                            ? "border-red-500 bg-red-50 dark:bg-red-900/30 ring-1 ring-red-500"
+                            : isDark
+                              ? "border-slate-700/80 bg-slate-800/60 hover:bg-slate-800"
+                              : "border-slate-200/80 bg-white hover:bg-red-50/40"
+                        }`}
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className={`text-xs font-semibold truncate ${isDark ? "text-slate-200" : "text-slate-700"}`}>
+                            {pt.label}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate">
+                            {pt.count} {pt.count === 1 ? "entry" : "entries"} · {pt.desc}
+                          </div>
+                        </div>
+                        <span className="font-mono text-xs font-bold text-red-600 dark:text-red-400 shrink-0">
+                          −{formatCurrency(pt.val)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Cash Out Transactions List */}
+              <div className="overflow-x-auto max-h-[520px] overflow-y-auto flex-1">
+                <table className="w-full text-sm border-separate border-spacing-0">
+                  <thead className="sticky top-0 z-10">
+                    <tr className={`text-[11px] uppercase tracking-wide ${
+                      isDark ? "bg-slate-800 text-slate-400" : "bg-slate-100 text-slate-500"
+                    }`}>
+                      <th className="px-3.5 py-2.5 text-left w-36 border-b border-slate-200 dark:border-slate-700">Time</th>
+                      <th className="px-3.5 py-2.5 text-left border-b border-slate-200 dark:border-slate-700">Outflow Point, Document & Party</th>
+                      <th className="px-3.5 py-2.5 text-right w-32 border-b border-slate-200 dark:border-slate-700">Cash Out (−)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCashOutTxns.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-10 text-center text-slate-400 text-xs">
+                          {effectiveFilter && outFilterSet.includes(effectiveFilter)
+                            ? "No Cash Out transactions match the selected outflow point."
+                            : "No Cash Out transactions recorded in this shift yet."}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredCashOutTxns.map((txn, idx) => (
+                        <TwoColumnTxnRow
+                          key={txn.id}
+                          txn={txn}
+                          index={idx + 1}
+                          formatCurrency={formatCurrency}
+                          isDark={isDark}
+                        />
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Cash Out Column Footer */}
+              <div className={`px-5 py-3 border-t mt-auto flex flex-col gap-1 text-xs ${
+                isDark ? "bg-red-950/20 border-slate-700" : "bg-red-50/50 border-red-100"
+              }`}>
+                <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                  <span>Shift Cash Outflows ({allCashOutTxns.length}):</span>
+                  <span className="font-mono font-bold text-red-600 dark:text-red-400">
+                    −{formatCurrency(totalCashOut)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between font-bold text-sm text-slate-800 dark:text-white pt-1 border-t border-red-200/60 dark:border-slate-700">
+                  <span>Net Expected Cash in Drawer:</span>
+                  <span className="font-mono text-blue-600 dark:text-blue-400">
+                    {formatCurrency(expectedBalance)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Bottom Net Reconciliation Bar ──────────────────────────────── */}
+          <div className={`px-5 py-3.5 border-t flex flex-wrap items-center justify-between gap-3 text-xs ${
+            isDark ? "bg-slate-800/80 border-slate-700 text-slate-200" : "bg-slate-100/80 border-slate-200 text-slate-700"
+          }`}>
+            <div className="flex flex-wrap items-center gap-2 font-mono">
+              <span>Opening Float: <strong>{formatCurrency(openingFloat)}</strong></span>
+              <span>+</span>
+              <span className="text-emerald-600 dark:text-emerald-400">
+                Cash In: <strong>+{formatCurrency(totalCashIn)}</strong>
+              </span>
+              <span>−</span>
+              <span className="text-red-600 dark:text-red-400">
+                Cash Out: <strong>−{formatCurrency(totalCashOut)}</strong>
+              </span>
+              <span>=</span>
+              <span className="px-2.5 py-1 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 font-bold">
+                Expected in Drawer: {formatCurrency(expectedBalance)}
+              </span>
+            </div>
+            {isClosed && (
+              <div className="flex flex-wrap items-center gap-3 font-mono">
+                <span>
+                  Actual Counted: <strong>{formatCurrency(session.closing_balance_actual)}</strong>
+                </span>
+                {diff !== null && (
+                  <span className={`px-2.5 py-1 rounded-full font-bold ${
+                    diff === 0
+                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                      : diff > 0
+                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
+                        : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
+                  }`}>
+                    {diff === 0
+                      ? "Balanced (Rs. 0)"
+                      : diff > 0
+                        ? `Surplus +${formatCurrency(Math.abs(diff))}`
+                        : `Shortage −${formatCurrency(Math.abs(diff))}`}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        /* ── CHRONOLOGICAL RUNNING LEDGER VIEW ────────────────────────────── */
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[900px]">
+            <thead>
+              <tr className={`text-xs uppercase tracking-wide ${isDark ? "bg-slate-800 text-slate-400" : "bg-slate-50 text-slate-500"}`}>
+                <th className="px-4 py-3 text-center w-10">#</th>
+                <th className="px-4 py-3 text-left">Time</th>
+                <th className="px-4 py-3 text-left">Type & Category</th>
+                <th className="px-4 py-3 text-left">Notes / Description</th>
+                <th className="px-4 py-3 text-left">Document & Party</th>
+                <th className="px-4 py-3 text-right">Cash In (+)</th>
+                <th className="px-4 py-3 text-right">Cash Out (−)</th>
+                <th className="px-4 py-3 text-right">Drawer Balance</th>
+                <th className="px-4 py-3 text-left">By</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Opening row */}
+              <tr className={`border-b font-semibold ${isDark ? "border-slate-700 bg-slate-800/50 text-slate-300" : "border-slate-200 bg-blue-50 text-slate-700"}`}>
+                <td className="px-4 py-3 text-center text-xs text-slate-400">—</td>
+                <td className="px-4 py-3 text-xs">{fmtDateTime(session.opened_at)}</td>
+                <td className="px-4 py-3" colSpan={3}>
+                  <div className="flex items-center gap-2">
+                    <LockOpenIcon className="w-4 h-4 text-blue-500" />
+                    <span className="text-blue-600 dark:text-blue-400">Drawer Opened (Initial Float)</span>
+                    {session.notes && (
+                      <span className="text-xs font-normal text-slate-500 dark:text-slate-400">— {session.notes}</span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3" />
+                <td className="px-4 py-3" />
+                <td className="px-4 py-3 text-right font-bold">{formatCurrency(session.opening_balance)}</td>
+                <td className="px-4 py-3 text-xs text-slate-400">{session.user?.name || session.opened_by?.name || "—"}</td>
+              </tr>
+
+              {/* Transaction rows */}
+              {visibleTxns.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-slate-400 text-sm">
+                    {effectiveFilter
+                      ? "No transactions match the selected category filter in this shift."
+                      : "No transactions recorded in this session yet."}
+                  </td>
+                </tr>
+              ) : (
+                visibleTxns.map((txn, i) => (
+                  <TxnRow
+                    key={txn.id}
+                    txn={txn}
+                    index={i + 1}
+                    formatCurrency={formatCurrency}
+                    isDark={isDark}
+                  />
+                ))
+              )}
+
+              {/* Closing row (only for closed sessions) */}
+              {isClosed && (
+                <tr className={`border-t-2 font-bold ${isDark ? "border-slate-600 bg-slate-800/60 text-slate-200" : "border-slate-300 bg-amber-50 text-slate-800"}`}>
+                  <td className="px-4 py-3 text-center text-xs text-slate-400">—</td>
+                  <td className="px-4 py-3 text-xs">{fmtDateTime(session.closed_at)}</td>
+                  <td className="px-4 py-3" colSpan={3}>
+                    <div className="flex items-center gap-2">
+                      <LockClosedIcon className="w-4 h-4 text-amber-500" />
+                      <span className="text-amber-600 dark:text-amber-400">Drawer Closed</span>
+                      {diff !== null && (
+                        <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${diff < 0 ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" : diff > 0 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400"}`}>
+                          {diff === 0 ? "Balanced" : diff > 0 ? `Surplus ${formatCurrency(Math.abs(diff))}` : `Short ${formatCurrency(Math.abs(diff))}`}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-right text-xs">
+                    <div className="flex flex-col items-end gap-0.5">
+                      <span className="text-slate-500">Expected:</span>
+                      <span className="text-slate-500">Actual:</span>
+                      <span className="text-slate-500">Diff:</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3" />
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex flex-col gap-0.5">
+                      <span>{formatCurrency(session.closing_balance_expected)}</span>
+                      <span className={isClosed ? (diff >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400") : ""}>
+                        {formatCurrency(session.closing_balance_actual)}
+                      </span>
+                      <span className={diff < 0 ? "text-red-500" : diff > 0 ? "text-emerald-500" : "text-slate-400"}>
+                        {diff !== null ? (diff >= 0 ? `+${formatCurrency(diff)}` : `−${formatCurrency(Math.abs(diff))}`) : "—"}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-400">{session.closed_by?.name || session.user?.name || "—"}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -1331,6 +2001,60 @@ export default function CashDrawerPage() {
               </div>
             </div>
           </div>
+
+          {lastClosedSummary && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 text-xs">
+              {/* Last Shift Cash In Column */}
+              <div className={`p-3.5 rounded-xl border ${isDark ? "border-emerald-900/50 bg-emerald-950/20" : "border-emerald-200 bg-emerald-50/40"}`}>
+                <div className="flex items-center justify-between font-bold text-emerald-700 dark:text-emerald-300 pb-2 mb-2 border-b border-emerald-200/60 dark:border-slate-700">
+                  <span className="flex items-center gap-1.5 uppercase tracking-wide">
+                    <ArrowUpCircleIcon className="w-4 h-4 text-emerald-500" />
+                    Last Shift · Cash In (All Points)
+                  </span>
+                  <span className="font-mono text-sm">+{formatCurrency(lastClosedSummary.total_cash_in ?? 0)}</span>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    { label: "Cash Sales (POS / Invoices)", val: lastClosedSummary.cash_sales ?? 0 },
+                    { label: "Customer Udhar Receipts", val: lastClosedSummary.customer_payments ?? 0 },
+                    { label: "Supplier Return Refunds", val: lastClosedSummary.purchase_returns ?? 0 },
+                    { label: "Manual Cash In / Safe Top-Up", val: lastClosedSummary.manual_cash_in ?? 0 },
+                  ].map((r) => (
+                    <div key={r.label} className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                      <span>{r.label}</span>
+                      <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">+{formatCurrency(r.val)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Last Shift Cash Out Column */}
+              <div className={`p-3.5 rounded-xl border ${isDark ? "border-red-900/50 bg-red-950/20" : "border-red-200 bg-red-50/40"}`}>
+                <div className="flex items-center justify-between font-bold text-red-700 dark:text-red-300 pb-2 mb-2 border-b border-red-200/60 dark:border-slate-700">
+                  <span className="flex items-center gap-1.5 uppercase tracking-wide">
+                    <ArrowDownCircleIcon className="w-4 h-4 text-red-500" />
+                    Last Shift · Cash Out (All Points)
+                  </span>
+                  <span className="font-mono text-sm">−{formatCurrency(lastClosedSummary.total_cash_out ?? 0)}</span>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    { label: "Cash Purchases (GRN)", val: lastClosedSummary.cash_purchases ?? 0 },
+                    { label: "Customer Sale Return Refunds", val: lastClosedSummary.cash_returns ?? 0 },
+                    { label: "Supplier Ledger Payments", val: lastClosedSummary.supplier_payments ?? 0 },
+                    { label: "Operating Shop Expenses", val: lastClosedSummary.expenses ?? 0 },
+                    { label: "Staff Salary Advances", val: lastClosedSummary.staff_advances ?? 0 },
+                    { label: "Manual Cash Out / Safe Drops", val: lastClosedSummary.manual_cash_out ?? 0 },
+                  ].map((r) => (
+                    <div key={r.label} className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                      <span>{r.label}</span>
+                      <span className="font-mono font-semibold text-red-600 dark:text-red-400">−{formatCurrency(r.val)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </GlassCard>
       )}
 
@@ -1367,121 +2091,14 @@ export default function CashDrawerPage() {
         </div>
       )}
 
-      {/* ── Category Breakdown Matrix (Cash Inflows vs. Cash Outflows) ──────── */}
-      {!loadingCurrent && session && summary && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Cash Inflows Card */}
-          <GlassCard className="p-4">
-            <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-2">
-                <ArrowUpCircleIcon className="w-5 h-5 text-emerald-500" />
-                <div>
-                  <h4 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
-                    Cash Inflows Breakdown (+)
-                  </h4>
-                  <p className="text-[11px] text-slate-400">Click any category to filter the ledger below</p>
-                </div>
-              </div>
-              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                +{formatCurrency(summary.total_cash_in ?? 0)}
-              </span>
-            </div>
-            <div className="space-y-1.5 text-xs">
-              {[
-                { key: "cash_sale", label: "Cash Sales (POS & Retail Invoices)", desc: "Cash collected on sale bills", val: summary.cash_sales ?? 0 },
-                { key: "customer_payment", label: "Customer Udhar Receipts", desc: "Cash recovered from customer ledgers", val: summary.customer_payments ?? 0 },
-                { key: "purchase_return", label: "Supplier Return Refunds", desc: "Cash refunded by suppliers on returns", val: summary.purchase_returns ?? 0 },
-                { key: "cash_in", label: "Manual Cash In / Bank Withdrawals", desc: "Added float or cash brought from bank/safe", val: summary.manual_cash_in ?? 0 },
-              ].map((item) => {
-                const isSelected = activeCategoryFilter === item.key;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setActiveCategoryFilter(isSelected ? null : item.key)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-colors ${
-                      isSelected
-                        ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30"
-                        : isDark
-                          ? "border-slate-700/70 hover:bg-slate-800"
-                          : "border-slate-100 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div>
-                      <div className={`font-semibold ${isDark ? "text-slate-200" : "text-slate-700"}`}>{item.label}</div>
-                      <div className="text-[11px] text-slate-400">{item.desc}</div>
-                    </div>
-                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                      +{formatCurrency(item.val)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </GlassCard>
-
-          {/* Cash Outflows Card */}
-          <GlassCard className="p-4">
-            <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-2">
-                <ArrowDownCircleIcon className="w-5 h-5 text-red-500" />
-                <div>
-                  <h4 className={`text-sm font-bold ${isDark ? "text-white" : "text-slate-800"}`}>
-                    Cash Outflows Breakdown (−)
-                  </h4>
-                  <p className="text-[11px] text-slate-400">Click any category to filter the ledger below</p>
-                </div>
-              </div>
-              <span className="text-sm font-bold text-red-600 dark:text-red-400">
-                −{formatCurrency(summary.total_cash_out ?? 0)}
-              </span>
-            </div>
-            <div className="space-y-1.5 text-xs">
-              {[
-                { key: "cash_purchase", label: "Cash Purchases (GRN)", desc: "Cash paid immediately on purchase bills", val: summary.cash_purchases ?? 0 },
-                { key: "cash_return", label: "Customer Cash Sale Returns", desc: "Cash refunded to customers for returned items", val: summary.cash_returns ?? 0 },
-                { key: "supplier_payment", label: "Supplier Ledger Payments", desc: "Cash paid against supplier payables", val: summary.supplier_payments ?? 0 },
-                { key: "expense", label: "Operating Shop Expenses", desc: "Bills, rent, refreshments & daily expenses", val: summary.expenses ?? 0 },
-                { key: "staff_advance", label: "Staff Salary Advances", desc: "Cash advances issued to employees", val: summary.staff_advances ?? 0 },
-                { key: "cash_out", label: "Manual Cash Out / Safe Drops", desc: "Cash removed or deposited to bank/safe", val: summary.manual_cash_out ?? 0 },
-              ].map((item) => {
-                const isSelected = activeCategoryFilter === item.key;
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => setActiveCategoryFilter(isSelected ? null : item.key)}
-                    className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg border text-left transition-colors ${
-                      isSelected
-                        ? "border-red-500 bg-red-50 dark:bg-red-900/30"
-                        : isDark
-                          ? "border-slate-700/70 hover:bg-slate-800"
-                          : "border-slate-100 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div>
-                      <div className={`font-semibold ${isDark ? "text-slate-200" : "text-slate-700"}`}>{item.label}</div>
-                      <div className="text-[11px] text-slate-400">{item.desc}</div>
-                    </div>
-                    <span className="font-mono font-bold text-red-600 dark:text-red-400">
-                      −{formatCurrency(item.val)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </GlassCard>
-        </div>
-      )}
-
-      {/* ── Current Session Ledger ───────────────────────────────────────────── */}
+      {/* ── Current Session Two-Column Cash In / Cash Out Ledger ────────────── */}
       {!loadingCurrent && session && (
         <GlassCard className="p-0 overflow-hidden">
           <div className={`px-5 py-4 border-b flex flex-wrap items-center justify-between gap-2 ${isDark ? "border-slate-700" : "border-slate-100"}`}>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className={`font-semibold ${isDark ? "text-white" : "text-slate-800"}`}>
-                  {isOpen ? "Current Session — Transaction Ledger" : `Session #${session.id} — Transaction Ledger`}
+                  {isOpen ? "Current Shift — Cash In vs Cash Out (All Points)" : `Session #${session.id} — Cash In vs Cash Out (All Points)`}
                 </h3>
                 {activeCategoryFilter && (
                   <button
@@ -1494,7 +2111,7 @@ export default function CashDrawerPage() {
                 )}
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                {enrichedTxns.length} transactions · Opening balance {formatCurrency(session.opening_balance)} · Click any blue document badge to view the original invoice or voucher
+                {enrichedTxns.length} transactions · Opening float {formatCurrency(session.opening_balance)} · Left column shows all Cash In points; Right column shows all Cash Out points
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1517,6 +2134,8 @@ export default function CashDrawerPage() {
             formatCurrency={formatCurrency}
             isDark={isDark}
             activeCategoryFilter={activeCategoryFilter}
+            onSelectCategory={setActiveCategoryFilter}
+            onQuickTxn={canRecordTxn ? (t) => setShowTxnModal(t) : null}
           />
         </GlassCard>
       )}

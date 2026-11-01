@@ -1062,4 +1062,78 @@ class PaymentService
 
         return $open;
     }
+
+    /**
+     * Get the total amount currently allocated to a specific invoice from posted payments / credit notes.
+     */
+    public function getAllocatedAmountForInvoice(string $invoiceType, int $invoiceId): float
+    {
+        if (!Schema::hasTable('payment_allocations') || !Schema::hasTable('payments')) {
+            return 0.0;
+        }
+
+        return round((float) PaymentAllocation::query()
+            ->where('invoice_type', $invoiceType)
+            ->where('invoice_id', $invoiceId)
+            ->whereHas('payment', fn ($q) => $q->where('status', 'posted'))
+            ->sum('amount'), 2);
+    }
+
+    /**
+     * Detach all payment / credit note allocations from an invoice being reversed or deleted,
+     * restoring unapplied credit to the underlying Payment vouchers and reducing the invoice's
+     * total_receive / total_paid so only direct invoice tender remains.
+     */
+    public function detachInvoiceAllocations(string $invoiceType, int $invoiceId, ?User $user = null): float
+    {
+        if (!Schema::hasTable('payment_allocations') || !Schema::hasTable('payments')) {
+            return 0.0;
+        }
+
+        return DB::transaction(function () use ($invoiceType, $invoiceId) {
+            $allocations = PaymentAllocation::query()
+                ->where('invoice_type', $invoiceType)
+                ->where('invoice_id', $invoiceId)
+                ->lockForUpdate()
+                ->get();
+
+            if ($allocations->isEmpty()) {
+                return 0.0;
+            }
+
+            $totalDetached = 0.0;
+
+            foreach ($allocations as $alloc) {
+                $allocAmount = round((float) ($alloc->amount ?? 0), 2);
+                $payment = Payment::where('id', $alloc->payment_id)->lockForUpdate()->first();
+
+                if ($payment && $payment->status === 'posted' && $allocAmount > 0) {
+                    $payment->allocated_amount = max(0.0, round((float) ($payment->allocated_amount ?? 0) - $allocAmount, 2));
+                    $payment->unapplied_amount = round(max((float) $payment->amount - (float) $payment->allocated_amount, 0.0), 2);
+                    $payment->save();
+                    $totalDetached = round($totalDetached + $allocAmount, 2);
+                }
+
+                $alloc->delete();
+            }
+
+            if ($totalDetached > 0) {
+                if ($invoiceType === 'sale_invoice') {
+                    $invoice = SaleInvoice::where('id', $invoiceId)->lockForUpdate()->first();
+                    if ($invoice) {
+                        $invoice->total_receive = max(0.0, round((float) ($invoice->total_receive ?? 0) - $totalDetached, 2));
+                        $invoice->saveQuietly();
+                    }
+                } elseif ($invoiceType === 'purchase_invoice') {
+                    $invoice = PurchaseInvoice::where('id', $invoiceId)->lockForUpdate()->first();
+                    if ($invoice) {
+                        $invoice->total_paid = max(0.0, round((float) ($invoice->total_paid ?? 0) - $totalDetached, 2));
+                        $invoice->saveQuietly();
+                    }
+                }
+            }
+
+            return $totalDetached;
+        });
+    }
 }

@@ -26,12 +26,15 @@ class AccountService
     ];
 
     /**
-     * Synchronize Cash in Hand (Drawer) account balance across all active open Cash Drawer sessions
-     * plus any account-level safe reserve (opening_balance), without overwriting other cash accounts.
+     * Ensure the default Cash in Hand (Drawer) account exists and return it.
+     * Note: Balance mutations are strictly driven by append-only AccountTransactions
+     * (including drawer opening float additions, manual till cash-in/out, operational
+     * vouchers, and shift-close shortage/overage variances) so historical closed-shift
+     * and off-shift cash reserves are never overwritten.
      */
     public function syncCashDrawerBalance(?\App\Models\CashDrawerSession $session = null): ?Account
     {
-        if (!SchemaCache::hasTable('accounts') || !SchemaCache::hasTable('cash_drawer_sessions')) {
+        if (!SchemaCache::hasTable('accounts')) {
             return null;
         }
 
@@ -52,39 +55,6 @@ class AccountService
                 'is_default'      => true,
                 'notes'           => 'Primary cash counter / drawer balance',
             ]);
-        }
-
-        $openSessions = \App\Models\CashDrawerSession::where('status', 'open')
-            ->get(['id', 'opening_balance']);
-
-        if ($openSessions->isNotEmpty()) {
-            $sessionIds = $openSessions->pluck('id')->all();
-            $groupedTotals = \App\Models\CashDrawerTransaction::whereIn('session_id', $sessionIds)
-                ->selectRaw('session_id, type, SUM(amount) as total_amount')
-                ->groupBy('session_id', 'type')
-                ->get()
-                ->groupBy('session_id');
-
-            $totalOpenDrawers = 0.0;
-            foreach ($openSessions as $openSession) {
-                $rows = $groupedTotals->get($openSession->id, collect());
-                $cashIn = (float) $rows
-                    ->whereIn('type', \App\Services\CashDrawerService::CASH_IN_TYPES)
-                    ->sum('total_amount');
-                $cashOut = (float) $rows
-                    ->whereIn('type', \App\Services\CashDrawerService::CASH_OUT_TYPES)
-                    ->sum('total_amount');
-                $sessionExpected = round((float) $openSession->opening_balance + $cashIn - $cashOut, 2);
-                $totalOpenDrawers = round($totalOpenDrawers + $sessionExpected, 2);
-            }
-
-            $safeOpeningReserve = max((float) ($cashAccount->opening_balance ?? 0), 0.0);
-            $targetBalance = round($safeOpeningReserve + $totalOpenDrawers, 2);
-
-            if (abs((float) $cashAccount->current_balance - $targetBalance) > 0.001) {
-                $cashAccount->current_balance = $targetBalance;
-                $cashAccount->save();
-            }
         }
 
         return $cashAccount;
@@ -116,19 +86,8 @@ class AccountService
         }
 
         if (!$account) {
-            // Fallback to any active default account or create one
-            $account = Account::where('is_active', true)->first();
-        }
-
-        if (!$account) {
-            $account = Account::create([
-                'name'            => 'Cash in Hand (Drawer)',
-                'type'            => 'cash',
-                'opening_balance' => 0,
-                'current_balance' => 0,
-                'is_active'       => true,
-                'is_default'      => true,
-            ]);
+            // Fallback to the primary Cash in Hand (Drawer) account
+            $account = $this->syncCashDrawerBalance() ?? Account::where('is_active', true)->first();
         }
 
         return $account;
@@ -441,6 +400,11 @@ class AccountService
                     $this->deposit($newAcc, $newReceived, 'sale_invoice_update', $invoice->id, "Sale Invoice #{$invoice->posted_number} changed account to {$newAcc->name}", $user);
                 }
             }
+
+            if (Schema::hasColumn('sale_invoices', 'account_id') && (int) $invoice->account_id !== (int) $newAcc->id) {
+                $invoice->account_id = $newAcc->id;
+                $invoice->saveQuietly();
+            }
         });
     }
 
@@ -489,6 +453,80 @@ class AccountService
                 if ($newPaid > 0) {
                     $this->withdraw($newAcc, $newPaid, 'purchase_invoice_update', $invoice->id, "Purchase Invoice #{$invoice->posted_number} payment charged to {$newAcc->name}", $user);
                 }
+            }
+
+            if (Schema::hasColumn('purchase_invoices', 'account_id') && (int) $invoice->account_id !== (int) $newAcc->id) {
+                $invoice->account_id = $newAcc->id;
+                $invoice->saveQuietly();
+            }
+        });
+    }
+
+    /**
+     * Refund direct tender collected on a sale invoice across its exact deposit account legs
+     * (supporting both single-tender and multi-account split payments).
+     */
+    public function refundSaleInvoice(
+        $invoice,
+        float $revAmount,
+        string $refType,
+        string $descriptionPrefix,
+        ?User $user = null
+    ): void {
+        if (!Schema::hasTable('accounts') || $revAmount <= 0) {
+            return;
+        }
+
+        DB::transaction(function () use ($invoice, $revAmount, $refType, $descriptionPrefix, $user) {
+            $txns = AccountTransaction::query()
+                ->whereIn('reference_type', ['sale_invoice', 'sale_invoice_update'])
+                ->where('reference_id', $invoice->id)
+                ->get();
+
+            if ($txns->isNotEmpty()) {
+                $netByAccount = [];
+                foreach ($txns as $txn) {
+                    $accId = (int) $txn->account_id;
+                    $amt = (float) $txn->amount;
+                    $delta = in_array($txn->type, ['deposit', 'transfer_in', 'opening_balance'], true) ? $amt : -$amt;
+                    $netByAccount[$accId] = round(($netByAccount[$accId] ?? 0.0) + $delta, 2);
+                }
+
+                $positiveLegs = array_filter($netByAccount, fn ($v) => $v > 0.001);
+                if (!empty($positiveLegs)) {
+                    $remainingToRefund = round($revAmount, 2);
+                    foreach ($positiveLegs as $accId => $legNet) {
+                        if ($remainingToRefund <= 0.001) {
+                            break;
+                        }
+                        $refundLeg = round(min($remainingToRefund, $legNet), 2);
+                        $acc = Account::find($accId);
+                        if ($acc && $refundLeg > 0) {
+                            $this->withdraw(
+                                $acc,
+                                $refundLeg,
+                                $refType,
+                                $invoice->id,
+                                "{$descriptionPrefix} ({$acc->name})",
+                                $user
+                            );
+                            $remainingToRefund = round($remainingToRefund - $refundLeg, 2);
+                        }
+                    }
+
+                    if ($remainingToRefund > 0.001) {
+                        $fallbackAcc = $this->resolveAccount($invoice->account_id, $invoice->payment_method ?? 'cash');
+                        if ($fallbackAcc) {
+                            $this->withdraw($fallbackAcc, $remainingToRefund, $refType, $invoice->id, $descriptionPrefix, $user);
+                        }
+                    }
+                    return;
+                }
+            }
+
+            $acc = $this->resolveAccount($invoice->account_id, $invoice->payment_method ?? 'cash');
+            if ($acc) {
+                $this->withdraw($acc, $revAmount, $refType, $invoice->id, $descriptionPrefix, $user);
             }
         });
     }

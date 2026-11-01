@@ -160,6 +160,7 @@ export default function PaymentsPage() {
   const [reversingPayment, setReversingPayment] = useState(null);
   const [reversalReason, setReversalReason] = useState("");
   const [reversing, setReversing] = useState(false);
+  const [summary, setSummary] = useState(null);
 
   const controllerRef = useRef(null);
 
@@ -187,6 +188,7 @@ export default function PaymentsPage() {
       .then(({ data }) => {
         setRows(Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []));
         setTotal(data?.total || 0);
+        setSummary(data?.summary || null);
       })
       .catch(err => {
         if (axios.isCancel(err)) return;
@@ -207,12 +209,25 @@ export default function PaymentsPage() {
 
   // ── KPI aggregations ──────────────────────────────────────────────────────
   const kpi = useMemo(() => {
-    const posted = rows.filter(r => r.status === "posted");
-    const customerTotal = posted.filter(r => r.party_type === "customer").reduce((s, r) => s + parseFloat(r.amount || 0), 0);
-    const supplierTotal = posted.filter(r => r.party_type === "supplier").reduce((s, r) => s + parseFloat(r.amount || 0), 0);
+    if (summary) {
+      return {
+        customerTotal: parseFloat(summary.customer_total || 0),
+        supplierTotal: parseFloat(summary.supplier_total || 0),
+        net: parseFloat(summary.net_cash_flow || 0),
+        reversals: Number(summary.reversals || 0),
+      };
+    }
+    const postedCash = rows.filter(
+      r =>
+        r.status === "posted" &&
+        r.payment_method !== "credit_note" &&
+        (!r.cheque_status || r.cheque_status === "cleared")
+    );
+    const customerTotal = postedCash.filter(r => r.party_type === "customer").reduce((s, r) => s + parseFloat(r.amount || 0), 0);
+    const supplierTotal = postedCash.filter(r => r.party_type === "supplier").reduce((s, r) => s + parseFloat(r.amount || 0), 0);
     const reversals = rows.filter(r => r.status === "reversed").length;
     return { customerTotal, supplierTotal, net: customerTotal - supplierTotal, reversals };
-  }, [rows]);
+  }, [rows, summary]);
 
   // ── PDC Cheque Status Transition ──────────────────────────────────────────
   const handleUpdateChequeStatus = async (payment, newStatus) => {
@@ -588,7 +603,12 @@ export default function PaymentsPage() {
                     <p className={`text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}>No payments found.</p>
                     {canCreatePayment && (
                       <button
-                        onClick={() => setShowRecordModal(true)}
+                        onClick={() => {
+                          setPickerPartyType("customer");
+                          setPickerPartyId(null);
+                          setPickerPartyName("");
+                          setShowPartyPicker(true);
+                        }}
                         className={`mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg ${btnPrimary.className}`}
                         style={btnPrimary.style}
                       >

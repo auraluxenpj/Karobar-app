@@ -395,19 +395,23 @@ class PurchaseInvoiceController extends Controller
                 // Keep existing posted_number intact
                 $data['posted_number'] = $purchaseInvoice->posted_number;
 
-                // Store old invoice type before update
+                // Store old invoice type before update (excluding standalone PaymentAllocation amounts)
+                $allocatedOnInvoice = app(\App\Services\PaymentService::class)->getAllocatedAmountForInvoice('purchase_invoice', (int) $purchaseInvoice->id);
                 $oldAccountId = $purchaseInvoice->account_id;
                 $oldInvoiceType = $purchaseInvoice->invoice_type ?? 'debit';
                 $oldPayMethod = $purchaseInvoice->payment_method ?? 'cash';
-                $oldPaid = (float)($purchaseInvoice->total_paid ?? 0);
-                if ($oldInvoiceType === 'debit' && $oldPaid <= 0) {
-                    $oldPaid = (float)$purchaseInvoice->total_amount;
+                $oldRawPaid = (float) ($purchaseInvoice->total_paid ?? 0);
+                if ($oldInvoiceType === 'debit' && $oldRawPaid <= 0) {
+                    $oldRawPaid = (float) $purchaseInvoice->total_amount;
                 }
-                $oldCashPaid = ($oldPayMethod === 'cash') ? $oldPaid : 0.0;
+                $oldDirectPaid = max(0.0, round($oldRawPaid - $allocatedOnInvoice, 2));
+                $oldCashPaid = ($oldPayMethod === 'cash') ? $oldDirectPaid : 0.0;
                 $newInvoiceType = $data['invoice_type'] ?? $oldInvoiceType;
 
                 if (!array_key_exists('total_paid', $data) || $data['total_paid'] === null || $data['total_paid'] === '') {
-                    $data['total_paid'] = $newInvoiceType === 'credit' ? 0 : ($data['total_amount'] ?? 0);
+                    $data['total_paid'] = $newInvoiceType === 'credit' ? $allocatedOnInvoice : ($data['total_amount'] ?? 0);
+                } elseif ($newInvoiceType === 'credit' && $allocatedOnInvoice > 0 && (float) $data['total_paid'] < $allocatedOnInvoice) {
+                    $data['total_paid'] = round((float) $data['total_paid'] + $allocatedOnInvoice, 2);
                 }
 
                 $purchaseInvoice->load('items');
@@ -524,14 +528,18 @@ class PurchaseInvoiceController extends Controller
                 elseif ($newInvoiceType === 'credit') {
                     // Check if a ledger entry already exists for this invoice
                     $existingLedger = SupplierLedger::where('purchase_invoice_id', $purchaseInvoice->id)->first();
-                    
+                    $invTotalAmount = (float) $data['total_amount'];
+                    $rawTotalPaid   = (float) ($data['total_paid'] ?? 0);
+                    $directPaidOnInv = max(0.0, min(round($rawTotalPaid - $allocatedOnInvoice, 2), $invTotalAmount));
+                    $creditRemainingOnInv = max(0.0, round($invTotalAmount - $directPaidOnInv, 2));
+
                     if ($existingLedger) {
                         $ledgerUpdates = [
                             'supplier_id'        => $data['supplier_id'],
                             'entry_date'         => $data['posted_date'],
-                            'invoice_total'      => $data['total_amount'],
-                            'total_paid'         => $data['total_paid'] ?? 0,
-                            'credit_remaining'   => max((float)$data['total_amount'] - (float)($data['total_paid'] ?? 0), 0),
+                            'invoice_total'      => $invTotalAmount,
+                            'total_paid'         => $directPaidOnInv,
+                            'credit_remaining'   => $creditRemainingOnInv,
                             'description'        => 'Purchase invoice ' . $data['posted_number'],
                         ];
                         if (\Illuminate\Support\Facades\Schema::hasColumn('supplier_ledgers', 'due_date')) {
@@ -551,10 +559,10 @@ class PurchaseInvoiceController extends Controller
                         }
                         $ledger->posted_number       = $data['posted_number'];
                         $ledger->invoice_number      = $data['invoice_number'];
-                        $ledger->invoice_total       = $data['total_amount'];
-                        $ledger->total_paid          = $data['total_paid'] ?? 0;
+                        $ledger->invoice_total       = $invTotalAmount;
+                        $ledger->total_paid          = $directPaidOnInv;
                         $ledger->debited_amount      = 0;
-                        $ledger->credit_remaining    = max((float)$data['total_amount'] - (float)($data['total_paid'] ?? 0), 0);
+                        $ledger->credit_remaining    = $creditRemainingOnInv;
                         $ledger->payment_ref         = null;
                         $ledger->description         = 'Purchase invoice ' . $data['posted_number'];
                         $ledger->created_by          = optional(Auth::user())->id;
@@ -567,13 +575,14 @@ class PurchaseInvoiceController extends Controller
                     app(SupplierProductSorting::class)->remember((int) $data['supplier_id'], array_column($data['items'], 'product_id'));
                 }
 
-                // Sync with active cash drawer if applicable
+                // Sync with active cash drawer if applicable (using direct paid only, excluding allocations)
                 $newPayMethod = $data['payment_method'] ?? $purchaseInvoice->payment_method ?? 'cash';
-                $newPaid = (float)($data['total_paid'] ?? 0);
-                if ($newInvoiceType === 'debit' && $newPaid <= 0) {
-                    $newPaid = (float)$data['total_amount'];
+                $newRawPaid = (float) ($data['total_paid'] ?? 0);
+                if ($newInvoiceType === 'debit' && $newRawPaid <= 0) {
+                    $newRawPaid = (float) $data['total_amount'];
                 }
-                $newCashPaid = ($newPayMethod === 'cash') ? $newPaid : 0.0;
+                $newDirectPaid = max(0.0, round($newRawPaid - $allocatedOnInvoice, 2));
+                $newCashPaid = ($newPayMethod === 'cash') ? $newDirectPaid : 0.0;
                 $updateDrawerFlag = null;
                 if ($request->has('update_drawer')) {
                     $updateDrawerFlag = $request->boolean('update_drawer');
@@ -595,10 +604,10 @@ class PurchaseInvoiceController extends Controller
                     $purchaseInvoice,
                     $oldAccountId,
                     $oldPayMethod,
-                    $oldPaid,
+                    $oldDirectPaid,
                     $newAccountId,
                     $newPayMethod,
-                    $newPaid,
+                    $newDirectPaid,
                     Auth::user()
                 );
 
@@ -636,6 +645,13 @@ class PurchaseInvoiceController extends Controller
                 foreach ($purchaseInvoice->items as $item) {
                     $this->revertItem($item, true, true);
                 }
+
+                // Unwind any Payment / Credit Note allocations before deletion so standalone payments
+                // and credit notes are restored to supplier unapplied credit and not refunded as cash
+                app(\App\Services\PaymentService::class)->detachInvoiceAllocations('purchase_invoice', (int) $purchaseInvoice->id, Auth::user());
+                $purchaseInvoice->refresh();
+
+                \App\Models\SupplierLedger::where('purchase_invoice_id', $purchaseInvoice->id)->delete();
 
                 // Adjust cash drawer for deleted purchase invoice
                 app(\App\Services\CashDrawerService::class)->handlePurchaseInvoiceDeletion(
@@ -719,6 +735,11 @@ class PurchaseInvoiceController extends Controller
             }
 
             $this->recalcProductsByIds($affectedIds);
+
+            // Unwind any Payment / Credit Note allocations before reversing so standalone payments
+            // and credit notes are restored to supplier unapplied credit and not refunded as cash
+            app(\App\Services\PaymentService::class)->detachInvoiceAllocations('purchase_invoice', (int) $purchaseInvoice->id, $request->user());
+            $purchaseInvoice->refresh();
 
             // Revert supplier ledger entry if credit/invoice entry
             \App\Models\SupplierLedger::where('purchase_invoice_id', $purchaseInvoice->id)->delete();
