@@ -123,12 +123,17 @@ async function initWhatsAppSocket() {
 
     let versionOption = {};
     try {
-      const latest = await fetchLatestWaWebVersion();
+      const latest = await Promise.race([
+        fetchLatestWaWebVersion(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("version_fetch_timeout")), 2500)
+        ),
+      ]);
       if (latest?.version && latest.isLatest) {
         versionOption = { version: latest.version };
       }
     } catch {
-      // Use Baileys built-in default version when offline
+      // Use Baileys built-in default version when slow or offline
     }
 
     sock = makeWASocket({
@@ -537,4 +542,16 @@ server.listen(PORT, HOST, () => {
   );
   writeRuntimeMeta();
   initWhatsAppSocket();
+});
+
+process.on("uncaughtException", (err) => {
+  lastError = err?.message || String(err);
+  console.error("[WhatsApp Agent] Uncaught exception:", err);
+  writeRuntimeMeta();
+});
+
+process.on("unhandledRejection", (reason) => {
+  lastError = reason?.message || String(reason);
+  console.error("[WhatsApp Agent] Unhandled rejection:", reason);
+  writeRuntimeMeta();
 });

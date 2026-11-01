@@ -687,6 +687,11 @@ class OutboundDocumentSharingTest extends TestCase
             ->assertJsonPath('agent_running', true)
             ->assertJsonPath('status', 'qr_ready');
 
+        $startRes = $this->postJson('/api/settings/whatsapp-agent/start');
+        $startRes->assertOk()
+            ->assertJsonPath('agent_running', true)
+            ->assertJsonPath('status', 'qr_ready');
+
         $pairRes = $this->postJson('/api/settings/whatsapp-agent/pair-code', [
             'phone' => '0300-1122334',
         ]);

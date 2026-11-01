@@ -268,12 +268,25 @@ export default function WhatsAppSetting({ form, setForm, canUpdate, disableInput
 
       if (data.status === "connected") {
         toast.success("Built-in Free WhatsApp Agent is connected and ready!");
-      } else {
+      } else if (data.agent_running) {
         toast.success("Free WhatsApp Agent started! Scan the QR code with your phone.");
+      } else {
+        toast.error(data.last_error || data.message || "WhatsApp Agent did not start.");
       }
     } catch (err) {
-      setAgentState((s) => ({ ...s, starting: false }));
-      toast.error(err?.response?.data?.message || "Failed to start local WhatsApp Agent");
+      const errMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.last_error ||
+        err?.message ||
+        "Failed to start local WhatsApp Agent";
+      setAgentState((s) => ({
+        ...s,
+        starting: false,
+        agent_running: false,
+        status: "error",
+        last_error: errMsg,
+      }));
+      toast.error(errMsg);
     }
   };
 
@@ -735,9 +748,9 @@ export default function WhatsAppSetting({ form, setForm, canUpdate, disableInput
               )}
 
               {agentState.last_error && agentState.status !== "connected" && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  Note: {agentState.last_error}
-                </p>
+                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/70 text-xs text-amber-800 dark:text-amber-300 font-medium break-words">
+                  <strong>Diagnostic Note:</strong> {agentState.last_error}
+                </div>
               )}
             </div>
           )}

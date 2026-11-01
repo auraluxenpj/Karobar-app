@@ -412,6 +412,14 @@ class SettingController extends Controller
             abort(401);
         }
 
+        try {
+            if (method_exists($user, 'hasRole') && ($user->hasRole('Admin') || $user->hasRole('Super Admin'))) {
+                return;
+            }
+        } catch (\Throwable) {
+            // Ignore role guard lookup issues
+        }
+
         $allowedPermissions = [
             'settings.view',
             'settings.update',
@@ -424,9 +432,21 @@ class SettingController extends Controller
         ];
 
         foreach ($allowedPermissions as $perm) {
-            if ($user->can($perm)) {
+            try {
+                if ($user->can($perm)) {
+                    return;
+                }
+            } catch (\Throwable) {
+                // Ignore missing permission exception on unmigrated/unseeded DB
+            }
+        }
+
+        try {
+            if ($user->can('view', Setting::class) || $user->can('update', Setting::class)) {
                 return;
             }
+        } catch (\Throwable) {
+            // Fall through
         }
 
         abort(403, 'Unauthorized to access WhatsApp Agent.');
@@ -437,7 +457,28 @@ class SettingController extends Controller
     {
         $this->authorizeWhatsAppAgentAccess($request);
 
-        return response()->json($agent->status(Setting::first()));
+        try {
+            $setting = null;
+            try {
+                $setting = Setting::first();
+            } catch (\Throwable) {
+                $setting = null;
+            }
+
+            return response()->json($agent->status($setting));
+        } catch (\Throwable $e) {
+            return response()->json([
+                'ok'            => false,
+                'agent_running' => false,
+                'status'        => 'error',
+                'qr_data_url'   => null,
+                'pairing_code'  => null,
+                'user'          => null,
+                'last_error'    => $e->getMessage(),
+                'agent_url'     => $agent->agentUrl(),
+                'api_key'       => '',
+            ]);
+        }
     }
 
     // POST /api/settings/whatsapp-agent/start
@@ -446,12 +487,30 @@ class SettingController extends Controller
         $this->authorizeWhatsAppAgentAccess($request);
 
         try {
-            return response()->json($agent->start(Setting::first()));
+            $setting = null;
+            try {
+                $setting = Setting::first();
+            } catch (\Throwable) {
+                $setting = null;
+            }
+
+            $result = $agent->start($setting);
+
+            if (empty($result['ok']) && empty($result['agent_running'])) {
+                return response()->json([
+                    ...$result,
+                    'message' => $result['last_error'] ?? 'Could not start built-in WhatsApp Agent.',
+                ], 422);
+            }
+
+            return response()->json($result);
         } catch (\Throwable $e) {
             return response()->json([
-                'ok'      => false,
-                'status'  => 'error',
-                'message' => $e->getMessage(),
+                'ok'            => false,
+                'agent_running' => false,
+                'status'        => 'error',
+                'last_error'    => $e->getMessage(),
+                'message'       => $e->getMessage(),
             ], 422);
         }
     }
