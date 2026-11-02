@@ -75,7 +75,7 @@ class InvoiceDraftWorkflowTest extends TestCase
         $this->actingAs($this->user);
         Gate::before(fn ($user) => ($user->id === $this->user->id && $this->bypassGate) ? true : null);
 
-        DB::table('customers')->insert(['id' => 1, 'name' => 'Walk-in Customer']);
+        DB::table('customers')->insert(['id' => 1, 'name' => 'Regular Customer']);
         DB::table('suppliers')->insert(['id' => 1, 'name' => 'Main Supplier']);
         DB::table('categories')->insert(['id' => 1, 'name' => 'General']);
         DB::table('brands')->insert(['id' => 1, 'name' => 'Standard']);

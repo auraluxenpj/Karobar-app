@@ -12,7 +12,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        foreach (['framework/views', 'framework/cache/data', 'framework/sessions', 'framework/testing', 'fonts'] as $dir) {
+            $path = storage_path($dir);
+            if (!is_dir($path)) {
+                @mkdir($path, 0775, true);
+            }
+        }
+
+        if (!config('view.compiled')) {
+            config(['view.compiled' => realpath(storage_path('framework/views')) ?: storage_path('framework/views')]);
+        }
     }
 
     /**

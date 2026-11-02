@@ -651,7 +651,9 @@ class PurchaseInvoiceController extends Controller
                 app(\App\Services\PaymentService::class)->detachInvoiceAllocations('purchase_invoice', (int) $purchaseInvoice->id, Auth::user());
                 $purchaseInvoice->refresh();
 
-                \App\Models\SupplierLedger::where('purchase_invoice_id', $purchaseInvoice->id)->delete();
+                if (\Illuminate\Support\Facades\Schema::hasTable('supplier_ledgers')) {
+                    \App\Models\SupplierLedger::where('purchase_invoice_id', $purchaseInvoice->id)->delete();
+                }
 
                 // Adjust cash drawer for deleted purchase invoice
                 app(\App\Services\CashDrawerService::class)->handlePurchaseInvoiceDeletion(
@@ -742,7 +744,9 @@ class PurchaseInvoiceController extends Controller
             $purchaseInvoice->refresh();
 
             // Revert supplier ledger entry if credit/invoice entry
-            \App\Models\SupplierLedger::where('purchase_invoice_id', $purchaseInvoice->id)->delete();
+            if (\Illuminate\Support\Facades\Schema::hasTable('supplier_ledgers')) {
+                \App\Models\SupplierLedger::where('purchase_invoice_id', $purchaseInvoice->id)->delete();
+            }
 
             $purchaseInvoice->status = 'reversed';
             $purchaseInvoice->reversed_at = now();

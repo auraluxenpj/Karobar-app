@@ -106,6 +106,39 @@ class UrduPdfTextShaper
                 @mkdir($fontCacheDir, 0775, true);
             }
 
+            $installedFontsFile = $fontCacheDir . '/installed-fonts.json';
+            if (is_file($installedFontsFile)) {
+                $installed = @json_decode((string) @file_get_contents($installedFontsFile), true);
+                if (is_array($installed)) {
+                    $dirty = false;
+                    foreach ($installed as $family => $variants) {
+                        if (!is_array($variants)) {
+                            continue;
+                        }
+                        foreach ($variants as $style => $fontPath) {
+                            if (!is_string($fontPath)) {
+                                continue;
+                            }
+                            $base = basename($fontPath);
+                            if (is_file($fontCacheDir . '/' . $base . '.ufm') && $fontPath !== $base) {
+                                $installed[$family][$style] = $base;
+                                $dirty = true;
+                            } elseif (!is_file($fontPath . '.ufm') && !is_file($fontCacheDir . '/' . $base . '.ufm')) {
+                                unset($installed[$family][$style]);
+                                $dirty = true;
+                            }
+                        }
+                        if (empty($installed[$family])) {
+                            unset($installed[$family]);
+                            $dirty = true;
+                        }
+                    }
+                    if ($dirty) {
+                        @file_put_contents($installedFontsFile, json_encode($installed, JSON_PRETTY_PRINT));
+                    }
+                }
+            }
+
             $regPath = public_path('fonts/Tahoma.ttf');
             $boldPath = public_path('fonts/Tahoma-Bold.ttf');
 

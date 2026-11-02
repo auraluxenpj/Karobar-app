@@ -90,8 +90,10 @@
       .boot-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
       .boot-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
     </style>
-    @viteReactRefresh
-    @vite(['resources/css/app.css', 'resources/js/app.jsx'])
+    @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
+        @viteReactRefresh
+        @vite(['resources/css/app.css', 'resources/js/app.jsx'])
+    @endif
 </head>
 <body>
     <div id="app">
