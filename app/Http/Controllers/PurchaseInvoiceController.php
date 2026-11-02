@@ -90,7 +90,7 @@ class PurchaseInvoiceController extends Controller
     public function show(PurchaseInvoice $purchaseInvoice)
     {
         $this->authorize('view', $purchaseInvoice);
-        $purchaseInvoice->load('supplier', 'items.product.brand', 'purchaseOrder');
+        $purchaseInvoice->load('supplier', 'account', 'items.product.brand', 'purchaseOrder');
         app(\App\Services\ReturnEntitlement::class)->annotate('purchase', $purchaseInvoice, request()->integer('exclude_return_id') ?: null);
         return $purchaseInvoice;
     }
@@ -296,7 +296,7 @@ class PurchaseInvoiceController extends Controller
                 app(\App\Services\DocumentAuditService::class)->recordCreate($invoice->load('items.product'), Auth::user());
 
                 // Return the created invoice including items and supplier for the client
-                return response()->json($invoice->load('items.product', 'supplier', 'purchaseOrder'), 201);
+                return response()->json($invoice->load('items.product.brand', 'supplier', 'account', 'purchaseOrder'), 201);
             });
         } catch (\Illuminate\Database\QueryException $e) {
             // Likely unique-constraint violation (invoice_number / posted_number)
@@ -613,7 +613,7 @@ class PurchaseInvoiceController extends Controller
 
                 $auditService->recordUpdate($purchaseInvoice->fresh(['items.product', 'supplier']), $beforeSnapshot, Auth::user(), $data['reason'] ?? 'Purchase invoice updated');
 
-                return response()->json($purchaseInvoice->load('items.product', 'supplier', 'purchaseOrder'));
+                return response()->json($purchaseInvoice->load('items.product.brand', 'supplier', 'account', 'purchaseOrder'));
             });
         } catch (\Illuminate\Database\QueryException $e) {
             // Likely unique-constraint violation (invoice_number / posted_number)

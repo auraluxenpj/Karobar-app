@@ -172,8 +172,8 @@ export default function PurchaseInvoiceForm({ invoiceId, onSuccess, onSubmit, in
 
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts] = useState([]);
-  // Purchase Order receipts arrive pre-sorted in the supplier's remembered order; keep it.
-  const [arrangement, setArrangement] = useState(initialData?.purchase_order_id ? 'original' : 'brand_asc');
+  // Keep original/saved order by default so saving or editing an invoice preserves its product sorting unless explicitly re-sorted.
+  const [arrangement, setArrangement] = useState('original');
   const [displayOrder, setDisplayOrder] = useState([]);
   const arrangedRows = useMemo(() => {
     const rows = arrangePurchaseInvoiceRows(form.items, products, 'original');
@@ -181,15 +181,19 @@ export default function PurchaseInvoiceForm({ invoiceId, onSuccess, onSubmit, in
     return rows.sort((a, b) => (rank.get(a.index) ?? displayOrder.length + a.index) - (rank.get(b.index) ?? displayOrder.length + b.index));
   }, [form.items, products, displayOrder]);
   const applyArrangement = value => {
-    if (value === 'custom') return; // manual order is kept as-is
+    if (!value || value === 'custom') return; // manual order is kept as-is
+    const nextOrder = arrangePurchaseInvoiceRows(form.items, products, value).map(row => row.index);
     setArrangement(value);
-    setDisplayOrder(arrangePurchaseInvoiceRows(form.items, products, value).map(row => row.index));
+    setDisplayOrder(nextOrder);
+    setForm(prev => ({ ...prev, arrangement: value, displayOrder: nextOrder }));
   };
   // Commit a manual (drag & drop) order; empty rows stay at the end. Saved as-is.
   const commitManualOrder = productIndices => {
     const empty = arrangedRows.filter(row => !row.item.product_id).map(row => row.index);
+    const nextOrder = [...productIndices, ...empty];
     setArrangement('custom');
-    setDisplayOrder([...productIndices, ...empty]);
+    setDisplayOrder(nextOrder);
+    setForm(prev => ({ ...prev, arrangement: 'custom', displayOrder: nextOrder }));
   };
   const remembersSupplierOrder = Boolean(form.purchase_order_id || initialData?.purchase_order_id);
 
@@ -225,6 +229,8 @@ export default function PurchaseInvoiceForm({ invoiceId, onSuccess, onSubmit, in
 
   const handleStartBlank = () => {
     draftHook.resetToNew();
+    setArrangement('original');
+    setDisplayOrder([]);
     setForm({
       invoice_type: "debit",
       supplier_id: "",
@@ -300,6 +306,8 @@ export default function PurchaseInvoiceForm({ invoiceId, onSuccess, onSubmit, in
         }));
       }
       setForm(next);
+      setArrangement(loadedPayload?.arrangement || 'original');
+      setDisplayOrder(Array.isArray(loadedPayload?.displayOrder) ? loadedPayload.displayOrder : []);
       if (next.supplier_id) {
         const sup = suppliers.find((s) => String(s.id) === String(next.supplier_id));
         if (sup) setSelectedSupplier(sup);
@@ -380,6 +388,8 @@ export default function PurchaseInvoiceForm({ invoiceId, onSuccess, onSubmit, in
         }));
       }
       setForm(next);
+      setArrangement('original');
+      setDisplayOrder([]);
       setSelectedSupplier(initialData.supplier);
       upsertProducts((initialData.items || []).map(item => item.product).filter(Boolean));
       fetchProducts().catch(showAxiosError);
@@ -490,7 +500,9 @@ export default function PurchaseInvoiceForm({ invoiceId, onSuccess, onSubmit, in
       }));
     }
     setForm(next);
-    if (res.data?.purchase_order_id) setArrangement('original');
+    setArrangement('original');
+    setDisplayOrder([]);
+    upsertProducts((res.data?.items || []).map(item => item.product).filter(Boolean));
     // Reflect the invoice's supplier in the search button display
     if (next.supplier_id) {
       const sup = res.data?.supplier || suppliers.find((s) => String(s.id) === String(next.supplier_id));
@@ -1308,7 +1320,9 @@ const contRect = container.getBoundingClientRect();
           : (form.total_amount ?? 0),
       };
 
-      const sortedRows = arrangement === 'custom' ? arrangedRows : arrangePurchaseInvoiceRows(payload.items, products, arrangement);
+      const sortedRows = (arrangement === 'custom' || arrangement === 'original')
+        ? arrangedRows
+        : arrangePurchaseInvoiceRows(payload.items, products, arrangement);
       const nonBlankRows = sortedRows.some(row => Boolean(row.item.product_id))
         ? sortedRows.filter(row => Boolean(row.item.product_id))
         : sortedRows;
@@ -1316,6 +1330,7 @@ const contRect = container.getBoundingClientRect();
         ? nonBlankRows.filter(row => hasDeliveredRow(row.item))
         : nonBlankRows;
       submittedRowIndices = effectiveRows.map(row => row.index);
+      const sortedFormItems = effectiveRows.map(row => row.item);
       const payloadToSend = {
         ...payload,
         items: effectiveRows.map(({ item: { _rowKey, ...restItem } }) => ({
@@ -1337,6 +1352,9 @@ const contRect = container.getBoundingClientRect();
           // If onSubmit prop is provided, use it for API calls
           if (onSubmit) {
             const result = await onSubmit(dataPayload);
+            setForm((prev) => ({ ...prev, items: sortedFormItems }));
+            setDisplayOrder([]);
+            setArrangement('original');
             window.dispatchEvent(new CustomEvent("cash-drawer-changed"));
             window.dispatchEvent(new CustomEvent("accounts-changed"));
             try { localStorage.setItem("cash_drawer_sync", String(Date.now())); } catch {}
@@ -1349,6 +1367,9 @@ const contRect = container.getBoundingClientRect();
           // Original logic when onSubmit is not provided
           if (invoiceId) {
             await axios.put(`/api/purchase-invoices/${invoiceId}`, dataPayload);
+            setForm((prev) => ({ ...prev, items: sortedFormItems }));
+            setDisplayOrder([]);
+            setArrangement('original');
             window.dispatchEvent(new CustomEvent("cash-drawer-changed"));
             window.dispatchEvent(new CustomEvent("accounts-changed"));
             try { localStorage.setItem("cash_drawer_sync", String(Date.now())); } catch {}
@@ -1363,7 +1384,13 @@ const contRect = container.getBoundingClientRect();
             try { localStorage.setItem("accounts_sync", String(Date.now())); } catch {}
             draftHook.resetToNew();
             // Server returns created invoice with posted_number assigned — reflect it locally.
-            setForm((prev) => ({ ...prev, posted_number: saved?.posted_number || prev.posted_number }));
+            setForm((prev) => ({
+              ...prev,
+              items: sortedFormItems,
+              posted_number: saved?.posted_number || prev.posted_number,
+            }));
+            setDisplayOrder([]);
+            setArrangement('original');
             toast.success(`Invoice created: ${saved?.posted_number || "(number assigned)"}`);
             onSuccess && onSuccess();
           }

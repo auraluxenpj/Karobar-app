@@ -30,7 +30,7 @@ class SaleReturn extends Model
         return $this->belongsTo(SaleInvoice::class);
     }
     public function items(){
-        return $this->hasMany(SaleReturnItem::class);
+        return $this->hasMany(SaleReturnItem::class)->orderBy('id');
     }
 
     

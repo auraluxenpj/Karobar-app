@@ -24,7 +24,7 @@ class PurchaseOrder extends Model
 
     public function items()
     {
-        return $this->hasMany(PurchaseOrderItem::class);
+        return $this->hasMany(PurchaseOrderItem::class)->orderBy('id');
     }
 
     public function invoices()

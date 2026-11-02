@@ -1,12 +1,26 @@
 // /src/pages/purchase-invoices/Show.jsx
-import { Fragment, useEffect, useRef, useState, useMemo } from "react";
+import { Fragment, useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
-import { DocumentTextIcon, MagnifyingGlassIcon, PencilSquareIcon, TrashIcon, PlusIcon, ArrowLeftIcon, ClockIcon, ArrowUturnLeftIcon, BanknotesIcon, PrinterIcon, ShareIcon } from "@heroicons/react/24/outline";
+import {
+  DocumentTextIcon,
+  MagnifyingGlassIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  PlusIcon,
+  ArrowLeftIcon,
+  ClockIcon,
+  ArrowUturnLeftIcon,
+  BanknotesIcon,
+  PrinterIcon,
+  ShareIcon,
+  BuildingStorefrontIcon,
+} from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { usePermissions, Guard } from "@/api/usePermissions.js";
 import PageSkeleton from "@/components/PageSkeleton.jsx";
 import { useTheme } from "@/context/ThemeContext";
+import { useSaleSystem } from "@/context/SaleSystemContext.jsx";
 import { getThemeButtonClasses } from "@/utils/buttonStyles";
 import PurchaseInvoiceSearch from "@/components/PurchaseInvoiceSearch.jsx";
 import DocumentHistoryModal from "@/components/DocumentHistoryModal.jsx";
@@ -15,21 +29,16 @@ import RecordPaymentModal from "@/components/RecordPaymentModal.jsx";
 import InvoiceDraftsModal from "@/components/InvoiceDraftsModal.jsx";
 import ShareDocumentModal from "@/components/ShareDocumentModal.jsx";
 
-// Helper to determine text color based on background brightness
-const getContrastText = (hexColor) => {
-  hexColor = hexColor.replace('#', '');
-  const r = parseInt(hexColor.substring(0, 2), 16);
-  const g = parseInt(hexColor.substring(2, 4), 16);
-  const b = parseInt(hexColor.substring(4, 6), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5 ? '#1f2937' : '#ffffff';
-};
-
-const getButtonTextColor = (primaryColor, primaryHoverColor) => {
-  return getContrastText(primaryHoverColor || primaryColor);
-};
-
 const to2 = (n) => Number(parseFloat(n || 0).toFixed(2));
+
+const PAYMENT_METHOD_LABELS = {
+  cash: "Cash",
+  card: "Card / POS",
+  bank_transfer: "Bank Transfer",
+  cheque: "Cheque",
+  mobile_wallet: "Mobile Wallet",
+  other: "Other",
+};
 
 export default function PurchaseInvoiceShow() {
   const { id } = useParams();
@@ -53,6 +62,9 @@ export default function PurchaseInvoiceShow() {
   // Held Invoices & Drafts state
   const [isDraftsOpen, setIsDraftsOpen] = useState(false);
   const [draftsList, setDraftsList] = useState([]);
+
+  // Sale system setting to conditionally display wholesale fields
+  const { hasWholesale } = useSaleSystem();
 
   const fetchDrafts = async () => {
     try {
@@ -91,54 +103,38 @@ export default function PurchaseInvoiceShow() {
   const themeColors = useMemo(() => {
     if (!theme) {
       return {
-        primary: '#3b82f6',
-        primaryHover: '#2563eb',
-        primaryLight: '#dbeafe',
-        secondary: '#8b5cf6',
-        secondaryHover: '#7c3aed',
-        secondaryLight: '#ede9fe',
-        danger: '#ef4444',
-        dangerHover: '#dc2626',
-        dangerLight: '#fee2e2',
-        tertiary: '#06b6d4',
-        tertiaryHover: '#0891b2',
+        primary: "#3b82f6",
+        primaryHover: "#2563eb",
+        primaryLight: "#dbeafe",
+        secondary: "#8b5cf6",
+        secondaryHover: "#7c3aed",
+        secondaryLight: "#ede9fe",
+        danger: "#ef4444",
+        dangerHover: "#dc2626",
+        dangerLight: "#fee2e2",
+        tertiary: "#06b6d4",
+        tertiaryHover: "#0891b2",
       };
     }
     return {
-      primary: theme.primary_color || '#3b82f6',
-      primaryHover: theme.primary_hover || '#2563eb',
-      primaryLight: theme.primary_light || '#dbeafe',
-      secondary: theme.secondary_color || '#8b5cf6',
-      secondaryHover: theme.secondary_hover || '#7c3aed',
-      secondaryLight: theme.secondary_light || '#ede9fe',
-      tertiary: theme.tertiary_color || '#06b6d4',
-      tertiaryHover: theme.tertiary_hover || '#0891b2',
-      tertiaryLight: theme.tertiary_light || '#cffafe',
-      danger: theme.danger_color || '#ef4444',
-      dangerHover: '#dc2626',
-      dangerLight: '#fee2e2',
+      primary: theme.primary_color || "#3b82f6",
+      primaryHover: theme.primary_hover || "#2563eb",
+      primaryLight: theme.primary_light || "#dbeafe",
+      secondary: theme.secondary_color || "#8b5cf6",
+      secondaryHover: theme.secondary_hover || "#7c3aed",
+      secondaryLight: theme.secondary_light || "#ede9fe",
+      tertiary: theme.tertiary_color || "#06b6d4",
+      tertiaryHover: theme.tertiary_hover || "#0891b2",
+      tertiaryLight: theme.tertiary_light || "#cffafe",
+      danger: theme.danger_color || "#ef4444",
+      dangerHover: "#dc2626",
+      dangerLight: "#fee2e2",
     };
   }, [theme]);
 
-  // Calculate text colors based on background brightness
-  const primaryTextColor = useMemo(() => 
-    getButtonTextColor(themeColors.primary, themeColors.primaryHover), 
-    [themeColors.primary, themeColors.primaryHover]
-  );
-  
-  const secondaryTextColor = useMemo(() => 
-    getButtonTextColor(themeColors.secondary, themeColors.secondaryHover), 
-    [themeColors.secondary, themeColors.secondaryHover]
-  );
-  
-  const dangerTextColor = useMemo(() => 
-    getButtonTextColor(themeColors.danger, themeColors.dangerHover), 
-    [themeColors.danger, themeColors.dangerHover]
-  );
-
   // Get button style from theme
-  const buttonStyle = theme?.button_style || 'modern';
-  
+  const buttonStyle = theme?.button_style || "modern";
+
   // Get button style classes and styles based on theme button_style
   const getButtonClasses = useMemo(
     () => getThemeButtonClasses(buttonStyle, themeColors, isDark),
@@ -150,16 +146,13 @@ export default function PurchaseInvoiceShow() {
   const btnDanger = getButtonClasses.danger;
   const btnGlass = getButtonClasses.glass;
 
-  const chip =
-    "px-1 py-0.5 border rounded-sm bg-gray-50 dark:bg-slate-700 text-[10px] leading-none text-gray-700 dark:text-gray-300";
-
   // 🔒 permissions
   const { loading: permsLoading, canFor } = usePermissions?.() || {};
   const can = useMemo(
     () =>
-      (typeof canFor === "function"
+      typeof canFor === "function"
         ? canFor("purchase-invoice")
-        : { view: false, create: false, update: false, delete: false, import: false, export: false }),
+        : { view: false, create: false, update: false, delete: false, import: false, export: false },
     [canFor]
   );
 
@@ -167,6 +160,7 @@ export default function PurchaseInvoiceShow() {
   useEffect(() => {
     (async () => {
       try {
+        setLoading(true);
         const { data } = await axios.get(`/api/purchase-invoices/${id}`);
         setInv(data);
       } catch {
@@ -177,12 +171,58 @@ export default function PurchaseInvoiceShow() {
     })();
   }, [id]);
 
-  // Calculate totals
+  // Calculate totals & item metrics
   const totalAmount = useMemo(() => to2(inv?.total_amount), [inv]);
   const totalPaid = useMemo(() => to2(inv?.total_paid), [inv]);
-  const remainingAmount = useMemo(() => Math.max(totalAmount - totalPaid, 0), [totalAmount, totalPaid]);
-  const invoiceAmount = useMemo(() => Number(inv?.invoice_amount || 0), [inv]);
-  const difference = useMemo(() => invoiceAmount - totalAmount, [invoiceAmount, totalAmount]);
+  const remainingAmount = useMemo(() => Math.max(to2(totalAmount - totalPaid), 0), [totalAmount, totalPaid]);
+  const invoiceAmount = useMemo(() => to2(inv?.invoice_amount), [inv]);
+  const difference = useMemo(() => to2(invoiceAmount - totalAmount), [invoiceAmount, totalAmount]);
+
+  const itemMetrics = useMemo(() => {
+    const items = inv?.items || [];
+    let rowsTotal = 0;
+    let totalPacks = 0;
+    let totalUnits = 0;
+    let totalBonusPacks = 0;
+    let totalBonusUnits = 0;
+
+    for (const it of items) {
+      rowsTotal += Number(it.sub_total || 0);
+      totalPacks += Number(it.pack_quantity || 0);
+      totalUnits += Number(it.unit_quantity || 0);
+      totalBonusPacks += Number(it.pack_bonus || 0);
+      totalBonusUnits += Number(it.unit_bonus || 0);
+    }
+
+    return {
+      count: items.length,
+      rowsTotal: to2(rowsTotal),
+      totalPacks: to2(totalPacks),
+      totalUnits: Math.round(totalUnits),
+      totalBonusPacks: to2(totalBonusPacks),
+      totalBonusUnits: Math.round(totalBonusUnits),
+    };
+  }, [inv]);
+
+  // Precompute consecutive brand group counts so brand headings show item count like PurchaseInvoiceForm
+  const brandGroupStartCounts = useMemo(() => {
+    const items = inv?.items || [];
+    const counts = new Map();
+    let i = 0;
+    while (i < items.length) {
+      const brand = items[i]?.product?.brand?.name || items[i]?.product?.brand_name || "";
+      let j = i + 1;
+      while (
+        j < items.length &&
+        (items[j]?.product?.brand?.name || items[j]?.product?.brand_name || "") === brand
+      ) {
+        j++;
+      }
+      counts.set(i, j - i);
+      i = j;
+    }
+    return counts;
+  }, [inv]);
 
   // After delete, go to previous or index
   const goToPrevOrIndex = async (deletedId) => {
@@ -242,341 +282,675 @@ export default function PurchaseInvoiceShow() {
     const onKey = (e) => {
       if (!e.altKey) return;
       const k = (e.key || "").toLowerCase();
-      if (k === "b") { e.preventDefault(); navigate(-1); }
-      if (k === "f") { 
-        e.preventDefault(); 
-        setSearchOpen(true); 
+      if (k === "b" || e.code === "KeyB") {
+        e.preventDefault();
+        navigate(-1);
       }
-      if (k === "e") {
-        if (!can.update) return;
+      if (k === "f" || e.code === "KeyF") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+      if (k === "p" || e.code === "KeyP") {
+        e.preventDefault();
+        window.print();
+      }
+      if (k === "e" || e.code === "KeyE") {
+        if (!can.update || inv?.status === "reversed") return;
         e.preventDefault();
         navigate(`/purchase-invoices/${id}/edit`);
       }
-      if (k === "d") {
+      if (k === "d" || e.code === "KeyD") {
         if (!can.delete) return;
         e.preventDefault();
         openDeleteModal();
       }
-      if (k === "n") {
+      if (k === "n" || e.code === "KeyN") {
         if (!can.create) return;
         e.preventDefault();
         navigate("/purchase-invoices/create");
       }
-      if (k === "h") {
+      if (k === "h" || e.code === "KeyH") {
         e.preventDefault();
         setIsDraftsOpen((prev) => !prev);
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [navigate, id, can]);
+  }, [navigate, id, can, inv?.status]);
 
   if (loading || permsLoading) return <PageSkeleton />;
   if (!inv) return <div className="p-4 text-sm dark:text-gray-400">Invoice not found.</div>;
 
   const fmt = (v) => ((v ?? "") === "" ? "" : String(v));
+  const fmtMoney = (v) => {
+    if (v === null || v === undefined || v === "") return "—";
+    const num = Number(v);
+    return Number.isFinite(num) ? num.toFixed(2) : String(v);
+  };
+  const fmtQty = (v) => {
+    if (v === null || v === undefined || v === "") return "0";
+    const num = Number(v);
+    if (!Number.isFinite(num)) return String(v);
+    return Number.isInteger(num) ? String(num) : String(Number(num.toFixed(2)));
+  };
+  const fmtPct = (v) => {
+    if (v === null || v === undefined || v === "") return "—";
+    const num = Number(v);
+    if (!Number.isFinite(num)) return String(v);
+    return `${Number(num.toFixed(2))}%`;
+  };
 
-return (
+  const hasDueDateCol = Boolean(inv.invoice_type === "credit" || inv.due_date);
+  const totalCols = hasWholesale ? 20 : 17;
+  const paymentMethodLabel =
+    PAYMENT_METHOD_LABELS[inv.payment_method] ||
+    (inv.payment_method ? String(inv.payment_method).replace(/_/g, " ") : "Cash");
+
+  return (
     <div
-      className="purchase-show flex flex-col h-auto lg:h-[calc(100dvh-130px)]"
+      className="purchase-show purchase-entry flex flex-col h-auto lg:h-[calc(100dvh-130px)]"
       autoComplete="off"
     >
-      {inv.purchase_order && <div className="g-toolbar p-3">Source Purchase Order: <a className="underline" href={`/purchase-orders/${inv.purchase_order.id}`}>{inv.purchase_order.number}</a></div>}
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+        }
+      `}</style>
+
+      {inv.purchase_order && (
+        <div className="g-toolbar px-3 py-1 text-[11px] flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 dark:border-slate-700">
+          <span>
+            Source Purchase Order:{" "}
+            <a className="underline font-semibold" href={`/purchase-orders/${inv.purchase_order.id}`}>
+              {inv.purchase_order.number}
+            </a>
+          </span>
+          {inv.purchase_order.status && (
+            <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide bg-blue-500/10 text-blue-600 dark:text-blue-300">
+              {String(inv.purchase_order.status).replace(/_/g, " ")}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* ================= HEADER SECTION ================= */}
-      <div className="purchase-show-header sticky top-0 z-10" autoComplete="off">
-        {/* ---- Branded Title Banner ---- */}
-        <div className="purchase-show-banner px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="purchase-show-icon"><DocumentTextIcon aria-hidden="true" /></div>
-            <div>
-              <h2 className="purchase-show-title">
-                Purchase Invoice
-              </h2>
-              <p className="purchase-show-shortcuts mt-1">
-                Alt+E Edit · Alt+D Delete · Alt+N New · Alt+B Back
+      <div className="purchase-show-header purchase-entry-header sticky top-0 z-10 shadow-sm" autoComplete="off">
+        {/* ---- Compact Branded Title Banner ---- */}
+        <div className="purchase-show-banner purchase-entry-banner px-3 py-1.5 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="purchase-show-icon purchase-entry-icon w-8 h-8 rounded-lg flex items-center justify-center shadow-inner shrink-0">
+              <DocumentTextIcon aria-hidden="true" className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="purchase-show-title purchase-entry-title text-sm font-bold leading-none">
+                  Purchase Invoice
+                </h2>
+                {inv.posted_number && (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wide bg-blue-500/15 text-blue-700 dark:bg-blue-400/20 dark:text-blue-200 border border-blue-500/20">
+                    #{fmt(inv.posted_number)}
+                  </span>
+                )}
+                {inv.invoice_number && (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold bg-gray-500/10 text-gray-700 dark:bg-slate-700/80 dark:text-slate-300 border border-gray-400/20">
+                    Bill #{fmt(inv.invoice_number)}
+                  </span>
+                )}
+                {inv.status === "reversed" && (
+                  <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-rose-600 text-white tracking-wider border border-rose-400 shadow-xs">
+                    REVERSED
+                  </span>
+                )}
+              </div>
+              <p className="purchase-show-shortcuts text-[10px] mt-0.5 hidden sm:block truncate">
+                Alt+F search · Alt+E edit · Alt+P print · Alt+D delete · Alt+N new · Alt+B back
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {inv.status === 'reversed' && (
-              <span className="px-2.5 py-1 rounded text-[10px] font-extrabold uppercase bg-rose-600 text-white tracking-wider border border-rose-400 shadow-xs">
-                REVERSED
-              </span>
+          <div className="flex flex-wrap items-center gap-1.5 no-print">
+            {/* Read-only Debit / Credit Segmented Indicator */}
+            <div
+              className="purchase-entry-type flex items-center gap-0.5 rounded-md p-0.5 shadow-inner"
+              aria-label="Invoice type"
+            >
+              {["debit", "credit"].map((type) => {
+                const active = (inv.invoice_type || "debit") === type;
+                return (
+                  <span
+                    key={type}
+                    className={`purchase-entry-type-button inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-semibold rounded ${
+                      active ? "is-active theme-btn-primary shadow-xs" : "opacity-60"
+                    }`}
+                  >
+                    <span>{type === "debit" ? "Debit" : "Credit"}</span>
+                  </span>
+                );
+              })}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
+              style={btnSecondary.style}
+              title="Search Purchase Invoices (Alt+F)"
+            >
+              <MagnifyingGlassIcon className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Search</span>
+            </button>
+
+            {remainingAmount > 0.01 && inv.status !== "reversed" && (
+              <button
+                type="button"
+                onClick={() => setPaymentModalOpen(true)}
+                className="h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs flex items-center gap-1"
+                title="Record payment to supplier against this invoice"
+              >
+                <BanknotesIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Pay Supplier</span>
+              </button>
             )}
-            <span className="purchase-show-type">{inv.invoice_type === "credit" ? "Credit" : "Debit"}</span>
+
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
+              style={btnSecondary.style}
+              title="Print GRN / Purchase Invoice (Alt+P)"
+            >
+              <PrinterIcon className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Print</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShareModalOpen(true)}
+              className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
+              style={btnSecondary.style}
+              title="Download PDF or Share via WhatsApp / Email"
+            >
+              <ShareIcon className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>PDF / Share</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setHistoryModalOpen(true)}
+              className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
+              style={btnSecondary.style}
+              title="View audit history"
+            >
+              <ClockIcon className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>History</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                fetchDrafts();
+                setIsDraftsOpen(true);
+              }}
+              className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className} relative flex items-center gap-1.5`}
+              style={btnSecondary.style}
+              title="Open Held Invoices (Alt+H)"
+            >
+              <ClockIcon className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+              <span>Held</span>
+              {draftsList.length > 0 && (
+                <span className="inline-flex items-center justify-center px-1.5 py-0.2 text-[10px] font-bold leading-none text-white bg-amber-500 rounded-full">
+                  {draftsList.length}
+                </span>
+              )}
+            </button>
+
+            <Guard when={can.delete}>
+              {inv.status !== "reversed" && (
+                <button
+                  type="button"
+                  onClick={() => setVoidModalOpen(true)}
+                  className="h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 bg-amber-500 hover:bg-amber-600 text-white shadow-xs flex items-center gap-1"
+                  title="Void / Reverse this invoice safely"
+                >
+                  <ArrowUturnLeftIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Void</span>
+                </button>
+              )}
+            </Guard>
+
+            <Guard when={can.update}>
+              {inv.status !== "reversed" ? (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/purchase-invoices/${id}/edit`)}
+                  className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
+                  style={btnSecondary.style}
+                  title="Edit Invoice (Alt+E)"
+                >
+                  <PencilSquareIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Edit</span>
+                </button>
+              ) : (
+                <span
+                  className="h-7 px-2.5 rounded-md text-[11px] font-semibold opacity-40 cursor-not-allowed bg-gray-200 dark:bg-slate-700 text-gray-500 flex items-center gap-1"
+                  title="Reversed invoices cannot be edited"
+                >
+                  <PencilSquareIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Edit</span>
+                </span>
+              )}
+            </Guard>
+
+            <Guard when={can.delete}>
+              <button
+                type="button"
+                onClick={openDeleteModal}
+                className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnDanger.className}`}
+                style={btnDanger.style}
+                title="Delete Invoice (Alt+D)"
+              >
+                <TrashIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Delete</span>
+              </button>
+            </Guard>
+
+            <Guard when={can.create}>
+              <button
+                type="button"
+                onClick={() => navigate("/purchase-invoices/create")}
+                className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnPrimary.className}`}
+                style={btnPrimary.style}
+                title="New Purchase Invoice (Alt+N)"
+              >
+                <PlusIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>New</span>
+              </button>
+            </Guard>
+
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className={`h-7 px-2.5 rounded-md text-[11px] font-medium transition-all duration-200 ${btnGlass.className}`}
+              style={btnGlass.style}
+              title="Back (Alt+B)"
+            >
+              <ArrowLeftIcon className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Back</span>
+            </button>
           </div>
         </div>
 
-        {/* ---- Fields Card ---- */}
-        <div className="purchase-show-details px-3 py-2.5">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-xs">
+        {/* ---- Compact Header Details Table Card (matches SaleInvoice/Show & PurchaseInvoiceForm) ---- */}
+        <div className="purchase-show-details purchase-entry-details px-3 py-1.5">
+          <div className={`overflow-x-auto rounded-lg border ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+            <table className="w-full text-[11px] border-collapse">
               <thead>
-                <tr className="bg-gray-100 dark:bg-slate-700">
-                  {["Posted Number", "Posted Date", "Supplier", "Invoice #", "Amount", "Difference"].map((label) => (
-                    <th key={label} scope="col" className="border px-2 py-1 text-left font-medium text-gray-600 dark:border-slate-600 dark:text-gray-300">{label}</th>
-                  ))}
+                <tr
+                  className={`border-b text-[9.5px] font-semibold uppercase tracking-wide ${
+                    isDark
+                      ? "bg-slate-800/90 text-slate-400 border-slate-700"
+                      : "bg-gray-50 text-gray-500 border-gray-200"
+                  }`}
+                >
+                  <th className={`px-2.5 py-1 text-left border-r w-28 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                    Posted #
+                  </th>
+                  <th className={`px-2.5 py-1 text-left border-r w-28 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                    Posted Date
+                  </th>
+                  <th className={`px-2.5 py-1 text-left border-r min-w-[180px] ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                    Supplier
+                  </th>
+                  <th className={`px-2.5 py-1 text-left border-r w-28 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                    Invoice #
+                  </th>
+                  <th className={`px-2.5 py-1 text-right border-r w-28 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                    Bill Amount
+                  </th>
+                  <th className={`px-2.5 py-1 text-right border-r w-24 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                    Difference
+                  </th>
+                  {hasDueDateCol && (
+                    <th className={`px-2.5 py-1 text-left border-r w-28 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                      Due Date
+                    </th>
+                  )}
+                  <th className={`px-2.5 py-1 text-center border-r w-28 ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                    Items / Qty
+                  </th>
+                  <th className="px-2.5 py-1 text-left min-w-[160px]">Remarks</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="text-gray-900 dark:text-gray-100">
-                  <td className="border px-2 py-1 dark:border-slate-600">{fmt(inv.posted_number)}</td>
-                  <td className="border px-2 py-1 dark:border-slate-600">{fmt(inv.posted_date)}</td>
-                  <td className="border px-2 py-1 dark:border-slate-600">{inv.supplier?.name ?? inv.supplier_id ?? "—"}</td>
-                  <td className="border px-2 py-1 dark:border-slate-600">{fmt(inv.invoice_number)}</td>
-                  <td className="border px-2 py-1 dark:border-slate-600">{fmt(inv.invoice_amount)}</td>
-                  <td className={`border px-2 py-1 font-bold dark:border-slate-600 ${difference !== 0 ? "text-red-600 dark:text-red-400" : ""}`}>{difference.toFixed(2)}</td>
-                </tr>
-                <tr>
-                  <th scope="row" className="border px-2 py-1 text-left font-medium text-gray-600 dark:border-slate-600 dark:text-gray-300">Remarks</th>
-                  <td colSpan={5} className="border px-2 py-1 text-gray-900 dark:border-slate-600 dark:text-gray-100">{fmt(inv.remarks)}</td>
+                <tr className={isDark ? "bg-slate-800/60 text-slate-200" : "bg-white text-gray-800"}>
+                  <td className={`px-2.5 py-1.5 font-mono font-semibold border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                    {fmt(inv.posted_number) || "—"}
+                  </td>
+                  <td className={`px-2.5 py-1.5 font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                    {fmt(inv.posted_date) || "—"}
+                  </td>
+                  <td
+                    className={`px-2.5 py-1.5 font-semibold border-r ${
+                      isDark ? "border-slate-700 text-blue-300" : "border-gray-200 text-blue-700"
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <BuildingStorefrontIcon className="w-3.5 h-3.5 shrink-0 text-blue-500" aria-hidden="true" />
+                      <span>{inv.supplier?.name ?? inv.supplier_id ?? "—"}</span>
+                    </span>
+                  </td>
+                  <td className={`px-2.5 py-1.5 font-mono font-medium border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                    {fmt(inv.invoice_number) || "—"}
+                  </td>
+                  <td className={`px-2.5 py-1.5 font-mono font-semibold text-right border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                    {fmtMoney(inv.invoice_amount)}
+                  </td>
+                  <td
+                    className={`px-2.5 py-1.5 font-mono font-bold text-right border-r ${
+                      isDark ? "border-slate-700" : "border-gray-200"
+                    } ${
+                      Math.abs(difference) > 0.009
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-emerald-600 dark:text-emerald-400"
+                    }`}
+                  >
+                    {difference.toFixed(2)}
+                  </td>
+                  {hasDueDateCol && (
+                    <td className={`px-2.5 py-1.5 font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                      {fmt(inv.due_date) || "—"}
+                    </td>
+                  )}
+                  <td className={`px-2.5 py-1.5 text-center font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                    <span className="font-bold">{itemMetrics.count}</span>
+                    <span className="text-[10px] text-gray-500 dark:text-slate-400 ml-1">
+                      ({fmtQty(itemMetrics.totalPacks)}P / {itemMetrics.totalUnits}U)
+                    </span>
+                  </td>
+                  <td className="px-2.5 py-1.5 text-gray-700 dark:text-slate-300">
+                    {fmt(inv.remarks) || "—"}
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
-
-          {/* Action Buttons */}
-          <div className="purchase-show-remarks mt-2 flex justify-end">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSearchOpen(true)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200 ${btnSecondary.className}`}
-                style={btnSecondary.style}
-                title="Alt+F"
-              >
-                <MagnifyingGlassIcon className="w-4 h-4" aria-hidden="true" />
-                <span>Search</span>
-              </button>
-              {remainingAmount > 0.01 && inv.status !== 'reversed' && (
-                <button
-                  type="button"
-                  onClick={() => setPaymentModalOpen(true)}
-                  className="px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200 bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm flex items-center gap-1"
-                  title="Record payment to supplier against this invoice"
-                >
-                  <BanknotesIcon className="w-4 h-4" aria-hidden="true" />
-                  <span>Pay Supplier</span>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200 ${btnSecondary.className}`}
-                style={btnSecondary.style}
-                title="Print GRN / Purchase Invoice"
-              >
-                <PrinterIcon className="w-4 h-4" aria-hidden="true" />
-                <span>Print</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShareModalOpen(true)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200 ${btnSecondary.className}`}
-                style={btnSecondary.style}
-                title="Download PDF or Share via WhatsApp / Email"
-              >
-                <ShareIcon className="w-4 h-4" aria-hidden="true" />
-                <span>PDF / Share</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setHistoryModalOpen(true)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200 ${btnSecondary.className}`}
-                style={btnSecondary.style}
-                title="View audit history"
-              >
-                <ClockIcon className="w-4 h-4" aria-hidden="true" />
-                <span>History</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  fetchDrafts();
-                  setIsDraftsOpen(true);
-                }}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200 ${btnSecondary.className} relative flex items-center gap-1.5`}
-                style={btnSecondary.style}
-                title="Open Held Invoices (Alt+H)"
-              >
-                <ClockIcon className="w-4 h-4 text-amber-400" aria-hidden="true" />
-                <span>Held Invoices</span>
-                {draftsList.length > 0 && (
-                  <span className="inline-flex items-center justify-center px-1.5 py-0.2 text-[10px] font-bold leading-none text-white bg-amber-500 rounded-full">
-                    {draftsList.length}
-                  </span>
-                )}
-              </button>
-              <Guard when={can.delete}>
-                {inv.status !== 'reversed' && (
-                  <button
-                    type="button"
-                    onClick={() => setVoidModalOpen(true)}
-                    className="px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200 bg-amber-500 hover:bg-amber-600 text-white shadow-sm flex items-center gap-1"
-                    title="Void / Reverse this invoice safely"
-                  >
-                    <ArrowUturnLeftIcon className="w-4 h-4" aria-hidden="true" />
-                    <span>Void</span>
-                  </button>
-                )}
-              </Guard>
-              <Guard when={can.update}>
-                {inv.status !== 'reversed' ? (
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/purchase-invoices/${id}/edit`)}
-                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200 ${btnSecondary.className}`}
-                    style={btnSecondary.style}
-                    title="Alt+E"
-                  >
-                    <PencilSquareIcon className="w-4 h-4" aria-hidden="true" />
-                    <span>Edit</span>
-                  </button>
-                ) : (
-                  <span
-                    className="px-3 py-1 rounded-lg text-xs font-semibold opacity-40 cursor-not-allowed bg-gray-200 dark:bg-slate-700 text-gray-500 flex items-center gap-1"
-                    title="Reversed invoices cannot be edited"
-                  >
-                    <PencilSquareIcon className="w-4 h-4" aria-hidden="true" />
-                    <span>Edit</span>
-                  </span>
-                )}
-              </Guard>
-              <Guard when={can.delete}>
-                <button
-                  type="button"
-                  onClick={openDeleteModal}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200 ${btnDanger.className}`}
-                  style={btnDanger.style}
-                  title="Alt+D"
-                >
-                  <TrashIcon className="w-4 h-4" aria-hidden="true" />
-                  <span>Delete</span>
-                </button>
-              </Guard>
-              <Guard when={can.create}>
-                <button
-                  type="button"
-                  onClick={() => navigate("/purchase-invoices/create")}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all duration-200 ${btnPrimary.className}`}
-                  style={btnPrimary.style}
-                  title="Alt+N"
-                >
-                  <PlusIcon className="w-4 h-4" aria-hidden="true" />
-                  <span>New</span>
-                </button>
-              </Guard>
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${btnGlass.className}`}
-                style={btnGlass.style}
-                title="Alt+B"
-              >
-                <ArrowLeftIcon className="w-4 h-4" aria-hidden="true" />
-                <span>Back</span>
-              </button>
-            </div>
-          </div>
         </div>
       </div>
 
-{/* ================= ITEMS SECTION ================= */}
-      <div className="purchase-show-items purchase-entry-items flex-1 min-h-0 overflow-auto p-1" autoComplete="off">
-        <h2 className="text-xs font-bold mb-1 dark:text-gray-200">Items</h2>
-
-        <table className="invoice-repeater-table w-full lg:table-fixed border-collapse text-[11px]">
+      {/* ================= ITEMS SECTION ================= */}
+      <div className="purchase-show-items purchase-entry-items flex-1 min-h-0 overflow-auto px-2 py-1.5" autoComplete="off">
+        <table
+          className={`invoice-repeater-table w-full lg:table-fixed ${
+            hasWholesale ? "lg:min-w-[1160px]" : "lg:min-w-[1000px]"
+          } border-collapse text-[11px]`}
+        >
           <colgroup>
-            <col className="w-6" />
+            <col className="w-8" />
             <col className="w-auto min-w-[220px]" />
-            <col className="w-10" />
-            <col className="w-16" />
-            <col className="w-[74px]" />
+            <col className="w-11" />
+            <col className="w-[78px]" />
+            <col className="w-[82px]" />
+            <col className="w-12" />
+            <col className="w-12" />
+            <col className="w-14" />
+            <col className="w-14" />
             <col className="w-11" />
             <col className="w-11" />
-            <col className="w-13" />
-            <col className="w-13" />
             <col className="w-11" />
-            <col className="w-11" />
-            <col className="w-11" />
-            <col className="w-13" />
-            <col className="w-13" />
-            <col className="w-13" />
-            <col className="w-13" />
-            <col className="w-11" />
-            <col className="w-11" />
-            <col className="w-13" />
-            <col className="w-18" />
+            <col className="w-14" />
+            <col className="w-14" />
+            {hasWholesale && <col className="w-14" />}
+            {hasWholesale && <col className="w-14" />}
+            <col className="w-12" />
+            {hasWholesale && <col className="w-12" />}
+            <col className="w-14" />
+            <col className="w-20" />
           </colgroup>
           <thead className="sticky top-0 bg-gray-100 dark:bg-slate-700 z-5">
             <tr>
-              <th rowSpan={2} className="border w-6 dark:border-slate-600 dark:text-gray-200">#</th>
-              <th rowSpan={2} colSpan={1} className="border w-[24%] min-w-[220px] dark:border-slate-600 dark:text-gray-200">Product</th>
-              <th colSpan={3} className="border dark:border-slate-600 dark:text-gray-200">Pack Size / Batch / Expiry</th>
-              <th colSpan={2} className="border dark:border-slate-600 dark:text-gray-200">Qty (Pack / Unit)</th>
-              <th colSpan={2} className="border dark:border-slate-600 dark:text-gray-200">Purchase Price (P / U)</th>
-              <th colSpan={3} className="border dark:border-slate-600 dark:text-gray-200">Disc % / Bonus (P / U)</th>
-              <th colSpan={2} className="border dark:border-slate-600 dark:text-gray-200">Sale Price (P / U)</th>
-              <th colSpan={3} className="border dark:border-slate-600 dark:text-gray-200">Wholesale Price (P / U)</th>
-              <th colSpan={4} className="border dark:border-slate-600 dark:text-gray-200">Margin % / W.S.Mrg% / Avg / Sub Total</th>
+              <th rowSpan={2} className="border w-8 purchase-th-readonly dark:border-slate-600">
+                #
+              </th>
+              <th rowSpan={2} colSpan={1} className="border w-[25%] min-w-[220px] purchase-th-editable text-left px-2 dark:border-slate-600">
+                Product
+              </th>
+              <th colSpan={3} className="border dark:border-slate-600">
+                Pack Size / Batch / Expiry
+              </th>
+              <th colSpan={2} className="border purchase-th-editable dark:border-slate-600">
+                Qty (Pack / Unit)
+              </th>
+              <th colSpan={2} className="border purchase-th-editable dark:border-slate-600">
+                Purchase Price (P / U)
+              </th>
+              <th colSpan={3} className="border purchase-th-editable dark:border-slate-600">
+                Disc % / Bonus (P / U)
+              </th>
+              <th colSpan={2} className="border purchase-th-editable dark:border-slate-600">
+                Sale Price (P / U)
+              </th>
+              {hasWholesale && (
+                <th colSpan={2} className="border purchase-th-editable dark:border-slate-600">
+                  Wholesale Price (P / U)
+                </th>
+              )}
+              <th colSpan={hasWholesale ? 4 : 3} className="border purchase-th-readonly dark:border-slate-600">
+                Margin % {hasWholesale && "/ W.S.Mrg% "}/ Avg / Sub Total
+              </th>
             </tr>
 
             <tr>
-              <th className="border w-10 dark:border-slate-600 dark:text-gray-200">PSize</th>
-              <th className="border w-16 dark:border-slate-600 dark:text-gray-200">Batch</th>
-              <th className="border w-[74px] dark:border-slate-600 dark:text-gray-200">Exp</th>
-              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">Pack.Q</th>
-              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">Unit.Q</th>
-              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">Pack.P</th>
-              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">Unit.P</th>
-              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">Disc%</th>
-              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">PBonus</th>
-              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">UBonus</th>
-              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">Pack.S</th>
-              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">Unit.S</th>
-              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">W.S.Pack</th>
-              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">W.S.Unit</th>
-              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">Margin%</th>
-              <th className="border w-11 dark:border-slate-600 dark:text-gray-200">W.S.Mrg%</th>
-              <th className="border w-13 dark:border-slate-600 dark:text-gray-200">Avg</th>
-              <th className="border w-18 dark:border-slate-600 dark:text-gray-200">Sub Total</th>
+              <th className="border w-11 purchase-th-readonly dark:border-slate-600" title="Pack Size">
+                PSize
+              </th>
+              <th className="border w-[78px] purchase-th-editable dark:border-slate-600">Batch</th>
+              <th className="border w-[82px] purchase-th-editable dark:border-slate-600">Exp</th>
+              <th className="border w-12 purchase-th-editable dark:border-slate-600">Pack.Q</th>
+              <th className="border w-12 purchase-th-editable dark:border-slate-600">Unit.Q</th>
+              <th className="border w-14 purchase-th-editable dark:border-slate-600">Pack.P</th>
+              <th className="border w-14 purchase-th-editable dark:border-slate-600">Unit.P</th>
+              <th className="border w-11 purchase-th-editable dark:border-slate-600">Disc%</th>
+              <th className="border w-11 purchase-th-editable dark:border-slate-600">PBonus</th>
+              <th className="border w-11 purchase-th-editable dark:border-slate-600">UBonus</th>
+              <th className="border w-14 purchase-th-editable dark:border-slate-600">Pack.S</th>
+              <th className="border w-14 purchase-th-editable dark:border-slate-600">Unit.S</th>
+              {hasWholesale && (
+                <th className="border w-14 purchase-th-editable dark:border-slate-600">W.S.Pack</th>
+              )}
+              {hasWholesale && (
+                <th className="border w-14 purchase-th-editable dark:border-slate-600">W.S.Unit</th>
+              )}
+              <th className="border w-12 purchase-th-readonly dark:border-slate-600" title="Retail Margin %">
+                Margin%
+              </th>
+              {hasWholesale && (
+                <th className="border w-12 purchase-th-readonly dark:border-slate-600" title="Wholesale Margin %">
+                  W.S.Mrg%
+                </th>
+              )}
+              <th className="border w-14 purchase-th-readonly dark:border-slate-600" title="Average Unit Cost">
+                Avg
+              </th>
+              <th className="border w-20 purchase-th-readonly dark:border-slate-600" title="Row Sub Total">
+                Sub Total
+              </th>
             </tr>
           </thead>
 
           <tbody>
             {(inv.items || []).map((item, i) => {
               const brand = item.product?.brand?.name || item.product?.brand_name || "";
-              const previousBrand = inv.items[i - 1]?.product?.brand?.name || inv.items[i - 1]?.product?.brand_name || "";
+              const previousBrand =
+                inv.items[i - 1]?.product?.brand?.name || inv.items[i - 1]?.product?.brand_name || "";
+              const isBrandGroupStart = i === 0 || previousBrand !== brand;
+              const groupCount = brandGroupStartCounts.get(i) || 1;
+              const hasDisc = Number(item.item_discount_percentage || 0) > 0;
+              const hasPackBonus = Number(item.pack_bonus || 0) > 0;
+              const hasUnitBonus = Number(item.unit_bonus || 0) > 0;
 
               return (
                 <Fragment key={item.id || i}>
-                  {(i === 0 || previousBrand !== brand) && (
+                  {isBrandGroupStart && (
                     <tr className="purchase-invoice-brand-heading">
-                      <th colSpan={20} scope="rowgroup">{brand || "No Brand"}</th>
+                      <th colSpan={totalCols} scope="rowgroup">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span>{brand || "No Brand"}</span>
+                          <span className="font-normal opacity-60">· {groupCount}</span>
+                        </span>
+                      </th>
                     </tr>
                   )}
-                  <tr className="invoice-repeater-row text-center dark:text-gray-300">
-                    <td data-label="Item #" className="invoice-cell-index-only border px-1 dark:border-slate-600">{i + 1}</td>
-                    <td data-label="Product" className="invoice-cell-product border px-1 text-left dark:border-slate-600">{fmt(item.product?.name ?? item.product_id)}</td>
-                    <td data-label="Pack Size" className="border px-1 dark:border-slate-600">{fmt(item.pack_size)}</td>
-                    <td data-label="Batch" className="border px-1 dark:border-slate-600">{fmt(item.batch)}</td>
-                    <td data-label="Expiry" title={item.expiry ? String(item.expiry).trim().slice(0, 10) : undefined} className="border px-1 font-mono dark:border-slate-600">{item.expiry ? String(item.expiry).trim().slice(0, 10).replace(/^(\d{4})-(\d{2})(?:-\d{2})?$/, "$2/$1") : "—"}</td>
-                    <td data-label="Pack Qty" className="border px-1 dark:border-slate-600">{fmt(item.pack_quantity)}</td>
-                    <td data-label="Unit Qty" className="border px-1 dark:border-slate-600">{fmt(item.unit_quantity)}</td>
-                    <td data-label="Pack Cost" className="border px-1 dark:border-slate-600">{fmt(item.pack_purchase_price)}</td>
-                    <td data-label="Unit Cost" className="border px-1 dark:border-slate-600">{fmt(item.unit_purchase_price)}</td>
-                    <td data-label="Disc %" className="border px-1 dark:border-slate-600">{fmt(item.item_discount_percentage)}</td>
-                    <td data-label="Pack Bonus" className="border px-1 dark:border-slate-600">{fmt(item.pack_bonus)}</td>
-                    <td data-label="Unit Bonus" className="border px-1 dark:border-slate-600">{fmt(item.unit_bonus)}</td>
-                    <td data-label="Pack Sale" className="border px-1 dark:border-slate-600">{fmt(item.pack_sale_price)}</td>
-                    <td data-label="Unit Sale" className="border px-1 dark:border-slate-600">{fmt(item.unit_sale_price)}</td>
-                    <td data-label="W.S. Pack" className="border px-1 dark:border-slate-600">{fmt(item.whole_sale_pack_price)}</td>
-                    <td data-label="W.S. Unit" className="border px-1 dark:border-slate-600">{fmt(item.whole_sale_unit_price)}</td>
-                    <td data-label="Margin %" className="border px-1 dark:border-slate-600">{fmt(item.margin)}</td>
-                    <td data-label="W.S. Mrg %" className="border px-1 dark:border-slate-600">{fmt(item.whole_sale_margin)}</td>
-                    <td data-label="Avg Cost" className="border px-1 dark:border-slate-600">{fmt(item.avg_price)}</td>
-                    <td data-label="Sub Total" className="invoice-cell-subtotal border px-1 dark:border-slate-600">{fmt(item.sub_total)}</td>
+                  <tr className="invoice-repeater-row text-center dark:text-gray-200">
+                    <td
+                      data-label="Item #"
+                      className="invoice-cell-index-only border px-1 font-mono text-gray-500 dark:text-slate-400 dark:border-slate-600"
+                    >
+                      {i + 1}
+                    </td>
+                    <td
+                      data-label="Product"
+                      className="invoice-cell-product border px-2 text-left font-medium text-gray-900 dark:text-gray-100 dark:border-slate-600"
+                    >
+                      <div className="flex items-center justify-between gap-1.5 min-w-0">
+                        <span className="truncate">{fmt(item.product?.name ?? item.product_id)}</span>
+                        {item.product?.product_code && (
+                          <span className="shrink-0 px-1 py-0.2 rounded text-[9.5px] font-mono text-gray-500 dark:text-slate-400 bg-gray-100 dark:bg-slate-700/70">
+                            {item.product.product_code}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td
+                      data-label="Pack Size"
+                      className="border px-1 font-mono text-gray-600 dark:text-slate-300 dark:border-slate-600"
+                    >
+                      {fmt(item.pack_size) || "—"}
+                    </td>
+                    <td
+                      data-label="Batch"
+                      className="border px-1 font-mono text-gray-700 dark:text-slate-300 dark:border-slate-600 truncate"
+                      title={item.batch || "Unassigned"}
+                    >
+                      {fmt(item.batch) || "—"}
+                    </td>
+                    <td
+                      data-label="Expiry"
+                      title={item.expiry ? String(item.expiry).trim().slice(0, 10) : undefined}
+                      className="border px-1 font-mono text-gray-700 dark:text-slate-300 dark:border-slate-600"
+                    >
+                      {item.expiry
+                        ? String(item.expiry)
+                            .trim()
+                            .slice(0, 10)
+                            .replace(/^(\d{4})-(\d{2})(?:-\d{2})?$/, "$2/$1")
+                        : "—"}
+                    </td>
+                    <td
+                      data-label="Pack Qty"
+                      className="border px-1.5 font-mono font-bold text-gray-900 dark:text-gray-100 dark:border-slate-600"
+                    >
+                      {fmtQty(item.pack_quantity)}
+                    </td>
+                    <td
+                      data-label="Unit Qty"
+                      className="border px-1.5 font-mono font-bold text-gray-900 dark:text-gray-100 dark:border-slate-600"
+                    >
+                      {fmtQty(item.unit_quantity)}
+                    </td>
+                    <td
+                      data-label="Pack Cost"
+                      className="border px-1.5 text-right font-mono dark:border-slate-600"
+                    >
+                      {fmtMoney(item.pack_purchase_price)}
+                    </td>
+                    <td
+                      data-label="Unit Cost"
+                      className="border px-1.5 text-right font-mono dark:border-slate-600"
+                    >
+                      {fmtMoney(item.unit_purchase_price)}
+                    </td>
+                    <td
+                      data-label="Disc %"
+                      className={`border px-1 font-mono dark:border-slate-600 ${
+                        hasDisc ? "font-semibold text-rose-600 dark:text-rose-400" : "text-gray-500 dark:text-slate-400"
+                      }`}
+                    >
+                      {hasDisc ? fmtPct(item.item_discount_percentage) : "0"}
+                    </td>
+                    <td
+                      data-label="Pack Bonus"
+                      className={`border px-1 font-mono dark:border-slate-600 ${
+                        hasPackBonus
+                          ? "font-semibold text-emerald-600 dark:text-emerald-400"
+                          : "text-gray-500 dark:text-slate-400"
+                      }`}
+                    >
+                      {fmtQty(item.pack_bonus)}
+                    </td>
+                    <td
+                      data-label="Unit Bonus"
+                      className={`border px-1 font-mono dark:border-slate-600 ${
+                        hasUnitBonus
+                          ? "font-semibold text-emerald-600 dark:text-emerald-400"
+                          : "text-gray-500 dark:text-slate-400"
+                      }`}
+                    >
+                      {fmtQty(item.unit_bonus)}
+                    </td>
+                    <td
+                      data-label="Pack Sale"
+                      className="border px-1.5 text-right font-mono dark:border-slate-600"
+                    >
+                      {fmtMoney(item.pack_sale_price)}
+                    </td>
+                    <td
+                      data-label="Unit Sale"
+                      className="border px-1.5 text-right font-mono dark:border-slate-600"
+                    >
+                      {fmtMoney(item.unit_sale_price)}
+                    </td>
+                    {hasWholesale && (
+                      <td
+                        data-label="W.S. Pack"
+                        className="border px-1.5 text-right font-mono dark:border-slate-600"
+                      >
+                        {fmtMoney(item.whole_sale_pack_price)}
+                      </td>
+                    )}
+                    {hasWholesale && (
+                      <td
+                        data-label="W.S. Unit"
+                        className="border px-1.5 text-right font-mono dark:border-slate-600"
+                      >
+                        {fmtMoney(item.whole_sale_unit_price)}
+                      </td>
+                    )}
+                    <td
+                      data-label="Margin %"
+                      className="border px-1 font-mono font-semibold text-blue-600 dark:text-blue-400 dark:border-slate-600"
+                    >
+                      {fmtPct(item.margin)}
+                    </td>
+                    {hasWholesale && (
+                      <td
+                        data-label="W.S. Mrg %"
+                        className="border px-1 font-mono font-semibold text-indigo-600 dark:text-indigo-400 dark:border-slate-600"
+                      >
+                        {fmtPct(item.whole_sale_margin)}
+                      </td>
+                    )}
+                    <td
+                      data-label="Avg Cost"
+                      className="border px-1.5 text-right font-mono text-gray-600 dark:text-slate-300 dark:border-slate-600"
+                    >
+                      {fmtMoney(item.avg_price)}
+                    </td>
+                    <td
+                      data-label="Sub Total"
+                      className="invoice-cell-subtotal border px-2 text-right font-mono font-bold text-gray-900 dark:text-gray-100 dark:border-slate-600"
+                    >
+                      {fmtMoney(item.sub_total)}
+                    </td>
                   </tr>
                 </Fragment>
               );
@@ -585,48 +959,184 @@ return (
         </table>
       </div>
 
-      {/* ================= FOOTER SECTION ================= */}
-      <div className="purchase-show-footer sticky bottom-0 p-2 z-10" autoComplete="off">
-        <div className="flex items-end gap-2 overflow-x-auto">
-          <table className="min-w-[700px] flex-1 border-collapse text-xs">
-            <thead>
-              <tr className="bg-gray-100 dark:bg-slate-700">
-                {["Tax %", "Tax Amount", "Discount %", "Discount Amount", "Total Amount", "Total Paid", "Remaining"].map((label) => (
-                  <th key={label} scope="col" className="border p-1 text-left font-medium text-gray-600 dark:border-slate-600 dark:text-gray-300">{label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="text-gray-900 dark:text-gray-100">
-                <td className="border p-1 dark:border-slate-600">{fmt(inv.tax_percentage)}</td>
-                <td className="border p-1 dark:border-slate-600">{fmt(inv.tax_amount)}</td>
-                <td className="border p-1 dark:border-slate-600">{fmt(inv.discount_percentage)}</td>
-                <td className="border p-1 dark:border-slate-600">{fmt(inv.discount_amount)}</td>
-                <td className="border p-1 font-bold dark:border-slate-600">{totalAmount.toFixed(2)}</td>
-                <td className="border p-1 dark:border-slate-600">{totalPaid.toFixed(2)}</td>
-                <td className="border p-1 dark:border-slate-600">{remainingAmount.toFixed(2)}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div className="flex shrink-0 gap-2">
-            <button
-              type="button"
-              onClick={() => navigate(`/purchase-invoices/${id}/edit`)}
-              className={`px-3 py-2 rounded-sm text-xs font-semibold transition-all duration-200 ${btnSecondary.className}`}
-              style={btnSecondary.style}
-            >
-              <PencilSquareIcon className="w-4 h-4" aria-hidden="true" />
-              <span>Edit</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/purchase-invoices/create")}
-              className={`px-3 py-2 rounded-sm text-xs font-semibold transition-all duration-200 ${btnPrimary.className}`}
-              style={btnPrimary.style}
-            >
-              <PlusIcon className="w-4 h-4" aria-hidden="true" />
-              <span>New Invoice</span>
-            </button>
+      {/* ================= COMPACT 2-ROW FOOTER SECTION (matches PurchaseInvoiceForm) ================= */}
+      <div
+        className="purchase-show-footer purchase-entry-footer lg:sticky lg:bottom-0 z-10 border-t shadow-[0_-4px_16px_-6px_rgba(0,0,0,0.18)]"
+        autoComplete="off"
+      >
+        <div className="px-3 py-1.5 space-y-1">
+          {/* ---- Row 1: Adjustments (Disc / Tax) + Computed Totals ---- */}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  Disc %
+                </span>
+                <div className="purchase-readonly-field h-7 min-w-[52px] flex items-center justify-end px-2 rounded-md text-xs font-mono text-gray-900 dark:text-gray-100">
+                  {to2(inv.discount_percentage).toFixed(2)}%
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  Discount
+                </span>
+                <div className="purchase-readonly-field h-7 min-w-[76px] flex items-center justify-end px-2 rounded-md text-xs font-mono text-gray-900 dark:text-gray-100">
+                  {to2(inv.discount_amount).toFixed(2)}
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  Tax %
+                </span>
+                <div className="purchase-readonly-field h-7 min-w-[52px] flex items-center justify-end px-2 rounded-md text-xs font-mono text-gray-900 dark:text-gray-100">
+                  {to2(inv.tax_percentage).toFixed(2)}%
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  Tax
+                </span>
+                <div className="purchase-readonly-field h-7 min-w-[76px] flex items-center justify-end px-2 rounded-md text-xs font-mono text-gray-900 dark:text-gray-100">
+                  {to2(inv.tax_amount).toFixed(2)}
+                </div>
+              </div>
+              {(itemMetrics.totalBonusPacks > 0 || itemMetrics.totalBonusUnits > 0) && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                    Bonus
+                  </span>
+                  <div className="purchase-readonly-field h-7 flex items-center px-2 rounded-md text-xs font-mono font-semibold !text-emerald-600 dark:!text-emerald-400">
+                    {fmtQty(itemMetrics.totalBonusPacks)}P / {itemMetrics.totalBonusUnits}U
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap ml-auto">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  Items Total
+                </span>
+                <div className="purchase-readonly-field h-7 flex items-center px-2 rounded-md text-xs font-medium font-mono text-gray-900 dark:text-gray-100">
+                  {itemMetrics.rowsTotal.toFixed(2)}
+                </div>
+              </div>
+              {to2(inv.discount_amount) > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                    Disc {inv.discount_percentage ? `(${to2(inv.discount_percentage)}%)` : ""}
+                  </span>
+                  <div className="purchase-readonly-field h-7 flex items-center px-2 rounded-md text-xs font-medium font-mono !text-red-500 dark:!text-red-400">
+                    −{to2(inv.discount_amount).toFixed(2)}
+                  </div>
+                </div>
+              )}
+              {to2(inv.tax_amount) > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                    Tax {inv.tax_percentage ? `(${to2(inv.tax_percentage)}%)` : ""}
+                  </span>
+                  <div className="purchase-readonly-field h-7 flex items-center px-2 rounded-md text-xs font-medium font-mono text-gray-900 dark:text-gray-100">
+                    +{to2(inv.tax_amount).toFixed(2)}
+                  </div>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap"
+                  style={{ color: themeColors.primary }}
+                >
+                  Total Amount
+                </span>
+                <div
+                  className="h-7 flex items-center px-2.5 rounded-md text-xs font-bold font-mono border"
+                  style={{
+                    background: `${themeColors.primary}14`,
+                    color: themeColors.primary,
+                    borderColor: `${themeColors.primary}40`,
+                  }}
+                >
+                  {totalAmount.toFixed(2)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ---- Row 2: Payment Method & Account + Total Paid + Remaining + Quick Actions ---- */}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pt-1 border-t border-gray-100 dark:border-slate-700/60">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  Method
+                </span>
+                <div className="purchase-readonly-field h-7 flex items-center px-2.5 rounded-md text-xs font-semibold text-gray-900 dark:text-gray-100 capitalize">
+                  {paymentMethodLabel}
+                </div>
+              </div>
+
+              {inv.account && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                    Account
+                  </span>
+                  <div className="purchase-readonly-field h-7 flex items-center px-2.5 rounded-md text-xs font-medium text-gray-900 dark:text-gray-100">
+                    {inv.account.code ? `${inv.account.code} · ` : ""}
+                    {inv.account.name}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  Total Paid
+                </span>
+                <div className="purchase-readonly-field h-7 min-w-[84px] flex items-center justify-end px-2 rounded-md text-xs font-bold font-mono text-gray-900 dark:text-gray-100">
+                  {totalPaid.toFixed(2)}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  Remaining
+                </span>
+                <div
+                  className={`purchase-readonly-field h-7 min-w-[84px] flex items-center justify-end px-2 rounded-md text-xs font-bold font-mono ${
+                    remainingAmount > 0.009
+                      ? "!text-amber-600 dark:!text-amber-400"
+                      : "!text-emerald-600 dark:!text-emerald-400"
+                  }`}
+                >
+                  {remainingAmount.toFixed(2)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 ml-auto no-print">
+              <Guard when={can.update}>
+                {inv.status !== "reversed" && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/purchase-invoices/${id}/edit`)}
+                    className={`h-7 px-3 rounded-md text-xs font-semibold transition-all duration-200 ${btnSecondary.className}`}
+                    style={btnSecondary.style}
+                  >
+                    <PencilSquareIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Edit</span>
+                  </button>
+                )}
+              </Guard>
+              <Guard when={can.create}>
+                <button
+                  type="button"
+                  onClick={() => navigate("/purchase-invoices/create")}
+                  className={`h-7 px-3.5 rounded-md text-xs font-semibold transition-all duration-200 ${btnPrimary.className}`}
+                  style={btnPrimary.style}
+                >
+                  <PlusIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>New Invoice</span>
+                </button>
+              </Guard>
+            </div>
           </div>
         </div>
       </div>
@@ -635,23 +1145,42 @@ return (
       {deleteModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-          onClick={(e) => { if (e.target === e.currentTarget) closeDeleteModal(); }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeDeleteModal();
+          }}
         >
-          <div className="purchase-show-delete w-full max-w-md p-5" role="dialog" aria-modal="true" aria-label="Delete purchase invoice">
+          <div
+            className="purchase-show-delete w-full max-w-md p-5"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Delete purchase invoice"
+          >
             {deleteStep === 1 && (
               <div>
                 <h2 className="text-lg font-semibold mb-2 dark:text-gray-200">Delete purchase invoice?</h2>
-                <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                  <div><b className="dark:text-gray-300">Posted #:</b> {fmt(inv?.posted_number)}</div>
-                  <div><b className="dark:text-gray-300">Invoice No:</b> {fmt(inv?.invoice_number)}</div>
-                  <div><b className="dark:text-gray-300">Supplier:</b> {fmt(inv.supplier?.name ?? "N/A")}</div>
-                  <div><b className="dark:text-gray-300">Total:</b> {totalAmount.toLocaleString()}</div>
-                  <div><b className="dark:text-gray-300">Paid:</b> {totalPaid.toLocaleString()}</div>
-                  <div><b className="dark:text-gray-300">Remaining:</b> {remainingAmount.toLocaleString()}</div>
+                <div className="text-xs text-gray-600 dark:text-gray-400 mb-2 space-y-0.5">
+                  <div>
+                    <b className="dark:text-gray-300">Posted #:</b> {fmt(inv?.posted_number)}
+                  </div>
+                  <div>
+                    <b className="dark:text-gray-300">Invoice No:</b> {fmt(inv?.invoice_number)}
+                  </div>
+                  <div>
+                    <b className="dark:text-gray-300">Supplier:</b> {fmt(inv.supplier?.name ?? "N/A")}
+                  </div>
+                  <div>
+                    <b className="dark:text-gray-300">Total:</b> {totalAmount.toLocaleString()}
+                  </div>
+                  <div>
+                    <b className="dark:text-gray-300">Paid:</b> {totalPaid.toLocaleString()}
+                  </div>
+                  <div>
+                    <b className="dark:text-gray-300">Remaining:</b> {remainingAmount.toLocaleString()}
+                  </div>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">This action cannot be undone.</p>
                 <div className="mt-4 flex justify-end gap-2">
-                  <button 
+                  <button
                     className={`px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${btnGlass.className}`}
                     style={btnGlass.style}
                     onClick={closeDeleteModal}
@@ -698,10 +1227,10 @@ return (
                     <span>Back</span>
                   </button>
                   <div className="flex gap-2">
-                    <button 
+                    <button
                       className={`px-3 py-1.5 text-xs font-semibold transition-all duration-200 ${btnGlass.className}`}
                       style={btnGlass.style}
-                      onClick={closeDeleteModal} 
+                      onClick={closeDeleteModal}
                       disabled={deleting}
                     >
                       Cancel

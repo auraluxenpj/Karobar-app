@@ -58,7 +58,7 @@ class SaleInvoice extends Model
     }
     public function items()
     {
-        return $this->hasMany(SaleInvoiceItem::class);
+        return $this->hasMany(SaleInvoiceItem::class)->orderBy('id');
     }
     
 }
