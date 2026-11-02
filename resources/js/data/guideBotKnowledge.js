@@ -3246,6 +3246,9 @@ import {
   getBlueprintForGuide,
   MODAL_CONTEXT_GUIDES,
   explainDomElement,
+  loadLearnedCursorKnowledge,
+  saveLearnedCursorKnowledge,
+  getLearnedAnswerForQuery,
 } from "./guideBotScreenBlueprints.js";
 
 // Enrich every screen guide in SCREEN_GUIDES with its 4-pillar Screen Blueprint
@@ -3261,7 +3264,14 @@ Object.keys(SCREEN_GUIDES).forEach((routeKey) => {
   }
 });
 
-export { getBlueprintForGuide, MODAL_CONTEXT_GUIDES, explainDomElement };
+export {
+  getBlueprintForGuide,
+  MODAL_CONTEXT_GUIDES,
+  explainDomElement,
+  loadLearnedCursorKnowledge,
+  saveLearnedCursorKnowledge,
+  getLearnedAnswerForQuery,
+};
 
 export const MODULE_CATEGORIES = [
   { key: "all", en: "All Modules", ur: "تمام ماڈیولز" },
@@ -3390,7 +3400,25 @@ export {
  * trained Karobar ERP Intelligence Engine (`guideBotIntelligence.js`).
  */
 export function answerUserQuestion(queryText = "", currentGuide = SCREEN_GUIDES["/dashboard"]) {
-  return answerWithTrainedEngine(queryText, currentGuide, SCREEN_GUIDES);
+  const baseAnswer = answerWithTrainedEngine(queryText, currentGuide, SCREEN_GUIDES);
+  const learned = getLearnedAnswerForQuery(
+    queryText,
+    currentGuide?.key || currentGuide?.path || "/dashboard",
+    baseAnswer?.matchedIntentId || ""
+  );
+  if (learned && (learned.en || learned.ur)) {
+    return {
+      ...baseAnswer,
+      title: {
+        en: learned.title?.en || baseAnswer?.title?.en || "Karobar ERP Guide",
+        ur: learned.title?.ur || baseAnswer?.title?.ur || "کاروبار ایپ رہنمائی",
+      },
+      en: learned.en || baseAnswer?.en,
+      ur: learned.ur || baseAnswer?.ur,
+      aiImproved: true,
+    };
+  }
+  return baseAnswer;
 }
 
 /**

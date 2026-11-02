@@ -52,17 +52,8 @@ class CustomerLedgerController extends Controller
                 'total_receive', 'total_recieve', 'received', 'amount_received',
             ]);
 
-        $priorAllocated = collect();
         $priorIds = $priorInvoices->pluck('id')->all();
-        if (!empty($priorIds) && SchemaCache::hasTable('payment_allocations') && SchemaCache::hasTable('payments')) {
-            $priorAllocated = \App\Models\PaymentAllocation::query()
-                ->where('invoice_type', 'sale_invoice')
-                ->whereIn('invoice_id', $priorIds)
-                ->whereHas('payment', fn($q) => $q->where('status', 'posted'))
-                ->selectRaw('invoice_id, SUM(amount) as total_allocated')
-                ->groupBy('invoice_id')
-                ->pluck('total_allocated', 'invoice_id');
-        }
+        $priorAllocated = \App\Models\PaymentAllocation::sumAllocatedByInvoiceIds('sale_invoice', $priorIds);
 
         $openingBalance = 0.0;
         foreach ($priorInvoices as $pInv) {
@@ -165,17 +156,8 @@ class CustomerLedgerController extends Controller
                 'total_receive', 'total_recieve', 'received', 'amount_received',
             ]);
 
-        $allocatedByInvoice = collect();
         $invoiceIds = $invoices->pluck('id')->all();
-        if (!empty($invoiceIds) && SchemaCache::hasTable('payment_allocations') && SchemaCache::hasTable('payments')) {
-            $allocatedByInvoice = \App\Models\PaymentAllocation::query()
-                ->where('invoice_type', 'sale_invoice')
-                ->whereIn('invoice_id', $invoiceIds)
-                ->whereHas('payment', fn($q) => $q->where('status', 'posted'))
-                ->selectRaw('invoice_id, SUM(amount) as total_allocated')
-                ->groupBy('invoice_id')
-                ->pluck('total_allocated', 'invoice_id');
-        }
+        $allocatedByInvoice = \App\Models\PaymentAllocation::sumAllocatedByInvoiceIds('sale_invoice', $invoiceIds);
 
         $invoiceRows = $invoices->map(function ($inv) use ($customerId, $allocatedByInvoice) {
             // Invoice Total - pick the first that exists on your model
@@ -636,9 +618,9 @@ class CustomerLedgerController extends Controller
                 ->where('status', 'reversed')
                 ->pluck('id')
                 ->all();
-            if (!empty($reversedIds)) {
+            foreach (array_chunk($reversedIds, 500) as $revChunk) {
                 CustomerLedger::where('customer_id', $customerId)
-                    ->whereIn('sale_invoice_id', $reversedIds)
+                    ->whereIn('sale_invoice_id', $revChunk)
                     ->delete();
             }
 
@@ -652,17 +634,8 @@ class CustomerLedgerController extends Controller
                     'total_receive','total_recieve','received','amount_received',
                 ]);
 
-            $allocatedByInvoice = collect();
             $invIds = $invoices->pluck('id')->all();
-            if (!empty($invIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
-                $allocatedByInvoice = \App\Models\PaymentAllocation::query()
-                    ->where('invoice_type', 'sale_invoice')
-                    ->whereIn('invoice_id', $invIds)
-                    ->whereHas('payment', fn($q) => $q->where('status', 'posted'))
-                    ->selectRaw('invoice_id, SUM(amount) as total_allocated')
-                    ->groupBy('invoice_id')
-                    ->pluck('total_allocated', 'invoice_id');
-            }
+            $allocatedByInvoice = \App\Models\PaymentAllocation::sumAllocatedByInvoiceIds('sale_invoice', $invIds);
 
             foreach ($invoices as $inv) {
                 $invTotal = $this->num(
@@ -838,17 +811,8 @@ class CustomerLedgerController extends Controller
         ->orderBy('id')
         ->get($selectCols);
 
-    $allocatedByInvoice = collect();
     $invIds = $rawInvoices->pluck('id')->all();
-    if (!empty($invIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
-        $allocatedByInvoice = \App\Models\PaymentAllocation::query()
-            ->where('invoice_type', 'sale_invoice')
-            ->whereIn('invoice_id', $invIds)
-            ->whereHas('payment', fn($q) => $q->where('status', 'posted'))
-            ->selectRaw('invoice_id, SUM(amount) as total_allocated')
-            ->groupBy('invoice_id')
-            ->pluck('total_allocated', 'invoice_id');
-    }
+    $allocatedByInvoice = \App\Models\PaymentAllocation::sumAllocatedByInvoiceIds('sale_invoice', $invIds);
 
     $invoices = $rawInvoices->map(function ($inv) use ($hasInvoiceDate, $hasInvoiceNo, $allocatedByInvoice) {
             // robust totals

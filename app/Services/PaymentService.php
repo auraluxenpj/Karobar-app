@@ -822,24 +822,21 @@ class PaymentService
         $settlementService = app(ReturnSettlementService::class);
 
         if (($partyType === null || $partyType === 'customer') && \App\Support\SchemaCache::hasTable('sale_returns') && \App\Support\SchemaCache::hasColumn('sale_returns', 'settlement_mode')) {
-            $existingSrIds = Payment::query()
+            $existingSrLookup = Payment::query()
                 ->where('idempotency_key', 'like', 'sale_return:%')
                 ->pluck('idempotency_key')
-                ->map(fn ($k) => (int) substr((string) $k, strlen('sale_return:')))
-                ->filter()
-                ->values()
+                ->mapWithKeys(fn ($k) => [(int) substr((string) $k, strlen('sale_return:')) => true])
                 ->all();
 
             $saleReturnQuery = SaleReturn::whereIn('settlement_mode', ['credit_note', 'invoice_offset'])
                 ->where('credited_amount', '>', 0)
-                ->whereNotNull('customer_id')
-                ->when(!empty($existingSrIds), fn ($q) => $q->whereNotIn('id', $existingSrIds));
+                ->whereNotNull('customer_id');
 
             if ($partyType === 'customer' && $partyId !== null) {
                 $saleReturnQuery->where('customer_id', $partyId);
             }
 
-            $saleReturns = $saleReturnQuery->get();
+            $saleReturns = $saleReturnQuery->get()->reject(fn ($sr) => isset($existingSrLookup[(int) $sr->id]));
             foreach ($saleReturns as $sr) {
                 $settlementService->syncSaleReturnCreditPayment(
                     $sr,
@@ -851,24 +848,21 @@ class PaymentService
         }
 
         if (($partyType === null || $partyType === 'supplier') && \App\Support\SchemaCache::hasTable('purchase_returns') && \App\Support\SchemaCache::hasColumn('purchase_returns', 'settlement_mode')) {
-            $existingPrIds = Payment::query()
+            $existingPrLookup = Payment::query()
                 ->where('idempotency_key', 'like', 'purchase_return:%')
                 ->pluck('idempotency_key')
-                ->map(fn ($k) => (int) substr((string) $k, strlen('purchase_return:')))
-                ->filter()
-                ->values()
+                ->mapWithKeys(fn ($k) => [(int) substr((string) $k, strlen('purchase_return:')) => true])
                 ->all();
 
             $purchaseReturnQuery = PurchaseReturn::whereIn('settlement_mode', ['credit_note', 'invoice_offset'])
                 ->where('credited_amount', '>', 0)
-                ->whereNotNull('supplier_id')
-                ->when(!empty($existingPrIds), fn ($q) => $q->whereNotIn('id', $existingPrIds));
+                ->whereNotNull('supplier_id');
 
             if ($partyType === 'supplier' && $partyId !== null) {
                 $purchaseReturnQuery->where('supplier_id', $partyId);
             }
 
-            $purchaseReturns = $purchaseReturnQuery->get();
+            $purchaseReturns = $purchaseReturnQuery->get()->reject(fn ($pr) => isset($existingPrLookup[(int) $pr->id]));
             foreach ($purchaseReturns as $pr) {
                 $settlementService->syncPurchaseReturnCreditPayment(
                     $pr,

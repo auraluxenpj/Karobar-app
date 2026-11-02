@@ -1731,9 +1731,122 @@ function buildLiveStatusBlock(anatomy, shortcut = null) {
   };
 }
 
+const LEARNED_KNOWLEDGE_STORAGE_KEY = "karobar_cursor_ai_learned_knowledge_v2";
+let inMemoryLearnedKnowledge = null;
+
+/**
+ * Loads AI-learned improvements persisted by the Explain Cursor & Cube Assistant
+ * so old static knowledge is continuously upgraded with Generative AI explanations.
+ */
+export function loadLearnedCursorKnowledge() {
+  if (inMemoryLearnedKnowledge) {
+    return inMemoryLearnedKnowledge;
+  }
+  const empty = {
+    controls: {},
+    intents: {},
+    questions: {},
+  };
+  if (typeof window === "undefined" || !window.localStorage) {
+    inMemoryLearnedKnowledge = empty;
+    return inMemoryLearnedKnowledge;
+  }
+  try {
+    const raw = window.localStorage.getItem(LEARNED_KNOWLEDGE_STORAGE_KEY);
+    if (!raw) {
+      inMemoryLearnedKnowledge = empty;
+      return inMemoryLearnedKnowledge;
+    }
+    const parsed = JSON.parse(raw);
+    inMemoryLearnedKnowledge = {
+      controls: parsed?.controls && typeof parsed.controls === "object" ? parsed.controls : {},
+      intents: parsed?.intents && typeof parsed.intents === "object" ? parsed.intents : {},
+      questions: parsed?.questions && typeof parsed.questions === "object" ? parsed.questions : {},
+    };
+    return inMemoryLearnedKnowledge;
+  } catch {
+    inMemoryLearnedKnowledge = empty;
+    return inMemoryLearnedKnowledge;
+  }
+}
+
+/**
+ * Saves an AI-generated explanation into the learned knowledge store to improve old knowledge.
+ */
+export function saveLearnedCursorKnowledge({
+  controlKey = "",
+  intentId = "",
+  questionText = "",
+  route = "/dashboard",
+  titleEn = "",
+  titleUr = "",
+  answerEn = "",
+  answerUr = "",
+  provider = "ai",
+} = {}) {
+  if (!answerEn && !answerUr) return null;
+  const store = loadLearnedCursorKnowledge();
+  const updatedAt = new Date().toISOString();
+
+  const record = {
+    title: {
+      en: titleEn || "Karobar ERP Guide",
+      ur: titleUr || titleEn || "کاروبار ایپ رہنمائی",
+    },
+    en: answerEn || answerUr,
+    ur: answerUr || answerEn,
+    provider,
+    updatedAt,
+  };
+
+  if (controlKey) {
+    store.controls[String(controlKey).toLowerCase()] = record;
+  }
+  if (intentId) {
+    store.intents[String(intentId)] = record;
+  }
+  if (questionText) {
+    const normQ = `${route || "/dashboard"}::${String(questionText)
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim()}`;
+    store.questions[normQ] = record;
+  }
+
+  inMemoryLearnedKnowledge = store;
+  if (typeof window !== "undefined" && window.localStorage) {
+    try {
+      window.localStorage.setItem(LEARNED_KNOWLEDGE_STORAGE_KEY, JSON.stringify(store));
+    } catch {
+      // ignore storage quota errors
+    }
+  }
+  return record;
+}
+
+/**
+ * Retrieves any AI-improved answer for a previously asked question or matched intent.
+ */
+export function getLearnedAnswerForQuery(queryText = "", route = "/dashboard", matchedIntentId = "") {
+  const store = loadLearnedCursorKnowledge();
+  if (matchedIntentId && store.intents[matchedIntentId]) {
+    return store.intents[matchedIntentId];
+  }
+  const normQ = `${route || "/dashboard"}::${String(queryText)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()}`;
+  if (store.questions[normQ]) {
+    return store.questions[normQ];
+  }
+  return null;
+}
+
 /**
  * Inspects a clicked DOM element on the page and returns a detailed, component-specific
- * bilingual explanation card (never dumping generic whole-screen summaries).
+ * bilingual explanation card along with structured `elementContext` for Generative AI enrichment.
  */
 export function explainDomElement(element, currentGuide) {
   if (!element) return null;
@@ -1773,6 +1886,54 @@ export function explainDomElement(element, currentGuide) {
     .toLowerCase()
     .trim();
 
+  const guideKey = currentGuide?.key || currentGuide?.path || "/dashboard";
+  const displayLabel = anatomy.primaryLabel || anatomy.tableHeaderText || "Selected Control";
+  const controlKey = `${guideKey}::${anatomy.componentType.kind}::${(primaryLower || displayLabel.toLowerCase()).slice(0, 80)}`;
+
+  const finalizeExplanation = (baseResult) => {
+    const shortcutText = baseResult.shortcut?.keys || "";
+    const elementContext = {
+      control_key: controlKey,
+      label: String(baseResult.title?.en || displayLabel).slice(0, 240),
+      component_type: String(anatomy.componentType.en || "UI Control").slice(0, 120),
+      zone: String(anatomy.zone?.en || "Active Screen").slice(0, 120),
+      table_column: String(anatomy.tableHeaderText || "").slice(0, 160),
+      placeholder: String(anatomy.placeholder || "").slice(0, 200),
+      shortcut: String(shortcutText).slice(0, 80),
+    };
+
+    const learned = loadLearnedCursorKnowledge().controls[controlKey.toLowerCase()];
+    if (learned && (learned.en || learned.ur)) {
+      const liveStatus = buildLiveStatusBlock(anatomy, baseResult.shortcut);
+      return {
+        ...baseResult,
+        title: {
+          en: learned.title?.en || baseResult.title?.en,
+          ur: learned.title?.ur || baseResult.title?.ur,
+        },
+        en: `${learned.en}${liveStatus.en}`,
+        ur: `${learned.ur}${liveStatus.ur}`,
+        baselineEn: `${learned.en}${liveStatus.en}`,
+        baselineUr: `${learned.ur}${liveStatus.ur}`,
+        aiGenerated: false,
+        aiImproved: true,
+        aiProvider: learned.provider || "ai",
+        controlKey,
+        elementContext,
+      };
+    }
+
+    return {
+      ...baseResult,
+      baselineEn: baseResult.en,
+      baselineUr: baseResult.ur,
+      aiGenerated: false,
+      aiImproved: false,
+      controlKey,
+      elementContext,
+    };
+  };
+
   // 1. Check universal ERP control dictionary first (most specific to sub-columns, buttons & shortcuts)
   for (const entry of UNIVERSAL_CONTROL_DICTIONARY) {
     const exactHit =
@@ -1787,7 +1948,7 @@ export function explainDomElement(element, currentGuide) {
     if (exactHit || keywordHit) {
       const shortcut = resolveControlShortcut(element, anatomy, entry);
       const liveStatus = buildLiveStatusBlock(anatomy, shortcut);
-      return {
+      return finalizeExplanation({
         title: {
           en: entry.title.en,
           ur: entry.title.ur,
@@ -1796,12 +1957,11 @@ export function explainDomElement(element, currentGuide) {
         shortcut,
         en: `${entry.en}${liveStatus.en}`,
         ur: `${entry.ur}${liveStatus.ur}`,
-      };
+      });
     }
   }
 
   // 2. Check screen-specific fields glossary when the component's own label/column matches the field name
-  const guideKey = currentGuide?.key || currentGuide?.path || "";
   const blueprint = SCREEN_BLUEPRINTS[guideKey] || getBlueprintForGuide(currentGuide);
   const allScreenFields = [...(currentGuide?.fields || []), ...(blueprint?.fields || [])];
 
@@ -1821,7 +1981,7 @@ export function explainDomElement(element, currentGuide) {
       if (isDirectMatch) {
         const shortcut = resolveControlShortcut(element, anatomy, null);
         const liveStatus = buildLiveStatusBlock(anatomy, shortcut);
-        return {
+        return finalizeExplanation({
           title: {
             en: field.term.en,
             ur: field.term.ur || field.term.en,
@@ -1830,18 +1990,17 @@ export function explainDomElement(element, currentGuide) {
           shortcut,
           en: `**What this ${anatomy.componentType.en.toLowerCase()} does:**\n${field.en}${liveStatus.en}`,
           ur: `**اس کنٹرول کا کام:**\n${field.ur || field.en}${liveStatus.ur}`,
-        };
+        });
       }
     }
   }
 
   // 3. Detailed Component-Specific Analysis for any custom Button, Input, Dropdown, Table Column, or Card
-  const displayLabel = anatomy.primaryLabel || "Selected Control";
   const shortcut = resolveControlShortcut(element, anatomy, null);
   const liveStatus = buildLiveStatusBlock(anatomy, shortcut);
 
   if (anatomy.componentType.kind === "button" || anatomy.componentType.kind === "link") {
-    return {
+    return finalizeExplanation({
       title: {
         en: `${displayLabel}`,
         ur: `${displayLabel}`,
@@ -1850,11 +2009,11 @@ export function explainDomElement(element, currentGuide) {
       shortcut,
       en: `**What this button does:** Triggers the **${displayLabel}** action.\n**How to use it:**\n• Click this control when you want to execute **${displayLabel}**.${liveStatus.en}`,
       ur: `**یہ بٹن کیا کرتا ہے:** یہ بٹن دبانے سے **${displayLabel}** کا عمل شروع ہوتا ہے۔${liveStatus.ur}`,
-    };
+    });
   }
 
   if (anatomy.componentType.kind === "readonly-input") {
-    return {
+    return finalizeExplanation({
       title: {
         en: `${displayLabel}`,
         ur: `${displayLabel}`,
@@ -1863,7 +2022,7 @@ export function explainDomElement(element, currentGuide) {
       shortcut,
       en: `**What this read-only box shows:** Displays the live calculated value for **${displayLabel}**.\n**Why you cannot type here:**\n• Karobar ERP calculates this value automatically from your item quantities, rates, discounts, or ledger balances so manual typing errors cannot occur.${liveStatus.en}`,
       ur: `**یہ خانہ کیا دکھاتا ہے:** یہ **${displayLabel}** کی خودکار طریقے سے گنی گئی رقم یا معلومات دکھاتا ہے۔\n• حساب کی غلطی سے بچنے کے لیے سسٹم اسے خود کیلکولیٹ کرتا ہے، اس لیے اس میں ہاتھ سے لکھنے کی ضرورت نہیں ہوتی۔${liveStatus.ur}`,
-    };
+    });
   }
 
   if (
@@ -1873,7 +2032,7 @@ export function explainDomElement(element, currentGuide) {
     anatomy.componentType.kind === "select" ||
     anatomy.componentType.kind === "toggle"
   ) {
-    return {
+    return finalizeExplanation({
       title: {
         en: `${displayLabel}`,
         ur: `${displayLabel}`,
@@ -1888,12 +2047,12 @@ export function explainDomElement(element, currentGuide) {
             : `Enter the required value for **${displayLabel}** before saving or filtering.`
       }${liveStatus.en}`,
       ur: `**اس خانے کا مقصد:** یہاں **${displayLabel}** کی معلومات درج یا منتخب کی جاتی ہیں۔\n• اس خانے میں تبدیلی کرنے سے متعلقہ حساب یا فہرست فوری طور پر اپڈیٹ ہو جاتی ہے۔${liveStatus.ur}`,
-    };
+    });
   }
 
   if (anatomy.componentType.kind === "th" || anatomy.componentType.kind === "td") {
     const colName = anatomy.tableHeaderText || displayLabel;
-    return {
+    return finalizeExplanation({
       title: {
         en: `Column: ${colName}`,
         ur: `کالم: ${colName}`,
@@ -1908,7 +2067,7 @@ export function explainDomElement(element, currentGuide) {
           : ""
       }\n• If the cells in this column contain input boxes or action buttons, you can click directly inside any row's cell to edit or trigger it.${liveStatus.en}`,
       ur: `**یہ کالم کیا دکھاتا ہے:** ٹیبل کی ہر سطر کے لیے **${colName}** کی تفصیل یا قیمت دکھاتا ہے۔${liveStatus.ur}`,
-    };
+    });
   }
 
   // KPI Card / Summary Box / Section Block
@@ -1927,7 +2086,7 @@ export function explainDomElement(element, currentGuide) {
       ? `\n• **موجودہ معلومات:** \`${cardLines[0]}\` ← **${cardLines.slice(1).join(" • ")}**`
       : "";
 
-  return {
+  return finalizeExplanation({
     title: {
       en: `${cardLines[0] || displayLabel}`,
       ur: `${cardLines[0] || displayLabel}`,
@@ -1940,7 +2099,7 @@ export function explainDomElement(element, currentGuide) {
     ur: `**یہ حصہ کیا دکھاتا ہے:** یہ کارڈ **${
       cardLines[0] || displayLabel
     }** کے موجودہ اعداد و شمار اور خلاصہ دکھاتا ہے۔${cardBreakdownUr}`,
-  };
+  });
 }
 
 /**

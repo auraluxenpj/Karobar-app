@@ -67,9 +67,13 @@ class StocktakeService
 
         $products = $this->resolveProducts($session);
         $productIds = $products->pluck('id')->all();
-        $batchesByProduct = !empty($productIds)
-            ? Batch::whereIn('product_id', $productIds)->get()->groupBy('product_id')
-            : collect();
+        $batchesCollection = collect();
+        foreach (array_chunk($productIds, 500) as $chunkIds) {
+            $batchesCollection = $batchesCollection->concat(
+                Batch::whereIn('product_id', $chunkIds)->get()
+            );
+        }
+        $batchesByProduct = $batchesCollection->groupBy('product_id');
 
         $rows = [];
         $now  = now();
@@ -143,8 +147,8 @@ class StocktakeService
             }
         }
 
-        // Bulk insert for performance
-        foreach (array_chunk($rows, 500) as $chunk) {
+        // Bulk insert in SQLite-safe chunks (50 rows * 16 columns = 800 variables < 999 limit)
+        foreach (array_chunk($rows, 50) as $chunk) {
             StocktakeItem::insert($chunk);
         }
     }

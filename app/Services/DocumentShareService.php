@@ -1602,17 +1602,8 @@ class DocumentShareService
             ->orderBy('id')
             ->get($selectCols);
 
-        $allocatedByInvoice = collect();
         $invIds = $rawInvoices->pluck('id')->all();
-        if (!empty($invIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
-            $allocatedByInvoice = \App\Models\PaymentAllocation::query()
-                ->where('invoice_type', 'sale_invoice')
-                ->whereIn('invoice_id', $invIds)
-                ->whereHas('payment', fn ($q) => $q->where('status', 'posted'))
-                ->selectRaw('invoice_id, SUM(amount) as total_allocated')
-                ->groupBy('invoice_id')
-                ->pluck('total_allocated', 'invoice_id');
-        }
+        $allocatedByInvoice = \App\Models\PaymentAllocation::sumAllocatedByInvoiceIds('sale_invoice', $invIds);
 
         $invoices = $rawInvoices->map(function ($inv) use ($hasInvoiceDate, $hasInvoiceNo, $allocatedByInvoice) {
             $t = (float) ($inv->invoice_total ?? $inv->total ?? $inv->grand_total ?? $inv->net_total ?? $inv->gross_amount ?? $inv->sub_total ?? 0);
@@ -1681,17 +1672,8 @@ class DocumentShareService
                 ->whereDate($dateColumn, '<', $from)
                 ->get($selectCols);
 
-            $priorAllocated = collect();
             $priorIds = $priorInvRows->pluck('id')->all();
-            if (!empty($priorIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
-                $priorAllocated = \App\Models\PaymentAllocation::query()
-                    ->where('invoice_type', 'sale_invoice')
-                    ->whereIn('invoice_id', $priorIds)
-                    ->whereHas('payment', fn ($q) => $q->where('status', 'posted'))
-                    ->selectRaw('invoice_id, SUM(amount) as total_allocated')
-                    ->groupBy('invoice_id')
-                    ->pluck('total_allocated', 'invoice_id');
-            }
+            $priorAllocated = \App\Models\PaymentAllocation::sumAllocatedByInvoiceIds('sale_invoice', $priorIds);
 
             $priorInv = $priorInvRows->sum(function ($inv) use ($priorAllocated) {
                 $t = (float) ($inv->invoice_total ?? $inv->total ?? $inv->grand_total ?? $inv->net_total ?? $inv->gross_amount ?? $inv->sub_total ?? 0);
@@ -2021,17 +2003,8 @@ class DocumentShareService
             ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->get(['id', 'total', 'total_receive']);
 
-        $allocatedByInvoice = collect();
         $invIds = $invoices->pluck('id')->all();
-        if (!empty($invIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
-            $allocatedByInvoice = \App\Models\PaymentAllocation::query()
-                ->where('invoice_type', 'sale_invoice')
-                ->whereIn('invoice_id', $invIds)
-                ->whereHas('payment', fn ($q) => $q->where('status', 'posted'))
-                ->selectRaw('invoice_id, SUM(amount) as total_allocated')
-                ->groupBy('invoice_id')
-                ->pluck('total_allocated', 'invoice_id');
-        }
+        $allocatedByInvoice = \App\Models\PaymentAllocation::sumAllocatedByInvoiceIds('sale_invoice', $invIds);
 
         $invDelta = $invoices->sum(function ($inv) use ($allocatedByInvoice) {
             $t = (float) ($inv->total ?? 0);

@@ -37,7 +37,7 @@ class GroqProvider
         $modelsEndpoint = (string) ($config['models_endpoint'] ?? 'https://api.groq.com/openai/v1/models');
         $timeout = max(2, (int) ($config['timeout_seconds'] ?? 25));
         $connectTimeout = max(1, (int) ($config['connect_timeout_seconds'] ?? 10));
-        $maxTokens = max(250, (int) ($config['max_output_tokens'] ?? 2048));
+        $maxTokens = max(1024, (int) ($config['max_output_tokens'] ?? 4096));
         $temperature = (float) ($config['temperature'] ?? 0.3);
 
         $headers = [
@@ -104,6 +104,10 @@ class GroqProvider
             if ($response->successful()) {
                 $body = $response->json();
                 $rawContent = (string) data_get($body, 'choices.0.message.content', '');
+                if (trim($rawContent) === '') {
+                    $rawContent = (string) (data_get($body, 'choices.0.message.reasoning', '')
+                        ?: data_get($body, 'choices.0.message.reasoning_content', ''));
+                }
                 $decoded = $this->decodeJsonContent($rawContent);
 
                 if ($decoded === null) {
@@ -236,26 +240,23 @@ class GroqProvider
             'response_format' => ['type' => 'json_object'],
         ];
 
-        // Compound / reasoning models may not support response_format=json_object directly
-        if (str_contains(strtolower($model), 'compound') || str_contains(strtolower($model), 'qwen3')) {
+        // Compound / reasoning models (gpt-oss, compound, qwen, deepseek) consume reasoning tokens
+        // from max_tokens and frequently fail Groq's strict json_object validator if response_format is forced.
+        $lowerModel = strtolower($model);
+        if (
+            str_contains($lowerModel, 'gpt-oss') ||
+            str_contains($lowerModel, 'compound') ||
+            str_contains($lowerModel, 'qwen') ||
+            str_contains($lowerModel, 'deepseek')
+        ) {
             unset($payload['response_format']);
         }
 
         $response = $this->sendHttpRequest($headers, $endpoint, $payload, $connectTimeout, $timeout);
 
         if ($response->status() === 400 && isset($payload['response_format'])) {
-            $errBody = (array) $response->json();
-            $errCode = strtolower((string) (data_get($errBody, 'error.code') ?: ''));
-            $errMsg = strtolower((string) (data_get($errBody, 'error.message') ?: ''));
-            if (
-                str_contains($errCode, 'json_validate_failed') ||
-                str_contains($errMsg, 'response_format') ||
-                str_contains($errMsg, 'json_object') ||
-                str_contains($errMsg, 'not supported')
-            ) {
-                unset($payload['response_format']);
-                $response = $this->sendHttpRequest($headers, $endpoint, $payload, $connectTimeout, $timeout);
-            }
+            unset($payload['response_format']);
+            $response = $this->sendHttpRequest($headers, $endpoint, $payload, $connectTimeout, $timeout);
         }
 
         return $response;

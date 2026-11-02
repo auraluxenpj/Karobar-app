@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import 'tailwindcss' source('../');
 
 /* Login: first screen migrated to the modern glass system in Design.md.
    Keep tokens scoped so the remaining screens retain their current styling. */

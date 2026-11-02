@@ -159,12 +159,16 @@ class HrPayrollService
             $saleUnitsExpr = $hasBonusCol
                 ? '(COALESCE(sii.quantity, 0) + COALESCE(sii.bonus, 0))'
                 : 'COALESCE(sii.quantity, 0)';
-            $cogsRow = DB::table('sale_invoice_items as sii')
-                ->leftJoin('products as p', 'p.id', '=', 'sii.product_id')
-                ->whereIn('sii.sale_invoice_id', $invoiceIds)
-                ->selectRaw("COALESCE(SUM(COALESCE(sii.cost_price_snapshot, p.avg_price, p.unit_purchase_price, 0) * {$saleUnitsExpr}), 0) as total_cogs")
-                ->first();
-            $cogsTotal = round((float) ($cogsRow->total_cogs ?? 0), 2);
+            $cogsAccum = 0.0;
+            foreach (array_chunk($invoiceIds, 500) as $chunkIds) {
+                $cogsRow = DB::table('sale_invoice_items as sii')
+                    ->leftJoin('products as p', 'p.id', '=', 'sii.product_id')
+                    ->whereIn('sii.sale_invoice_id', $chunkIds)
+                    ->selectRaw("COALESCE(SUM(COALESCE(sii.cost_price_snapshot, p.avg_price, p.unit_purchase_price, 0) * {$saleUnitsExpr}), 0) as total_cogs")
+                    ->first();
+                $cogsAccum += (float) ($cogsRow->total_cogs ?? 0);
+            }
+            $cogsTotal = round($cogsAccum, 2);
         }
 
         $grossProfit = round(max(0.0, $netSales - $cogsTotal), 2);

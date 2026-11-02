@@ -27,6 +27,19 @@ class CubeAssistantController extends Controller
             'history.*.content' => ['required_with:history', 'string', 'max:2000'],
             'matched_intent_id' => ['nullable', 'string', 'max:120'],
             'screen_guide_id' => ['nullable', 'string', 'max:160'],
+            'explain_mode' => ['nullable', 'string', 'in:qa,cursor_element,screen_topic'],
+            'user_confirmed' => ['nullable', 'boolean'],
+            'element_context' => ['nullable', 'array'],
+            'element_context.control_key' => ['nullable', 'string', 'max:240'],
+            'element_context.label' => ['nullable', 'string', 'max:240'],
+            'element_context.component_type' => ['nullable', 'string', 'max:120'],
+            'element_context.zone' => ['nullable', 'string', 'max:120'],
+            'element_context.table_column' => ['nullable', 'string', 'max:160'],
+            'element_context.placeholder' => ['nullable', 'string', 'max:200'],
+            'element_context.shortcut' => ['nullable', 'string', 'max:80'],
+            'element_context.nearby_headings' => ['nullable', 'string', 'max:500'],
+            'element_context.baseline_en' => ['nullable', 'string', 'max:2000'],
+            'element_context.baseline_ur' => ['nullable', 'string', 'max:2000'],
 
             // Security: strictly reject arbitrary provider names, navigation URLs, action IDs, or CSS selectors from frontend
             'provider' => ['prohibited'],
@@ -65,6 +78,8 @@ class CubeAssistantController extends Controller
             'updates' => ['nullable', 'array', 'max:25'],
             'assignments' => ['nullable', 'array', 'max:50'],
             'standalone_formulations' => ['nullable', 'array', 'max:50'],
+            'user_confirmed' => ['nullable', 'boolean'],
+            'preview_only' => ['nullable', 'boolean'],
         ]);
 
         $response = $this->taskExecutor->executeStructuredTask(

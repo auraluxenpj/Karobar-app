@@ -25,17 +25,8 @@ class SupplierLedgerController extends Controller
             ->whereDate('entry_date', '<', $from)
             ->get();
 
-        $priorAllocated = collect();
         $priorInvIds = $priorRows->pluck('purchase_invoice_id')->filter()->unique()->values()->all();
-        if (!empty($priorInvIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
-            $priorAllocated = \App\Models\PaymentAllocation::query()
-                ->where('invoice_type', 'purchase_invoice')
-                ->whereIn('invoice_id', $priorInvIds)
-                ->whereHas('payment', fn($q) => $q->where('status', 'posted'))
-                ->selectRaw('invoice_id, SUM(amount) as total_allocated')
-                ->groupBy('invoice_id')
-                ->pluck('total_allocated', 'invoice_id');
-        }
+        $priorAllocated = \App\Models\PaymentAllocation::sumAllocatedByInvoiceIds('purchase_invoice', $priorInvIds);
 
         $openingBalance = 0.0;
         foreach ($priorRows as $pRow) {
@@ -80,17 +71,8 @@ class SupplierLedgerController extends Controller
 
         $rows = $q->orderBy('entry_date')->orderBy('id')->get();
 
-        $allocatedByInvoice = collect();
         $invIds = $rows->pluck('purchase_invoice_id')->filter()->unique()->values()->all();
-        if (!empty($invIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
-            $allocatedByInvoice = \App\Models\PaymentAllocation::query()
-                ->where('invoice_type', 'purchase_invoice')
-                ->whereIn('invoice_id', $invIds)
-                ->whereHas('payment', fn($q) => $q->where('status', 'posted'))
-                ->selectRaw('invoice_id, SUM(amount) as total_allocated')
-                ->groupBy('invoice_id')
-                ->pluck('total_allocated', 'invoice_id');
-        }
+        $allocatedByInvoice = \App\Models\PaymentAllocation::sumAllocatedByInvoiceIds('purchase_invoice', $invIds);
 
         foreach ($rows as $row) {
             if ($row->entry_type === 'invoice' && $row->purchaseInvoice) {
@@ -292,9 +274,9 @@ class SupplierLedgerController extends Controller
             ->where('status', 'reversed')
             ->pluck('id')
             ->all();
-        if (!empty($reversedIds)) {
+        foreach (array_chunk($reversedIds, 500) as $revChunk) {
             SupplierLedger::where('supplier_id', $validated['supplier_id'])
-                ->whereIn('purchase_invoice_id', $reversedIds)
+                ->whereIn('purchase_invoice_id', $revChunk)
                 ->delete();
         }
 
@@ -306,17 +288,8 @@ class SupplierLedgerController extends Controller
             ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
             ->get();
 
-        $allocatedByInvoice = collect();
         $invIds = $invoices->pluck('id')->all();
-        if (!empty($invIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
-            $allocatedByInvoice = \App\Models\PaymentAllocation::query()
-                ->where('invoice_type', 'purchase_invoice')
-                ->whereIn('invoice_id', $invIds)
-                ->whereHas('payment', fn($q) => $q->where('status', 'posted'))
-                ->selectRaw('invoice_id, SUM(amount) as total_allocated')
-                ->groupBy('invoice_id')
-                ->pluck('total_allocated', 'invoice_id');
-        }
+        $allocatedByInvoice = \App\Models\PaymentAllocation::sumAllocatedByInvoiceIds('purchase_invoice', $invIds);
 
         DB::transaction(function () use ($invoices, $allocatedByInvoice) {
             foreach ($invoices as $inv) {
@@ -573,17 +546,8 @@ class SupplierLedgerController extends Controller
             ->orderBy('id')
             ->get();
 
-        $allocatedByInvoice = collect();
         $invIds = $rows->pluck('purchase_invoice_id')->filter()->unique()->values()->all();
-        if (!empty($invIds) && Schema::hasTable('payment_allocations') && Schema::hasTable('payments')) {
-            $allocatedByInvoice = \App\Models\PaymentAllocation::query()
-                ->where('invoice_type', 'purchase_invoice')
-                ->whereIn('invoice_id', $invIds)
-                ->whereHas('payment', fn($q) => $q->where('status', 'posted'))
-                ->selectRaw('invoice_id, SUM(amount) as total_allocated')
-                ->groupBy('invoice_id')
-                ->pluck('total_allocated', 'invoice_id');
-        }
+        $allocatedByInvoice = \App\Models\PaymentAllocation::sumAllocatedByInvoiceIds('purchase_invoice', $invIds);
 
         $openingBalance = $this->calculateOpeningBalance($supplier->id, $from);
         $balance = $openingBalance;

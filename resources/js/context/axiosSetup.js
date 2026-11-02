@@ -163,8 +163,12 @@ export function initAxiosAuth() {
         config.headers.Authorization = `Bearer ${token}`;
       }
       const method = (config?.method || "get").toLowerCase();
-      if (["post", "put", "patch", "delete"].includes(method)) {
-        invalidateCacheForMutation(config?.url || "");
+      const reqUrl = config?.url || "";
+      if (
+        ["post", "put", "patch", "delete"].includes(method) &&
+        !reqUrl.includes("/api/cube/")
+      ) {
+        invalidateCacheForMutation(reqUrl);
       }
       return config;
     },
@@ -178,7 +182,12 @@ export function initAxiosAuth() {
       try {
         const method = (r?.config?.method || "get").toLowerCase();
         const url = r?.config?.url || "";
-        if (["post", "put", "patch", "delete"].includes(method)) {
+        const isCubeEndpoint = url.includes("/api/cube/");
+        const cubeDidMutateProducts = Boolean(r?.data?.task_meta?.refresh_products);
+        if (
+          ["post", "put", "patch", "delete"].includes(method) &&
+          (!isCubeEndpoint || cubeDidMutateProducts)
+        ) {
           invalidateCacheForMutation(url);
         }
         if (
@@ -221,6 +230,13 @@ export function initAxiosAuth() {
       const isLicenseApi = url.includes("/license/");
       const isLicenseStatusEndpoint = url === "/api/license/status";
       const isAuth = url.includes("/login") || url.includes("/user") || url.includes("/me");
+      const isCubeApi = url.includes("/api/cube/");
+
+      // Never trigger a full-page browser navigation for background Cube / GuideBot requests;
+      // let FeatureGuideBot catch errors and gracefully fall back without refreshing the screen.
+      if (isCubeApi) {
+        return Promise.reject(err);
+      }
 
       // Only redirect to activate for 402 from protected API endpoints (not status check)
       if (status === 402 && !isLicenseApi && !isLicenseStatusEndpoint && !isAuth) {

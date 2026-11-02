@@ -26,6 +26,9 @@ return [
     'backup_provider' => env('CUBE_BACKUP_PROVIDER', 'gemini'),
 
     'knowledge_path' => resource_path('assistant/cube-knowledge.json'),
+    'learned_knowledge_path' => env('APP_ENV') === 'testing'
+        ? storage_path('framework/testing/cube-learned-knowledge.json')
+        : storage_path('app/cube-learned-knowledge.json'),
 
     'max_question_length' => 2000,
     'max_history_messages' => 6,
@@ -46,7 +49,7 @@ return [
             'models_endpoint' => env('GROQ_MODELS_ENDPOINT', 'https://api.groq.com/openai/v1/models'),
             'timeout_seconds' => (int) env('GROQ_TIMEOUT_SECONDS', 25),
             'connect_timeout_seconds' => (int) env('GROQ_CONNECT_TIMEOUT_SECONDS', 10),
-            'max_output_tokens' => 2048,
+            'max_output_tokens' => 4096,
             'temperature' => 0.3,
             'allowed_free_models' => [
                 'openai/gpt-oss-120b',
@@ -77,7 +80,7 @@ return [
             'endpoint_base' => env('GEMINI_API_ENDPOINT_BASE', 'https://generativelanguage.googleapis.com/v1beta/models'),
             'timeout_seconds' => (int) env('GEMINI_TIMEOUT_SECONDS', 25),
             'connect_timeout_seconds' => (int) env('GEMINI_CONNECT_TIMEOUT_SECONDS', 10),
-            'max_output_tokens' => 2048,
+            'max_output_tokens' => 4096,
             'temperature' => 0.3,
             'allowed_free_models' => [
                 'gemini-3.8-flash',

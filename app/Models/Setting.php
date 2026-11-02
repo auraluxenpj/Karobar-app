@@ -223,7 +223,11 @@ class Setting extends Model
         }
 
         $groqKey = trim((string) ($this->cube_groq_api_key ?? ''));
-        if ($groqKey !== '' || $this->cube_groq_enabled === false) {
+        $hasGroqSettings = $groqKey !== ''
+            || $this->cube_groq_enabled === false
+            || trim((string) ($this->cube_groq_model ?? '')) !== ''
+            || $this->cube_groq_daily_limit !== null;
+        if ($hasGroqSettings) {
             self::applyRuntimeCubeProvider('groq', [
                 'enabled'     => (bool) ($this->cube_groq_enabled ?? true),
                 'api_key'     => $groqKey !== '' ? $groqKey : (string) config('cube.providers.groq.api_key', ''),
@@ -235,7 +239,11 @@ class Setting extends Model
         }
 
         $geminiKey = trim((string) ($this->cube_gemini_api_key ?? ''));
-        if ($geminiKey !== '' || $this->cube_gemini_enabled === false) {
+        $hasGeminiSettings = $geminiKey !== ''
+            || $this->cube_gemini_enabled === false
+            || trim((string) ($this->cube_gemini_model ?? '')) !== ''
+            || $this->cube_gemini_daily_limit !== null;
+        if ($hasGeminiSettings) {
             self::applyRuntimeCubeProvider('gemini', [
                 'enabled'     => (bool) ($this->cube_gemini_enabled ?? true),
                 'api_key'     => $geminiKey !== '' ? $geminiKey : (string) config('cube.providers.gemini.api_key', ''),

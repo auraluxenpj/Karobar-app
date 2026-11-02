@@ -97,8 +97,8 @@ class SupplierLedger extends Model
             ->where(function ($q) {
                 $q->whereNull('status')->orWhere('status', '!=', 'reversed');
             })
-            ->when(!empty($allLinkedInvIds), fn ($q) => $q->whereNotIn('id', array_values($allLinkedInvIds)))
             ->get(['id', 'supplier_id', 'total_amount', 'total_paid'])
+            ->reject(fn ($inv) => isset($allLinkedInvIds[(int) $inv->id]))
             ->groupBy('supplier_id');
 
         $allInvIdsForAlloc = $allLinkedInvIds;
@@ -108,16 +108,7 @@ class SupplierLedger extends Model
             }
         }
 
-        $allocatedByInvoice = collect();
-        if (!empty($allInvIdsForAlloc) && \App\Support\SchemaCache::hasTable('payment_allocations') && \App\Support\SchemaCache::hasTable('payments')) {
-            $allocatedByInvoice = PaymentAllocation::query()
-                ->where('invoice_type', 'purchase_invoice')
-                ->whereIn('invoice_id', array_values($allInvIdsForAlloc))
-                ->whereHas('payment', fn ($q) => $q->where('status', 'posted'))
-                ->selectRaw('invoice_id, SUM(amount) as total_allocated')
-                ->groupBy('invoice_id')
-                ->pluck('total_allocated', 'invoice_id');
-        }
+        $allocatedByInvoice = PaymentAllocation::sumAllocatedByInvoiceIds('purchase_invoice', array_values($allInvIdsForAlloc));
 
         $result = [];
         foreach ($supplierIds as $supplierId) {

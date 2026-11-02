@@ -52,6 +52,7 @@ import {
   EVIDENCE_TYPES,
   buildEvidenceBadge,
   explainDomElement,
+  saveLearnedCursorKnowledge,
 } from "@/data/guideBotKnowledge.js";
 
 const LANG_STORAGE_KEY = "karobar_guide_bot_lang";
@@ -300,6 +301,13 @@ function ScreenElementInspector({ guide, lang, onSetLang, isDark }) {
   const [inspectedPopover, setInspectedPopover] = useState(null);
   const [hoveredControlLabel, setHoveredControlLabel] = useState(null);
   const [stalkerTrickIdx, setStalkerTrickIdx] = useState(0);
+  const [cursorAiLoading, setCursorAiLoading] = useState(false);
+  const [cursorQuestionInput, setCursorQuestionInput] = useState("");
+  const [cursorCustomAnswer, setCursorCustomAnswer] = useState(null);
+  const [cursorIsStreaming, setCursorIsStreaming] = useState(false);
+  const [cursorStreamChars, setCursorStreamChars] = useState(0);
+  const cursorStreamTimerRef = useRef(null);
+  const cursorRequestIdRef = useRef(0);
   const popoverRef = useRef(null);
   const highlightedElRef = useRef(null);
   const stalkerElRef = useRef(null);
@@ -308,6 +316,53 @@ function ScreenElementInspector({ guide, lang, onSetLang, isDark }) {
     y: 86,
   });
   const isUr = lang === "ur";
+
+  const stopCursorStream = useCallback(() => {
+    if (cursorStreamTimerRef.current) {
+      window.clearInterval(cursorStreamTimerRef.current);
+      cursorStreamTimerRef.current = null;
+    }
+    setCursorIsStreaming(false);
+    setCursorStreamChars(0);
+  }, []);
+
+  const startCursorStream = useCallback((fullText = "") => {
+    if (cursorStreamTimerRef.current) {
+      window.clearInterval(cursorStreamTimerRef.current);
+      cursorStreamTimerRef.current = null;
+    }
+    const totalLen = String(fullText || "").length;
+    if (totalLen <= 20) {
+      setCursorIsStreaming(false);
+      setCursorStreamChars(totalLen);
+      return;
+    }
+    setCursorIsStreaming(true);
+    setCursorStreamChars(16);
+    const stepSize = Math.max(10, Math.min(30, Math.ceil(totalLen / 34)));
+    cursorStreamTimerRef.current = window.setInterval(() => {
+      setCursorStreamChars((prev) => {
+        const next = prev + stepSize;
+        if (next >= totalLen) {
+          if (cursorStreamTimerRef.current) {
+            window.clearInterval(cursorStreamTimerRef.current);
+            cursorStreamTimerRef.current = null;
+          }
+          setCursorIsStreaming(false);
+          return totalLen;
+        }
+        return next;
+      });
+    }, 20);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (cursorStreamTimerRef.current) {
+        window.clearInterval(cursorStreamTimerRef.current);
+      }
+    };
+  }, []);
 
   const clearElementHighlight = useCallback(() => {
     if (highlightedElRef.current) {
@@ -325,9 +380,145 @@ function ScreenElementInspector({ guide, lang, onSetLang, isDark }) {
   }, []);
 
   const dismissPopover = useCallback(() => {
+    cursorRequestIdRef.current += 1;
+    stopCursorStream();
+    setCursorAiLoading(false);
+    setCursorQuestionInput("");
+    setCursorCustomAnswer(null);
     setInspectedPopover(null);
     clearElementHighlight();
-  }, [clearElementHighlight]);
+  }, [clearElementHighlight, stopCursorStream]);
+
+  const requestCursorGenerativeAi = useCallback(
+    async (baseExplanation, customQuestion = null) => {
+      if (!baseExplanation) return;
+      const reqId = ++cursorRequestIdRef.current;
+      setCursorAiLoading(true);
+
+      const routePath = guide?.key || location.pathname || "/dashboard";
+      const controlLabel = baseExplanation.title?.en || "selected control";
+      const controlType = baseExplanation.elementContext?.component_type || "UI control";
+      const screenTitle = guide?.title?.en || routePath;
+
+      const questionToAsk = customQuestion
+        ? String(customQuestion).trim()
+        : `Explain the "${controlLabel}" (${controlType}) on the ${screenTitle} (${routePath}) screen in Karobar ERP, how to use it step-by-step, and how it affects stock or accounting.`;
+
+      try {
+        const res = await axios.post("/api/cube/ask", {
+          question: questionToAsk,
+          language: isUr ? "ur" : "en",
+          current_route: routePath,
+          screen_guide_id: guide?.key || null,
+          explain_mode: "cursor_element",
+          element_context: baseExplanation.elementContext || null,
+        });
+
+        if (cursorRequestIdRef.current !== reqId) return;
+        const data = res?.data || {};
+        const aiEn = data.answer_en || data.en || "";
+        const aiUr = data.answer_ur || data.ur || "";
+        const aiTitleEn = data.title_en || data.title?.en || baseExplanation.title?.en;
+        const aiTitleUr = data.title_ur || data.title?.ur || baseExplanation.title?.ur;
+
+        if (aiEn || aiUr) {
+          const isGeneratedByAi =
+            data.provider === "groq" || data.provider === "gemini";
+
+          if (isGeneratedByAi) {
+            saveLearnedCursorKnowledge({
+              controlKey: customQuestion ? "" : baseExplanation.controlKey || "",
+              questionText: customQuestion || "",
+              route: routePath,
+              titleEn: aiTitleEn,
+              titleUr: aiTitleUr,
+              answerEn: aiEn,
+              answerUr: aiUr,
+              provider: data.provider || "ai",
+            });
+          }
+
+          if (customQuestion) {
+            const nextText = isUr
+              ? aiUr || aiEn || baseExplanation.ur
+              : aiEn || baseExplanation.en;
+            setCursorCustomAnswer({
+              question: customQuestion,
+              title: { en: aiTitleEn, ur: aiTitleUr },
+              en: aiEn || baseExplanation.en,
+              ur: aiUr || baseExplanation.ur,
+              provider: data.provider || "local",
+              aiGenerated: isGeneratedByAi,
+              fallbackUsed: !isGeneratedByAi,
+              knowledgeImproved: Boolean(data.knowledge_improved),
+            });
+            startCursorStream(nextText);
+          } else {
+            const nextText = isUr
+              ? aiUr || aiEn || baseExplanation.ur
+              : aiEn || baseExplanation.en;
+            setInspectedPopover((prev) => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                explanation: {
+                  ...prev.explanation,
+                  title: {
+                    en: aiTitleEn || prev.explanation.title?.en,
+                    ur: aiTitleUr || prev.explanation.title?.ur,
+                  },
+                  en: isGeneratedByAi
+                    ? aiEn || prev.explanation.baselineEn || prev.explanation.en
+                    : prev.explanation.baselineEn || aiEn || prev.explanation.en,
+                  ur: isGeneratedByAi
+                    ? aiUr || prev.explanation.baselineUr || prev.explanation.ur
+                    : prev.explanation.baselineUr || aiUr || prev.explanation.ur,
+                  aiGenerated: isGeneratedByAi,
+                  aiImproved: isGeneratedByAi || prev.explanation.aiImproved,
+                  fallbackUsed: !isGeneratedByAi,
+                  aiProvider: data.provider || "local",
+                  knowledgeImproved: Boolean(data.knowledge_improved),
+                },
+              };
+            });
+            startCursorStream(nextText);
+          }
+        }
+      } catch {
+        // Fallback to local docs if AI endpoint fails or is offline
+        setInspectedPopover((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            explanation: {
+              ...prev.explanation,
+              aiGenerated: false,
+              fallbackUsed: true,
+            },
+          };
+        });
+      } finally {
+        if (cursorRequestIdRef.current === reqId) {
+          setCursorAiLoading(false);
+        }
+      }
+    },
+    [guide, location.pathname, isUr]
+  );
+
+  const handleCursorQuestionSubmit = useCallback(
+    (e, presetPrompt = null) => {
+      if (e) {
+        if (typeof e.preventDefault === "function") e.preventDefault();
+        if (typeof e.stopPropagation === "function") e.stopPropagation();
+      }
+      const q = String(presetPrompt ?? cursorQuestionInput).trim();
+      if (!q || !inspectedPopover?.explanation) return;
+      if (!presetPrompt) setCursorQuestionInput("");
+      requestCursorGenerativeAi(inspectedPopover.explanation, q);
+    },
+    [cursorQuestionInput, inspectedPopover, requestCursorGenerativeAi]
+  );
 
   // Clear inspect mode and any open popover only when the route actually changes after mount
   const prevRouteKeyRef = useRef(
@@ -617,14 +808,18 @@ function ScreenElementInspector({ guide, lang, onSetLang, isDark }) {
 
       const explanation = explainDomElement(inspectedEl, guide);
       setInspectMode(false);
+      setCursorCustomAnswer(null);
+      setCursorQuestionInput("");
 
       if (explanation) {
-        const initialLayout = computeBestPopoverPlacement(inspectedEl, 370, 250);
+        const initialLayout = computeBestPopoverPlacement(inspectedEl, 385, 310);
         setInspectedPopover({
           element: inspectedEl,
           explanation,
           layout: initialLayout,
         });
+        // Use Generative AI to explain the inspected element and improve old knowledge
+        requestCursorGenerativeAi(explanation, null);
       }
     };
 
@@ -645,7 +840,7 @@ function ScreenElementInspector({ guide, lang, onSetLang, isDark }) {
       document.removeEventListener("click", handleClickCapture, true);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [inspectMode, guide, setInspectMode, clearElementHighlight]);
+  }, [inspectMode, guide, setInspectMode, clearElementHighlight, requestCursorGenerativeAi]);
 
   // Measure actual popover height and keep it anchored beside the target element on scroll/resize
   useLayoutEffect(() => {
@@ -975,16 +1170,232 @@ function ScreenElementInspector({ guide, lang, onSetLang, isDark }) {
             </div>
           </div>
 
-          {/* Body: Formatted Explanation */}
-          <div className="p-3.5 max-h-[55vh] overflow-y-auto space-y-2">
-            <FormattedBotMessage
-              text={
-                isUr
-                  ? inspectedPopover.explanation.ur || inspectedPopover.explanation.en
-                  : inspectedPopover.explanation.en
-              }
-              isUrdu={isUr}
-            />
+          {/* Body: Formatted Explanation + Generative AI Status + Interactive Ask Cursor AI */}
+          <div className="p-3.5 max-h-[58vh] overflow-y-auto space-y-2.5">
+            {/* Generative AI Status / Fallback Indicator */}
+            <div className="flex items-center justify-between gap-2">
+              {cursorAiLoading ? (
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold animate-pulse ${
+                    isDark
+                      ? "bg-purple-500/20 text-purple-300 border border-purple-400/40"
+                      : "bg-purple-100 text-purple-800 border border-purple-300"
+                  }`}
+                >
+                  <SparklesIcon className="w-3 h-3 shrink-0 animate-spin" />
+                  <span>
+                    {isUr
+                      ? "اے آئی سے براہِ راست وضاحت تیار کی جا رہی ہے..."
+                      : "Generating fresh explanation from AI..."}
+                  </span>
+                </span>
+              ) : inspectedPopover.explanation.aiGenerated ||
+                cursorCustomAnswer?.aiGenerated ? (
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    isDark
+                      ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/35"
+                      : "bg-emerald-50 text-emerald-800 border border-emerald-300"
+                  }`}
+                >
+                  <SparklesIcon className="w-3 h-3 shrink-0" />
+                  <span>
+                    {isUr
+                      ? `✨ ${
+                          (cursorCustomAnswer?.provider ||
+                            inspectedPopover.explanation.aiProvider) === "gemini"
+                            ? "Gemini AI"
+                            : "Groq AI"
+                        } سے تیار کردہ براہِ راست اے آئی وضاحت`
+                      : `✨ Generated by ${
+                          (cursorCustomAnswer?.provider ||
+                            inspectedPopover.explanation.aiProvider) === "gemini"
+                            ? "Gemini AI"
+                            : "Groq AI"
+                        } • Live AI Explanation`}
+                  </span>
+                </span>
+              ) : (
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    isDark
+                      ? "bg-amber-500/15 text-amber-300 border border-amber-500/35"
+                      : "bg-amber-50 text-amber-800 border border-amber-300"
+                  }`}
+                >
+                  <span>
+                    {isUr
+                      ? "📘 فال بیک: کاروبار گائیڈ (اے آئی دستیاب نہ ہونے پر)"
+                      : "📘 Fallback: Karobar Docs (AI Unavailable)"}
+                  </span>
+                </span>
+              )}
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                {cursorIsStreaming && (
+                  <button
+                    type="button"
+                    onClick={stopCursorStream}
+                    className="px-1.5 py-0.5 rounded text-[9.5px] font-extrabold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 cursor-pointer"
+                  >
+                    {isUr ? "مکمل دکھائیں" : "⏹ Show Full"}
+                  </button>
+                )}
+                {cursorCustomAnswer && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopCursorStream();
+                      setCursorCustomAnswer(null);
+                    }}
+                    className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer shrink-0"
+                  >
+                    {isUr ? "واپس کنٹرول وضاحت پر" : "← Back to Control"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {cursorAiLoading &&
+            !inspectedPopover.explanation.aiGenerated &&
+            !cursorCustomAnswer ? (
+              <div
+                className={`p-3 rounded-xl border space-y-2 ${
+                  isDark
+                    ? "bg-slate-800/60 border-slate-700/80 text-slate-300"
+                    : "bg-slate-50 border-slate-200 text-slate-600"
+                }`}
+              >
+                <div className="h-2.5 w-3/4 rounded bg-cyan-500/25 animate-pulse" />
+                <div className="h-2.5 w-full rounded bg-slate-400/20 animate-pulse" />
+                <div className="h-2.5 w-5/6 rounded bg-slate-400/20 animate-pulse" />
+                <p className="text-[11px] font-medium pt-0.5">
+                  {isUr
+                    ? "جنریٹو اے آئی اس کنٹرول اور اسکرین کا تجزیہ کر کے نئی وضاحت تیار کر رہا ہے..."
+                    : "Generative AI is analyzing this control on your active screen..."}
+                </p>
+              </div>
+            ) : cursorCustomAnswer ? (
+              <div className="space-y-1.5">
+                <div
+                  className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold ${
+                    isDark
+                      ? "bg-slate-800/90 text-cyan-300 border border-slate-700"
+                      : "bg-slate-100 text-slate-700 border border-slate-200"
+                  }`}
+                >
+                  {isUr ? "سوال: " : "Q: "}
+                  {cursorCustomAnswer.question}
+                </div>
+                <FormattedBotMessage
+                  text={(() => {
+                    const full = String(
+                      (isUr
+                        ? cursorCustomAnswer.ur || cursorCustomAnswer.en
+                        : cursorCustomAnswer.en) || ""
+                    );
+                    return cursorIsStreaming
+                      ? `${full.slice(0, cursorStreamChars)} ▍`
+                      : full;
+                  })()}
+                  isUrdu={isUr}
+                />
+              </div>
+            ) : (
+              <FormattedBotMessage
+                text={(() => {
+                  const full = String(
+                    (isUr
+                      ? inspectedPopover.explanation.ur ||
+                        inspectedPopover.explanation.en
+                      : inspectedPopover.explanation.en) || ""
+                  );
+                  return cursorIsStreaming
+                    ? `${full.slice(0, cursorStreamChars)} ▍`
+                    : full;
+                })()}
+                isUrdu={isUr}
+              />
+            )}
+
+            {/* Quick AI Follow-up Prompts inside Explain Cursor */}
+            <div className="pt-1.5 border-t border-slate-200/70 dark:border-slate-800 space-y-1.5">
+              <div className="flex flex-wrap gap-1">
+                {[
+                  {
+                    en: "How to use step-by-step?",
+                    ur: "مرحلہ وار استعمال کیسے کریں؟",
+                  },
+                  {
+                    en: "Stock & accounting impact?",
+                    ur: "اسٹاک اور کھاتوں پر کیا اثر ہوگا؟",
+                  },
+                  {
+                    en: "Common mistakes to avoid?",
+                    ur: "عام غلطیوں سے کیسے بچیں؟",
+                  },
+                ].map((chip, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    disabled={cursorAiLoading}
+                    onClick={(e) =>
+                      handleCursorQuestionSubmit(e, isUr ? chip.ur : chip.en)
+                    }
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-colors cursor-pointer border ${
+                      isDark
+                        ? "bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700"
+                        : "bg-slate-100 hover:bg-cyan-50 text-slate-700 border-slate-200"
+                    } ${isUr ? "guide-bot-urdu-inline" : ""}`}
+                  >
+                    ✨ {isUr ? chip.ur : chip.en}
+                  </button>
+                ))}
+              </div>
+
+              {/* Interactive Ask Cursor AI Input */}
+              <div className="flex items-center gap-1.5" role="search">
+                <input
+                  type="text"
+                  value={cursorQuestionInput}
+                  onChange={(e) => setCursorQuestionInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (
+                      e.nativeEvent?.isComposing ||
+                      e.isComposing ||
+                      e.keyCode === 229
+                    ) {
+                      return;
+                    }
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleCursorQuestionSubmit(e);
+                    }
+                  }}
+                  disabled={cursorAiLoading}
+                  placeholder={
+                    isUr
+                      ? "اس کنٹرول یا اسکرین کے بارے میں اے آئی سے پوچھیں..."
+                      : "Ask Cursor AI about this control or screen..."
+                  }
+                  className={`flex-1 min-w-0 px-2.5 py-1.5 rounded-xl text-[11px] border focus:outline-none focus:ring-2 focus:ring-cyan-500/50 ${
+                    isDark
+                      ? "bg-slate-950/90 border-slate-700 text-slate-100 placeholder-slate-500"
+                      : "bg-white border-slate-300 text-slate-800 placeholder-slate-400"
+                  } ${isUr ? "guide-bot-urdu-inline" : ""}`}
+                />
+                <button
+                  type="button"
+                  onClick={(e) => handleCursorQuestionSubmit(e)}
+                  disabled={cursorAiLoading || !cursorQuestionInput.trim()}
+                  className="px-2.5 py-1.5 rounded-xl text-[10.5px] font-extrabold bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white transition-colors cursor-pointer shrink-0 inline-flex items-center gap-1"
+                >
+                  <SparklesIcon className="w-3 h-3 shrink-0" />
+                  <span>{isUr ? "پوچھیں" : "Ask AI"}</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Footer: Quick Re-Inspect or Click-Anywhere Hint */}
@@ -1500,8 +1911,76 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
 
   const [visualTalking, setVisualTalking] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [thinkingStageIdx, setThinkingStageIdx] = useState(0);
+  const [streamingMsgId, setStreamingMsgId] = useState(null);
+  const [streamedCharCount, setStreamedCharCount] = useState(0);
+  const [copiedMsgId, setCopiedMsgId] = useState(null);
+  const streamIntervalRef = useRef(null);
   const [questionInput, setQuestionInput] = useState("");
   const [popupTrickIdx, setPopupTrickIdx] = useState(0);
+
+  // Cycle through live AI reasoning stages while waiting for response
+  useEffect(() => {
+    if (!isTyping) {
+      setThinkingStageIdx(0);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setThinkingStageIdx((prev) => (prev + 1) % 3);
+    }, 950);
+    return () => window.clearInterval(timer);
+  }, [isTyping]);
+
+  // Live response token/chunk streaming engine
+  const stopLiveStream = useCallback(() => {
+    if (streamIntervalRef.current) {
+      window.clearInterval(streamIntervalRef.current);
+      streamIntervalRef.current = null;
+    }
+    setStreamingMsgId(null);
+    setStreamedCharCount(0);
+  }, []);
+
+  const startLiveStream = useCallback(
+    (msgId, fullText = "") => {
+      if (streamIntervalRef.current) {
+        window.clearInterval(streamIntervalRef.current);
+        streamIntervalRef.current = null;
+      }
+      const totalLen = String(fullText || "").length;
+      if (!msgId || totalLen <= 24) {
+        setStreamingMsgId(null);
+        setStreamedCharCount(totalLen);
+        return;
+      }
+      setStreamingMsgId(msgId);
+      setStreamedCharCount(18);
+      const stepSize = Math.max(12, Math.min(36, Math.ceil(totalLen / 38)));
+      streamIntervalRef.current = window.setInterval(() => {
+        setStreamedCharCount((prev) => {
+          const next = prev + stepSize;
+          if (next >= totalLen) {
+            if (streamIntervalRef.current) {
+              window.clearInterval(streamIntervalRef.current);
+              streamIntervalRef.current = null;
+            }
+            setStreamingMsgId(null);
+            return totalLen;
+          }
+          return next;
+        });
+      }, 22);
+    },
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      if (streamIntervalRef.current) {
+        window.clearInterval(streamIntervalRef.current);
+      }
+    };
+  }, []);
 
   // Automatically cycle the Guide Bot popup mascot through fun stage tricks
   // (Solving Rubik's Cube 🧩, Wearing Headphones & Listening to Music 🎧, etc.) while open
@@ -1534,6 +2013,9 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
   // Background AI Task State (e.g. multi-product formulation enrichment in background)
   const [bgTask, setBgTask] = useState(null);
   const [bgFilterQuery, setBgFilterQuery] = useState("");
+  const [bgTaskAwaitingPermission, setBgTaskAwaitingPermission] = useState(false);
+  const [bgPreviewLoading, setBgPreviewLoading] = useState(false);
+  const [bgPreviewData, setBgPreviewData] = useState(null);
   const bgTaskCancelRef = useRef(false);
 
   const triggerBotTalking = useCallback((durationMs = 1800) => {
@@ -1996,20 +2478,94 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
     scrollToBottom();
 
     if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current);
-    typingTimerRef.current = window.setTimeout(() => {
+    const botCardId = `b-${Date.now()}`;
+
+    const renderStaticDocsFallback = () => {
       setIsTyping(false);
-      const nextBotItem = {
-        id: `b-${Date.now()}`,
+      const fallbackBotItem = {
+        id: botCardId,
         role: "bot",
         kind: topicType,
         guideKey: displayedGuide.key,
         faq: payload?.faq || null,
         chipId: topicId,
       };
-      setThread((prev) => [...prev, nextBotItem]);
+      setThread((prev) => [...prev, fallbackBotItem]);
       scrollToBottom();
       window.setTimeout(() => setVisualTalking(false), 1800);
-    }, 220);
+    };
+
+    // Primary: Generate answer from Generative AI first; fall back to static docs only if AI fails
+    const topicQuestion = isUr ? userLabel.ur || userLabel.en : userLabel.en;
+    if (!topicQuestion) {
+      renderStaticDocsFallback();
+      return;
+    }
+
+    axios
+      .post("/api/cube/ask", {
+        question: topicQuestion,
+        language: isUr ? "ur" : "en",
+        current_route: displayedGuide?.key || location.pathname || "/dashboard",
+        screen_guide_id: displayedGuide?.key || null,
+        explain_mode: "screen_topic",
+      })
+      .then((res) => {
+        const data = res?.data || {};
+        const aiEn = data.answer_en || data.en || "";
+        const aiUr = data.answer_ur || data.ur || "";
+        const isGeneratedByAi =
+          (data.provider === "groq" || data.provider === "gemini") &&
+          Boolean(aiEn || aiUr);
+
+        if (!isGeneratedByAi) {
+          renderStaticDocsFallback();
+          return;
+        }
+
+        saveLearnedCursorKnowledge({
+          questionText: topicQuestion,
+          route: displayedGuide?.key || location.pathname || "/dashboard",
+          titleEn: data.title_en || data.title?.en || userLabel.en,
+          titleUr: data.title_ur || data.title?.ur || userLabel.ur,
+          answerEn: aiEn,
+          answerUr: aiUr,
+          provider: data.provider || "ai",
+        });
+
+        setIsTyping(false);
+        const aiBotItem = {
+          id: botCardId,
+          role: "bot",
+          kind: "qa",
+          fromGuideChip: true,
+          questionText: topicQuestion,
+          title: {
+            en: data.title_en || data.title?.en || userLabel.en,
+            ur: data.title_ur || data.title?.ur || userLabel.ur,
+          },
+          en: aiEn,
+          ur: aiUr || aiEn,
+          links: Array.isArray(data.links) ? data.links : [],
+          evidenceType:
+            data.evidence_classification || EVIDENCE_TYPES.AI_GROUNDED_DOCS,
+          evidenceBadge: data.evidence_badge,
+          sourceIds: Array.isArray(data.source_ids) ? data.source_ids : [],
+          providerStatus: data.provider_status || "groq_primary",
+          workflowId:
+            data.workflow_id && DEMO_MANIFESTS[data.workflow_id]
+              ? data.workflow_id
+              : null,
+        };
+        setThread((prev) => [...prev, aiBotItem]);
+        startLiveStream(botCardId, isUr ? aiUr || aiEn : aiEn);
+        scrollToBottom();
+        window.setTimeout(() => setVisualTalking(false), 1800);
+      })
+      .catch(() => {
+        // Fallback to static docs card if AI endpoint is unreachable
+        renderStaticDocsFallback();
+      });
   };
 
   /**
@@ -2165,8 +2721,35 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
   );
 
   /**
+   * Computes a dry-run staged preview of Background Formulation Auto-Fill (`preview_only: true`)
+   * so the user sees the exact products and 100%-verified formulations BEFORE anything is posted to the database.
+   */
+  const previewBackgroundFormulationTask = useCallback(async () => {
+    if (bgTask?.running || bgPreviewLoading) return;
+    const filterToUse = bgFilterQuery.trim();
+    setBgPreviewLoading(true);
+    setBgTaskAwaitingPermission(true);
+    try {
+      const res = await axios.post("/api/cube/execute-task", {
+        task_type: "bulk_autofill_missing_formulations",
+        batch_size: 20,
+        after_id: 0,
+        filter_query: filterToUse,
+        preview_only: true,
+      });
+      const data = res?.data || {};
+      const previewResult = data.task_meta?.preview_result || null;
+      setBgPreviewData(previewResult);
+    } catch {
+      setBgPreviewData(null);
+    } finally {
+      setBgPreviewLoading(false);
+    }
+  }, [bgFilterQuery, bgPreviewLoading, bgTask?.running]);
+
+  /**
    * Starts the 100%-certainty background formulation auto-fill directly inside the Background Tasks tab
-   * without adding any noise to the clean Chat tab.
+   * after the user reviews the staged preview and grants permission.
    */
   const startBackgroundFormulationTask = useCallback(
     async (customFilter = null) => {
@@ -2261,13 +2844,35 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
    *   Layer 3: Google Gemini Backup AI (via `POST /api/cube/ask`)
    *   Layer 4: Local knowledge fallback
    */
-  const handleAskSubmit = async (e, presetQuery = null, forceAi = false) => {
-    if (e) e.preventDefault();
+  const handleAskSubmit = async (
+    e,
+    presetQuery = null,
+    forceAi = false,
+    userConfirmed = false,
+    permissionCardId = null
+  ) => {
+    if (e) {
+      if (typeof e.preventDefault === "function") e.preventDefault();
+      if (typeof e.stopPropagation === "function") e.stopPropagation();
+    }
     const raw = (presetQuery ?? questionInput).trim().slice(0, 2000);
     if (!raw) return;
 
-    const isUserTypedQuestion = presetQuery === null || forceAi;
+    const isUserTypedQuestion = presetQuery === null || forceAi || userConfirmed;
     setActiveMainTab("chat");
+
+    if (permissionCardId) {
+      setThread((prev) =>
+        prev.map((item) =>
+          item.id === permissionCardId
+            ? {
+                ...item,
+                permissionResolved: userConfirmed ? "approved" : "cancelled",
+              }
+            : item
+        )
+      );
+    }
 
     const routed = routeUserQuery({
       queryText: raw,
@@ -2279,7 +2884,10 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
 
     const localReply = routed.answer || answerUserQuestion(raw, displayedGuide);
     const lastBotMsg = [...thread].reverse().find((m) => m && m.role === "bot");
-    const isAnsweringPendingTask = lastBotMsg?.providerStatus === "cube_task_needs_input";
+    const isAnsweringPendingTask =
+      Boolean(userConfirmed) ||
+      lastBotMsg?.providerStatus === "cube_task_needs_input" ||
+      lastBotMsg?.providerStatus === "cube_task_awaiting_permission";
 
     // Deterministic walkthrough intelligence: never allow AI to invent selectors or workflow IDs
     if (!isAnsweringPendingTask && routed.startDemoNow && routed.workflowId && DEMO_MANIFESTS[routed.workflowId]) {
@@ -2321,19 +2929,21 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
 
     if (typingTimerRef.current) window.clearTimeout(typingTimerRef.current);
 
-    // Keep greetings, live-data privacy boundary, explicit screen overview, interactive demos,
-    // and preset topic queries in Layer 1; send user-typed chat questions and pending-task answers to Hybrid AI
+    // Keep only interactive spotlight walkthrough triggers and live-data privacy boundaries local;
+    // route all software questions, screen explanations, and preset prompts through Generative AI
+    // so the bot explains our software with AI and continuously improves its old knowledge.
     const isStrictlyLocalIntent =
       !isAnsweringPendingTask &&
       (routed.startDemoNow ||
-        routed.matchedIntentId === "greeting_and_help" ||
-        routed.matchedIntentId === "live_data_privacy_boundary" ||
-        routed.matchedIntentId === "current_screen_overview");
+        routed.matchedIntentId === "live_data_privacy_boundary");
 
     const shouldUseHybridAi =
       forceAi ||
+      userConfirmed ||
       isAnsweringPendingTask ||
-      (!isStrictlyLocalIntent && (routed.shouldCallAi || isUserTypedQuestion));
+      !isStrictlyLocalIntent ||
+      routed.shouldCallAi ||
+      isUserTypedQuestion;
 
     if (!shouldUseHybridAi) {
       typingTimerRef.current = window.setTimeout(() => {
@@ -2360,6 +2970,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               : null,
         };
         setThread((prev) => [...prev, nextBotItem]);
+        startLiveStream(nextBotItem.id, isUr ? localReply.ur : localReply.en);
         scrollToBottom();
         window.setTimeout(() => setVisualTalking(false), 1800);
       }, 220);
@@ -2375,6 +2986,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         history: recentHistory,
         matched_intent_id: routed.matchedIntentId || null,
         screen_guide_id: displayedGuide?.key || null,
+        user_confirmed: Boolean(userConfirmed),
       });
 
       const data = response?.data || {};
@@ -2398,22 +3010,44 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
 
       const bgMeta = data.background_task || data.task_meta?.background_task;
       const isBgTaskResponse = Boolean(
-        bgMeta || data.task_meta?.action === "bulk_autofill_missing_formulations"
+        data.provider_status === "cube_task_executed" &&
+          (bgMeta || data.task_meta?.action === "bulk_autofill_missing_formulations")
       );
 
       const nextCardId = `b-${Date.now()}`;
+      const resolvedTitleEn =
+        data.title_en || data.title?.en || localReply.title?.en || "Karobar ERP Guide";
+      const resolvedTitleUr =
+        data.title_ur || data.title?.ur || localReply.title?.ur || "کاروبار ایپ رہنمائی";
+      const resolvedAnswerEn = data.answer_en || data.en || localReply.en;
+      const resolvedAnswerUr = data.answer_ur || data.ur || localReply.ur;
+
+      if (data.provider === "groq" || data.provider === "gemini") {
+        saveLearnedCursorKnowledge({
+          intentId: routed.matchedIntentId || "",
+          questionText: raw,
+          route: displayedGuide?.key || location.pathname || "/dashboard",
+          titleEn: resolvedTitleEn,
+          titleUr: resolvedTitleUr,
+          answerEn: resolvedAnswerEn,
+          answerUr: resolvedAnswerUr,
+          provider: data.provider,
+        });
+      }
+
       const nextBotItem = {
         id: nextCardId,
         role: "bot",
         kind: "qa",
         questionText: raw,
         hasBackgroundTask: isBgTaskResponse,
+        taskMeta: data.task_meta || null,
         title: {
-          en: data.title_en || data.title?.en || localReply.title?.en || "Karobar ERP Guide",
-          ur: data.title_ur || data.title?.ur || localReply.title?.ur || "کاروبار ایپ رہنمائی",
+          en: resolvedTitleEn,
+          ur: resolvedTitleUr,
         },
-        en: data.answer_en || data.en || localReply.en,
-        ur: data.answer_ur || data.ur || localReply.ur,
+        en: resolvedAnswerEn,
+        ur: resolvedAnswerUr,
         links: resolvedLinks,
         evidenceType: data.evidence_classification || routed.evidenceType,
         evidenceBadge: data.evidence_badge || routed.evidenceBadge,
@@ -2430,6 +3064,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
 
       setIsTyping(false);
       setThread((prev) => [...prev, nextBotItem]);
+      startLiveStream(nextCardId, isUr ? resolvedAnswerUr : resolvedAnswerEn);
       scrollToBottom();
       window.setTimeout(() => setVisualTalking(false), 1800);
 
@@ -3153,9 +3788,22 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       );
     }
 
-    // 7. FREE-TEXT Q&A REPLY
+    // 7. FREE-TEXT Q&A REPLY & AI TASK AUTOMATION CARDS
     const hasWalkthrough = Boolean(msg.workflowId && DEMO_MANIFESTS[msg.workflowId]);
     const isTaskWaitingForInput = msg.providerStatus === "cube_task_needs_input";
+    const isTaskAwaitingPermission =
+      msg.providerStatus === "cube_task_awaiting_permission" ||
+      Boolean(msg.taskMeta?.awaiting_permission) ||
+      Boolean(msg.taskMeta?.requires_permission);
+    const isTaskExecuted =
+      msg.providerStatus === "cube_task_executed" &&
+      Boolean(msg.taskMeta?.result_summary);
+    const previewResult = msg.taskMeta?.preview_result || null;
+    const isActivelyStreaming = streamingMsgId === msg.id;
+    const fullReplyText = String((isUr ? msg.ur : msg.en) || msg.en || "");
+    const displayedReplyText = isActivelyStreaming
+      ? `${fullReplyText.slice(0, streamedCharCount)} ▍`
+      : fullReplyText;
     const canEscalateToAi =
       Boolean(msg.questionText) &&
       msg.evidenceType !== EVIDENCE_TYPES.AI_GROUNDED_DOCS &&
@@ -3171,23 +3819,562 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         lang={isUr ? "ur" : "en"}
         className={cardBaseClass}
       >
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          {msg.title && (
-            <p className="text-xs font-extrabold text-blue-600 dark:text-blue-400">
-              {isUr ? msg.title.ur : msg.title.en}
-            </p>
-          )}
-          {msg.evidenceBadge && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-              {isUr ? msg.evidenceBadge.ur : msg.evidenceBadge.en}
+        {/* Interactive AI Assistant Header Bar */}
+        <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-200/70 dark:border-slate-800/80 flex-wrap">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-[11px] font-black shrink-0 shadow-2xs">
+              🤖
             </span>
-          )}
+            <span className="text-[11px] font-extrabold text-slate-900 dark:text-white truncate">
+              {isUr ? "کیوب اے آئی" : "Cube AI"}
+            </span>
+            {isActivelyStreaming ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span>{isUr ? "لائیو جواب..." : "Streaming live..."}</span>
+              </span>
+            ) : (
+              msg.evidenceBadge && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 truncate max-w-[200px]">
+                  {isUr ? msg.evidenceBadge.ur : msg.evidenceBadge.en}
+                </span>
+              )
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0" dir="ltr">
+            {isActivelyStreaming && (
+              <button
+                type="button"
+                onClick={stopLiveStream}
+                className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-500/30 cursor-pointer"
+              >
+                {isUr ? "مکمل دکھائیں" : "⏹ Show Full"}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof navigator !== "undefined" && navigator.clipboard) {
+                  navigator.clipboard.writeText(fullReplyText).catch(() => {});
+                  setCopiedMsgId(msg.id);
+                  window.setTimeout(() => setCopiedMsgId(null), 1600);
+                }
+              }}
+              title={isUr ? "کاپی کریں" : "Copy response"}
+              className="px-1.5 py-0.5 rounded-md text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              {copiedMsgId === msg.id ? "✓ Copied" : "📋 Copy"}
+            </button>
+            {msg.questionText && !isTaskAwaitingPermission && (
+              <button
+                type="button"
+                onClick={() => handleAskSubmit(null, msg.questionText, true)}
+                title={isUr ? "دوبارہ تیار کریں" : "Regenerate response"}
+                className="px-1.5 py-0.5 rounded-md text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                🔄
+              </button>
+            )}
+          </div>
         </div>
 
+        {msg.title && (
+          <p className="text-xs font-extrabold text-blue-600 dark:text-blue-400 pt-0.5">
+            {isUr ? msg.title.ur : msg.title.en}
+          </p>
+        )}
+
+        {/* STEP-BY-STEP PROGRESS INDICATOR (`taskMeta.step_info`) */}
+        {msg.taskMeta?.step_info && (
+          <div
+            className={`px-2.5 py-1.5 rounded-xl border flex items-center justify-between gap-2 flex-wrap ${
+              isDark
+                ? "bg-indigo-950/45 border-indigo-700/60 text-indigo-200"
+                : "bg-indigo-50/90 border-indigo-200 text-indigo-900"
+            }`}
+          >
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold">
+              <span aria-hidden="true">🪜</span>
+              <span>
+                {isUr
+                  ? msg.taskMeta.step_info.label_ur || msg.taskMeta.step_info.label_en
+                  : msg.taskMeta.step_info.label_en}
+              </span>
+            </span>
+            {msg.taskMeta.step_info.current && msg.taskMeta.step_info.total && (
+              <div className="flex items-center gap-1" dir="ltr">
+                {Array.from({ length: Number(msg.taskMeta.step_info.total) || 3 }).map(
+                  (_, sIdx) => {
+                    const stepNum = sIdx + 1;
+                    const isCompleted = stepNum < Number(msg.taskMeta.step_info.current);
+                    const isCurrent = stepNum === Number(msg.taskMeta.step_info.current);
+                    return (
+                      <span
+                        key={stepNum}
+                        className={`w-5 h-1.5 rounded-full transition-all ${
+                          isCurrent
+                            ? "bg-indigo-500 w-7"
+                            : isCompleted
+                            ? "bg-emerald-500"
+                            : isDark
+                            ? "bg-slate-700"
+                            : "bg-slate-300"
+                        }`}
+                      />
+                    );
+                  }
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <FormattedBotMessage
-          text={isUr ? msg.ur : msg.en}
+          text={displayedReplyText}
           isUrdu={isUr}
         />
+
+        {/* INTERACTIVE DATABASE MATCHES PANEL (`taskMeta.db_matches`) */}
+        {isTaskWaitingForInput &&
+          Array.isArray(msg.taskMeta?.db_matches) &&
+          msg.taskMeta.db_matches.length > 0 && (
+            <div
+              className={`rounded-xl border overflow-hidden mt-1.5 ${
+                isDark
+                  ? "bg-slate-950/80 border-cyan-800/60"
+                  : "bg-cyan-50/50 border-cyan-200"
+              }`}
+            >
+              <div
+                className={`px-2.5 py-1.5 border-b flex items-center justify-between gap-2 text-[10.5px] font-extrabold ${
+                  isDark
+                    ? "bg-cyan-950/50 border-cyan-800/60 text-cyan-300"
+                    : "bg-cyan-100/80 border-cyan-200 text-cyan-900"
+                }`}
+              >
+                <span className="inline-flex items-center gap-1.5">
+                  <span aria-hidden="true">🔍</span>
+                  <span>
+                    {isUr
+                      ? `ڈیٹا بیس میں موجود ملتے جلتے ریکارڈز (${msg.taskMeta.db_matches.length})`
+                      : `Matching Records Found in Your Database (${msg.taskMeta.db_matches.length})`}
+                  </span>
+                </span>
+                <span className="text-[9.5px] font-bold opacity-80">
+                  {isUr ? "منتخب کرنے کے لیے کلک کریں" : "Select Existing or Create New"}
+                </span>
+              </div>
+              <div className="divide-y divide-slate-200/70 dark:divide-slate-800 max-h-56 overflow-y-auto">
+                {msg.taskMeta.db_matches.map((match, mIdx) => (
+                  <div
+                    key={match.id || mIdx}
+                    className="px-2.5 py-2 flex items-center justify-between gap-2 flex-wrap hover:bg-blue-500/5 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+                          {match.name}
+                        </span>
+                        {match.code && (
+                          <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono font-bold bg-blue-500/15 text-blue-600 dark:text-blue-300">
+                            {match.code}
+                          </span>
+                        )}
+                      </div>
+                      {(match.details_en || match.details_ur) && (
+                        <p className="text-[10.5px] text-slate-600 dark:text-slate-300">
+                          {isUr
+                            ? match.details_ur || match.details_en
+                            : match.details_en}
+                        </p>
+                      )}
+                    </div>
+                    {match.select_reply && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleAskSubmit(null, match.select_reply, true)
+                        }
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs transition-all cursor-pointer shrink-0 active:scale-95"
+                      >
+                        <span>{isUr ? "✓ منتخب کریں" : "✓ Select"}</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        {/* INTERACTIVE STEP QUICK-CHOICE BUTTONS (`taskMeta.step_choices`) */}
+        {isTaskWaitingForInput &&
+          Array.isArray(msg.taskMeta?.step_choices) &&
+          msg.taskMeta.step_choices.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {msg.taskMeta.step_choices.map((choice, cIdx) => {
+                const isPrimary = choice.variant === "primary";
+                const isAccent = choice.variant === "accent";
+                return (
+                  <button
+                    key={`${choice.reply}-${cIdx}`}
+                    type="button"
+                    onClick={() => handleAskSubmit(null, choice.reply, true)}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold border transition-all cursor-pointer active:scale-95 ${
+                      isPrimary
+                        ? "bg-blue-600 hover:bg-blue-500 text-white border-blue-500 shadow-2xs"
+                        : isAccent
+                        ? isDark
+                          ? "bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border-amber-500/40"
+                          : "bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300"
+                        : isDark
+                        ? "bg-slate-800 hover:bg-slate-700 text-cyan-300 border-slate-700"
+                        : "bg-white hover:bg-slate-100 text-slate-700 border-slate-300"
+                    }`}
+                  >
+                    <span>
+                      {isUr
+                        ? choice.label_ur || choice.label_en
+                        : choice.label_en}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+        {/* STAGED PRE-DATABASE RESULT PREVIEW & MANDATORY USER PERMISSION CARD */}
+        {isTaskAwaitingPermission && (
+          <div
+            className={`p-3 rounded-xl border space-y-3 mt-1.5 ${
+              isDark
+                ? "bg-amber-950/35 border-amber-700/60 text-amber-100"
+                : "bg-amber-50/90 border-amber-300 text-slate-900"
+            }`}
+          >
+            {/* Header: Permission Status & Pre-DB Guard Badge */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-amber-700 dark:text-amber-300">
+                <span aria-hidden="true">🛡️</span>
+                <span>
+                  {isUr
+                    ? msg.taskMeta?.proposed_task?.label_ur ||
+                      "ڈیٹا بیس میں پوسٹ کرنے سے پہلے نتیجہ چیک کریں اور اجازت دیں"
+                    : msg.taskMeta?.proposed_task?.label_en ||
+                      "Staged Result Preview — Permission Required Before Posting to Database"}
+                </span>
+              </span>
+
+              {msg.permissionResolved ? (
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                    msg.permissionResolved === "approved"
+                      ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                      : "bg-rose-500/20 text-rose-700 dark:text-rose-300"
+                  }`}
+                >
+                  {msg.permissionResolved === "approved"
+                    ? isUr
+                      ? "✅ اجازت دے دی گئی (Posted)"
+                      : "✅ Approved & Posted"
+                    : isUr
+                    ? "✕ منسوخ شدہ (Not Posted)"
+                    : "✕ Denied (Not Posted)"}
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[9.5px] font-extrabold bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-500/30">
+                  {isUr ? "ابھی ڈیٹا بیس میں محفوظ نہیں ہوا" : "NOT POSTED TO DB YET"}
+                </span>
+              )}
+            </div>
+
+            {/* Structured Pre-Database Result Preview Table (`preview_result`) */}
+            {previewResult && (
+              <div
+                className={`rounded-xl border overflow-hidden ${
+                  isDark
+                    ? "bg-slate-950/80 border-slate-800"
+                    : "bg-white border-amber-200/90"
+                }`}
+              >
+                <div
+                  className={`px-2.5 py-1.5 border-b flex items-center justify-between gap-2 flex-wrap text-[10.5px] font-extrabold ${
+                    isDark
+                      ? "bg-slate-900 border-slate-800 text-cyan-300"
+                      : "bg-slate-100/90 border-slate-200 text-slate-700"
+                  }`}
+                >
+                  <span>
+                    {isUr
+                      ? previewResult.summary_ur || previewResult.summary_en || "ڈیٹا بیس پری ویو"
+                      : previewResult.summary_en || "Staged Database Result Preview"}
+                  </span>
+                  <div className="flex items-center gap-1.5" dir="ltr">
+                    {previewResult.database_table && (
+                      <span className="px-1.5 py-0.5 rounded font-mono text-[9.5px] bg-blue-500/15 text-blue-600 dark:text-blue-300">
+                        table: {previewResult.database_table}
+                      </span>
+                    )}
+                    {previewResult.operation && (
+                      <span className="px-1.5 py-0.5 rounded font-mono text-[9.5px] bg-purple-500/15 text-purple-600 dark:text-purple-300">
+                        {previewResult.operation}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Case A: Record-by-Record Before -> After Field Table */}
+                {Array.isArray(previewResult.records) &&
+                  previewResult.records.length > 0 && (
+                    <div className="divide-y divide-slate-200/70 dark:divide-slate-800 max-h-60 overflow-y-auto">
+                      {previewResult.records.map((rec, rIdx) => (
+                        <div key={rIdx} className="p-2.5 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2 flex-wrap">
+                            <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+                              {rec.title || rec.name || `Record #${rIdx + 1}`}
+                            </span>
+                            {rec.status && (
+                              <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                                {rec.status}
+                              </span>
+                            )}
+                          </div>
+                          {Array.isArray(rec.fields) && rec.fields.length > 0 && (
+                            <div className="grid grid-cols-1 gap-1 text-[11px]">
+                              {rec.fields.map((fld, fIdx) => (
+                                <div
+                                  key={fIdx}
+                                  className={`px-2 py-1 rounded-lg flex items-center justify-between gap-2 ${
+                                    isDark ? "bg-slate-900/90" : "bg-slate-50"
+                                  }`}
+                                >
+                                  <span className="font-bold text-slate-500 dark:text-slate-400">
+                                    {fld.field}:
+                                  </span>
+                                  <div className="flex items-center gap-1.5 font-mono text-[10.5px] truncate">
+                                    {fld.before &&
+                                      !String(fld.before).includes("New") &&
+                                      fld.before !== "—" && (
+                                        <>
+                                          <span className="line-through text-slate-400">
+                                            {fld.before}
+                                          </span>
+                                          <span className="text-slate-400">→</span>
+                                        </>
+                                      )}
+                                    <span className="font-extrabold text-emerald-600 dark:text-emerald-400">
+                                      {fld.after}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                {/* Case B: Bulk Formulation Preview Items */}
+                {Array.isArray(previewResult.preview_items) &&
+                  previewResult.preview_items.length > 0 && (
+                    <div className="divide-y divide-slate-200/70 dark:divide-slate-800 max-h-52 overflow-y-auto">
+                      {previewResult.preview_items.map((item, idx) => (
+                        <div
+                          key={item.id || idx}
+                          className="px-2.5 py-1.5 text-[11px] flex items-center justify-between gap-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <span className="font-bold text-slate-900 dark:text-white truncate block">
+                              {item.name}
+                            </span>
+                            {item.code && (
+                              <span className="text-[9.5px] font-mono text-slate-400">
+                                {item.code}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0 font-mono text-[10.5px]">
+                            <span className="text-slate-400">
+                              {item.before || "Empty"} →
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                              {item.after}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+              </div>
+            )}
+
+            {!msg.permissionResolved && (
+              <div className="flex items-center flex-wrap gap-2 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleAskSubmit(
+                      null,
+                      isUr
+                        ? "جی ہاں، اجازت ہے — ڈیٹا بیس میں محفوظ کریں"
+                        : "Yes, approve and post to database",
+                      true,
+                      true,
+                      msg.id
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
+                >
+                  <CheckCircleIcon className="w-4 h-4 shrink-0" />
+                  <span>
+                    {isUr
+                      ? "✅ اجازت دیں اور ڈیٹا بیس میں محفوظ کریں"
+                      : "✅ Approve & Post to Database"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    askInputRef.current?.focus();
+                  }}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    isDark
+                      ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-cyan-300"
+                      : "bg-white hover:bg-slate-100 border-slate-300 text-slate-700"
+                  }`}
+                >
+                  <span>✏️ {isUr ? "تفصیل تبدیل کریں" : "Modify Details"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleAskSubmit(null, "cancel", true, false, msg.id)
+                  }
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 border border-rose-500/30 transition-all cursor-pointer active:scale-95"
+                >
+                  <XMarkIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    {isUr ? "✕ منسوخ کریں (Do Not Post)" : "✕ Deny & Do Not Post"}
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* STRUCTURED TASK EXECUTION RESULT SUMMARY CARD AFTER PERMISSION */}
+        {isTaskExecuted && (
+          <div
+            className={`p-3 rounded-xl border space-y-2 mt-1 ${
+              isDark
+                ? "bg-emerald-950/30 border-emerald-700/60 text-emerald-100"
+                : "bg-emerald-50/85 border-emerald-300 text-slate-900"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300">
+                <CheckCircleIcon className="w-4 h-4 shrink-0" />
+                <span>
+                  {isUr
+                    ? `نتیجہ: ${msg.taskMeta?.result_summary?.action_label?.ur || "ڈیٹا بیس میں محفوظ ہو گیا"}`
+                    : `Committed Result: ${msg.taskMeta?.result_summary?.action_label?.en || "Posted to Database"}`}
+                </span>
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                {isUr ? "✅ اجازت کے بعد ڈیٹا بیس میں محفوظ" : "✅ Posted to Database"}
+              </span>
+            </div>
+
+            {Array.isArray(msg.taskMeta?.result_summary?.items) &&
+              msg.taskMeta.result_summary.items.length > 0 && (
+                <div
+                  className={`rounded-lg border divide-y ${
+                    isDark
+                      ? "bg-slate-950/60 border-slate-800 divide-slate-800"
+                      : "bg-white border-emerald-200/80 divide-slate-100"
+                  }`}
+                >
+                  {msg.taskMeta.result_summary.items.map((item, idx) => (
+                    <div
+                      key={`${item.id || idx}-${item.code || idx}`}
+                      className="px-2.5 py-2 text-xs flex items-center justify-between gap-2 flex-wrap"
+                    >
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-extrabold text-slate-900 dark:text-white">
+                            {item.name}
+                          </span>
+                          {item.code && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              {item.code}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                          {isUr
+                            ? item.details_ur || item.details_en
+                            : item.details_en}
+                        </p>
+                      </div>
+                      {item.edit_path && (
+                        <button
+                          type="button"
+                          onClick={() => handleNavigateToRoute(item.edit_path)}
+                          className="px-2 py-1 rounded-lg text-[10.5px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors cursor-pointer shrink-0"
+                        >
+                          {isUr ? "دیکھیں ←" : "View →"}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+            {Array.isArray(msg.taskMeta?.result_summary?.records) &&
+              msg.taskMeta.result_summary.records.length > 0 && (
+                <div
+                  className={`rounded-lg border divide-y ${
+                    isDark
+                      ? "bg-slate-950/60 border-slate-800 divide-slate-800"
+                      : "bg-white border-emerald-200/80 divide-slate-100"
+                  }`}
+                >
+                  {msg.taskMeta.result_summary.records.map((rec, idx) => (
+                    <div
+                      key={`${rec.id || idx}-committed`}
+                      className="px-2.5 py-2 text-xs flex items-center justify-between gap-2 flex-wrap"
+                    >
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-extrabold text-slate-900 dark:text-white">
+                            {rec.name}
+                          </span>
+                          {rec.id && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                              ID #{rec.id}
+                            </span>
+                          )}
+                          {msg.taskMeta?.result_summary?.database_table && (
+                            <span className="px-1.5 py-0.5 rounded text-[9.5px] font-mono bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              {msg.taskMeta.result_summary.database_table}
+                            </span>
+                          )}
+                        </div>
+                        {Array.isArray(rec.changes) && rec.changes.length > 0 && (
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                            {rec.changes.join(" • ")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+          </div>
+        )}
 
         {(msg.hasBackgroundTask || isTaskWaitingForInput || hasWalkthrough || canEscalateToAi || (msg.links && msg.links.length > 0)) && (
           <div className="flex flex-wrap gap-1.5 pt-1">
@@ -4012,19 +5199,150 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 />
               </div>
 
-              {/* Start / Stop Action Buttons */}
+              {/* Start / Stop Action Buttons with Pre-Database Result Preview & Mandatory Permission */}
+              {bgTaskAwaitingPermission && !bgTask?.running && (
+                <div
+                  className={`p-3 rounded-xl border space-y-2.5 ${
+                    isDark
+                      ? "bg-amber-950/35 border-amber-700/60 text-amber-100"
+                      : "bg-amber-50/90 border-amber-300 text-slate-900"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="text-xs font-extrabold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                      <span aria-hidden="true">🛡️</span>
+                      <span>
+                        {isUr
+                          ? "ڈیٹا بیس میں محفوظ کرنے سے پہلے نتیجہ چیک کریں اور اجازت دیں"
+                          : "Staged Database Preview — Permission Required Before Saving"}
+                      </span>
+                    </p>
+                    <span className="px-2 py-0.5 rounded-full text-[9.5px] font-extrabold bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-500/30">
+                      {isUr ? "ابھی ڈیٹا بیس میں پوسٹ نہیں ہوا" : "NOT POSTED TO DB YET"}
+                    </span>
+                  </div>
+
+                  {bgPreviewLoading ? (
+                    <div className="p-2.5 rounded-xl border border-amber-400/30 bg-white/60 dark:bg-slate-900/60 flex items-center gap-2 text-xs font-bold">
+                      <SparklesIcon className="w-4 h-4 text-amber-500 animate-spin shrink-0" />
+                      <span>
+                        {isUr
+                          ? "پروڈکٹس کا پری ویو نتیجہ تیار کیا جا رہا ہے (ڈیٹا بیس میں کچھ محفوظ نہیں کیا جا رہا)..."
+                          : "Computing dry-run preview of verified formulations (nothing written to database)..."}
+                      </span>
+                    </div>
+                  ) : bgPreviewData ? (
+                    <div
+                      className={`rounded-xl border overflow-hidden ${
+                        isDark
+                          ? "bg-slate-950/80 border-slate-800"
+                          : "bg-white border-amber-200/90"
+                      }`}
+                    >
+                      <div
+                        className={`px-2.5 py-1.5 border-b flex items-center justify-between gap-2 flex-wrap text-[10.5px] font-extrabold ${
+                          isDark
+                            ? "bg-slate-900 border-slate-800 text-cyan-300"
+                            : "bg-slate-100/90 border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        <span>
+                          {isUr
+                            ? `کل خالی پروڈکٹس: ${bgPreviewData.total_missing || 0} • اس بیچ میں تصدیق شدہ: ${bgPreviewData.resolvable_in_preview || 0}`
+                            : `Total Missing: ${bgPreviewData.total_missing || 0} • Verified in Preview Batch: ${bgPreviewData.resolvable_in_preview || 0}`}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded font-mono text-[9.5px] bg-blue-500/15 text-blue-600 dark:text-blue-300" dir="ltr">
+                          table: products (UPDATE)
+                        </span>
+                      </div>
+
+                      {Array.isArray(bgPreviewData.preview_items) &&
+                      bgPreviewData.preview_items.length > 0 ? (
+                        <div className="divide-y divide-slate-200/70 dark:divide-slate-800 max-h-48 overflow-y-auto">
+                          {bgPreviewData.preview_items.map((item, idx) => (
+                            <div
+                              key={item.id || idx}
+                              className="px-2.5 py-1.5 text-[11px] flex items-center justify-between gap-2"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <span className="font-bold text-slate-900 dark:text-white truncate block">
+                                  {item.name}
+                                </span>
+                                {item.code && (
+                                  <span className="text-[9.5px] font-mono text-slate-400">
+                                    {item.code}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0 font-mono text-[10.5px]">
+                                <span className="text-slate-400">Empty →</span>
+                                <span className="px-1.5 py-0.5 rounded font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                                  {item.after}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="p-2.5 text-[11px] text-slate-500">
+                          {isUr
+                            ? "اس فلٹر میں کوئی نئی تصدیق شدہ فارمولیشن اپڈیٹ کے لیے نہیں ملی۔"
+                            : "No missing formulations in this batch matched a 100%-verified salt."}
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+
+                  <p className="text-[11.5px] leading-relaxed text-slate-600 dark:text-slate-300">
+                    {isUr
+                      ? "صرف اوپر دکھائے گئے 100% تصدیق شدہ نتائج ڈیٹا بیس میں محفوظ ہوں گے۔ کیا آپ اجازت دیتے ہیں؟"
+                      : "Only 100%-verified pharmaceutical formulations will be posted to the database. Do you grant permission?"}
+                  </p>
+                  <div className="flex items-center flex-wrap gap-2 pt-0.5">
+                    <button
+                      type="button"
+                      disabled={bgPreviewLoading}
+                      onClick={() => {
+                        setBgTaskAwaitingPermission(false);
+                        setBgPreviewData(null);
+                        startBackgroundFormulationTask();
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
+                    >
+                      <CheckCircleIcon className="w-4 h-4 shrink-0" />
+                      <span>
+                        {isUr
+                          ? "✅ اجازت دیں اور ڈیٹا بیس میں پوسٹ کریں"
+                          : "✅ Approve & Post to Database"}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBgTaskAwaitingPermission(false);
+                        setBgPreviewData(null);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 border border-rose-500/30 transition-all cursor-pointer"
+                    >
+                      <XMarkIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span>{isUr ? "✕ منسوخ کریں (Do Not Post)" : "✕ Deny & Do Not Post"}</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center flex-wrap gap-2 pt-0.5">
                 {!bgTask?.running ? (
                   <button
                     type="button"
-                    onClick={() => startBackgroundFormulationTask()}
+                    onClick={previewBackgroundFormulationTask}
                     className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
                   >
-                    <span aria-hidden="true">▶️</span>
+                    <span aria-hidden="true">🔍</span>
                     <span>
                       {isUr
-                        ? "بیک گراؤنڈ فارمولیشن ٹاسک شروع کریں"
-                        : "Start Background Auto-Fill"}
+                        ? "نتیجہ چیک کریں اور فارمولیشن ٹاسک شروع کریں"
+                        : "Preview Result & Start Auto-Fill"}
                     </span>
                   </button>
                 ) : (
@@ -4052,6 +5370,48 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   <span>{isUr ? "پروڈکٹس لسٹ کھولیں" : "Open Products"}</span>
                   <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5 shrink-0" />
                 </button>
+              </div>
+            </div>
+
+            {/* Interactive ERP Task Launchers (All Pre-Database Preview + Permission Guarded) */}
+            <div
+              className={`p-3.5 rounded-2xl border space-y-2.5 shadow-2xs ${
+                isDark
+                  ? "bg-slate-900 border-slate-800 text-slate-100"
+                  : "bg-white border-slate-200/90 text-slate-800"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400">
+                  {isUr
+                    ? "⚡ دیگر اے آئی ٹاسکس (پری ویو اور اجازت کے ساتھ):"
+                    : "⚡ Quick AI Tasks (Staged Preview + Permission Before DB Post):"}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { icon: "➕", en: "Add Product", ur: "نئی پروڈکٹ", cmd: "Add a new product" },
+                  { icon: "✏️", en: "Edit Product", ur: "پروڈکٹ ایڈٹ", cmd: "Edit a product" },
+                  { icon: "🏷️", en: "Add Brand", ur: "نیا برانڈ", cmd: "Add a new brand" },
+                  { icon: "📂", en: "Add Category", ur: "نئی کیٹیگری", cmd: "Add a new category" },
+                  { icon: "🚚", en: "Add Supplier", ur: "نیا سپلائر", cmd: "Add a new supplier" },
+                  { icon: "👤", en: "Add Customer", ur: "نیا کسٹمر", cmd: "Add a new customer" },
+                  { icon: "📋", en: "Log Demand", ur: "کسٹمر ڈیمانڈ", cmd: "Add a new user demand" },
+                ].map((tsk) => (
+                  <button
+                    key={tsk.cmd}
+                    type="button"
+                    onClick={() => handleAskSubmit(null, tsk.cmd, true)}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer active:scale-95 ${
+                      isDark
+                        ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
+                        : "bg-slate-50 hover:bg-blue-50 border-slate-200 text-slate-700"
+                    }`}
+                  >
+                    <span aria-hidden="true">{tsk.icon}</span>
+                    <span>{isUr ? tsk.ur : tsk.en}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -4410,13 +5770,49 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
           </div>
         ) : (
           /* ================================================================= */
-          /* TAB 1 (DEFAULT): CLEAN AI CHAT ONLY                               */
+          /* TAB 1 (DEFAULT): INTERACTIVE AI CHAT & TASK AGENT                 */
           /* ================================================================= */
           <div
             className={`guide-bot-drawer-body p-4 space-y-3.5 ${
               isDark ? "bg-slate-950/40" : "bg-slate-50/50"
             }`}
           >
+            {/* Interactive AI Chat Status Bar */}
+            <div
+              dir={isUr ? "rtl" : "ltr"}
+              lang={isUr ? "ur" : "en"}
+              className={`px-3 py-1.5 rounded-xl border flex items-center justify-between gap-2 text-[11px] font-bold ${
+                isDark
+                  ? "bg-slate-900/90 border-slate-800 text-slate-300"
+                  : "bg-white border-slate-200/90 text-slate-700 shadow-2xs"
+              }`}
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className="truncate font-extrabold">
+                  {isUr
+                    ? "کیوب اے آئی انٹرایکٹو چیٹ • لائیو جواب اور ٹاسک اسسٹنٹ"
+                    : "Cube AI Interactive Chat • Live Streaming & Task Agent"}
+                </span>
+              </div>
+              {thread.some(
+                (msg) =>
+                  (msg.role === "user" && !msg.fromGuideChip) || msg.kind === "qa"
+              ) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    stopLiveStream();
+                    clearChatOnly();
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10.5px] font-extrabold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+                >
+                  <ArrowPathIcon className="w-3 h-3" />
+                  <span>{isUr ? "نئی چیٹ" : "New Chat"}</span>
+                </button>
+              )}
+            </div>
+
             {/* Subtle 1-Line Pill if Background Task is Running (Switch to Tasks Tab if Wanted) */}
             {bgTask?.running && (
               <div
@@ -4453,73 +5849,104 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   <div
                     dir={isUr ? "rtl" : "ltr"}
                     lang={isUr ? "ur" : "en"}
-                    className={`p-4 rounded-2xl border space-y-3 shadow-2xs ${
+                    className={`p-4 rounded-2xl rounded-tl-xs border space-y-3.5 shadow-2xs ${
                       isDark
                         ? "bg-slate-900 border-slate-800 text-slate-100"
                         : "bg-white border-slate-200/90 text-slate-800"
                     }`}
                   >
-                    <div className="space-y-1">
-                      <p className="text-xs font-extrabold text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
-                        <SparklesIcon className="w-4 h-4 shrink-0" />
-                        <span>
+                    {/* AI Avatar Greeting Header */}
+                    <div className="flex items-start gap-2.5">
+                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-sm font-black shrink-0 shadow-xs">
+                        🤖
+                      </span>
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+                            {isUr ? "کیوب اے آئی اسسٹنٹ" : "Cube AI Assistant"}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[9.5px] font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">
+                            {isUr ? "لائیو اے آئی چیٹ" : "Live Generative AI"}
+                          </span>
+                        </div>
+                        <p className="text-[12.5px] leading-relaxed text-slate-600 dark:text-slate-300">
                           {isUr
-                            ? "کیوب اے آئی چیٹ (کلین موڈ)"
-                            : "Cube AI Chat (Clean Mode)"}
-                        </span>
-                      </p>
-                      <p className="text-[12.5px] leading-relaxed text-slate-600 dark:text-slate-300">
-                        {isUr
-                          ? "یہاں آپ بغیر کسی اضافی کارڈ کے براہِ راست کیوب اے آئی سے بات کر سکتے ہیں، نئی پروڈکٹ شامل کر سکتے ہیں یا موجودہ پروڈکٹ ایڈٹ کر سکتے ہیں۔"
-                          : "Chat directly with Cube AI without screen clutter. Ask any question, or tell Cube to add or edit a product (Cube will ask for any required fields and never assumes)."}
-                      </p>
+                            ? "السلام علیکم! میں آپ کا انٹرایکٹو اے آئی اسسٹنٹ ہوں۔ آپ مجھ سے سافٹ ویئر کے بارے میں کوئی بھی سوال پوچھ سکتے ہیں یا کوئی بھی ٹاسک کروا سکتے ہیں۔ ہر ٹاسک کو ڈیٹا بیس میں پوسٹ کرنے سے پہلے میں آپ کو مکمل نتیجہ (Preview) دکھاؤں گا اور آپ کی اجازت لوں گا۔"
+                            : "Hi! I'm your interactive Karobar ERP AI assistant. Ask me anything about this screen, or tell me to perform a task. Before posting anything to the database, I will always show you the exact staged result preview and ask for your permission."}
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-1.5 pt-0.5">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleAskSubmit(null, "Add a new product", true)
-                        }
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-95 ${
-                          isDark
-                            ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-emerald-300"
-                            : "bg-emerald-50/70 hover:bg-emerald-100 border-emerald-200 text-emerald-800"
-                        }`}
-                      >
-                        <span aria-hidden="true">➕</span>
-                        <span>{isUr ? "نئی پروڈکٹ بنائیں" : "Add Product"}</span>
-                      </button>
+                    {/* Interactive ERP Tasks Section */}
+                    <div className="space-y-1.5 pt-0.5">
+                      <p className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-400">
+                        {isUr
+                          ? "⚡ اے آئی سے ٹاسک کروائیں (پری ویو + اجازت کے ساتھ):"
+                          : "⚡ Ask AI to Perform a Task (Preview + Permission Guarded):"}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { icon: "➕", en: "Add Product", ur: "نئی پروڈکٹ بنائیں", cmd: "Add a new product" },
+                          { icon: "✏️", en: "Edit Product", ur: "پروڈکٹ ایڈٹ کریں", cmd: "Edit a product" },
+                          { icon: "🏷️", en: "Add Brand", ur: "نیا برانڈ", cmd: "Add a new brand" },
+                          { icon: "📂", en: "Add Category", ur: "نئی کیٹیگری", cmd: "Add a new category" },
+                          { icon: "🚚", en: "Add Supplier", ur: "نیا سپلائر", cmd: "Add a new supplier" },
+                          { icon: "👤", en: "Add Customer", ur: "نیا کسٹمر", cmd: "Add a new customer" },
+                          { icon: "📋", en: "Log Demand", ur: "ڈیمانڈ درج کریں", cmd: "Add a new user demand" },
+                          { icon: "🧪", en: "Auto-Fill Formulations", ur: "فارمولیشن لگائیں", cmd: "Auto-fill missing formulations for my products" },
+                        ].map((chip) => (
+                          <button
+                            key={chip.cmd}
+                            type="button"
+                            onClick={() => handleAskSubmit(null, chip.cmd, true)}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-95 ${
+                              isDark
+                                ? "bg-slate-800/90 hover:bg-slate-700 border-slate-700 text-slate-100"
+                                : "bg-slate-50 hover:bg-blue-50/80 border-slate-200 text-slate-800"
+                            }`}
+                          >
+                            <span aria-hidden="true">{chip.icon}</span>
+                            <span>{isUr ? chip.ur : chip.en}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleAskSubmit(null, "Edit a product", true)
-                        }
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-95 ${
-                          isDark
-                            ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-amber-300"
-                            : "bg-amber-50/70 hover:bg-amber-100 border-amber-200 text-amber-800"
-                        }`}
-                      >
-                        <span aria-hidden="true">✏️</span>
-                        <span>{isUr ? "پروڈکٹ ایڈٹ کریں" : "Edit Product"}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setActiveMainTab("tasks")}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-95 ${
-                          isDark
-                            ? "bg-indigo-950/60 hover:bg-indigo-900/70 border-indigo-500/40 text-indigo-200"
-                            : "bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-800"
-                        }`}
-                      >
-                        <span aria-hidden="true">⚡</span>
-                        <span>
-                          {isUr ? "بیک گراؤنڈ ٹاسکس" : "Background Tasks"}
-                        </span>
-                      </button>
+                    {/* Interactive Software Questions Section */}
+                    <div className="space-y-1.5 pt-0.5">
+                      <p className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-400">
+                        {isUr
+                          ? "💬 اس اسکرین کے بارے میں اے آئی سے پوچھیں:"
+                          : "💬 Ask Live AI About Your Current Screen:"}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          {
+                            en: `Explain ${displayedGuide.title.en} step by step`,
+                            ur: `${displayedGuide.title.ur} کا مکمل طریقہ بتائیں`,
+                          },
+                          {
+                            en: "How does this screen affect stock & accounting?",
+                            ur: "اس اسکرین کا اسٹاک اور کھاتوں پر کیا اثر پڑتا ہے؟",
+                          },
+                        ].map((qChip, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() =>
+                              handleAskSubmit(null, isUr ? qChip.ur : qChip.en, true)
+                            }
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-95 ${
+                              isDark
+                                ? "bg-blue-950/40 hover:bg-blue-900/50 border-blue-500/30 text-blue-200"
+                                : "bg-blue-50/70 hover:bg-blue-100 border-blue-200 text-blue-800"
+                            }`}
+                          >
+                            <SparklesIcon className="w-3.5 h-3.5 shrink-0" />
+                            <span>{isUr ? qChip.ur : qChip.en}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 );
@@ -4534,14 +5961,19 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                     : msg.text;
                   return (
                     <div key={msg.id} className="flex justify-end">
-                      <div
-                        dir={isUr ? "rtl" : "ltr"}
-                        lang={isUr ? "ur" : "en"}
-                        className={`max-w-[85%] px-3.5 py-2 rounded-2xl rounded-br-xs bg-slate-900 dark:bg-blue-600 text-white text-xs sm:text-[13px] font-semibold shadow-2xs ${
-                          isUr ? "guide-bot-urdu-block" : ""
-                        }`}
-                      >
-                        {userText}
+                      <div className="max-w-[86%] flex flex-col items-end gap-1">
+                        <span className="text-[10px] font-extrabold text-slate-400 px-1">
+                          {isUr ? "آپ" : "You"}
+                        </span>
+                        <div
+                          dir={isUr ? "rtl" : "ltr"}
+                          lang={isUr ? "ur" : "en"}
+                          className={`px-3.5 py-2.5 rounded-2xl rounded-br-xs bg-gradient-to-br from-slate-900 to-slate-800 dark:from-blue-600 dark:to-indigo-600 text-white text-xs sm:text-[13px] font-semibold shadow-2xs ${
+                            isUr ? "guide-bot-urdu-block" : ""
+                          }`}
+                        >
+                          {userText}
+                        </div>
                       </div>
                     </div>
                   );
@@ -4550,22 +5982,45 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               });
             })()}
 
+            {/* Live Multi-Stage AI Reasoning & Streaming Indicator */}
             {isTyping && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-start gap-2">
                 <div
-                  className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl rounded-tl-xs border ${
+                  dir={isUr ? "rtl" : "ltr"}
+                  lang={isUr ? "ur" : "en"}
+                  className={`px-3.5 py-2.5 rounded-2xl rounded-tl-xs border space-y-1.5 shadow-2xs ${
                     isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
                   }`}
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce" />
-                  <span
-                    className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce"
-                    style={{ animationDelay: "120ms" }}
-                  />
-                  <span
-                    className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce"
-                    style={{ animationDelay: "240ms" }}
-                  />
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-[11px] font-black shrink-0">
+                      🤖
+                    </span>
+                    <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400">
+                      {thinkingStageIdx === 0
+                        ? isUr
+                          ? "🧠 آپ کی بات اور ٹاسک کو سمجھا جا رہا ہے..."
+                          : "🧠 Understanding your request & intent..."
+                        : thinkingStageIdx === 1
+                        ? isUr
+                          ? "🔍 کاروبار ای آر پی سیاق و سباق اور پری ویو چیک ہو رہا ہے..."
+                          : "🔍 Checking Karobar ERP context & staging preview..."
+                        : isUr
+                        ? "✨ لائیو اے آئی جواب تیار کیا جا رہا ہے..."
+                        : "✨ Generating live AI response..."}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 pl-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce" />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-bounce"
+                      style={{ animationDelay: "120ms" }}
+                    />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce"
+                      style={{ animationDelay: "240ms" }}
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -4581,40 +6036,35 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   className="pt-1 flex items-center justify-between gap-2 flex-wrap"
                 >
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleAskSubmit(null, "Add a new product", true)
-                      }
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
-                        isDark
-                          ? "bg-slate-900 hover:bg-slate-800 border-slate-700 text-emerald-300"
-                          : "bg-white hover:bg-emerald-50 border-slate-200 text-emerald-700"
-                      }`}
-                    >
-                      <span aria-hidden="true">➕</span>
-                      <span>{isUr ? "نئی پروڈکٹ" : "Add Product"}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleAskSubmit(null, "Edit a product", true)
-                      }
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
-                        isDark
-                          ? "bg-slate-900 hover:bg-slate-800 border-slate-700 text-amber-300"
-                          : "bg-white hover:bg-amber-50 border-slate-200 text-amber-700"
-                      }`}
-                    >
-                      <span aria-hidden="true">✏️</span>
-                      <span>{isUr ? "پروڈکٹ ایڈٹ" : "Edit Product"}</span>
-                    </button>
+                    {[
+                      { icon: "➕", en: "Add Product", ur: "نئی پروڈکٹ", cmd: "Add a new product" },
+                      { icon: "✏️", en: "Edit Product", ur: "پروڈکٹ ایڈٹ", cmd: "Edit a product" },
+                      { icon: "🏷️", en: "Add Brand", ur: "نیا برانڈ", cmd: "Add a new brand" },
+                      { icon: "🚚", en: "Add Supplier", ur: "نیا سپلائر", cmd: "Add a new supplier" },
+                      { icon: "👤", en: "Add Customer", ur: "نیا کسٹمر", cmd: "Add a new customer" },
+                    ].map((quick) => (
+                      <button
+                        key={quick.cmd}
+                        type="button"
+                        onClick={() => handleAskSubmit(null, quick.cmd, true)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+                          isDark
+                            ? "bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200"
+                            : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
+                        }`}
+                      >
+                        <span aria-hidden="true">{quick.icon}</span>
+                        <span>{isUr ? quick.ur : quick.en}</span>
+                      </button>
+                    ))}
                   </div>
 
                   <button
                     type="button"
-                    onClick={clearChatOnly}
+                    onClick={() => {
+                      stopLiveStream();
+                      clearChatOnly();
+                    }}
                     className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
                   >
                     <ArrowPathIcon className="w-3 h-3" />
@@ -4628,7 +6078,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         )}
 
         {/* =================================================================== */}
-        {/* BOTTOM ASK INPUT BAR                                                */}
+        {/* BOTTOM INTERACTIVE AI CHAT COMPOSER (IME-Safe Enter to Submit)      */}
         {/* =================================================================== */}
         <footer
           className={`p-3 shrink-0 ${
@@ -4637,36 +6087,50 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               : "bg-white border-t border-slate-200"
           }`}
         >
-          <form onSubmit={handleAskSubmit} className="flex items-center gap-2">
+          <div className="flex items-end gap-2" role="search">
             <label htmlFor="guide-bot-ask-input" className="sr-only">
-              Ask a question
+              Ask Cube AI or request a task
             </label>
-            <input
+            <textarea
               id="guide-bot-ask-input"
               ref={askInputRef}
-              type="text"
+              rows={1}
               dir={isUr ? "rtl" : "ltr"}
               value={questionInput}
               onChange={(e) => setQuestionInput(e.target.value)}
+              onKeyDown={(e) => {
+                // Guard against premature Enter submit during IME composition
+                if (e.nativeEvent?.isComposing || e.isComposing || e.keyCode === 229) {
+                  return;
+                }
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleAskSubmit(e);
+                }
+              }}
               placeholder={
                 isUr
-                  ? "کچھ بھی پوچھیں (مثلاً: پرچیز آرڈر کیسے بنائیں؟)..."
-                  : "Ask Cube anything (e.g. how to make purchase order)..."
+                  ? "کیوب اے آئی سے سوال پوچھیں یا ٹاسک بتائیں (مثلاً: Add product Panadol، یا پرچیز آرڈر کیسے بنائیں؟)..."
+                  : "Message Cube AI — ask a question or request a task (e.g. Add product, Add brand, Edit price)..."
               }
-              className={`flex-1 h-10 px-3.5 text-base sm:text-[13px] font-medium rounded-xl border focus:outline-hidden focus:ring-2 focus:ring-blue-500 ${
+              className={`flex-1 min-h-[40px] max-h-28 py-2 px-3.5 text-base sm:text-[13px] font-medium rounded-xl border resize-none focus:outline-hidden focus:ring-2 focus:ring-blue-500 ${
                 isDark
                   ? "bg-slate-800 border-slate-700 text-white placeholder-slate-400"
                   : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"
               }`}
             />
             <button
-              type="submit"
-              aria-label={isUr ? "سوال بھیجیں" : "Send question"}
-              className="h-10 px-3.5 text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer shrink-0 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-blue-600 dark:hover:bg-blue-500"
+              type="button"
+              disabled={isTyping || !questionInput.trim()}
+              onClick={(e) => handleAskSubmit(e)}
+              aria-label={isUr ? "سوال بھیجیں" : "Send message"}
+              className="h-10 px-3.5 text-white text-xs font-extrabold inline-flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer shrink-0 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50"
             >
               <PaperAirplaneIcon className="w-4 h-4" />
+              <span className="hidden sm:inline">{isUr ? "بھیجیں" : "Send"}</span>
             </button>
-          </form>
+          </div>
         </footer>
       </div>
       </dialog>

@@ -37,7 +37,7 @@ class GeminiProvider
         $endpoint = "{$endpointBase}/{$model}:generateContent";
         $timeout = max(2, (int) ($config['timeout_seconds'] ?? 25));
         $connectTimeout = max(1, (int) ($config['connect_timeout_seconds'] ?? 10));
-        $maxTokens = max(250, (int) ($config['max_output_tokens'] ?? 2048));
+        $maxTokens = max(1024, (int) ($config['max_output_tokens'] ?? 4096));
         $temperature = (float) ($config['temperature'] ?? 0.3);
 
         $headers = [
@@ -47,33 +47,38 @@ class GeminiProvider
             'User-Agent' => 'KarobarApp-CubeAssistant/2.0',
         ];
 
-        $payload = [
-            'system_instruction' => [
-                'parts' => [
-                    ['text' => $systemPrompt],
-                ],
-            ],
-            'contents' => [
-                [
-                    'role' => 'user',
-                    'parts' => [
-                        ['text' => $userPrompt],
-                    ],
-                ],
-            ],
-            'generationConfig' => [
-                'temperature' => $temperature,
-                'maxOutputTokens' => $maxTokens,
-                'responseMimeType' => 'application/json',
-            ],
-        ];
+        $isGemmaModel = str_contains(strtolower($model), 'gemma');
+        $payload = $this->buildModelPayload(
+            $model,
+            $systemPrompt,
+            $userPrompt,
+            $temperature,
+            $maxTokens,
+            $isGemmaModel
+        );
 
         try {
             $response = $this->sendHttpRequest($headers, $endpoint, $payload, $connectTimeout, $timeout);
             $discoveredModels = [];
 
-            // If the configured model returns 404, discover available generateContent models on this key
-            if ($response->status() === 404) {
+            // If the model rejected system_instruction or responseMimeType with HTTP 400, retry in compatibility mode
+            if ($response->status() === 400 && ! $isGemmaModel) {
+                $compatPayload = $this->buildModelPayload(
+                    $model,
+                    $systemPrompt,
+                    $userPrompt,
+                    $temperature,
+                    $maxTokens,
+                    true
+                );
+                $compatResponse = $this->sendHttpRequest($headers, $endpoint, $compatPayload, $connectTimeout, $timeout);
+                if ($compatResponse->successful() || $compatResponse->status() !== 400) {
+                    $response = $compatResponse;
+                }
+            }
+
+            // If the configured model returns 404 or unsupported 400, discover available generateContent models on this key
+            if ($response->status() === 404 || $response->status() === 400) {
                 $discoveredModels = $this->discoverChatModels($headers, $endpointBase, $connectTimeout, $timeout);
                 $candidates = array_values(array_unique(array_filter(
                     array_merge($discoveredModels, ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash']),
@@ -82,14 +87,22 @@ class GeminiProvider
 
                 foreach (array_slice($candidates, 0, 3) as $candidateModel) {
                     $fallbackEndpoint = "{$endpointBase}/{$candidateModel}:generateContent";
-                    $fallbackResponse = $this->sendHttpRequest($headers, $fallbackEndpoint, $payload, $connectTimeout, $timeout);
+                    $candidatePayload = $this->buildModelPayload(
+                        $candidateModel,
+                        $systemPrompt,
+                        $userPrompt,
+                        $temperature,
+                        $maxTokens,
+                        str_contains(strtolower($candidateModel), 'gemma')
+                    );
+                    $fallbackResponse = $this->sendHttpRequest($headers, $fallbackEndpoint, $candidatePayload, $connectTimeout, $timeout);
                     if ($fallbackResponse->successful()) {
                         $response = $fallbackResponse;
                         $model = $candidateModel;
                         $this->persistDiscoveredModel($candidateModel);
                         break;
                     }
-                    if ($fallbackResponse->status() !== 404) {
+                    if ($fallbackResponse->status() !== 404 && $fallbackResponse->status() !== 400) {
                         $response = $fallbackResponse;
                         $model = $candidateModel;
                         break;
@@ -101,7 +114,16 @@ class GeminiProvider
 
             if ($response->successful()) {
                 $body = $response->json();
-                $rawText = (string) data_get($body, 'candidates.0.content.parts.0.text', '');
+                $parts = (array) data_get($body, 'candidates.0.content.parts', []);
+                $textChunks = [];
+                foreach ($parts as $part) {
+                    if (is_array($part) && empty($part['thought']) && isset($part['text']) && is_string($part['text'])) {
+                        $textChunks[] = $part['text'];
+                    }
+                }
+                $rawText = ! empty($textChunks)
+                    ? implode("\n", $textChunks)
+                    : (string) data_get($body, 'candidates.0.content.parts.0.text', '');
                 $decoded = $this->decodeJsonContent($rawText);
 
                 if ($decoded === null) {
@@ -200,6 +222,62 @@ class GeminiProvider
                 'error_message' => $this->sanitizeErrorMessage($e->getMessage(), $apiKey),
             ];
         }
+    }
+
+    /**
+     * Builds the request payload for Gemini / Gemma `generateContent` endpoints.
+     * Gemma models do not support `system_instruction` or `responseMimeType: application/json`,
+     * so compatibility mode merges system instructions into the user prompt.
+     *
+     * @return array<string, mixed>
+     */
+    protected function buildModelPayload(
+        string $model,
+        string $systemPrompt,
+        string $userPrompt,
+        float $temperature,
+        int $maxTokens,
+        bool $compatibilityMode = false
+    ): array {
+        if ($compatibilityMode || str_contains(strtolower($model), 'gemma')) {
+            return [
+                'contents' => [
+                    [
+                        'role' => 'user',
+                        'parts' => [
+                            [
+                                'text' => "SYSTEM INSTRUCTIONS:\n{$systemPrompt}\n\nUSER REQUEST:\n{$userPrompt}",
+                            ],
+                        ],
+                    ],
+                ],
+                'generationConfig' => [
+                    'temperature' => $temperature,
+                    'maxOutputTokens' => $maxTokens,
+                ],
+            ];
+        }
+
+        return [
+            'system_instruction' => [
+                'parts' => [
+                    ['text' => $systemPrompt],
+                ],
+            ],
+            'contents' => [
+                [
+                    'role' => 'user',
+                    'parts' => [
+                        ['text' => $userPrompt],
+                    ],
+                ],
+            ],
+            'generationConfig' => [
+                'temperature' => $temperature,
+                'maxOutputTokens' => $maxTokens,
+                'responseMimeType' => 'application/json',
+            ],
+        ];
     }
 
     /**

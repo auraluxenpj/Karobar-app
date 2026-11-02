@@ -52,6 +52,8 @@ class CubeHybridAssistantTest extends TestCase
             'cube.providers.gemini.model' => 'gemini-3.8-flash',
             'cube.providers.gemini.daily_limit' => 50,
         ]);
+
+        app(CubeKnowledgeRetriever::class)->clearLearnedKnowledge();
     }
 
     /**
@@ -961,17 +963,38 @@ JS;
         $this->assertSame(1, \App\Models\Supplier::count());
         $this->assertNull(\App\Models\Product::where('name', 'Panadol 500mg Tablet')->first());
 
-        // 1C. User replies with the EXISTING brand & supplier + optional prices/formulation/rack -> Product is now created!
-        $createResp = $this->postJson('/api/cube/ask', [
+        // 1C. User replies with the EXISTING brand & supplier + optional prices/formulation/rack -> Cube MUST ask for User Permission before creating!
+        $permissionCreateResp = $this->postJson('/api/cube/ask', [
             'question' => 'brand GSK, supplier Ali Gohar, formulation Paracetamol, pack purchase price 500, pack sale price 600, rack R-10',
             'language' => 'en',
             'current_route' => '/products',
         ]);
 
+        $permissionCreateResp->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_awaiting_permission')
+            ->assertJsonPath('task_meta.action', 'create_products')
+            ->assertJsonPath('task_meta.status', 'awaiting_permission')
+            ->assertJsonPath('task_meta.requires_permission', true)
+            ->assertJsonPath('task_meta.created_count', 0);
+
+        // Product must still NOT be created before user grants permission
+        $this->assertNull(\App\Models\Product::where('name', 'Panadol 500mg Tablet')->first());
+
+        // 1D. User grants permission -> Product is now created and result summary is returned!
+        $createResp = $this->postJson('/api/cube/ask', [
+            'question' => 'Yes, approve and execute task',
+            'language' => 'en',
+            'current_route' => '/products',
+            'user_confirmed' => true,
+        ]);
+
         $createResp->assertOk()
             ->assertJsonPath('provider_status', 'cube_task_executed')
             ->assertJsonPath('task_meta.action', 'create_products')
-            ->assertJsonPath('task_meta.created_count', 1);
+            ->assertJsonPath('task_meta.status', 'completed')
+            ->assertJsonPath('task_meta.permission_granted', true)
+            ->assertJsonPath('task_meta.created_count', 1)
+            ->assertJsonPath('task_meta.result_summary.affected_count', 1);
 
         $panadol = \App\Models\Product::where('name', 'Panadol 500mg Tablet')->first();
         $this->assertNotNull($panadol);
@@ -985,9 +1008,28 @@ JS;
         $this->assertEquals(3.0, (float) $panadol->unit_sale_price);
         $this->assertSame('R-10', $panadol->rack);
 
-        // 2. Edit the existing product via Cube
-        $editResp = $this->postJson('/api/cube/ask', [
+        // 2A. Edit the existing product via Cube -> Cube MUST ask for User Permission first!
+        $permissionEditResp = $this->postJson('/api/cube/ask', [
             'question' => 'Update product Panadol 500mg Tablet pack sale price to 640 and rack to R-22',
+            'language' => 'en',
+            'current_route' => '/products',
+        ]);
+
+        $permissionEditResp->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_awaiting_permission')
+            ->assertJsonPath('task_meta.action', 'update_products')
+            ->assertJsonPath('task_meta.status', 'awaiting_permission')
+            ->assertJsonPath('task_meta.requires_permission', true)
+            ->assertJsonPath('task_meta.updated_count', 0);
+
+        // Verify product is NOT modified before user grants permission
+        $panadol->refresh();
+        $this->assertEquals(600.0, (float) $panadol->pack_sale_price);
+        $this->assertSame('R-10', $panadol->rack);
+
+        // 2B. User replies "yes" in chat to grant permission -> Product update executes and shows result!
+        $editResp = $this->postJson('/api/cube/ask', [
+            'question' => 'yes',
             'language' => 'en',
             'current_route' => '/products',
         ]);
@@ -995,7 +1037,10 @@ JS;
         $editResp->assertOk()
             ->assertJsonPath('provider_status', 'cube_task_executed')
             ->assertJsonPath('task_meta.action', 'update_products')
-            ->assertJsonPath('task_meta.updated_count', 1);
+            ->assertJsonPath('task_meta.status', 'completed')
+            ->assertJsonPath('task_meta.permission_granted', true)
+            ->assertJsonPath('task_meta.updated_count', 1)
+            ->assertJsonPath('task_meta.result_summary.affected_count', 1);
 
         $panadol->refresh();
         $this->assertEquals(640.0, (float) $panadol->pack_sale_price);
@@ -1103,5 +1148,353 @@ JS;
 
         // Verify Panadol still exists in the database
         $this->assertNotNull(\App\Models\Product::where('name', 'Panadol 500mg Tablet')->first());
+    }
+
+    /**
+     * 26. Explain Cursor & Self-Improving Knowledge Base:
+     * - Explain Cursor sends `explain_mode = cursor_element` and `element_context` to Generative AI
+     * - Generative AI explains the control and improves old static knowledge (`knowledge_improved = true`)
+     * - Subsequent queries (even if AI is later offline/disabled) return the AI-improved knowledge instead of stale old knowledge
+     * - Gemma models (`gemma-4-26b-a4b-it`) work seamlessly in compatibility mode without `system_instruction` HTTP 400 errors
+     */
+    public function test_explain_cursor_uses_generative_ai_and_self_improves_old_knowledge_for_future_queries(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        config([
+            'cube.providers.groq.model' => 'openai/gpt-oss-120b',
+            'cube.providers.gemini.model' => 'gemma-4-26b-a4b-it',
+        ]);
+
+        $capturedGroqPayload = null;
+
+        Http::fake([
+            'api.groq.com/*' => function ($request) use (&$capturedGroqPayload) {
+                $capturedGroqPayload = $request->data();
+
+                return Http::response([
+                    'choices' => [
+                        [
+                            'message' => [
+                                'content' => json_encode([
+                                    'title_en' => 'Regular Customer Toggle — Auto-Fill Repeat Prescriptions',
+                                    'title_ur' => 'ریگولر کسٹمر بٹن — مستقل گاہکوں کا خودکار بل',
+                                    'answer_en' => '1. Clicking **Regular Customer** on the POS loads all medicines marked as Regular for that patient.\n2. It automatically selects the earliest-expiring batch (FEFO) and improves checkout speed.',
+                                    'answer_ur' => '1. پی او ایس پر **Regular Customer** بٹن دبانے سے مستقل مریض کی تمام ادویات خودکار طور پر بل میں شامل ہو جاتی ہیں۔\n2. یہ خودکار طور پر FEFO کے مطابق بیچ منتخب کرتا ہے۔',
+                                    'source_ids' => ['screen:/sale-invoices/pos'],
+                                ], JSON_UNESCAPED_UNICODE),
+                            ],
+                        ],
+                    ],
+                ], 200);
+            },
+        ]);
+
+        // 1. Explain Cursor clicks a button and calls /api/cube/ask with explain_mode=cursor_element & element_context
+        $cursorResp = $this->postJson('/api/cube/ask', [
+            'question' => 'Explain the "Regular Customer" (Button) on the Barcode POS screen in Karobar ERP.',
+            'language' => 'en',
+            'current_route' => '/sale-invoices/pos',
+            'explain_mode' => 'cursor_element',
+            'element_context' => [
+                'control_key' => '/sale-invoices/pos::button::regular customer',
+                'label' => 'Regular Customer',
+                'component_type' => 'Button',
+                'zone' => 'Main Workspace',
+                'shortcut' => 'Alt+R',
+                'baseline_en' => 'Triggers the Regular Customer action.',
+                'baseline_ur' => 'یہ بٹن دبانے سے عمل شروع ہوتا ہے۔',
+            ],
+        ]);
+
+        $cursorResp->assertOk()
+            ->assertJsonPath('provider', 'groq')
+            ->assertJsonPath('provider_status', 'groq_primary')
+            ->assertJsonPath('knowledge_improved', true)
+            ->assertJsonPath('title_en', 'Regular Customer Toggle — Auto-Fill Repeat Prescriptions');
+
+        $this->assertNotNull($capturedGroqPayload);
+        // Verify gpt-oss-120b did not force response_format=json_object
+        $this->assertArrayNotHasKey('response_format', $capturedGroqPayload);
+        $userPromptSent = (string) data_get($capturedGroqPayload, 'messages.1.content', '');
+        $this->assertStringContainsString('INSPECTED UI ELEMENT / CONTROL CONTEXT', $userPromptSent);
+        $this->assertStringContainsString('Regular Customer', $userPromptSent);
+
+        // 2. Now disable external AI providers to verify that the self-improved knowledge replaced the old static fallback!
+        config([
+            'cube.providers.groq.daily_limit' => 0,
+            'cube.providers.gemini.daily_limit' => 0,
+        ]);
+
+        $offlineResp = $this->postJson('/api/cube/ask', [
+            'question' => 'Explain the "Regular Customer" (Button) on the Barcode POS screen in Karobar ERP.',
+            'language' => 'en',
+            'current_route' => '/sale-invoices/pos',
+            'explain_mode' => 'cursor_element',
+            'element_context' => [
+                'control_key' => '/sale-invoices/pos::button::regular customer',
+                'label' => 'Regular Customer',
+                'component_type' => 'Button',
+            ],
+        ]);
+
+        $offlineResp->assertOk()
+            ->assertJsonPath('provider', 'local')
+            ->assertJsonPath('provider_status', 'local_fallback');
+
+        $this->assertStringContainsString(
+            'loads all medicines marked as Regular for that patient',
+            (string) $offlineResp->json('answer_en')
+        );
+    }
+
+    /**
+     * 27. Pre-Database Staged Result Preview & Permission Guard for All ERP Tasks:
+     * - Every task (Brands, Categories, Suppliers, Customers, Demands, Products, Formulations)
+     *   returns `task_meta.preview_result` (`staged = true`, `posted_to_database = false`) BEFORE writing to DB.
+     * - Nothing is written to the database until explicit user permission is granted.
+     */
+    public function test_cube_interactive_tasks_show_staged_preview_result_before_posting_to_database(): void
+    {
+        $adminRole = \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'sanctum']);
+        $this->user->assignRole($adminRole);
+        Sanctum::actingAs($this->user);
+
+        // 1. Ask Cube to add a Brand -> must stage preview_result and NOT write to DB yet
+        $brandStageResp = $this->postJson('/api/cube/ask', [
+            'question' => 'Add brand Abbott Laboratories',
+            'language' => 'en',
+            'current_route' => '/brands',
+        ]);
+
+        $brandStageResp->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_awaiting_permission')
+            ->assertJsonPath('task_meta.action', 'create_brands')
+            ->assertJsonPath('task_meta.awaiting_permission', true)
+            ->assertJsonPath('task_meta.preview_result.staged', true)
+            ->assertJsonPath('task_meta.preview_result.posted_to_database', false)
+            ->assertJsonPath('task_meta.preview_result.database_table', 'brands')
+            ->assertJsonPath('task_meta.preview_result.operation', 'INSERT');
+
+        $this->assertNull(\App\Models\Brand::where('name', 'Abbott Laboratories')->first());
+
+        // 2. Grant permission -> now posted to database
+        $brandCommitResp = $this->postJson('/api/cube/ask', [
+            'question' => 'Yes, approve and post to database',
+            'language' => 'en',
+            'current_route' => '/brands',
+            'user_confirmed' => true,
+        ]);
+
+        $brandCommitResp->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_executed')
+            ->assertJsonPath('task_meta.action', 'create_brands')
+            ->assertJsonPath('task_meta.result_summary.posted_to_database', true)
+            ->assertJsonPath('task_meta.result_summary.database_table', 'brands');
+
+        $this->assertNotNull(\App\Models\Brand::where('name', 'Abbott Laboratories')->first());
+
+        // 3. Ask Cube to add a Supplier -> must stage preview_result and NOT write to DB yet
+        $supplierStageResp = $this->postJson('/api/cube/ask', [
+            'question' => 'Add supplier Premier Pharma Distributors, phone 03001112233, address Lahore',
+            'language' => 'en',
+            'current_route' => '/suppliers',
+        ]);
+
+        $supplierStageResp->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_awaiting_permission')
+            ->assertJsonPath('task_meta.action', 'create_suppliers')
+            ->assertJsonPath('task_meta.preview_result.posted_to_database', false)
+            ->assertJsonPath('task_meta.preview_result.database_table', 'suppliers');
+
+        $this->assertNull(\App\Models\Supplier::where('name', 'Premier Pharma Distributors')->first());
+
+        // Confirm Supplier creation
+        $supplierCommitResp = $this->postJson('/api/cube/ask', [
+            'question' => 'yes',
+            'language' => 'en',
+            'current_route' => '/suppliers',
+            'user_confirmed' => true,
+        ]);
+
+        $supplierCommitResp->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_executed')
+            ->assertJsonPath('task_meta.result_summary.posted_to_database', true);
+
+        $createdSupplier = \App\Models\Supplier::where('name', 'Premier Pharma Distributors')->first();
+        $this->assertNotNull($createdSupplier);
+        $this->assertSame('03001112233', $createdSupplier->phone);
+
+        // 4. Dry-run preview_only on /api/cube/execute-task must return staged preview without saving to DB
+        $cat = \App\Models\Category::firstOrCreate(['name' => 'Syrups']);
+        $brand = \App\Models\Brand::where('name', 'Abbott Laboratories')->first();
+        $dryRunProd = \App\Models\Product::create([
+            'name' => 'Calpol 120mg Syrup',
+            'product_code' => 'PRD-9910',
+            'barcode' => 'PRD0000009910',
+            'formulation' => null,
+            'pack_size' => 1,
+            'quantity' => 0,
+            'pack_purchase_price' => 80,
+            'pack_sale_price' => 100,
+            'unit_purchase_price' => 80,
+            'unit_sale_price' => 100,
+            'category_id' => $cat->id,
+            'brand_id' => $brand->id,
+            'supplier_id' => $createdSupplier->id,
+        ]);
+
+        $previewOnlyResp = $this->postJson('/api/cube/execute-task', [
+            'task_type' => 'bulk_autofill_missing_formulations',
+            'filter_query' => 'Calpol',
+            'preview_only' => true,
+        ]);
+
+        $previewOnlyResp->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_awaiting_permission')
+            ->assertJsonPath('task_meta.preview_result.posted_to_database', false)
+            ->assertJsonPath('task_meta.preview_result.resolvable_in_preview', 1);
+
+        // Verify dryRunProd was NOT modified in DB during preview_only
+        $this->assertNull($dryRunProd->fresh()->formulation);
+    }
+
+    /**
+     * 28. Step-by-Step Task Execution & DB-First Matching (Never Excessively Create Duplicate Items):
+     * - User Demand: Step 1 asks product name -> Step 2 searches DB first and presents matching products (`db_matches`)
+     *   -> Step 3 asks requested quantity -> Step 4 shows staged `preview_result` and asks permission -> Commits linked demand without creating a duplicate product.
+     * - Master Entities & Products: Searches DB first when adding a Brand or Product and presents existing matches so the user can select existing or create new.
+     */
+    public function test_cube_step_by_step_task_execution_searches_database_first_and_prevents_excessive_duplicate_creation(): void
+    {
+        $adminRole = \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'sanctum']);
+        $this->user->assignRole($adminRole);
+        Sanctum::actingAs($this->user);
+
+        $cat = \App\Models\Category::create(['name' => 'Tablets']);
+        $brand = \App\Models\Brand::create([
+            'name' => 'GSK Pakistan',
+            'expiry_return_policy' => 'before_expiry',
+            'expiry_return_months' => 3,
+        ]);
+        $supplier = \App\Models\Supplier::create([
+            'name' => 'Ali Gohar Distributors',
+            'phone' => '03009998877',
+            'address' => 'Karachi',
+        ]);
+
+        $panadol = \App\Models\Product::create([
+            'name' => 'Panadol 500mg Tablet',
+            'product_code' => 'PRD-0101',
+            'barcode' => 'PRD0000000101',
+            'formulation' => 'Paracetamol',
+            'pack_size' => 200,
+            'quantity' => 45,
+            'pack_purchase_price' => 500,
+            'pack_sale_price' => 600,
+            'unit_purchase_price' => 2.5,
+            'unit_sale_price' => 3.0,
+            'category_id' => $cat->id,
+            'brand_id' => $brand->id,
+            'supplier_id' => $supplier->id,
+        ]);
+
+        // 1. Step 1 of Create User Demand: Ask for product name first
+        $demandStep1 = $this->postJson('/api/cube/ask', [
+            'question' => 'Create user demand',
+            'language' => 'en',
+            'current_route' => '/user-demands',
+        ]);
+
+        $demandStep1->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_needs_input')
+            ->assertJsonPath('task_meta.action', 'create_user_demands')
+            ->assertJsonPath('task_meta.step_info.current', 1);
+
+        // 2. Step 2 of Create User Demand: User provides "Panadol" -> Cube searches DB first and presents Panadol 500mg Tablet!
+        $demandStep2 = $this->postJson('/api/cube/ask', [
+            'question' => 'Panadol',
+            'language' => 'en',
+            'current_route' => '/user-demands',
+        ]);
+
+        $demandStep2->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_needs_input')
+            ->assertJsonPath('task_meta.action', 'create_user_demands')
+            ->assertJsonPath('task_meta.step_info.current', 2)
+            ->assertJsonPath('task_meta.db_matches.0.id', $panadol->id)
+            ->assertJsonPath('task_meta.db_matches.0.name', 'Panadol 500mg Tablet');
+
+        // 3. Step 3 of Create User Demand: User selects the matching DB product -> Cube asks for Requested Quantity
+        $demandStep3 = $this->postJson('/api/cube/ask', [
+            'question' => "Select product #{$panadol->id}: Panadol 500mg Tablet",
+            'language' => 'en',
+            'current_route' => '/user-demands',
+        ]);
+
+        $demandStep3->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_needs_input')
+            ->assertJsonPath('task_meta.action', 'create_user_demands')
+            ->assertJsonPath('task_meta.step_info.current', 3);
+
+        // 4. Step 4 of Create User Demand: User provides quantity -> Cube stages preview_result and asks permission
+        $demandStep4 = $this->postJson('/api/cube/ask', [
+            'question' => 'quantity 5',
+            'language' => 'en',
+            'current_route' => '/user-demands',
+        ]);
+
+        $demandStep4->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_awaiting_permission')
+            ->assertJsonPath('task_meta.action', 'create_user_demands')
+            ->assertJsonPath('task_meta.preview_result.posted_to_database', false)
+            ->assertJsonPath('task_meta.preview_result.database_table', 'user_demands');
+
+        $this->assertSame(0, \App\Models\UserDemand::count());
+
+        // 5. Grant permission -> UserDemand is created linked to existing Product ID, and NO new Product was created!
+        $demandCommit = $this->postJson('/api/cube/ask', [
+            'question' => 'Yes, approve and post to database',
+            'language' => 'en',
+            'current_route' => '/user-demands',
+            'user_confirmed' => true,
+        ]);
+
+        $demandCommit->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_executed')
+            ->assertJsonPath('task_meta.result_summary.posted_to_database', true);
+
+        $this->assertSame(1, \App\Models\UserDemand::count());
+        $this->assertSame(1, \App\Models\Product::count());
+        $createdDemand = \App\Models\UserDemand::first();
+        $this->assertSame($panadol->id, (int) $createdDemand->product_id);
+        $this->assertSame(5, (int) $createdDemand->requested_quantity);
+
+        // 6. DB-First Duplicate Prevention on Brands: Asking to "Add brand GSK" presents existing "GSK Pakistan" from DB first!
+        $brandMatchResp = $this->postJson('/api/cube/ask', [
+            'question' => 'Add brand GSK',
+            'language' => 'en',
+            'current_route' => '/brands',
+        ]);
+
+        $brandMatchResp->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_needs_input')
+            ->assertJsonPath('task_meta.action', 'create_brands')
+            ->assertJsonPath('task_meta.db_matches.0.id', $brand->id)
+            ->assertJsonPath('task_meta.db_matches.0.name', 'GSK Pakistan');
+
+        // User chooses to use existing Brand -> No duplicate brand is created!
+        $brandSelectExisting = $this->postJson('/api/cube/ask', [
+            'question' => "Select existing #{$brand->id}: GSK Pakistan",
+            'language' => 'en',
+            'current_route' => '/brands',
+        ]);
+
+        $brandSelectExisting->assertOk()
+            ->assertJsonPath('provider_status', 'cube_task_executed')
+            ->assertJsonPath('task_meta.created_count', 0)
+            ->assertJsonPath('task_meta.selected_existing.id', $brand->id);
+
+        $this->assertSame(1, \App\Models\Brand::count());
     }
 }

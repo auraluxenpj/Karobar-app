@@ -14,13 +14,17 @@ return new class extends Migration
 
         // 1. Clean up any historical AccountTransactions referencing hard-deleted SaleInvoices
         //    that had no corresponding sale_invoice_deletion reversal entry.
+        //    Uses whereNotExists subquery instead of whereNotIn($existingSaleIds) to avoid
+        //    SQLite's "too many SQL variables" limit on databases with thousands of invoices.
         if (Schema::hasTable('sale_invoices')) {
-            $existingSaleIds = DB::table('sale_invoices')->pluck('id')->all();
-
             $orphanedSaleRefIds = DB::table('account_transactions')
                 ->whereIn('reference_type', ['sale_invoice', 'sale_invoice_update'])
                 ->whereNotNull('reference_id')
-                ->when(!empty($existingSaleIds), fn ($q) => $q->whereNotIn('reference_id', $existingSaleIds))
+                ->whereNotExists(function ($q) {
+                    $q->select(DB::raw(1))
+                        ->from('sale_invoices')
+                        ->whereColumn('sale_invoices.id', 'account_transactions.reference_id');
+                })
                 ->pluck('reference_id')
                 ->unique()
                 ->all();

@@ -6,6 +6,8 @@ class CubeKnowledgeRetriever
 {
     protected ?array $knowledgeCache = null;
 
+    protected ?array $learnedCache = null;
+
     protected const STOP_WORDS = [
         'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'to', 'of', 'in', 'on', 'at', 'by', 'for',
         'with', 'from', 'into', 'onto', 'upon', 'out', 'over', 'under', 'can', 'could', 'would', 'should',
@@ -90,6 +92,254 @@ class CubeKnowledgeRetriever
         $kb = $this->loadKnowledge();
 
         return (string) ($kb['product_version'] ?? '2026.10');
+    }
+
+    public function getLearnedKnowledgePath(): string
+    {
+        return (string) config(
+            'cube.learned_knowledge_path',
+            storage_path('app/cube-learned-knowledge.json')
+        );
+    }
+
+    /**
+     * Loads the self-improving AI knowledge overlay persisted from verified Generative AI explanations.
+     *
+     * @return array{
+     *   updated_at: ?string,
+     *   improved_sources: array<string, array<string, mixed>>,
+     *   learned_controls: array<string, array<string, mixed>>,
+     *   learned_qa: array<string, array<string, mixed>>
+     * }
+     */
+    public function loadLearnedKnowledge(): array
+    {
+        if ($this->learnedCache !== null) {
+            return $this->learnedCache;
+        }
+
+        $default = [
+            'updated_at' => null,
+            'improved_sources' => [],
+            'learned_controls' => [],
+            'learned_qa' => [],
+        ];
+
+        $path = $this->getLearnedKnowledgePath();
+        if (! is_file($path)) {
+            $this->learnedCache = $default;
+
+            return $this->learnedCache;
+        }
+
+        $decoded = json_decode((string) @file_get_contents($path), true);
+        if (! is_array($decoded)) {
+            $this->learnedCache = $default;
+
+            return $this->learnedCache;
+        }
+
+        $this->learnedCache = [
+            'updated_at' => $decoded['updated_at'] ?? null,
+            'improved_sources' => is_array($decoded['improved_sources'] ?? null) ? $decoded['improved_sources'] : [],
+            'learned_controls' => is_array($decoded['learned_controls'] ?? null) ? $decoded['learned_controls'] : [],
+            'learned_qa' => is_array($decoded['learned_qa'] ?? null) ? $decoded['learned_qa'] : [],
+        ];
+
+        return $this->learnedCache;
+    }
+
+    public function clearLearnedKnowledge(): void
+    {
+        $this->learnedCache = [
+            'updated_at' => null,
+            'improved_sources' => [],
+            'learned_controls' => [],
+            'learned_qa' => [],
+        ];
+        $path = $this->getLearnedKnowledgePath();
+        if (is_file($path)) {
+            @unlink($path);
+        }
+    }
+
+    public function buildControlKnowledgeKey(string $currentRoute, ?array $elementContext): string
+    {
+        if (empty($elementContext)) {
+            return '';
+        }
+
+        $explicitKey = trim((string) ($elementContext['control_key'] ?? ''));
+        if ($explicitKey !== '') {
+            return mb_strtolower($explicitKey, 'UTF-8');
+        }
+
+        $cleanRoute = '/'.ltrim(trim($currentRoute ?: '/dashboard'), '/');
+        $comp = mb_strtolower(trim((string) ($elementContext['component_type'] ?? 'control')), 'UTF-8');
+        $label = mb_strtolower(trim((string) ($elementContext['label'] ?? ($elementContext['table_column'] ?? ''))), 'UTF-8');
+        $label = preg_replace('/\s+/u', ' ', $label) ?? $label;
+
+        if ($label === '') {
+            return '';
+        }
+
+        return "{$cleanRoute}::{$comp}::{$label}";
+    }
+
+    /**
+     * Persists a verified Generative AI explanation back into the learned knowledge store
+     * so the assistant continuously improves its old static knowledge over time.
+     *
+     * @param  array{
+     *   question: string,
+     *   current_route: string,
+     *   explain_mode?: string,
+     *   element_context?: ?array<string, mixed>,
+     *   title_en: string,
+     *   title_ur: string,
+     *   answer_en: string,
+     *   answer_ur: string,
+     *   source_ids: array<int, string>,
+     *   links?: array<int, array<string, string>>,
+     *   workflow_id?: ?string,
+     *   provider?: string
+     * }  $entry
+     * @return array{learned: bool, knowledge_key: string, updated_source_ids: array<int, string>}
+     */
+    public function recordLearnedImprovement(array $entry): array
+    {
+        $titleEn = trim((string) ($entry['title_en'] ?? ''));
+        $titleUr = trim((string) ($entry['title_ur'] ?? ''));
+        $answerEn = trim((string) ($entry['answer_en'] ?? ''));
+        $answerUr = trim((string) ($entry['answer_ur'] ?? ''));
+
+        if ($answerEn === '' && $answerUr === '') {
+            return [
+                'learned' => false,
+                'knowledge_key' => '',
+                'updated_source_ids' => [],
+            ];
+        }
+
+        $learned = $this->loadLearnedKnowledge();
+        $nowIso = now()->toIso8601String();
+        $cleanRoute = '/'.ltrim(trim((string) ($entry['current_route'] ?? '/dashboard')), '/');
+        $question = trim((string) ($entry['question'] ?? ''));
+        $analysis = $this->analyzeText($question);
+        $sourceIds = array_values(array_filter((array) ($entry['source_ids'] ?? []), 'is_string'));
+        $elementContext = is_array($entry['element_context'] ?? null) ? $entry['element_context'] : null;
+        $updatedSourceIds = [];
+        $knowledgeKey = '';
+
+        // 1. If an inspected DOM element was explained via Explain Cursor, persist improved control knowledge
+        $controlKey = $this->buildControlKnowledgeKey($cleanRoute, $elementContext);
+        if ($controlKey !== '') {
+            $controlSourceId = 'control:cursor_'.substr(md5($controlKey), 0, 10);
+            $label = trim((string) ($elementContext['label'] ?? ($elementContext['table_column'] ?? $titleEn)));
+            $compType = trim((string) ($elementContext['component_type'] ?? 'UI Control'));
+            $kwAnalysis = $this->analyzeText($label.' '.$compType.' '.$question);
+
+            $learned['learned_controls'][$controlKey] = [
+                'source_id' => $controlSourceId,
+                'control_key' => $controlKey,
+                'route' => $cleanRoute,
+                'label' => $label,
+                'component_type' => $compType,
+                'title' => [
+                    'en' => $titleEn !== '' ? $titleEn : $label,
+                    'ur' => $titleUr !== '' ? $titleUr : $label,
+                ],
+                'en' => $answerEn,
+                'ur' => $answerUr,
+                'keywords' => array_slice($kwAnalysis['meaningful_words'], 0, 12),
+                'updated_at' => $nowIso,
+                'provider' => (string) ($entry['provider'] ?? 'ai'),
+            ];
+
+            $updatedSourceIds[] = $controlSourceId;
+            $knowledgeKey = $controlKey;
+        }
+
+        // 2. Upgrade baseline static source (intent, faq, control, or screen topic) with AI-improved knowledge
+        if (! empty($sourceIds)) {
+            $primarySid = $sourceIds[0];
+            if (
+                str_starts_with($primarySid, 'intent:') ||
+                str_starts_with($primarySid, 'faq:') ||
+                str_starts_with($primarySid, 'control:') ||
+                ($entry['explain_mode'] ?? '') === 'screen_topic'
+            ) {
+                $learned['improved_sources'][$primarySid] = [
+                    'source_id' => $primarySid,
+                    'title_en' => $titleEn,
+                    'title_ur' => $titleUr,
+                    'answer_en' => $answerEn,
+                    'answer_ur' => $answerUr,
+                    'updated_at' => $nowIso,
+                    'provider' => (string) ($entry['provider'] ?? 'ai'),
+                ];
+                $updatedSourceIds[] = $primarySid;
+                if ($knowledgeKey === '') {
+                    $knowledgeKey = $primarySid;
+                }
+            }
+        }
+
+        // 3. Record learned Q&A entry so future identical or similar questions have improved baseline knowledge
+        if ($analysis['cleaned'] !== '') {
+            $qaKey = $cleanRoute.'::'.$analysis['cleaned'];
+            $qaSourceId = 'learned:'.substr(md5($qaKey), 0, 10);
+            $learned['learned_qa'][$qaKey] = [
+                'source_id' => $qaSourceId,
+                'route' => $cleanRoute,
+                'question' => $question,
+                'cleaned_question' => $analysis['cleaned'],
+                'keywords' => array_slice($analysis['meaningful_words'], 0, 14),
+                'title' => [
+                    'en' => $titleEn,
+                    'ur' => $titleUr,
+                ],
+                'en' => $answerEn,
+                'ur' => $answerUr,
+                'links' => is_array($entry['links'] ?? null) ? $entry['links'] : [],
+                'workflow_id' => $entry['workflow_id'] ?? null,
+                'updated_at' => $nowIso,
+                'provider' => (string) ($entry['provider'] ?? 'ai'),
+            ];
+
+            // Cap learned_qa at 300 entries
+            if (count($learned['learned_qa']) > 300) {
+                $learned['learned_qa'] = array_slice($learned['learned_qa'], -300, null, true);
+            }
+
+            if ($knowledgeKey === '') {
+                $knowledgeKey = $qaKey;
+            }
+            $updatedSourceIds[] = $qaSourceId;
+        }
+
+        $learned['updated_at'] = $nowIso;
+        $this->learnedCache = $learned;
+
+        try {
+            $path = $this->getLearnedKnowledgePath();
+            $dir = dirname($path);
+            if (! is_dir($dir)) {
+                @mkdir($dir, 0775, true);
+            }
+            @file_put_contents(
+                $path,
+                json_encode($learned, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            );
+        } catch (\Throwable) {
+            // Ignore filesystem write issues in read-only environments
+        }
+
+        return [
+            'learned' => true,
+            'knowledge_key' => $knowledgeKey,
+            'updated_source_ids' => array_values(array_unique($updatedSourceIds)),
+        ];
     }
 
     /**
@@ -282,9 +532,12 @@ class CubeKnowledgeRetriever
         string $currentRoute = '/dashboard',
         ?string $matchedIntentId = null,
         ?string $screenGuideId = null,
-        array $history = []
+        array $history = [],
+        ?array $elementContext = null,
+        string $explainMode = 'qa'
     ): array {
         $kb = $this->loadKnowledge();
+        $learned = $this->loadLearnedKnowledge();
         $maxSections = max(1, min(4, (int) config('cube.max_retrieved_sections', 4)));
 
         // Combine question with recent user turn context when the question is a short follow-up
@@ -325,6 +578,119 @@ class CubeKnowledgeRetriever
         }
 
         $candidates = [];
+
+        // 0. If Explain Cursor inspected a UI element, include its live DOM context + any learned control knowledge
+        if (is_array($elementContext) && ! empty($elementContext)) {
+            $controlKey = $this->buildControlKnowledgeKey($cleanRoute, $elementContext);
+            $learnedControl = ($controlKey !== '' && isset($learned['learned_controls'][$controlKey]))
+                ? $learned['learned_controls'][$controlKey]
+                : null;
+
+            $elLabel = trim((string) ($elementContext['label'] ?? ($elementContext['table_column'] ?? 'UI Control')));
+            $elType = trim((string) ($elementContext['component_type'] ?? 'Interactive Control'));
+            $elZone = trim((string) ($elementContext['zone'] ?? 'Active Screen'));
+            $elShortcut = trim((string) ($elementContext['shortcut'] ?? ''));
+            $baseEn = trim((string) ($elementContext['baseline_en'] ?? ''));
+            $baseUr = trim((string) ($elementContext['baseline_ur'] ?? ''));
+
+            $contentEnParts = [
+                "Inspected UI Control: {$elLabel} ({$elType} in {$elZone} on `{$cleanRoute}`)",
+            ];
+            if ($elShortcut !== '') {
+                $contentEnParts[] = "Shortcut: {$elShortcut}";
+            }
+            if ($learnedControl !== null && ! empty($learnedControl['en'])) {
+                $contentEnParts[] = "AI-Improved Explanation:\n".$learnedControl['en'];
+            }
+            if ($baseEn !== '') {
+                $contentEnParts[] = "Baseline Description:\n".$baseEn;
+            }
+
+            $contentUrParts = [
+                "منتخب کردہ کنٹرول: {$elLabel} ({$elType} — `{$cleanRoute}`)",
+            ];
+            if ($learnedControl !== null && ! empty($learnedControl['ur'])) {
+                $contentUrParts[] = "بہتر شدہ اے آئی وضاحت:\n".$learnedControl['ur'];
+            }
+            if ($baseUr !== '') {
+                $contentUrParts[] = "بنیادی وضاحت:\n".$baseUr;
+            }
+
+            $controlSid = $learnedControl['source_id'] ?? ('control:cursor_'.substr(md5($controlKey ?: $elLabel), 0, 10));
+            $candidates[] = [
+                'source_id' => (string) $controlSid,
+                'type' => 'control',
+                'score' => 240,
+                'title' => $learnedControl['title'] ?? [
+                    'en' => "{$elLabel} — {$elType}",
+                    'ur' => "{$elLabel} — {$elType}",
+                ],
+                'content_en' => implode("\n\n", $contentEnParts),
+                'content_ur' => implode("\n\n", $contentUrParts),
+                'links' => $currentScreen ? $this->buildScreenLinks($currentScreen) : [],
+                'workflow_id' => $currentScreen['workflowId'] ?? null,
+                'risk_level' => 'low',
+            ];
+
+            if ($currentScreen !== null) {
+                $screenRoute = (string) ($currentScreen['route'] ?? $cleanRoute);
+                $candidates[] = [
+                    'source_id' => (string) ($currentScreen['id'] ?? ('screen:'.$screenRoute)),
+                    'type' => 'screen',
+                    'score' => 190,
+                    'title' => $currentScreen['title'] ?? ['en' => $screenRoute, 'ur' => $screenRoute],
+                    'content_en' => $this->formatScreenContentEn($currentScreen),
+                    'content_ur' => $this->formatScreenContentUr($currentScreen),
+                    'links' => $this->buildScreenLinks($currentScreen),
+                    'workflow_id' => $currentScreen['workflowId'] ?? null,
+                    'risk_level' => 'low',
+                ];
+            }
+        }
+
+        // 0B. Score Learned QA and Learned Controls from previous Generative AI improvements
+        if ($cleaned !== '') {
+            $exactQaKey = $cleanRoute.'::'.$cleaned;
+            if (isset($learned['learned_qa'][$exactQaKey])) {
+                $lqa = $learned['learned_qa'][$exactQaKey];
+                $candidates[] = [
+                    'source_id' => (string) ($lqa['source_id'] ?? 'learned:exact'),
+                    'type' => 'learned_qa',
+                    'score' => 210,
+                    'title' => $lqa['title'] ?? ['en' => 'Karobar ERP Guide', 'ur' => 'کاروبار ایپ رہنمائی'],
+                    'content_en' => (string) ($lqa['en'] ?? ''),
+                    'content_ur' => (string) ($lqa['ur'] ?? ''),
+                    'links' => ! empty($lqa['links']) ? $lqa['links'] : ($currentScreen ? $this->buildScreenLinks($currentScreen) : []),
+                    'workflow_id' => $lqa['workflow_id'] ?? ($currentScreen['workflowId'] ?? null),
+                    'risk_level' => 'low',
+                ];
+            }
+
+            foreach (($learned['learned_controls'] ?? []) as $lCtrl) {
+                $lcScore = 0;
+                foreach (($lCtrl['keywords'] ?? []) as $kw) {
+                    if ($this->hasBoundedPhrase($cleaned, $wordLookup, $stemLookup, (string) $kw)) {
+                        $lcScore += 28;
+                    }
+                }
+                if (($lCtrl['route'] ?? '') === $cleanRoute && $lcScore > 0) {
+                    $lcScore += 20;
+                }
+                if ($lcScore >= 40) {
+                    $candidates[] = [
+                        'source_id' => (string) ($lCtrl['source_id'] ?? 'control:learned'),
+                        'type' => 'control',
+                        'score' => $lcScore,
+                        'title' => $lCtrl['title'] ?? ['en' => '', 'ur' => ''],
+                        'content_en' => (string) ($lCtrl['en'] ?? ''),
+                        'content_ur' => (string) ($lCtrl['ur'] ?? ''),
+                        'links' => $currentScreen ? $this->buildScreenLinks($currentScreen) : [],
+                        'workflow_id' => $currentScreen['workflowId'] ?? null,
+                        'risk_level' => 'low',
+                    ];
+                }
+            }
+        }
 
         // 1. Score Intents
         foreach (($kb['intents'] ?? []) as $intent) {
@@ -409,13 +775,30 @@ class CubeKnowledgeRetriever
 
         usort($candidates, static fn (array $a, array $b): int => $b['score'] <=> $a['score']);
 
-        // Deduplicate by source_id and keep at most 3–4 sections
+        // Deduplicate by source_id, apply any AI-learned improvements to static sources, and keep at most 3–4 sections
         $selected = [];
         $seenIds = [];
+        $improvedSources = $learned['improved_sources'] ?? [];
         foreach ($candidates as $cand) {
             $sid = $cand['source_id'];
             if (isset($seenIds[$sid])) {
                 continue;
+            }
+            if (isset($improvedSources[$sid]) && is_array($improvedSources[$sid])) {
+                $imp = $improvedSources[$sid];
+                if (! empty($imp['title_en'])) {
+                    $cand['title']['en'] = (string) $imp['title_en'];
+                }
+                if (! empty($imp['title_ur'])) {
+                    $cand['title']['ur'] = (string) $imp['title_ur'];
+                }
+                if (! empty($imp['answer_en'])) {
+                    $cand['content_en'] = (string) $imp['answer_en'];
+                }
+                if (! empty($imp['answer_ur'])) {
+                    $cand['content_ur'] = (string) $imp['answer_ur'];
+                }
+                $cand['ai_improved'] = true;
             }
             $seenIds[$sid] = true;
             $selected[] = $cand;
@@ -451,7 +834,7 @@ class CubeKnowledgeRetriever
             }
         }
 
-        // Always ground in the user's active screen blueprint if no other section matched yet
+        // Always ground in the user's active screen blueprint + Karobar ERP system overview if no specific intent matched yet
         if (empty($selected) && $currentScreen !== null && $cleaned !== '') {
             $route = (string) ($currentScreen['route'] ?? '/dashboard');
             $screenSid = (string) ($currentScreen['id'] ?? ('screen:'.$route));
@@ -459,7 +842,7 @@ class CubeKnowledgeRetriever
             $selected[] = [
                 'source_id' => $screenSid,
                 'type' => 'screen',
-                'score' => 20,
+                'score' => 25,
                 'title' => $currentScreen['title'] ?? ['en' => $route, 'ur' => $route],
                 'content_en' => $this->formatScreenContentEn($currentScreen),
                 'content_ur' => $this->formatScreenContentUr($currentScreen),
@@ -467,6 +850,36 @@ class CubeKnowledgeRetriever
                 'workflow_id' => $currentScreen['workflowId'] ?? null,
                 'risk_level' => 'low',
             ];
+
+            if (count($selected) < $maxSections && ! isset($seenIds['system:karobar_erp_overview'])) {
+                $seenIds['system:karobar_erp_overview'] = true;
+                $selected[] = [
+                    'source_id' => 'system:karobar_erp_overview',
+                    'type' => 'system_overview',
+                    'score' => 20,
+                    'title' => [
+                        'en' => 'Karobar ERP Software Architecture & Core Workflows',
+                        'ur' => 'کاروبار ایپ سافٹ ویئر کا مکمل ڈھانچہ اور ورک فلو',
+                    ],
+                    'content_en' => "Karobar ERP is a complete pharmacy & retail ERP with 4-pillar synchronization (Stock/Batches, Party Ledgers, Cash/Bank Treasury, Double-Entry General Ledger):\n"
+                        ."1. Catalog & Inventory (`/products`, `/categories`, `/brands`, `/suppliers`, `/stock-adjustments`, `/stock-transfers`, `/stock-audits`): Products track Pack Size, Unit vs Pack pricing, Formulation (Generic Salt), FEFO batches, and Expiry Warning Days.\n"
+                        ."2. Procurement (`/purchase-orders` -> `/goods-receive-notes` -> `/purchase-invoices` & `/purchase-returns`): Purchase Orders plan supplier demand; GRNs verify physical delivery; Purchase Invoices add batch stock, update weighted-average cost, and credit Supplier Payable Ledger.\n"
+                        ."3. Sales & POS (`/sale-invoices/pos`, `/sale-invoices`, `/sale-returns`, `/quotations`): Barcode POS supports Pack vs Unit (loose tablet) billing, FEFO batch selection, F8 Hold Bill, Regular Customer prescription auto-fill, and split Cash/Card/Credit checkout.\n"
+                        ."4. Ledgers, Finance & HR (`/customer-ledger`, `/supplier-ledger`, `/cash-drawer`, `/expenses`, `/accounts`, `/journal-entries`, `/employees`, `/payroll`, `/reports`): Real-time Customer Udhar recovery, Supplier payments, Z-Report shift reconciliation, and automated Double-Entry financial statements.",
+                    'content_ur' => "کاروبار ایپ (Karobar ERP) فارمیسی اور ریٹیل کاروبار کا مکمل سافٹ ویئر ہے جس میں اسٹاک/بیچز، کسٹمر و سپلائر کھاتے، کیش ڈراور/بینک، اور ڈبل انٹری جنرل لیجر خودکار طور پر منسلک ہیں:\n"
+                        ."1. انوینٹری اور کیٹلاگ (`/products`, `/categories`, `/brands`, `/suppliers`): پیک سائز، پیک اور کھلی گولی (Unit) کی قیمتیں، فارمولیشن (Generic Salt)، اور ایکسپائری بیچ ٹریکنگ۔\n"
+                        ."2. خریداری (`/purchase-orders` -> `/goods-receive-notes` -> `/purchase-invoices`): پرچیز آرڈر سے ڈیمانڈ لسٹ، GRN سے مال کی چیکنگ، اور پرچیز انوائس سے اسٹاک اور سپلائر کھاتہ اپڈیٹ ہوتا ہے۔\n"
+                        ."3. سیلز اور POS (`/sale-invoices/pos`, `/sale-returns`): بارکوڈ اسکیننگ، ڈبہ یا کھلی گولی (Unit) فروخت، FEFO بیچ سلیکشن، اور نقد یا ادھار بلنگ۔\n"
+                        ."4. کھاتے، فنانس اور رپورٹس (`/customer-ledger`, `/supplier-ledger`, `/cash-drawer`, `/accounts`, `/reports`): گاہکوں کی وصولی، سپلائر ادائیگی، کیش ڈراور شفٹ، اور مکمل منافع و نقصان رپورٹس۔",
+                    'links' => [
+                        ['path' => '/dashboard', 'en' => 'Dashboard', 'ur' => 'ڈیش بورڈ'],
+                        ['path' => '/products', 'en' => 'Products Catalog', 'ur' => 'پروڈکٹس کیٹلاگ'],
+                        ['path' => '/sale-invoices/pos', 'en' => 'POS Billing', 'ur' => 'پی او ایس بلنگ'],
+                    ],
+                    'workflow_id' => null,
+                    'risk_level' => 'low',
+                ];
+            }
         }
 
         $hasVerifiedDocs = count($selected) > 0;

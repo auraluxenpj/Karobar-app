@@ -47,41 +47,53 @@ class CubeAssistantService
         $history = is_array($payload['history'] ?? null) ? array_slice($payload['history'], -6) : [];
         $matchedIntentId = isset($payload['matched_intent_id']) ? trim((string) $payload['matched_intent_id']) : null;
         $screenGuideId = isset($payload['screen_guide_id']) ? trim((string) $payload['screen_guide_id']) : null;
+        $rawExplainMode = (string) ($payload['explain_mode'] ?? 'qa');
+        $explainMode = in_array($rawExplainMode, ['qa', 'cursor_element', 'screen_topic'], true)
+            ? $rawExplainMode
+            : 'qa';
+        $elementContext = is_array($payload['element_context'] ?? null) ? $payload['element_context'] : null;
+        $userConfirmed = (bool) ($payload['user_confirmed'] ?? false);
         $productVersion = $this->retriever->getProductVersion();
 
         // 0. Non-Destructive AI Task Execution (Add Product, Edit Product, Bulk Auto-Fill Formulations; Delete Hardcoded Blocked)
-        $taskResult = $this->taskExecutor->detectAndExecuteFromChat($user, $question, $language, $productVersion, $history);
-        if ($taskResult !== null) {
-            return $taskResult;
+        if ($explainMode === 'qa' && empty($elementContext)) {
+            $taskResult = $this->taskExecutor->detectAndExecuteFromChat($user, $question, $language, $productVersion, $history, $userConfirmed);
+            if ($taskResult !== null) {
+                return $taskResult;
+            }
         }
 
         // 1. Enforce Live ERP Data Privacy Boundary (never query live DB tables or send live data requests to AI)
-        $liveBoundary = $this->retriever->detectLiveRecordQuery($question);
-        if ($liveBoundary !== null) {
-            return $this->formatResponse(
-                titleEn: $liveBoundary['title_en'],
-                titleUr: $liveBoundary['title_ur'],
-                answerEn: $liveBoundary['answer_en'],
-                answerUr: $liveBoundary['answer_ur'],
-                sourceIds: $liveBoundary['source_ids'],
-                evidenceClassification: 'documented_info',
-                provider: 'local',
-                providerStatus: 'local_privacy_boundary',
-                fallbackUsed: false,
-                links: $liveBoundary['links'],
-                workflowId: null,
-                productVersion: $productVersion,
-                providerTrace: []
-            );
+        if ($explainMode !== 'cursor_element') {
+            $liveBoundary = $this->retriever->detectLiveRecordQuery($question);
+            if ($liveBoundary !== null) {
+                return $this->formatResponse(
+                    titleEn: $liveBoundary['title_en'],
+                    titleUr: $liveBoundary['title_ur'],
+                    answerEn: $liveBoundary['answer_en'],
+                    answerUr: $liveBoundary['answer_ur'],
+                    sourceIds: $liveBoundary['source_ids'],
+                    evidenceClassification: 'documented_info',
+                    provider: 'local',
+                    providerStatus: 'local_privacy_boundary',
+                    fallbackUsed: false,
+                    links: $liveBoundary['links'],
+                    workflowId: null,
+                    productVersion: $productVersion,
+                    providerTrace: []
+                );
+            }
         }
 
-        // 2. Retrieve Top 3–4 Verified Documentation Sections
+        // 2. Retrieve Top 3–4 Verified Documentation Sections (+ Learned Knowledge & Element Context)
         $retrieval = $this->retriever->retrieve(
             question: $question,
             currentRoute: $currentRoute,
             matchedIntentId: $matchedIntentId,
             screenGuideId: $screenGuideId,
-            history: $history
+            history: $history,
+            elementContext: $elementContext,
+            explainMode: $explainMode
         );
 
         $localFallback = $retrieval['local_fallback'];
@@ -116,7 +128,9 @@ class CubeAssistantService
             retrievedSections: $retrieval['sections'],
             history: $history,
             currentScreen: $retrieval['current_screen'],
-            productVersion: $productVersion
+            productVersion: $productVersion,
+            elementContext: $elementContext,
+            explainMode: $explainMode
         );
 
         // 4. Apply any runtime Cube AI settings saved via the Settings UI before inspecting providers
@@ -170,9 +184,24 @@ class CubeAssistantService
                         'status' => 'ok',
                     ];
 
+                    $learnedMeta = $this->retriever->recordLearnedImprovement([
+                        'question' => $question,
+                        'current_route' => $currentRoute,
+                        'explain_mode' => $explainMode,
+                        'element_context' => $elementContext,
+                        'title_en' => $validated['title_en'],
+                        'title_ur' => $validated['title_ur'],
+                        'answer_en' => $validated['answer_en'],
+                        'answer_ur' => $validated['answer_ur'],
+                        'source_ids' => $validated['source_ids'],
+                        'links' => $verifiedLinks,
+                        'workflow_id' => $verifiedWorkflowId,
+                        'provider' => $providerName,
+                    ]);
+
                     $providerStatus = $index === 0 ? "{$providerName}_primary" : "{$providerName}_backup";
 
-                    return $this->formatResponse(
+                    $formatted = $this->formatResponse(
                         titleEn: $validated['title_en'],
                         titleUr: $validated['title_ur'],
                         answerEn: $validated['answer_en'],
@@ -187,6 +216,10 @@ class CubeAssistantService
                         productVersion: $productVersion,
                         providerTrace: $providerTrace
                     );
+                    $formatted['knowledge_improved'] = (bool) ($learnedMeta['learned'] ?? false);
+                    $formatted['learned_key'] = (string) ($learnedMeta['knowledge_key'] ?? '');
+
+                    return $formatted;
                 }
 
                 // Invalid or unsafe AI output -> record failure and fall back
@@ -379,11 +412,11 @@ class CubeAssistantService
     protected function buildEvidenceBadge(string $evidenceClassification, string $provider, string $productVersion): array
     {
         if ($evidenceClassification === 'ai_grounded_docs') {
-            $providerLabel = $provider === 'groq' ? 'Groq AI' : ($provider === 'gemini' ? 'Gemini AI' : 'AI');
+            $providerLabel = $provider === 'groq' ? 'Groq AI' : ($provider === 'gemini' ? 'Gemini AI' : 'Generative AI');
 
             return [
-                'en' => "✨ AI-Assisted Explanation • Grounded in Karobar Docs (v{$productVersion} • {$providerLabel})",
-                'ur' => "✨ اے آئی وضاحت • کاروبار ایپ مستند گائیڈ پر مبنی (v{$productVersion} • {$providerLabel})",
+                'en' => "✨ Generated by {$providerLabel} • Live Generative AI (v{$productVersion})",
+                'ur' => "✨ {$providerLabel} سے تیار کردہ براہِ راست اے آئی وضاحت (v{$productVersion})",
             ];
         }
 
@@ -395,8 +428,8 @@ class CubeAssistantService
         }
 
         return [
-            'en' => "📘 Documented in Karobar Knowledge Base (v{$productVersion})",
-            'ur' => "📘 کاروبار ایپ مستند گائیڈ میں درج معلومات (v{$productVersion})",
+            'en' => "📘 Docs Fallback • Karobar Knowledge Base (v{$productVersion})",
+            'ur' => "📘 گائیڈ فال بیک • کاروبار ایپ مستند گائیڈ (v{$productVersion})",
         ];
     }
 }

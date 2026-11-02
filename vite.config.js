@@ -13,6 +13,14 @@ export default defineConfig({
         hmr: {
             host: 'localhost',
         },
+        watch: {
+            ignored: [
+                '**/storage/**',
+                '**/database/**',
+                '**/bootstrap/cache/**',
+                '**/vendor/**',
+            ],
+        },
     },
     plugins: [
         laravel({
