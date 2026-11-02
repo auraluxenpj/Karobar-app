@@ -110,9 +110,13 @@ class StockDisposalService
                     $expiryDate = $batch->expiry_date;
                 } else {
                     $previousQty = $this->getProductQty($product);
-                    if ($disposeQty > $previousQty) {
+                    $totalBatchQty = $this->sumBatches($product);
+                    $unbatchedAvailable = $totalBatchQty > 0 ? max(0.0, $previousQty - $totalBatchQty) : $previousQty;
+                    if ($disposeQty > $unbatchedAvailable) {
                         throw ValidationException::withMessages([
-                            "items.{$idx}.dispose_qty" => "Insufficient stock for '{$product->name}'. Available: {$previousQty}, requested: {$disposeQty}.",
+                            "items.{$idx}.dispose_qty" => $totalBatchQty > 0
+                                ? "Insufficient unbatched stock for '{$product->name}' (unbatched available: {$unbatchedAvailable}, batched stock: {$totalBatchQty}). Please select a specific batch to dispose."
+                                : "Insufficient stock for '{$product->name}'. Available: {$previousQty}, requested: {$disposeQty}.",
                         ]);
                     }
                     $remainingQty = max(0.0, $previousQty - $disposeQty);
@@ -242,12 +246,13 @@ class StockDisposalService
                 $touchedProducts[$product->id] = true;
             }
 
-            // Sync product-level stock from batch sums where applicable
+            // Sync product-level stock from batch sums where all disposed items for that product were batch-tracked
             foreach (array_keys($touchedProducts) as $pid) {
                 /** @var Product $p */
                 $p = Product::query()->lockForUpdate()->findOrFail($pid);
                 $batchCount = Batch::where('product_id', $pid)->count();
-                if ($batchCount > 0) {
+                $hasUnbatchedItem = collect($preparedItems)->contains(fn ($it) => (int) $it['product']->id === (int) $pid && $it['batch'] === null);
+                if ($batchCount > 0 && !$hasUnbatchedItem) {
                     $this->setProductQty($p, $this->sumBatches($p));
                 }
             }
@@ -391,7 +396,8 @@ class StockDisposalService
                 /** @var Product $p */
                 $p = Product::query()->lockForUpdate()->findOrFail($pid);
                 $batchCount = Batch::where('product_id', $pid)->count();
-                if ($batchCount > 0) {
+                $hasUnbatchedRestore = $disposal->items->contains(fn ($it) => (int) $it->product_id === (int) $pid && empty($it->batch_id) && empty($it->batch_number));
+                if ($batchCount > 0 && !$hasUnbatchedRestore) {
                     $this->setProductQty($p, $this->sumBatches($p));
                 }
             }

@@ -54,10 +54,10 @@ export function recalcItem(item, changedField = null) {
   // ------------------------------
   if (packSize > 0) {
     // Quantity
-    if (changedField === "pack_quantity") unitQty = packQty * packSize;
+    if (changedField === "pack_quantity") unitQty = Math.round(packQty * packSize);
     else if (changedField === "unit_quantity") packQty = unitQty / packSize;
     else if (changedField === "pack_size") {
-      if (packQty > 0 && unitQty === 0) unitQty = packQty * packSize;
+      if (packQty > 0 && unitQty === 0) unitQty = Math.round(packQty * packSize);
       else if (unitQty > 0 && packQty === 0) packQty = unitQty / packSize;
     }
 
@@ -86,12 +86,15 @@ export function recalcItem(item, changedField = null) {
     }
 
     // Bonus
-    if (changedField === "pack_bonus") unitBonus = packBonus * packSize;
+    if (changedField === "pack_bonus") unitBonus = Math.round(packBonus * packSize);
     else if (changedField === "unit_bonus") packBonus = unitBonus / packSize;
     else if (changedField === "pack_size") {
-      if (packBonus > 0 && unitBonus === 0) unitBonus = packBonus * packSize;
+      if (packBonus > 0 && unitBonus === 0) unitBonus = Math.round(packBonus * packSize);
       else if (unitBonus > 0 && packBonus === 0) packBonus = unitBonus / packSize;
     }
+  } else {
+    unitQty = Math.round(unitQty);
+    unitBonus = Math.round(unitBonus);
   }
 
   // ------------------------------

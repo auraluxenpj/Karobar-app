@@ -348,10 +348,18 @@ class DocumentShareService
 
         // Optionally persist the phone number back to the Customer or Supplier profile
         if ($savePhone && $rawPhone !== '' && !empty($context['party_type']) && !empty($context['party_id'])) {
+            $actor = request()?->user();
+            $isAdmin = $actor && $actor->hasRole(['Admin', 'admin', 'super-admin']);
             if ($context['party_type'] === 'customer') {
-                Customer::where('id', $context['party_id'])->update(['phone' => $rawPhone]);
+                $cust = Customer::find($context['party_id']);
+                if ($cust && (trim((string) $cust->phone) === '' || $isAdmin || ($actor && $actor->can('customer.update')))) {
+                    $cust->update(['phone' => $rawPhone]);
+                }
             } elseif ($context['party_type'] === 'supplier') {
-                Supplier::where('id', $context['party_id'])->update(['phone' => $rawPhone]);
+                $sup = Supplier::find($context['party_id']);
+                if ($sup && (trim((string) $sup->phone) === '' || $isAdmin || ($actor && $actor->can('supplier.update')))) {
+                    $sup->update(['phone' => $rawPhone]);
+                }
             }
         }
 
@@ -2264,7 +2272,7 @@ class DocumentShareService
         $docNo = 'DC-' . ($invoice->posted_number ?: $invoice->id);
         $dateStr = $invoice->date ? Carbon::parse($invoice->date)->format('d M Y') : optional($invoice->created_at)->format('d M Y');
         $custName = $customer->name ?? 'Valued Customer';
-        $totalUnits = (int) $invoice->items->sum('quantity');
+        $totalUnits = (int) $invoice->items->sum(fn ($it) => (int) ($it->quantity ?? 0) + max(0, (int) ($it->bonus ?? 0)));
 
         $waLines = [
             "*{$storeName}*",

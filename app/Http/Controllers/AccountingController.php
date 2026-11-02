@@ -216,6 +216,19 @@ class AccountingController extends Controller
      */
     public function taxRates(Request $request): JsonResponse
     {
+        $this->authorizeAccountingAction([
+            'account.view',
+            'tax.view',
+            'report.net-profit.view',
+            'report.tax-return.view',
+            'sale-invoice.view',
+            'sale-invoice.create',
+            'purchase-invoice.view',
+            'purchase-invoice.create',
+            'barcode-pos.view',
+            'barcode-pos.create',
+        ]);
+
         return response()->json($this->accountingService->getTaxRates($request->boolean('active_only')));
     }
 

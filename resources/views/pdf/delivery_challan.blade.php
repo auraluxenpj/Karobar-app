@@ -141,7 +141,7 @@
         <tbody>
             @foreach($invoice->items as $idx => $item)
                 @php
-                    $qty = (int) ($item->quantity ?? 0);
+                    $qty = (int) ($item->quantity ?? 0) + max(0, (int) ($item->bonus ?? 0));
                     $packSize = max(1, (int) ($item->pack_size ?? $item->product?->pack_size ?? 1));
                     $packs = $packSize > 1 ? round($qty / $packSize, 2) : $qty;
                     $totalUnits += $qty;

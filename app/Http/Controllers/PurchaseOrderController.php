@@ -288,14 +288,29 @@ class PurchaseOrderController extends Controller
         $safetyPacks = (int) ($data['safety_packs'] ?? 0);
         $moqPacks    = (int) ($data['moq_packs'] ?? 0);
 
-        // --- sales within selected range (STRICT filter) ---
+        // --- sales within selected range (STRICT filter, excluding reversed invoices & netting sale returns) ---
+        $saleReturnsInRange = DB::table('sale_return_items as sri')
+            ->join('sale_returns as sr', 'sr.id', '=', 'sri.sale_return_id')
+            ->whereBetween('sr.date', [$from->toDateString(), $to->toDateString()])
+            ->groupBy('sri.product_id')
+            ->select(
+                'sri.product_id',
+                DB::raw('SUM(sri.unit_return_quantity) as units_returned')
+            );
+
         $salesInRange = DB::table('sale_invoice_items as sii')
             ->join('sale_invoices as si', 'si.id', '=', 'sii.sale_invoice_id')
+            ->leftJoinSub($saleReturnsInRange, 'srx', function ($j) {
+                $j->on('srx.product_id', '=', 'sii.product_id');
+            })
             ->whereBetween('si.date', [$from->toDateString(), $to->toDateString()])
-            ->groupBy('sii.product_id')
+            ->where(function ($q) {
+                $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed');
+            })
+            ->groupBy('sii.product_id', 'srx.units_returned')
             ->select(
                 'sii.product_id',
-                DB::raw('SUM(sii.quantity) as units_sold'),
+                DB::raw('MAX(0, SUM(sii.quantity + COALESCE(sii.bonus, 0)) - COALESCE(srx.units_returned, 0)) as units_sold'),
                 DB::raw('MAX(si.date) as last_sold_date_in_range')
             );
 

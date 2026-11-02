@@ -20,7 +20,7 @@
 <body>
   @php
     $storeName = $setting->store_name ?? 'Pharmacy ERP';
-    $hideSystemQty = $session->is_blind && in_array($session->status, ['draft', 'in_progress'], true);
+    $hideSystemQty = $session->is_blind && $session->status !== 'finalized';
   @endphp
 
   <table class="header-table">

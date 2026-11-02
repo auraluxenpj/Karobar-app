@@ -74,15 +74,14 @@ Route::middleware(['auth:sanctum', 'token.expiry'])->group(function () {
 
     // License endpoints
     Route::get('/license/status',     [LicenseController::class, 'status']);
-    Route::post('/license/activate',  [LicenseController::class, 'activate']);
-    Route::post('/license/deactivate',[LicenseController::class, 'deactivate']); // optional
+    Route::post('/license/activate',  [LicenseController::class, 'activate'])->middleware('throttle:10,1');
+    Route::post('/license/deactivate',[LicenseController::class, 'deactivate'])->middleware('throttle:10,1'); // optional
 
     // Keep /me here so dashboard shell can mount pre-activation
     Route::get('/me', MeController::class);
 
     // Theme Settings - available before license activation (for shell rendering)
     Route::get('/theme-settings/active',          [ThemeSettingController::class, 'getActive']);
-    Route::put('/theme-settings/active',          [ThemeSettingController::class, 'updateActive']);
 
     // Sale system mode & Currency — app-wide UI gating and formatting.
     // Any authenticated user needs this to render the correct UI, so it is
@@ -359,6 +358,7 @@ Route::middleware(['auth:sanctum', 'licensed', 'token.expiry'])->group(function 
     Route::post('/settings/test-cube-ai',                [SettingController::class, 'testCubeAi']);
 
     // Theme Settings (CRUD operations require license)
+    Route::put('/theme-settings/active',          [ThemeSettingController::class, 'updateActive']);
     Route::get('/theme-settings',                 [ThemeSettingController::class, 'index']);
     Route::get('/theme-settings/{id}',            [ThemeSettingController::class, 'show']);
     Route::post('/theme-settings',                [ThemeSettingController::class, 'store']);
@@ -377,11 +377,11 @@ Route::middleware(['auth:sanctum', 'licensed', 'token.expiry'])->group(function 
     Route::get('/backups',                        [BackupController::class, 'index']);
     Route::post('/backups',                       [BackupController::class, 'store']);
     Route::get('/backups/{id}/download',          [BackupController::class, 'download']);
-    Route::post('/backups/{id}/restore',          [BackupController::class, 'restore']);
+    Route::post('/backups/{id}/restore',          [BackupController::class, 'restore'])->middleware('throttle:10,1');
     Route::delete('/backups/{id}',                [BackupController::class, 'destroy']);
     Route::post('/backups/upload/validate',       [BackupController::class, 'validateUpload']);
     Route::post('/backups/upload',                [BackupController::class, 'upload']);
-    Route::post('/backups/upload/restore',        [BackupController::class, 'restoreFromUpload']);
+    Route::post('/backups/upload/restore',        [BackupController::class, 'restoreFromUpload'])->middleware('throttle:10,1');
 
     // Supplier Import
     Route::get('/suppliers/import/template',      [SupplierImportController::class, 'template'])->middleware('permission:supplier.import');

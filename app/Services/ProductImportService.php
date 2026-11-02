@@ -161,8 +161,9 @@ class ProductImportService
         }
 
         // Existing for constraints
-        $existing = Product::select('id','product_code','barcode')->get();
+        $existing = Product::select('id','product_code','barcode','quantity')->get();
         $codeToId = $existing->mapWithKeys(fn($p)=>[mb_strtolower(trim((string)$p->product_code)) => (int)$p->id])->all();
+        $codeToQty = $existing->mapWithKeys(fn($p)=>[mb_strtolower(trim((string)$p->product_code)) => (int)($p->quantity ?? 0)])->all();
         $barcodeToCode = $existing->filter(fn($p)=>$p->barcode)->mapWithKeys(function($p){
             return [mb_strtolower(trim((string)$p->barcode)) => mb_strtolower(trim((string)$p->product_code))];
         })->all();
@@ -192,45 +193,56 @@ class ProductImportService
         $fh = $this->openCsv($absolutePath, $delimiter);
         $this->readNextNonEmpty($fh); // header
 
-        while (!$fh->eof()) {
-            $row = $this->readNextNonEmpty($fh);
-            if ($row === null) break;
+        DB::transaction(function () use ($fh, $colIdx, $codeToId, $codeToQty, $barcodeToCode, &$catNameToId, &$brandNameToId, &$suppNameToId, $allowCreateRefs, $insertValidOnly, &$stats, &$toUpsert, $flush) {
+            while (!$fh->eof()) {
+                $row = $this->readNextNonEmpty($fh);
+                if ($row === null) break;
 
-            $data = $this->extractRowData($row, $colIdx);
-            $stats['total']++;
+                $data = $this->extractRowData($row, $colIdx);
+                $stats['total']++;
 
-            [$errors, $warnings, $normalized] = $this->rowIssues(
-                $data, $codeToId, $barcodeToCode, [], [], $catNameToId, $brandNameToId, $suppNameToId, $allowCreateRefs, false
-            );
+                [$errors, $warnings, $normalized] = $this->rowIssues(
+                    $data, $codeToId, $barcodeToCode, [], [], $catNameToId, $brandNameToId, $suppNameToId, $allowCreateRefs, false
+                );
 
-            if ($errors) {
-                $stats['invalid']++;
-                if ($insertValidOnly) continue;
-                throw new \RuntimeException('Import aborted due to validation error.');
+                if ($errors) {
+                    $stats['invalid']++;
+                    if ($insertValidOnly) continue;
+                    throw new \RuntimeException('Import aborted due to validation error.');
+                }
+
+                $stats['valid']++;
+
+                // Compute derived prices if needed
+                $normalized = $this->fillDerivedPrices($normalized);
+
+                // Compute avg_price (fallback to UPP) and margin
+                if (!is_numeric($normalized['avg_price'])) {
+                    $normalized['avg_price'] = (float) ($normalized['unit_purchase_price'] ?? 0.0);
+                }
+                $usp = (float) ($normalized['unit_sale_price'] ?? 0.0);
+                $avg = (float) ($normalized['avg_price'] ?? 0.0);
+                $normalized['margin'] = ($usp > 0) ? round((($usp - $avg) / $usp) * 100, 2) : 0.0;
+
+                $lc = mb_strtolower($normalized['product_code']);
+                $hasExplicitQty = $data['quantity'] !== null && $data['quantity'] !== '';
+                if (isset($codeToId[$lc])) {
+                    $stats['existing']++;
+                    if (!$hasExplicitQty && isset($codeToQty[$lc])) {
+                        $normalized['quantity'] = $codeToQty[$lc];
+                    }
+                } else {
+                    $stats['new']++;
+                    $codeToId[$lc] = -1;
+                }
+
+                $toUpsert[] = $normalized;
+
+                if (count($toUpsert) >= self::CHUNK_SIZE) $flush();
             }
 
-            $stats['valid']++;
-
-            // Compute derived prices if needed
-            $normalized = $this->fillDerivedPrices($normalized);
-
-            // Compute avg_price (fallback to UPP) and margin
-            if (!is_numeric($normalized['avg_price'])) {
-                $normalized['avg_price'] = (float) ($normalized['unit_purchase_price'] ?? 0.0);
-            }
-            $usp = (float) ($normalized['unit_sale_price'] ?? 0.0);
-            $avg = (float) ($normalized['avg_price'] ?? 0.0);
-            $normalized['margin'] = ($usp > 0) ? round((($usp - $avg) / $usp) * 100, 2) : 0.0;
-
-            $lc = mb_strtolower($normalized['product_code']);
-            if (isset($codeToId[$lc])) $stats['existing']++; else { $stats['new']++; $codeToId[$lc] = -1; }
-
-            $toUpsert[] = $normalized;
-
-            if (count($toUpsert) >= self::CHUNK_SIZE) $flush();
-        }
-
-        DB::transaction(fn() => $flush());
+            $flush();
+        });
 
         return $stats;
     }

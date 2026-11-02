@@ -175,9 +175,16 @@ public function confirmPassword(Request $request)
      */
     public function forgotPassword(Request $request): JsonResponse
     {
-        $request->validate([
-            'email' => 'required|email|exists:users,email',
+        $validated = $request->validate([
+            'email' => 'required|email',
         ]);
+
+        if (!User::where('email', $validated['email'])->exists()) {
+            return response()->json([
+                'message' => 'Password reset link sent to your email.',
+                'status'  => __(Password::RESET_LINK_SENT),
+            ], 200);
+        }
 
         $status = Password::sendResetLink(
             $request->only('email')

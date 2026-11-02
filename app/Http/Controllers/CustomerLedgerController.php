@@ -215,7 +215,8 @@ class CustomerLedgerController extends Controller
             $isInvoiceLike = $r->entry_type === 'manual';
             $invTotal  = $isInvoiceLike ? (float)($r->invoice_total ?? 0) : 0.0;
             $invRecv   = $isInvoiceLike ? (float)($r->total_received ?? 0) : 0.0;
-            $balRemain = $isInvoiceLike ? max($invTotal - $invRecv, 0) : 0.0;
+            // Allow negative balance_remaining on manual rows (e.g., store-credit reversal entries)
+            $balRemain = $isInvoiceLike ? ($invTotal < 0 ? ($invTotal - $invRecv) : max($invTotal - $invRecv, 0)) : 0.0;
 
             return [
                 'id'                => $r->id,

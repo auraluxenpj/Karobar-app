@@ -262,13 +262,21 @@ class BackupController extends Controller
         $this->authorize('upload', BackupLog::class);
 
         $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
-            'file' => ['required', 'file'],
+            'file' => ['required', 'file', 'max:512000'],
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'message' => 'Validation failed',
                 'errors' => $validator->errors()->all(),
+            ], 422);
+        }
+
+        $backupValidation = $this->backupService->validateUploadedBackup($request->file('file'));
+        if (empty($backupValidation['valid'])) {
+            return response()->json([
+                'message' => 'Invalid backup file',
+                'errors'  => $backupValidation['errors'] ?? ['Invalid backup archive format.'],
             ], 422);
         }
 

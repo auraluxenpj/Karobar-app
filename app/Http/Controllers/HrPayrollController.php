@@ -23,19 +23,23 @@ class HrPayrollController extends Controller
         $this->hrService = $hrService;
     }
 
+    protected function canViewHr($user): bool
+    {
+        return (bool) (
+            $user && (
+                $user->hasRole(['Admin', 'admin', 'super-admin'])
+                || $user->can('hr.view')
+                || $user->can('hr.manage')
+                || $user->can('user.manage')
+                || ($user->can('user.view') && $user->can('account.view'))
+            )
+        );
+    }
+
     protected function authorizeView(Request $request): void
     {
         $user = $request->user();
-        if (
-            !$user
-            || (
-                !$user->hasRole(['Admin', 'admin', 'super-admin'])
-                && !$user->can('user.view')
-                && !$user->can('expense.view')
-                && !$user->can('account.view')
-                && !$user->can('report.view')
-            )
-        ) {
+        if (!$this->canViewHr($user)) {
             abort(403, 'Unauthorized to view HR & Payroll.');
         }
     }
@@ -47,10 +51,10 @@ class HrPayrollController extends Controller
             !$user
             || (
                 !$user->hasRole(['Admin', 'admin', 'super-admin'])
-                && !$user->can('user.create')
-                && !$user->can('user.update')
-                && !$user->can('expense.create')
+                && !$user->can('hr.manage')
+                && !$user->can('user.manage')
                 && !$user->can('account.manage')
+                && !($user->can('user.update') && $user->can('account.update'))
             )
         ) {
             abort(403, 'Unauthorized to manage HR & Payroll.');
@@ -90,7 +94,28 @@ class HrPayrollController extends Controller
      */
     public function employees(Request $request)
     {
-        $this->authorizeView($request);
+        $user = $request->user();
+        $hasFullHrAccess = $this->canViewHr($user);
+
+        if (!$hasFullHrAccess) {
+            $canLookupActiveSalesmen = $user && $request->query('status') === 'active' && (
+                $user->can('sale-invoice.view')
+                || $user->can('sale-invoice.create')
+                || $user->can('barcode-pos.view')
+                || $user->can('barcode-pos.create')
+            );
+            if (!$canLookupActiveSalesmen) {
+                abort(403, 'Unauthorized to view HR & Payroll.');
+            }
+            $this->hrService->ensureTables();
+            return response()->json(
+                Employee::query()
+                    ->where('status', 'active')
+                    ->orderBy('name')
+                    ->get(['id', 'employee_code', 'name', 'designation', 'department', 'status', 'commission_rate'])
+            );
+        }
+
         $this->hrService->ensureTables();
 
         $query = Employee::with('user:id,name,email')->orderBy('name');

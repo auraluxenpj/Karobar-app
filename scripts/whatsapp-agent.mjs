@@ -276,23 +276,22 @@ function sendJson(res, statusCode, payload) {
   const body = JSON.stringify(payload);
   res.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Api-Key",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Cache-Control": "no-store",
   });
   res.end(body);
 }
 
 function isAuthorized(req) {
   const remote = req.socket?.remoteAddress || "";
-  if (
+  const isLoopback =
     remote === "127.0.0.1" ||
     remote === "::1" ||
-    remote === "::ffff:127.0.0.1"
-  ) {
-    return true;
+    remote === "::ffff:127.0.0.1";
+
+  if (!API_KEY) {
+    return isLoopback;
   }
-  if (!API_KEY) return true;
+
   const headerKey = (req.headers["x-api-key"] || "").toString().trim();
   const authHeader = (req.headers["authorization"] || "").toString().trim();
   const bearerKey = authHeader.toLowerCase().startsWith("bearer ")
@@ -311,6 +310,14 @@ const server = http.createServer(async (req, res) => {
   const parsedUrl = new URL(req.url || "/", `http://${HOST}:${PORT}`);
   const pathname = parsedUrl.pathname;
 
+  if (!isAuthorized(req)) {
+    sendJson(res, 401, {
+      ok: false,
+      message: "Unauthorized: Invalid Local WhatsApp Agent API Key.",
+    });
+    return;
+  }
+
   // Health & Status endpoint
   if (req.method === "GET" && (pathname === "/status" || pathname === "/")) {
     sendJson(res, 200, {
@@ -324,14 +331,6 @@ const server = http.createServer(async (req, res) => {
       uptime_seconds: Math.floor((Date.now() - startedAt) / 1000),
       pid: process.pid,
       port: PORT,
-    });
-    return;
-  }
-
-  if (!isAuthorized(req)) {
-    sendJson(res, 401, {
-      ok: false,
-      message: "Unauthorized: Invalid Local WhatsApp Agent API Key.",
     });
     return;
   }
@@ -362,6 +361,14 @@ const server = http.createServer(async (req, res) => {
 
       if (!sock) {
         await initWhatsAppSocket();
+      }
+
+      if (!sock || typeof sock.requestPairingCode !== "function") {
+        sendJson(res, 422, {
+          ok: false,
+          message: "WhatsApp socket is still initializing. Please try again in a moment.",
+        });
+        return;
       }
 
       const code = await sock.requestPairingCode(rawPhone);
@@ -539,6 +546,7 @@ const server = http.createServer(async (req, res) => {
       qrDataUrl = null;
       pairingCode = null;
       connectionStatus = "disconnected";
+      isStartingSocket = false;
       clearAuthDirectory();
       writeRuntimeMeta();
 
@@ -565,6 +573,7 @@ const server = http.createServer(async (req, res) => {
     qrRaw = null;
     qrDataUrl = null;
     pairingCode = null;
+    isStartingSocket = false;
     initWhatsAppSocket();
     sendJson(res, 200, {
       ok: true,

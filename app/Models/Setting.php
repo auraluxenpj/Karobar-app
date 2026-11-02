@@ -69,6 +69,13 @@ class Setting extends Model
         'cube_gemini_daily_limit' => 'integer',
     ];
 
+    protected $hidden = [
+        'smtp_password',
+        'whatsapp_access_token',
+        'cube_groq_api_key',
+        'cube_gemini_api_key',
+    ];
+
     protected $appends = ['logo_url'];
 
     public function getLogoUrlAttribute(): ?string

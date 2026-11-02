@@ -938,6 +938,20 @@ class BackupService
     }
 
     /**
+     * Filter settings backup payload against actual settings table columns.
+     */
+    protected function filterRestoredSettingsAttributes(array $raw): array
+    {
+        $columns = \Illuminate\Support\Facades\Schema::hasTable('settings')
+            ? \Illuminate\Support\Facades\Schema::getColumnListing('settings')
+            : [];
+        $excluded = ['id', 'created_at', 'updated_at'];
+        $allowed = array_diff($columns, $excluded);
+
+        return array_intersect_key($raw, array_flip($allowed));
+    }
+
+    /**
      * Restore settings from backup
      */
     protected function restoreSettingsBackup(string $filepath): void
@@ -945,12 +959,15 @@ class BackupService
         $content = file_get_contents($filepath);
         $data = json_decode($content, true);
         
-        if (!$data || !isset($data['data'])) {
+        if (!$data || !isset($data['data']) || !is_array($data['data'])) {
             throw new \Exception('Invalid settings backup format');
         }
         
         $settings = \App\Models\Setting::firstOrCreate(['id' => 1]);
-        $settings->update($data['data']);
+        $filtered = $this->filterRestoredSettingsAttributes($data['data']);
+        if (!empty($filtered)) {
+            $settings->forceFill($filtered)->save();
+        }
     }
 
     /**
@@ -998,9 +1015,12 @@ class BackupService
             $content = file_get_contents($settingsPath);
             $data = json_decode($content, true);
             
-            if ($data && isset($data['data'])) {
+            if ($data && isset($data['data']) && is_array($data['data'])) {
                 $settings = \App\Models\Setting::firstOrCreate(['id' => 1]);
-                $settings->update($data['data']);
+                $filtered = $this->filterRestoredSettingsAttributes($data['data']);
+                if (!empty($filtered)) {
+                    $settings->forceFill($filtered)->save();
+                }
             }
         }
         

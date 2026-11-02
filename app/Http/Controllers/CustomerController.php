@@ -348,7 +348,18 @@ class CustomerController extends Controller
      */
     public function sendRefillReminder(Request $request, Customer $customer, DocumentShareService $shareService)
     {
-        $this->authorize('view', $customer);
+        $user = $request->user();
+        if (
+            !$user
+            || (
+                !$user->hasRole(['Admin', 'admin', 'super-admin'])
+                && !$user->can('customer.update')
+                && !$user->can('customer.create')
+                && !$user->can('sale-invoice.create')
+            )
+        ) {
+            abort(403, 'This action is unauthorized.');
+        }
         self::ensureRegularCustomerSchema();
 
         $validated = $request->validate([
@@ -409,7 +420,18 @@ class CustomerController extends Controller
      */
     public function sendBulkRefillReminders(Request $request, DocumentShareService $shareService)
     {
-        $this->authorize('viewAny', Customer::class);
+        $user = $request->user();
+        if (
+            !$user
+            || (
+                !$user->hasRole(['Admin', 'admin', 'super-admin'])
+                && !$user->can('customer.update')
+                && !$user->can('customer.create')
+                && !$user->can('sale-invoice.create')
+            )
+        ) {
+            abort(403, 'This action is unauthorized.');
+        }
         self::ensureRegularCustomerSchema();
 
         $validated = $request->validate([
@@ -552,17 +574,25 @@ class CustomerController extends Controller
             fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF));
             fputcsv($out, ['name', 'email', 'phone', 'address', 'is_regular', 'refill_cycle', 'next_refill_date']);
 
+            $sanitizeCsv = static function ($val) {
+                $str = (string) ($val ?? '');
+                if ($str !== '' && in_array($str[0], ['=', '+', '-', '@', "\t", "\r"], true) && !preg_match('/^[+-]?\d+(\.\d+)?$/', $str)) {
+                    return "'" . $str;
+                }
+                return $str;
+            };
+
             Customer::select('name', 'email', 'phone', 'address', 'is_regular', 'refill_cycle', 'next_refill_date')
                 ->orderBy('name')
-                ->chunk(1000, function ($chunk) use ($out) {
+                ->chunk(1000, function ($chunk) use ($out, $sanitizeCsv) {
                     foreach ($chunk as $c) {
                         fputcsv($out, [
-                            (string) ($c->name ?? ''),
-                            (string) ($c->email ?? ''),
-                            (string) ($c->phone ?? ''),
-                            (string) ($c->address ?? ''),
+                            $sanitizeCsv($c->name ?? ''),
+                            $sanitizeCsv($c->email ?? ''),
+                            $sanitizeCsv($c->phone ?? ''),
+                            $sanitizeCsv($c->address ?? ''),
                             $c->is_regular ? 'Yes' : 'No',
-                            (string) ($c->refill_cycle ?? ''),
+                            $sanitizeCsv($c->refill_cycle ?? ''),
                             $c->next_refill_date ? Carbon::parse($c->next_refill_date)->format('Y-m-d') : '',
                         ]);
                     }

@@ -26,7 +26,7 @@ class ProductImportController extends Controller
     public function validateUpload(Request $request)
     {
         $request->validate([
-            'file' => ['required','file','mimes:csv,txt'],
+            'file' => ['required','file','mimes:csv,txt','max:10240'],
             'delimiter' => ['nullable', Rule::in([',',';','\t','|'])],
             'create_missing_refs' => ['sometimes','in:1,0,true,false,on,off'],
         ]);

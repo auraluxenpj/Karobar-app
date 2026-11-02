@@ -591,13 +591,21 @@ class ProductController extends Controller
                 'category','brand','supplier','barcode','narcotic','max_discount','formulation','description','rack'
             ]);
 
+            $sanitizeCsv = static function ($val) {
+                $str = (string) ($val ?? '');
+                if ($str !== '' && in_array($str[0], ['=', '+', '-', '@', "\t", "\r"], true) && !preg_match('/^[+-]?\d+(\.\d+)?$/', $str)) {
+                    return "'" . $str;
+                }
+                return $str;
+            };
+
             Product::with(['category:id,name','brand:id,name','supplier:id,name'])
                 ->orderBy('id')
-                ->chunk(1000, function ($chunk) use ($out) {
+                ->chunk(1000, function ($chunk) use ($out, $sanitizeCsv) {
                 foreach ($chunk as $p) {
                         fputcsv($out, [
-                            (string)($p->product_code ?? ''),
-                            (string)($p->name ?? ''),
+                            $sanitizeCsv($p->product_code ?? ''),
+                            $sanitizeCsv($p->name ?? ''),
                             (int)($p->pack_size ?? 0),
                             (string)($p->unit_purchase_price ?? ''),
                             (string)($p->unit_sale_price ?? ''),
@@ -608,15 +616,15 @@ class ProductController extends Controller
                             (string)($p->avg_price ?? ''),
                             (string)($p->margin ?? ''),
                             (int)($p->quantity ?? 0),
-                            (string)($p->category->name ?? ''),
-                            (string)($p->brand->name ?? ''),
-                            (string)($p->supplier->name ?? ''),
-                            (string)($p->barcode ?? ''),
-                            (string)($p->narcotic ?? 'no'),
+                            $sanitizeCsv($p->category->name ?? ''),
+                            $sanitizeCsv($p->brand->name ?? ''),
+                            $sanitizeCsv($p->supplier->name ?? ''),
+                            $sanitizeCsv($p->barcode ?? ''),
+                            $sanitizeCsv($p->narcotic ?? 'no'),
                             (string)($p->max_discount ?? ''),
-                            (string)($p->formulation ?? ''),
-                            (string)($p->description ?? ''),
-                            (string)($p->rack ?? ''),
+                            $sanitizeCsv($p->formulation ?? ''),
+                            $sanitizeCsv($p->description ?? ''),
+                            $sanitizeCsv($p->rack ?? ''),
                         ]);
                     }
                 });

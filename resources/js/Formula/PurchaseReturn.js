@@ -28,26 +28,28 @@ export function recalcItem(item, changedField = null) {
   // ------------------------------
   if (packSize > 0) {
     // Quantity
-    if (changedField === "return_pack_quantity") unitQty = packQty * packSize;
+    if (changedField === "return_pack_quantity") unitQty = Math.round(packQty * packSize);
     else if (changedField === "return_unit_quantity") packQty = unitQty / packSize;
-    else if (changedField === "pack_size") {
-      if (packQty > 0 && unitQty === 0) unitQty = packQty * packSize;
+    else {
+      if (packQty > 0 && unitQty === 0) unitQty = Math.round(packQty * packSize);
       else if (unitQty > 0 && packQty === 0) packQty = unitQty / packSize;
     }
 
     // Purchase price
     if (changedField === "pack_purchase_price") unitPurchase = packPurchase / packSize;
     else if (changedField === "unit_purchase_price") packPurchase = unitPurchase * packSize;
-    else if (changedField === "pack_size") {
+    else {
       if (packPurchase > 0 && unitPurchase === 0) unitPurchase = packPurchase / packSize;
       else if (unitPurchase > 0 && packPurchase === 0) packPurchase = unitPurchase * packSize;
     }
+  } else {
+    unitQty = Math.round(unitQty);
   }
 
   // ------------------------------
   // Totals & pricing
   // ------------------------------
-  const subTotal = packQty * packPurchase;
+  const subTotal = unitQty > 0 && unitPurchase > 0 ? unitQty * unitPurchase : packQty * packPurchase;
   const discountAmount = (subTotal * discountPct) / 100;
   const netTotal = subTotal - discountAmount;
 

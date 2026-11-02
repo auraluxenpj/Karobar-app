@@ -84,7 +84,7 @@
 </style>
 </head>
 <body>
-<div class="Print-actions">
+<div class="print-actions">
   <button onclick="window.print()">Print Invoice</button>
 </div>
 

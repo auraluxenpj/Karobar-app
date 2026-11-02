@@ -132,6 +132,19 @@ class SettingController extends Controller
             'logo'                    => ['nullable','image','mimes:jpg,jpeg,png,webp','max:2048'],
         ]);
 
+        $effectiveProvider = $request->has('whatsapp_provider')
+            ? ($request->input('whatsapp_provider') ?: 'local_agent')
+            : ($setting->whatsapp_provider ?: 'local_agent');
+
+        if ($request->filled('whatsapp_api_url')) {
+            $this->assertSafeWhatsAppApiUrl(
+                trim((string) $request->input('whatsapp_api_url')),
+                (string) $effectiveProvider
+            );
+        }
+
+        $submittedSecrets = [];
+
         // Handle logo upload (optional)
         if ($request->hasFile('logo')) {
             $newPath = $request->file('logo')->store('logos', 'public');
@@ -198,7 +211,13 @@ class SettingController extends Controller
                 $setting->smtp_username = $request->input('smtp_username');
             }
             if ($request->has('smtp_password')) {
-                $setting->smtp_password = $request->input('smtp_password');
+                $rawPass = (string) $request->input('smtp_password');
+                if ($rawPass !== '') {
+                    $setting->smtp_password = $rawPass;
+                    $submittedSecrets[] = 'smtp_password';
+                } elseif ($request->boolean('clear_smtp_password')) {
+                    $setting->smtp_password = null;
+                }
             }
             if ($request->has('smtp_encryption')) {
                 $setting->smtp_encryption = $request->input('smtp_encryption') ?: 'tls';
@@ -220,7 +239,13 @@ class SettingController extends Controller
                 $setting->whatsapp_provider = $request->input('whatsapp_provider') ?: 'local_agent';
             }
             if ($request->has('whatsapp_access_token')) {
-                $setting->whatsapp_access_token = trim((string) $request->input('whatsapp_access_token'));
+                $rawToken = trim((string) $request->input('whatsapp_access_token'));
+                if ($rawToken !== '') {
+                    $setting->whatsapp_access_token = $rawToken;
+                    $submittedSecrets[] = 'whatsapp_access_token';
+                } elseif ($request->boolean('clear_whatsapp_access_token')) {
+                    $setting->whatsapp_access_token = null;
+                }
             }
             if ($request->has('whatsapp_phone_number_id')) {
                 $setting->whatsapp_phone_number_id = trim((string) $request->input('whatsapp_phone_number_id'));
@@ -258,7 +283,13 @@ class SettingController extends Controller
                 $setting->cube_groq_enabled = $request->boolean('cube_groq_enabled');
             }
             if ($request->has('cube_groq_api_key')) {
-                $setting->cube_groq_api_key = trim((string) $request->input('cube_groq_api_key'));
+                $rawGroqKey = trim((string) $request->input('cube_groq_api_key'));
+                if ($rawGroqKey !== '') {
+                    $setting->cube_groq_api_key = $rawGroqKey;
+                    $submittedSecrets[] = 'cube_groq_api_key';
+                } elseif ($request->boolean('clear_cube_groq_api_key')) {
+                    $setting->cube_groq_api_key = null;
+                }
             }
             if ($request->has('cube_groq_model')) {
                 $setting->cube_groq_model = $request->input('cube_groq_model') ?: 'llama-3.3-70b-versatile';
@@ -271,7 +302,13 @@ class SettingController extends Controller
                 $setting->cube_gemini_enabled = $request->boolean('cube_gemini_enabled');
             }
             if ($request->has('cube_gemini_api_key')) {
-                $setting->cube_gemini_api_key = trim((string) $request->input('cube_gemini_api_key'));
+                $rawGeminiKey = trim((string) $request->input('cube_gemini_api_key'));
+                if ($rawGeminiKey !== '') {
+                    $setting->cube_gemini_api_key = $rawGeminiKey;
+                    $submittedSecrets[] = 'cube_gemini_api_key';
+                } elseif ($request->boolean('clear_cube_gemini_api_key')) {
+                    $setting->cube_gemini_api_key = null;
+                }
             }
             if ($request->has('cube_gemini_model')) {
                 $setting->cube_gemini_model = $request->input('cube_gemini_model') ?: 'gemini-3.8-flash';
@@ -314,7 +351,7 @@ class SettingController extends Controller
         $setting->applyWhatsAppConfig();
         $setting->applyCubeAiConfig();
 
-        return response()->json($this->appendCubeMetadata($setting->fresh()));
+        return response()->json($this->appendCubeMetadata($setting->fresh(), $submittedSecrets));
     }
 
     // POST /api/settings/test-whatsapp
@@ -335,10 +372,18 @@ class SettingController extends Controller
             'test_phone'                    => ['required', 'string', 'max:50'],
         ]);
 
+        $setting = Setting::first();
         $provider = $validated['whatsapp_provider'];
         $token = trim((string) ($validated['whatsapp_access_token'] ?? ''));
+        if ($token === '' && $setting && !empty($setting->whatsapp_access_token)) {
+            $token = trim((string) $setting->whatsapp_access_token);
+        }
         $phoneOrInstanceId = trim((string) ($validated['whatsapp_phone_number_id'] ?? ''));
         $apiUrl = trim((string) ($validated['whatsapp_api_url'] ?? ''));
+
+        if ($apiUrl !== '') {
+            $this->assertSafeWhatsAppApiUrl($apiUrl, $provider);
+        }
 
         if (in_array($provider, ['whapi_cloud', 'wasender'], true) && $token === '') {
             return response()->json([
@@ -368,7 +413,6 @@ class SettingController extends Controller
             ], 422);
         }
 
-        $setting = Setting::first();
         $storeName = $setting?->store_name ?: 'Karobar App';
 
         if ($provider === 'local_agent') {
@@ -467,7 +511,9 @@ class SettingController extends Controller
                 $setting = null;
             }
 
-            return response()->json($agent->status($setting));
+            $status = $agent->status($setting);
+            unset($status['api_key']);
+            return response()->json($status);
         } catch (\Throwable $e) {
             return response()->json([
                 'ok'            => false,
@@ -478,7 +524,6 @@ class SettingController extends Controller
                 'user'          => null,
                 'last_error'    => $e->getMessage(),
                 'agent_url'     => $agent->agentUrl(),
-                'api_key'       => '',
             ]);
         }
     }
@@ -497,6 +542,7 @@ class SettingController extends Controller
             }
 
             $result = $agent->start($setting);
+            unset($result['api_key']);
 
             if (empty($result['ok']) && empty($result['agent_running'])) {
                 return response()->json([
@@ -520,14 +566,16 @@ class SettingController extends Controller
     // POST /api/settings/whatsapp-agent/pair-code
     public function whatsappAgentPairCode(Request $request, \App\Services\LocalWhatsAppAgentService $agent)
     {
-        $this->authorizeWhatsAppAgentAccess($request);
+        $this->authorize('update', Setting::class);
 
         $validated = $request->validate([
             'phone' => ['required', 'string', 'max:50'],
         ]);
 
         try {
-            return response()->json($agent->requestPairingCode($validated['phone'], Setting::first()));
+            $result = $agent->requestPairingCode($validated['phone'], Setting::first());
+            unset($result['api_key']);
+            return response()->json($result);
         } catch (\Throwable $e) {
             return response()->json([
                 'ok'      => false,
@@ -539,7 +587,7 @@ class SettingController extends Controller
     // POST /api/settings/whatsapp-agent/logout
     public function whatsappAgentLogout(Request $request, \App\Services\LocalWhatsAppAgentService $agent)
     {
-        $this->authorizeWhatsAppAgentAccess($request);
+        $this->authorize('update', Setting::class);
 
         try {
             return response()->json($agent->logout(Setting::first()));
@@ -554,7 +602,7 @@ class SettingController extends Controller
     // POST /api/settings/whatsapp-agent/stop
     public function whatsappAgentStop(Request $request, \App\Services\LocalWhatsAppAgentService $agent)
     {
-        $this->authorizeWhatsAppAgentAccess($request);
+        $this->authorize('update', Setting::class);
 
         try {
             return response()->json($agent->stop(Setting::first()));
@@ -584,12 +632,16 @@ class SettingController extends Controller
 
         $setting = Setting::first();
         $storeName = $validated['smtp_from_name'] ?? $setting?->store_name ?? 'Karobar App';
+        $smtpPassword = trim((string) ($validated['smtp_password'] ?? ''));
+        if ($smtpPassword === '' && $setting && !empty($setting->smtp_password)) {
+            $smtpPassword = (string) $setting->smtp_password;
+        }
 
         Setting::applyRuntimeSmtp([
             'smtp_host'         => $validated['smtp_host'],
             'smtp_port'         => $validated['smtp_port'],
             'smtp_username'     => $validated['smtp_username'] ?? null,
-            'smtp_password'     => $validated['smtp_password'] ?? null,
+            'smtp_password'     => $smtpPassword !== '' ? $smtpPassword : null,
             'smtp_encryption'   => $validated['smtp_encryption'] ?? 'tls',
             'smtp_from_address' => $validated['smtp_from_address'] ?? $validated['smtp_username'] ?? null,
             'smtp_from_name'    => $storeName,
@@ -623,11 +675,25 @@ class SettingController extends Controller
 
         $validated = $request->validate([
             'provider' => ['required', Rule::in(['groq', 'gemini'])],
-            'api_key'  => ['required', 'string', 'max:1000'],
+            'api_key'  => ['nullable', 'string', 'max:1000'],
             'model'    => ['required', 'string', 'max:120'],
         ]);
 
         $provider = $validated['provider'];
+        $apiKey = trim((string) ($validated['api_key'] ?? ''));
+        if ($apiKey === '') {
+            $existingSetting = Setting::first();
+            $apiKey = $provider === 'groq'
+                ? trim((string) ($existingSetting?->cube_groq_api_key ?? ''))
+                : trim((string) ($existingSetting?->cube_gemini_api_key ?? ''));
+        }
+        if ($apiKey === '') {
+            return response()->json([
+                'status'  => 'failed',
+                'message' => 'Please enter your ' . ucfirst($provider) . ' API key.',
+            ], 422);
+        }
+
         $allowedModels = (array) config("cube.providers.{$provider}.allowed_free_models", []);
         if (! app(CubeQuotaGuard::class)->isEligibleFreeModel($provider, $validated['model'], $allowedModels)) {
             return response()->json([
@@ -638,7 +704,7 @@ class SettingController extends Controller
 
         Setting::applyRuntimeCubeProvider($provider, [
             'enabled'     => true,
-            'api_key'     => $validated['api_key'],
+            'api_key'     => $apiKey,
             'model'       => $validated['model'],
             'daily_limit' => 250,
         ]);
@@ -660,14 +726,14 @@ class SettingController extends Controller
                         $setting->cube_ai_enabled = true;
                         if ($provider === 'groq') {
                             $setting->cube_groq_enabled = true;
-                            $setting->cube_groq_api_key = trim($validated['api_key']);
+                            $setting->cube_groq_api_key = $apiKey;
                             $setting->cube_groq_model = $verifiedModel;
                             if (! $setting->cube_groq_daily_limit || $setting->cube_groq_daily_limit <= 0) {
                                 $setting->cube_groq_daily_limit = 250;
                             }
                         } else {
                             $setting->cube_gemini_enabled = true;
-                            $setting->cube_gemini_api_key = trim($validated['api_key']);
+                            $setting->cube_gemini_api_key = $apiKey;
                             $setting->cube_gemini_model = $verifiedModel;
                             if (! $setting->cube_gemini_daily_limit || $setting->cube_gemini_daily_limit <= 0) {
                                 $setting->cube_gemini_daily_limit = 250;
@@ -719,9 +785,67 @@ class SettingController extends Controller
         ], 422);
     }
 
-    protected function appendCubeMetadata(Setting $setting): array
+    /**
+     * Validate that a WhatsApp API URL uses HTTP(S) and does not target cloud metadata
+     * or (for remote providers) loopback/private network addresses.
+     */
+    protected function assertSafeWhatsAppApiUrl(string $url, string $provider): void
     {
+        $url = trim($url);
+        if ($url === '') {
+            return;
+        }
+
+        $parsed = @parse_url($url);
+        $scheme = strtolower((string) ($parsed['scheme'] ?? ''));
+        $host   = strtolower(trim((string) ($parsed['host'] ?? ''), '[]'));
+
+        if (!filter_var($url, FILTER_VALIDATE_URL) || !in_array($scheme, ['http', 'https'], true) || $host === '') {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'whatsapp_api_url' => ['The WhatsApp API URL must be a valid http:// or https:// URL.'],
+            ]);
+        }
+
+        // Always block cloud metadata, link-local, and unspecified addresses across ALL providers
+        $alwaysBlockedHosts = ['169.254.169.254', 'metadata.google.internal', 'metadata', '0.0.0.0', '::', '0:0:0:0:0:0:0:0'];
+        if (in_array($host, $alwaysBlockedHosts, true) || str_starts_with($host, '169.254.') || str_starts_with($host, 'fe80:')) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'whatsapp_api_url' => ['The WhatsApp API URL points to a restricted metadata or link-local address.'],
+            ]);
+        }
+
+        // Self-hosted bridges (local_agent, waha, evolution_api) legitimately run on localhost / LAN
+        $selfHostedProviders = ['local_agent', 'waha', 'evolution_api'];
+        if (in_array($provider, $selfHostedProviders, true)) {
+            return;
+        }
+
+        if ($host === 'localhost' || str_ends_with($host, '.localhost') || $host === '::1' || str_starts_with($host, '127.')) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'whatsapp_api_url' => ['Remote WhatsApp providers cannot target loopback/localhost addresses.'],
+            ]);
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            if (!filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'whatsapp_api_url' => ['Remote WhatsApp providers cannot target private or reserved IP ranges.'],
+                ]);
+            }
+        }
+    }
+
+    protected function appendCubeMetadata(Setting $setting, array $visibleSecrets = []): array
+    {
+        if (!empty($visibleSecrets)) {
+            $setting->makeVisible($visibleSecrets);
+        }
+
         $payload = $setting->toArray();
+        $payload['has_smtp_password']          = trim((string) ($setting->getRawOriginal('smtp_password') ?? $setting->smtp_password ?? '')) !== '';
+        $payload['has_whatsapp_access_token']  = trim((string) ($setting->getRawOriginal('whatsapp_access_token') ?? $setting->whatsapp_access_token ?? '')) !== '';
+        $payload['has_cube_groq_api_key']      = trim((string) ($setting->getRawOriginal('cube_groq_api_key') ?? $setting->cube_groq_api_key ?? '')) !== '';
+        $payload['has_cube_gemini_api_key']    = trim((string) ($setting->getRawOriginal('cube_gemini_api_key') ?? $setting->cube_gemini_api_key ?? '')) !== '';
 
         $today = now()->toDateString();
         $groqUsage = null;

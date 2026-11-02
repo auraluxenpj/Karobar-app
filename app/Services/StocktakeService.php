@@ -261,6 +261,11 @@ class StocktakeService
         ?string $reason,
         ?int $userId
     ): StocktakeItem {
+        $session = $item->session;
+        if ($session && !in_array($session->status, ['in_progress', 'pending_review'], true)) {
+            throw new \RuntimeException("Counts cannot be recorded for a session with status: {$session->status}");
+        }
+
         $varianceQty   = $countedQty - $item->system_qty;
         $varianceValue = abs($varianceQty) * $item->unit_purchase_price;
 
@@ -326,16 +331,44 @@ class StocktakeService
             $items = $session->items()->with('product')->get();
 
             foreach ($items as $item) {
-                // Only process items with a non-zero variance
-                if ($item->variance_qty == 0) {
-                    continue;
-                }
-
                 /** @var Product $product */
                 $product = Product::lockForUpdate()->findOrFail($item->product_id);
 
+                $batch = null;
+                if ($item->batch_number) {
+                    $batch = Batch::lockForUpdate()
+                        ->where('product_id', $item->product_id)
+                        ->where('batch_number', $item->batch_number)
+                        ->first();
+                    $liveSystemQty = $batch ? (float) ($batch->quantity ?? 0) : 0.0;
+                } else {
+                    $batchSum = (float) Batch::where('product_id', $item->product_id)->sum(DB::raw('COALESCE(quantity, 0)'));
+                    $hasBatchedSessionItem = $items->contains(fn ($it) => (int) $it->product_id === (int) $item->product_id && !empty($it->batch_number));
+                    $liveSystemQty = $hasBatchedSessionItem
+                        ? max(0.0, (float) ($product->quantity ?? 0) - $batchSum)
+                        : (float) ($product->quantity ?? 0);
+                }
+
+                $countedQty = (float) ($item->counted_qty ?? $liveSystemQty);
+                $liveVarianceQty = $countedQty - $liveSystemQty;
+
+                // Refresh item's system_qty and variance_qty if live stock changed since snapshot
+                if (abs($liveSystemQty - (float) $item->system_qty) > 0.0001 || abs($liveVarianceQty - (float) $item->variance_qty) > 0.0001) {
+                    $unitCostForItem = $item->unit_purchase_price ?: (float) ($product->unit_purchase_price ?? 0);
+                    $item->update([
+                        'system_qty'     => $liveSystemQty,
+                        'variance_qty'   => $liveVarianceQty,
+                        'variance_value' => abs($liveVarianceQty) * $unitCostForItem,
+                    ]);
+                }
+
+                // Only process items with a non-zero variance
+                if ($liveVarianceQty == 0) {
+                    continue;
+                }
+
                 $unitCost = $item->unit_purchase_price ?: (float) ($product->unit_purchase_price ?? 0);
-                $worth    = abs($item->variance_qty) * $unitCost;
+                $worth    = abs($liveVarianceQty) * $unitCost;
 
                 // Create StockAdjustmentItem record
                 StockAdjustmentItem::create([
@@ -344,9 +377,9 @@ class StocktakeService
                     'batch_number'        => $item->batch_number,
                     'expiry'              => $item->expiry_date,
                     'pack_size'           => null,
-                    'previous_qty'        => $item->system_qty,
-                    'actual_qty'          => $item->counted_qty,
-                    'diff_qty'            => $item->variance_qty,
+                    'previous_qty'        => $liveSystemQty,
+                    'actual_qty'          => $countedQty,
+                    'diff_qty'            => $liveVarianceQty,
                     'unit_purchase_price' => $unitCost,
                     'worth_adjusted'      => $worth,
                 ]);
@@ -355,29 +388,24 @@ class StocktakeService
 
                 // Apply stock change
                 if ($item->batch_number) {
-                    $batch = Batch::lockForUpdate()
-                        ->where('product_id', $item->product_id)
-                        ->where('batch_number', $item->batch_number)
-                        ->first();
-
                     if ($batch) {
-                        $batch->quantity = max(0, (float) ($batch->quantity ?? 0) + $item->variance_qty);
+                        $batch->quantity = max(0, $countedQty);
                         if (!$batch->expiry_date && $item->expiry_date) {
                             $batch->expiry_date = $item->expiry_date;
                         }
                         $batch->save();
-                    } elseif ((float) $item->counted_qty > 0) {
+                    } elseif ($countedQty > 0) {
                         Batch::create([
                             'product_id'   => $item->product_id,
                             'batch_number' => $item->batch_number,
                             'expiry_date'  => $item->expiry_date,
-                            'quantity'     => max(0, (float) $item->counted_qty),
+                            'quantity'     => max(0, $countedQty),
                         ]);
                     }
-                    $product->quantity = max(0, (float) ($product->quantity ?? 0) + $item->variance_qty);
+                    $product->quantity = max(0, (float) ($product->quantity ?? 0) + $liveVarianceQty);
                     $product->save();
                 } else {
-                    $product->quantity = max(0, (float) ($product->quantity ?? 0) + $item->variance_qty);
+                    $product->quantity = max(0, (float) ($product->quantity ?? 0) + $liveVarianceQty);
                     // If qty hits zero, reset avg_price and margins
                     if ($product->quantity <= 0) {
                         $product->avg_price         = 0;

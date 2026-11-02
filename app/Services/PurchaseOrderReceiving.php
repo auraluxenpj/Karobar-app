@@ -43,11 +43,20 @@ class PurchaseOrderReceiving
     public function sync(PurchaseOrder $order): void
     {
         $order->load('items.product', 'items.invoiceItems', 'invoices');
-        $hasInvoices = $order->invoices->isNotEmpty();
-        $complete = $order->items->every(fn ($line) => $line->invoiceItems->sum('unit_quantity') >= $line->ordered_quantity);
+        $activeInvoices = $order->invoices
+            ->filter(fn ($inv) => ($inv->status ?? null) !== 'reversed')
+            ->values();
+        $activeInvoiceIds = $activeInvoices->pluck('id')->map(fn ($id) => (int) $id)->all();
+        $hasInvoices = $activeInvoices->isNotEmpty();
+        $complete = $order->items->every(function ($line) use ($activeInvoiceIds) {
+            $activeQty = $line->invoiceItems
+                ->filter(fn ($ii) => in_array((int) $ii->purchase_invoice_id, $activeInvoiceIds, true))
+                ->sum('unit_quantity');
+            return $activeQty >= $line->ordered_quantity;
+        });
         $status = $hasInvoices ? ($complete ? 'received' : 'partially_received') : 'ordered';
         $latestSupplierId = $hasInvoices
-            ? ($order->invoices->last()?->supplier_id ?? $order->supplier_id)
+            ? ($activeInvoices->last()?->supplier_id ?? $order->supplier_id)
             : $order->supplier_id;
 
         $order->update([
@@ -58,10 +67,10 @@ class PurchaseOrderReceiving
             'received_at' => $hasInvoices ? ($order->received_at ?? now()) : null,
         ]);
 
-        $this->syncUndeliveredUserDemands($order, $status);
+        $this->syncUndeliveredUserDemands($order, $status, $activeInvoiceIds);
     }
 
-    private function syncUndeliveredUserDemands(PurchaseOrder $order, string $status): void
+    private function syncUndeliveredUserDemands(PurchaseOrder $order, string $status, array $activeInvoiceIds = []): void
     {
         $orderNumber = $order->number ?: ('PO-' . str_pad((string) $order->id, 5, '0', STR_PAD_LEFT));
         $note = "Undelivered from Purchase Order {$orderNumber}";
@@ -74,7 +83,9 @@ class PurchaseOrderReceiving
         }
 
         foreach ($order->items as $line) {
-            $receivedUnits = (int) $line->invoiceItems->sum('unit_quantity');
+            $receivedUnits = (int) $line->invoiceItems
+                ->filter(fn ($ii) => in_array((int) $ii->purchase_invoice_id, $activeInvoiceIds, true))
+                ->sum('unit_quantity');
             $remainingUnits = max(0, (int) $line->ordered_quantity - $receivedUnits);
 
             if ($remainingUnits <= 0) {

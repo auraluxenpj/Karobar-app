@@ -7,7 +7,7 @@ use App\Http\Controllers\SupplierLedgerController;
 
 // --- Password Reset Route ---
 Route::get('/password/reset/{token}/{email}', function ($token, $email) {
-    return redirect("/reset-password/{$token}/{$email}");
+    return redirect('/reset-password/' . rawurlencode((string) $token) . '/' . rawurlencode((string) $email));
 })->name('password.reset');
 
 // --- Server-rendered routes FIRST ---

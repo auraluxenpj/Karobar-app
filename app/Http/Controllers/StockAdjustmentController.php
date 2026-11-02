@@ -225,12 +225,13 @@ class StockAdjustmentController extends Controller
                 $touchedProducts[$product->id] = true;
             }
 
-            // Sync product-level totals with batch sums (for products with any batches)
+            // Sync product-level totals with batch sums (for products where all adjustment items were batch-level)
             foreach (array_keys($touchedProducts) as $pid) {
                 /** @var Product $p */
                 $p = Product::query()->lockForUpdate()->findOrFail($pid);
                 $batchCount = Batch::where('product_id', $pid)->count();
-                if ($batchCount > 0) {
+                $hasUnbatchedRow = collect($data['items'])->contains(fn ($r) => (int) ($r['product_id'] ?? 0) === (int) $pid && empty(trim((string) ($r['batch_number'] ?? ''))));
+                if ($batchCount > 0 && !$hasUnbatchedRow) {
                     $this->setProductQty($p, $this->sumBatches($p));
                 }
             }
@@ -256,6 +257,17 @@ class StockAdjustmentController extends Controller
         $adj = StockAdjustment::with('items.product')->findOrFail($id);
         // 🔒 delete instance
         $this->authorize('delete', $adj);
+
+        if (Schema::hasTable('stock_disposals') && DB::table('stock_disposals')->where('stock_adjustment_id', $adj->id)->exists()) {
+            return response()->json([
+                'message' => 'Cannot delete a stock adjustment that is linked to a stock disposal voucher.',
+            ], 422);
+        }
+        if (Schema::hasTable('stocktake_sessions') && DB::table('stocktake_sessions')->where('stock_adjustment_id', $adj->id)->exists()) {
+            return response()->json([
+                'message' => 'Cannot delete a stock adjustment that is linked to a finalized stocktake session.',
+            ], 422);
+        }
 
         return DB::transaction(function () use ($adj) {
             app(DocumentAuditService::class)->recordReversal($adj, auth()->user(), 'Stock adjustment deleted');
@@ -333,8 +345,9 @@ class StockAdjustmentController extends Controller
         if (!Schema::hasTable('expenses') || !Schema::hasTable('expense_categories')) {
             return;
         }
-        // Disposal adjustments manage their own P&L write-off via StockDisposalService
-        if (str_starts_with((string) $adj->posted_number, 'DISP-')) {
+        // Disposal and stocktake adjustments manage their own P&L write-off via their respective services
+        $postedNo = (string) $adj->posted_number;
+        if (str_starts_with($postedNo, 'DISP-') || str_starts_with($postedNo, 'DSP-') || str_starts_with($postedNo, 'STOCKTAKE-')) {
             return;
         }
 

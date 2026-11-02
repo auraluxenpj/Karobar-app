@@ -113,7 +113,7 @@ class PurchaseReturnController extends Controller
 
         $batch = null;
         if ($batchNo !== '') {
-            $batchQuery = Batch::where('product_id', $productId)
+            $batchQuery = Batch::lockForUpdate()->where('product_id', $productId)
                 ->where('batch_number', $batchNo);
             if ($expiry !== '') {
                 $cleanExpiry = substr($expiry, 0, 10);
@@ -124,7 +124,7 @@ class PurchaseReturnController extends Controller
             }
             $batch = $batchQuery->first();
             if (!$batch) {
-                $batch = Batch::where('product_id', $productId)
+                $batch = Batch::lockForUpdate()->where('product_id', $productId)
                     ->where('batch_number', $batchNo)
                     ->first();
             }
@@ -133,16 +133,24 @@ class PurchaseReturnController extends Controller
         if ($batch) {
             $before = $this->i($batch->quantity);
             $after  = $before + $deltaUnits;
-            if ($after < 0) $after = 0;                // safety floor
+            if ($after < 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => ["Insufficient stock in batch {$batch->batch_number}."],
+                ]);
+            }
             $actualApplied = $after - $before;         // what really changed
             $batch->quantity = $after;
             $batch->save();
         }
 
-        if ($product = Product::find($productId)) {
+        if ($product = Product::lockForUpdate()->find($productId)) {
             $pBefore = $this->i($product->quantity);
             $pAfter  = $pBefore + $actualApplied;
-            if ($pAfter < 0) $pAfter = 0;
+            if ($pAfter < 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => ["Insufficient stock for {$product->name}."],
+                ]);
+            }
             $product->quantity = $pAfter;
             
             // If stock becomes zero, reset average price and margins

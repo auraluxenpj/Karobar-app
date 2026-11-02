@@ -123,12 +123,19 @@ class CategoryController extends Controller
             fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
             // Header
             fputcsv($out, ['name']);
+            $sanitizeCsv = static function ($val) {
+                $str = (string) ($val ?? '');
+                if ($str !== '' && in_array($str[0], ['=', '+', '-', '@', "\t", "\r"], true) && !preg_match('/^[+-]?\d+(\.\d+)?$/', $str)) {
+                    return "'" . $str;
+                }
+                return $str;
+            };
             // Rows
             Category::select('name')
                 ->orderBy('name')
-                ->chunk(1000, function ($chunk) use ($out) {
+                ->chunk(1000, function ($chunk) use ($out, $sanitizeCsv) {
                     foreach ($chunk as $c) {
-                        fputcsv($out, [(string)($c->name ?? '')]);
+                        fputcsv($out, [$sanitizeCsv($c->name ?? '')]);
                     }
                 });
             fclose($out);

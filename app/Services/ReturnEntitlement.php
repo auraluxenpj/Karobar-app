@@ -21,14 +21,35 @@ class ReturnEntitlement
         $original = [];
         foreach ($invoice->items()->get() as $item) {
             $key = $this->key($item->product_id, $item->$batch, $item->expiry);
-            $original[$key] = ($original[$key] ?? 0) + (int) $item->quantity;
+            $units = (int) $item->quantity + ($sale ? max(0, (int) ($item->bonus ?? 0)) : 0);
+            $original[$key] = ($original[$key] ?? 0) + $units;
         }
         $returned = DB::table($lines.' as l')->join($headers.' as h', 'h.id', '=', 'l.'.$parent)
             ->where('h.'.$link, $invoice->id)->when($exclude, fn ($q) => $q->where('h.id', '!=', $exclude))
             ->select('l.product_id', 'l.'.$batch.' as batch', 'l.expiry', 'l.'.$quantity.' as quantity')->get();
         foreach ($returned as $line) {
             $key = $this->key($line->product_id, $line->batch, $line->expiry);
-            $original[$key] = ($original[$key] ?? 0) - (int) $line->quantity;
+            if (array_key_exists($key, $original) || trim((string) $line->batch) !== '' || trim((string) $line->expiry) !== '') {
+                $original[$key] = ($original[$key] ?? 0) - (int) $line->quantity;
+            } else {
+                // Batchless return against a batched invoice line: deduct across matching product keys
+                $remToDeduct = (int) $line->quantity;
+                $prefix = '[' . (int) $line->product_id . ',';
+                foreach ($original as $oKey => &$oQty) {
+                    if ($remToDeduct <= 0) {
+                        break;
+                    }
+                    if (str_starts_with($oKey, $prefix) && $oQty > 0) {
+                        $deduct = min($oQty, $remToDeduct);
+                        $oQty -= $deduct;
+                        $remToDeduct -= $deduct;
+                    }
+                }
+                unset($oQty);
+                if ($remToDeduct > 0) {
+                    $original[$key] = ($original[$key] ?? 0) - $remToDeduct;
+                }
+            }
         }
 
         return $original;
@@ -68,13 +89,36 @@ class ReturnEntitlement
             throw ValidationException::withMessages([$link => 'The selected invoice does not belong to this '.($sale ? 'customer.' : 'supplier.')]);
         }
         $remaining = $this->remaining($kind, $invoice, $existing?->id);
+        $totalByProduct = [];
+        foreach ($remaining as $rKey => $rQty) {
+            $decoded = json_decode($rKey, true);
+            $pid = (int) ($decoded[0] ?? 0);
+            if ($pid > 0) {
+                $totalByProduct[$pid] = ($totalByProduct[$pid] ?? 0) + max(0, (int) $rQty);
+            }
+        }
         $requested = [];
+        $requestedByProduct = [];
         foreach ($data['items'] as $index => $row) {
             $field = $sale ? 'unit_return_quantity' : 'return_unit_quantity';
-            $key = $this->key($row['product_id'], $row[$sale ? 'batch_number' : 'batch'] ?? '', $row['expiry'] ?? '');
+            $pid = (int) ($row['product_id'] ?? 0);
+            $batchVal = trim((string) ($row[$sale ? 'batch_number' : 'batch'] ?? ''));
+            $expiryVal = trim((string) ($row['expiry'] ?? ''));
+            $key = $this->key($pid, $batchVal, $expiryVal);
+            $qty = (int) ($row[$field] ?? 0);
+            $requestedByProduct[$pid] = ($requestedByProduct[$pid] ?? 0) + $qty;
+            $productAvailable = max(0, $totalByProduct[$pid] ?? 0);
+
+            if ($batchVal === '' && $expiryVal === '' && ! array_key_exists($key, $remaining) && array_key_exists($pid, $totalByProduct)) {
+                if ($requestedByProduct[$pid] > $productAvailable) {
+                    throw ValidationException::withMessages(["items.$index.$field" => "Only $productAvailable units remain available to return for this product/batch on the selected invoice."]);
+                }
+                continue;
+            }
+
             $available = max(0, $remaining[$key] ?? 0);
-            $requested[$key] = ($requested[$key] ?? 0) + (int) $row[$field];
-            if (! array_key_exists($key, $remaining) || $requested[$key] > $available) {
+            $requested[$key] = ($requested[$key] ?? 0) + $qty;
+            if (! array_key_exists($key, $remaining) || $requested[$key] > $available || $requestedByProduct[$pid] > $productAvailable) {
                 throw ValidationException::withMessages(["items.$index.$field" => "Only $available units remain available to return for this product/batch on the selected invoice."]);
             }
         }

@@ -439,10 +439,12 @@ class PurchaseInvoiceController extends Controller
                     }
 
                     $delta = (int) ($newGroup['quantity'] ?? 0) - (int) ($oldGroup['quantity'] ?? 0);
-                    $product = Product::find($productId);
+                    $product = Product::lockForUpdate()->find($productId);
                     if (!$product) {
                         continue;
                     }
+
+                    $batchSource = $newGroup['source'] ?? $oldGroup['source'] ?? [];
 
                     if ($delta > 0) {
                         $payload = $newGroup['source'] ?? [];
@@ -450,13 +452,33 @@ class PurchaseInvoiceController extends Controller
                         $payload['avg_price'] = $newGroup['avg_price'] ?? ($payload['avg_price'] ?? $payload['unit_purchase_price'] ?? 0);
                         $product->applyPurchaseFromItem($payload);
                     } elseif ($delta < 0) {
+                        $reduction = abs($delta);
+                        if ((int) ($product->quantity ?? 0) < $reduction) {
+                            throw ValidationException::withMessages([
+                                'items' => ["Cannot reduce purchase quantity for {$product->name} by {$reduction} units because only {$product->quantity} units remain in stock."],
+                            ]);
+                        }
+                        $batchNoCheck = trim((string) ($batchSource['batch'] ?? ''));
+                        $expiryCheck = trim((string) ($batchSource['expiry'] ?? ''));
+                        if ($batchNoCheck !== '' && $expiryCheck !== '') {
+                            $batchModelCheck = Batch::lockForUpdate()
+                                ->where('product_id', $productId)
+                                ->where('batch_number', $batchNoCheck)
+                                ->where('expiry_date', $expiryCheck)
+                                ->first();
+                            if ($batchModelCheck && (int) ($batchModelCheck->quantity ?? 0) < $reduction) {
+                                throw ValidationException::withMessages([
+                                    'items' => ["Cannot reduce purchase quantity for {$product->name} (Batch {$batchNoCheck}) by {$reduction} units because only {$batchModelCheck->quantity} units remain in that batch."],
+                                ]);
+                            }
+                        }
+
                         $payload = $oldGroup['source'] ?? [];
-                        $payload['quantity'] = abs($delta);
+                        $payload['quantity'] = $reduction;
                         $payload['avg_price'] = $oldGroup['avg_price'] ?? ($payload['avg_price'] ?? $payload['unit_purchase_price'] ?? 0);
                         $product->revertPurchaseFromItem($payload);
                     }
 
-                    $batchSource = $newGroup['source'] ?? $oldGroup['source'] ?? [];
                     $this->adjustBatchQuantity(
                         $productId,
                         $batchSource['batch'] ?? null,
@@ -519,6 +541,11 @@ class PurchaseInvoiceController extends Controller
                 }
 
                 // Handle supplier ledger entries
+                if ($allocatedOnInvoice > 0.009 && ($newInvoiceType !== 'credit' || (int) $data['supplier_id'] !== (int) $purchaseInvoice->supplier_id)) {
+                    throw ValidationException::withMessages([
+                        'invoice_type' => ['Cannot change supplier or convert a credit invoice with active payment/debit-note allocations to cash/debit. Detach or reverse payments first.'],
+                    ]);
+                }
                 // If invoice was previously credit but is now debit, delete the ledger entry
                 if ($oldInvoiceType === 'credit' && $newInvoiceType !== 'credit') {
                     // Remove existing ledger entry for this invoice
@@ -630,10 +657,68 @@ class PurchaseInvoiceController extends Controller
         }
     }
 
+    private function validatePurchaseReversalStock(PurchaseInvoice $purchaseInvoice): void
+    {
+        $purchaseInvoice->loadMissing('items.product');
+        $byProduct = [];
+        $byBatch = [];
+
+        foreach ($purchaseInvoice->items as $item) {
+            $pid = (int) ($item->product_id ?? 0);
+            $qty = (int) ($item->quantity ?? 0);
+            if ($pid <= 0 || $qty <= 0) {
+                continue;
+            }
+            $byProduct[$pid] = ($byProduct[$pid] ?? 0) + $qty;
+
+            $batchNo = trim((string) ($item->batch ?? ''));
+            $expiry = trim((string) ($item->expiry ?? ''));
+            if ($batchNo !== '' && $expiry !== '') {
+                $bKey = "{$pid}|{$batchNo}|{$expiry}";
+                $byBatch[$bKey] = [
+                    'product_id' => $pid,
+                    'batch'      => $batchNo,
+                    'expiry'     => $expiry,
+                    'qty'        => ($byBatch[$bKey]['qty'] ?? 0) + $qty,
+                ];
+            }
+        }
+
+        foreach ($byProduct as $pid => $requiredQty) {
+            $product = Product::lockForUpdate()->find($pid);
+            if ($product && (int) ($product->quantity ?? 0) < $requiredQty) {
+                throw ValidationException::withMessages([
+                    'items' => ["Cannot reverse or delete purchase invoice because stock for {$product->name} has already been sold or consumed (on hand: {$product->quantity}, required: {$requiredQty})."],
+                ]);
+            }
+        }
+
+        foreach ($byBatch as $bInfo) {
+            $batch = Batch::lockForUpdate()
+                ->where('product_id', $bInfo['product_id'])
+                ->where('batch_number', $bInfo['batch'])
+                ->where('expiry_date', $bInfo['expiry'])
+                ->first();
+            if ($batch && (int) ($batch->quantity ?? 0) < $bInfo['qty']) {
+                $pName = Product::whereKey($bInfo['product_id'])->value('name') ?? "Product #{$bInfo['product_id']}";
+                throw ValidationException::withMessages([
+                    'items' => ["Cannot reverse or delete purchase invoice because batch {$bInfo['batch']} for {$pName} has already been sold or consumed (on hand: {$batch->quantity}, required: {$bInfo['qty']})."],
+                ]);
+            }
+        }
+    }
+
     // Delete invoice
     public function destroy(PurchaseInvoice $purchaseInvoice)
     {
         $this->authorize('delete', $purchaseInvoice);
+
+        if (\App\Models\PurchaseReturn::where('purchase_invoice_id', $purchaseInvoice->id)->exists()) {
+            return response()->json([
+                'message' => 'Cannot delete this invoice because linked purchase returns exist. Please delete the returns first.',
+            ], 422);
+        }
+
         try {
             return DB::transaction(function () use ($purchaseInvoice) {
                 $order = $purchaseInvoice->purchase_order_id ? PurchaseOrder::lockForUpdate()->findOrFail($purchaseInvoice->purchase_order_id) : null;
@@ -642,47 +727,51 @@ class PurchaseInvoiceController extends Controller
 
                 $affectedIds = $purchaseInvoice->items->pluck('product_id')->unique()->all();
 
-                foreach ($purchaseInvoice->items as $item) {
-                    $this->revertItem($item, true, true);
-                }
+                if ($purchaseInvoice->status !== 'reversed') {
+                    $this->validatePurchaseReversalStock($purchaseInvoice);
 
-                // Unwind any Payment / Credit Note allocations before deletion so standalone payments
-                // and credit notes are restored to supplier unapplied credit and not refunded as cash
-                app(\App\Services\PaymentService::class)->detachInvoiceAllocations('purchase_invoice', (int) $purchaseInvoice->id, Auth::user());
-                $purchaseInvoice->refresh();
+                    foreach ($purchaseInvoice->items as $item) {
+                        $this->revertItem($item, false, false);
+                    }
 
-                if (\Illuminate\Support\Facades\Schema::hasTable('supplier_ledgers')) {
-                    \App\Models\SupplierLedger::where('purchase_invoice_id', $purchaseInvoice->id)->delete();
-                }
+                    // Unwind any Payment / Credit Note allocations before deletion so standalone payments
+                    // and credit notes are restored to supplier unapplied credit and not refunded as cash
+                    app(\App\Services\PaymentService::class)->detachInvoiceAllocations('purchase_invoice', (int) $purchaseInvoice->id, Auth::user());
+                    $purchaseInvoice->refresh();
 
-                // Adjust cash drawer for deleted purchase invoice
-                app(\App\Services\CashDrawerService::class)->handlePurchaseInvoiceDeletion(
-                    $purchaseInvoice,
-                    Auth::user()
-                );
+                    if (\Illuminate\Support\Facades\Schema::hasTable('supplier_ledgers')) {
+                        \App\Models\SupplierLedger::where('purchase_invoice_id', $purchaseInvoice->id)->delete();
+                    }
 
-                // Adjust financial accounts for deleted purchase invoice (refund deposited back)
-                $delPaid = (float)($purchaseInvoice->total_paid ?? 0);
-                if (($purchaseInvoice->invoice_type ?? 'debit') === 'debit' && $delPaid <= 0) {
-                    $delPaid = (float)$purchaseInvoice->total_amount;
-                }
-                if ($delPaid > 0) {
-                    $acc = app(\App\Services\AccountService::class)->resolveAccount($purchaseInvoice->account_id, $purchaseInvoice->payment_method ?? 'cash');
-                    app(\App\Services\AccountService::class)->deposit(
-                        $acc,
-                        $delPaid,
-                        'purchase_invoice_deletion',
-                        $purchaseInvoice->id,
-                        "Refund for deleted purchase invoice #{$purchaseInvoice->posted_number}",
+                    // Adjust cash drawer for deleted purchase invoice
+                    app(\App\Services\CashDrawerService::class)->handlePurchaseInvoiceDeletion(
+                        $purchaseInvoice,
                         Auth::user()
                     );
+
+                    // Adjust financial accounts for deleted purchase invoice (refund deposited back)
+                    $delPaid = (float)($purchaseInvoice->total_paid ?? 0);
+                    if (($purchaseInvoice->invoice_type ?? 'debit') === 'debit' && $delPaid <= 0) {
+                        $delPaid = (float)$purchaseInvoice->total_amount;
+                    }
+                    if ($delPaid > 0) {
+                        app(\App\Services\AccountService::class)->refundPurchaseInvoice(
+                            $purchaseInvoice,
+                            $delPaid,
+                            'purchase_invoice_deletion',
+                            "Refund for deleted purchase invoice #{$purchaseInvoice->posted_number}",
+                            Auth::user()
+                        );
+                    }
                 }
 
                 $purchaseInvoice->items()->delete();
                 $purchaseInvoice->delete();
                 if ($order) app(PurchaseOrderReceiving::class)->sync($order);
 
-                $this->recalcProductsByIds($affectedIds);
+                if ($purchaseInvoice->status !== 'reversed') {
+                    $this->recalcProductsByIds($affectedIds);
+                }
 
                 return response()->json(['message' => 'Invoice and related data deleted successfully']);
             });
@@ -726,10 +815,12 @@ class PurchaseInvoiceController extends Controller
             if ($order) $purchaseInvoice->refresh();
             $purchaseInvoice->load('items');
 
+            $this->validatePurchaseReversalStock($purchaseInvoice);
+
             $affectedIds = $purchaseInvoice->items->pluck('product_id')->unique()->all();
 
             foreach ($purchaseInvoice->items as $item) {
-                $this->revertItem($item, true, true);
+                $this->revertItem($item, false, false);
             }
 
             if ($order) {
@@ -754,6 +845,10 @@ class PurchaseInvoiceController extends Controller
             $purchaseInvoice->reversal_reason = $validated['reason'];
             $purchaseInvoice->save();
 
+            if ($order) {
+                app(\App\Services\PurchaseOrderReceiving::class)->sync($order);
+            }
+
             // Adjust cash drawer for reversed purchase invoice (supplier refund)
             app(\App\Services\CashDrawerService::class)->handlePurchaseInvoiceReversal(
                 $purchaseInvoice,
@@ -767,12 +862,10 @@ class PurchaseInvoiceController extends Controller
                 $revPaid = (float)$purchaseInvoice->total_amount;
             }
             if ($revPaid > 0) {
-                $acc = app(\App\Services\AccountService::class)->resolveAccount($purchaseInvoice->account_id, $purchaseInvoice->payment_method ?? 'cash');
-                app(\App\Services\AccountService::class)->deposit(
-                    $acc,
+                app(\App\Services\AccountService::class)->refundPurchaseInvoice(
+                    $purchaseInvoice,
                     $revPaid,
                     'purchase_invoice_reversal',
-                    $purchaseInvoice->id,
                     "Reversal refund for Purchase Invoice #{$purchaseInvoice->posted_number}",
                     $request->user()
                 );

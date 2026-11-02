@@ -21,7 +21,27 @@ export function AuthProvider({ children }) {
   };
 
   const [user, setUser] = useState(getStoredUser());
-  const token = localStorage.getItem("token");
+  const [token, setToken] = useState(() => localStorage.getItem("token"));
+
+  useEffect(() => {
+    const handleStorageChange = (event) => {
+      if (event.key === "token" || event.key === "user" || event.key === null) {
+        const nextToken = localStorage.getItem("token");
+        const nextUser = getStoredUser();
+        setToken(nextToken);
+        setUser(nextUser);
+        if (nextToken) {
+          axios.defaults.headers.common["Authorization"] = `Bearer ${nextToken}`;
+        } else {
+          delete axios.defaults.headers.common["Authorization"];
+          clearApiCache();
+          invalidatePermissionsCache();
+        }
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
 
   useEffect(() => {
     if (token && !user) {
@@ -35,6 +55,7 @@ export function AuthProvider({ children }) {
       .catch(() => {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
+        setToken(null);
       });
     }
   }, [token, user]);
@@ -49,6 +70,7 @@ export function AuthProvider({ children }) {
     } catch {
       /* ignore storage errors */
     }
+    setToken(tokenValue);
     setUser(userData);
     axios.defaults.headers.common["Authorization"] = `Bearer ${tokenValue}`;
 
@@ -80,6 +102,7 @@ export function AuthProvider({ children }) {
       /* ignore storage errors */
     }
 
+    setToken(null);
     setUser(null);
     delete axios.defaults.headers.common["Authorization"];
   }, []);

@@ -59,11 +59,13 @@ class RolesAndPermissionsSeeder extends Seeder
             'barcode-pos.view', 'barcode-pos.create',
             'batch-expiry.view', 'batch-expiry.update',
 
-            // Financial Accounts, Cash Drawer, Expenses, Payments & POS Overrides
-            'account.view', 'account.create', 'account.update', 'account.transfer', 'account.adjust',
+            // Financial Accounts, Cash Drawer, Expenses, Payments, HR & POS Overrides
+            'account.view', 'account.create', 'account.update', 'account.delete', 'account.transfer', 'account.adjust',
             'cash-drawer.view', 'cash-drawer.open', 'cash-drawer.transaction', 'cash-drawer.close',
             'expense.view', 'expense.create', 'expense.update', 'expense.delete',
-            'payment.view', 'payment.create', 'payment.delete',
+            'payment.view', 'payment.create', 'payment.update', 'payment.delete',
+            'hr.view', 'hr.manage',
+            'storage-location.view', 'tax.view', 'report.tax-return.view', 'report.tax-return.export',
             'stocktake.view', 'stocktake.create', 'stocktake.update', 'stocktake.delete', 'stocktake.finalize',
             'sale-invoice.credit-override', 'sale-invoice.discount-override', 'sale-invoice.expired-override',
         ];

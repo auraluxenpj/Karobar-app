@@ -39,7 +39,7 @@ class SaleReturnController extends Controller
 
         $batch = null;
         if ($batchNo !== '') {
-            $batchQuery = Batch::where('product_id', $productId)
+            $batchQuery = Batch::lockForUpdate()->where('product_id', $productId)
                 ->where('batch_number', $batchNo);
             if ($expiry !== '') {
                 $cleanExpiry = substr($expiry, 0, 10);
@@ -50,7 +50,7 @@ class SaleReturnController extends Controller
             }
             $batch = $batchQuery->first();
             if (!$batch) {
-                $batch = Batch::where('product_id', $productId)
+                $batch = Batch::lockForUpdate()->where('product_id', $productId)
                     ->where('batch_number', $batchNo)
                     ->first();
             }
@@ -59,16 +59,24 @@ class SaleReturnController extends Controller
         if ($batch) {
             $before = $this->i($batch->quantity);
             $after  = $before + $deltaUnits;
-            if ($after < 0) $after = 0;                 // never below zero
+            if ($after < 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => ["Cannot revert or delete sale return because returned stock in batch {$batch->batch_number} has already been sold or consumed."],
+                ]);
+            }
             $actualApplied = $after - $before;          // what really changed
             $batch->quantity = $after;
             $batch->save();
         }
 
-        if ($product = Product::find($productId)) {
+        if ($product = Product::lockForUpdate()->find($productId)) {
             $pBefore = $this->i($product->quantity);
             $pAfter  = $pBefore + $actualApplied;
-            if ($pAfter < 0) $pAfter = 0;
+            if ($pAfter < 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'items' => ["Cannot revert or delete sale return because returned stock for {$product->name} has already been sold or consumed."],
+                ]);
+            }
             $product->quantity = $pAfter;
             
             // If stock becomes zero, reset average price and margins
@@ -227,20 +235,23 @@ class SaleReturnController extends Controller
             $next = $last ? ($last->id + 1) : 1;
             $posted = 'SLRET-' . str_pad((string)$next, 4, '0', STR_PAD_LEFT);
 
-            $sr = SaleReturn::create([
+            $createPayload = [
                 'user_id'            => $userId,
                 'customer_id'        => $data['customer_id'],
                 'sale_invoice_id'    => $data['sale_invoice_id'] ?? null,
                 'posted_number'      => $posted, // assigned on save
                 'date'               => $data['date'],
-                'remarks'            => $data['remarks'] ?? null,
                 'gross_total'        => $this->f($data['gross_total'] ?? 0),
                 'discount_percentage'=> $this->f($data['discount_percentage'] ?? 0),
                 'discount_amount'    => $this->f($data['discount_amount'] ?? 0),
                 'tax_percentage'     => $this->f($data['tax_percentage'] ?? 0),
                 'tax_amount'         => $this->f($data['tax_amount'] ?? 0),
                 'total'              => $this->f($data['total'] ?? 0),
-            ]);
+            ];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('sale_returns', 'remarks')) {
+                $createPayload['remarks'] = $data['remarks'] ?? null;
+            }
+            $sr = SaleReturn::create($createPayload);
 
             $this->createItemsAndIncrease($sr, $data['items']);
 
@@ -321,20 +332,23 @@ class SaleReturnController extends Controller
 
             // Replace items
             $saleReturn->items()->delete();
-            $saleReturn->update([
+            $updatePayload = [
                 'user_id'            => $userId,
                 'customer_id'         => $data['customer_id'],
                 'sale_invoice_id'     => $data['sale_invoice_id'] ?? null,
                 'posted_number'       => $data['posted_number'],
                 'date'                => $data['date'],
-                'remarks'             => $data['remarks'] ?? null,
                 'gross_total'         => $this->f($data['gross_total'] ?? 0),
                 'discount_percentage' => $this->f($data['discount_percentage'] ?? 0),
                 'discount_amount'     => $this->f($data['discount_amount'] ?? 0),
                 'tax_percentage'      => $this->f($data['tax_percentage'] ?? 0),
                 'tax_amount'          => $this->f($data['tax_amount'] ?? 0),
                 'total'               => $this->f($data['total'] ?? 0),
-            ]);
+            ];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('sale_returns', 'remarks')) {
+                $updatePayload['remarks'] = $data['remarks'] ?? null;
+            }
+            $saleReturn->update($updatePayload);
 
             $this->createItemsAndIncrease($saleReturn, $data['items'], $originalItems);
 

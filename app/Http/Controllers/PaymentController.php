@@ -318,7 +318,7 @@ class PaymentController extends Controller
     public function updateChequeStatus(Request $request, int $id): JsonResponse
     {
         $payment = Payment::findOrFail($id);
-        $this->authorize('create', Payment::class);
+        $this->authorize('allocate', $payment);
 
         if (!$request->has('status') && $request->has('cheque_status')) {
             $request->merge(['status' => $request->input('cheque_status')]);

@@ -367,17 +367,24 @@ class BrandController extends Controller
             $out = fopen('php://output', 'w');
             fprintf($out, chr(0xEF) . chr(0xBB) . chr(0xBF)); // BOM
             fputcsv($out, ['name', 'expiry_return_policy', 'expiry_return_months', 'expiry_return_days', 'expiry_return_notes', 'image']);
+            $sanitizeCsv = static function ($val) {
+                $str = (string) ($val ?? '');
+                if ($str !== '' && in_array($str[0], ['=', '+', '-', '@', "\t", "\r"], true) && !preg_match('/^[+-]?\d+(\.\d+)?$/', $str)) {
+                    return "'" . $str;
+                }
+                return $str;
+            };
             Brand::select('name', 'expiry_return_policy', 'expiry_return_months', 'expiry_return_days', 'expiry_return_notes', 'image')
                 ->orderBy('name')
-                ->chunk(1000, function ($chunk) use ($out) {
+                ->chunk(1000, function ($chunk) use ($out, $sanitizeCsv) {
                     foreach ($chunk as $b) {
                         fputcsv($out, [
-                            (string) ($b->name ?? ''),
-                            (string) ($b->expiry_return_policy ?? 'before_expiry'),
+                            $sanitizeCsv($b->name ?? ''),
+                            $sanitizeCsv($b->expiry_return_policy ?? 'before_expiry'),
                             (string) ($b->expiry_return_months ?? 3),
                             (string) ($b->expiry_return_days ?? 90),
-                            (string) ($b->expiry_return_notes ?? ''),
-                            (string) ($b->image ?? ''),
+                            $sanitizeCsv($b->expiry_return_notes ?? ''),
+                            $sanitizeCsv($b->image ?? ''),
                         ]);
                     }
                 });

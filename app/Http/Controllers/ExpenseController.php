@@ -109,7 +109,6 @@ class ExpenseController extends Controller
             'payee'               => ['nullable', 'string', 'max:255'],
             'description'         => ['nullable', 'string', 'max:1000'],
             'receipt'             => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
-            'receipt_path'        => ['nullable', 'string', 'max:500'],
             'is_recurring'        => ['nullable', 'boolean'],
             'recurring_frequency' => ['nullable', 'required_if:is_recurring,true', 'string', 'in:weekly,monthly,yearly'],
         ]);
@@ -164,7 +163,6 @@ class ExpenseController extends Controller
             'description'         => ['nullable', 'string', 'max:1000'],
             'receipt'             => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
             'remove_receipt'      => ['nullable', 'boolean'],
-            'receipt_path'        => ['nullable', 'string', 'max:500'],
             'is_recurring'        => ['nullable', 'boolean'],
             'recurring_frequency' => ['nullable', 'required_if:is_recurring,true', 'string', 'in:weekly,monthly,yearly'],
         ]);
@@ -281,11 +279,17 @@ class ExpenseController extends Controller
     {
         $this->authorizeExpenseAction('expense.view');
 
-        if (!$expense->receipt_path || !Storage::disk('public')->exists($expense->receipt_path)) {
+        $path = ltrim((string) ($expense->receipt_path ?? ''), '/\\');
+        if (
+            $path === ''
+            || !str_starts_with($path, 'expense-receipts/')
+            || str_contains($path, '..')
+            || !Storage::disk('public')->exists($path)
+        ) {
             abort(404, 'Receipt attachment not found.');
         }
 
-        return Storage::disk('public')->response($expense->receipt_path);
+        return Storage::disk('public')->response($path);
     }
 }
 

@@ -51,12 +51,18 @@ class CustomerLedger extends Model
             return 0.0;
         }
 
-        $invAgg = DB::table('customer_ledgers')
-            ->where('customer_id', $customerId)
-            ->whereIn('entry_type', ['invoice', 'manual'])
+        $invAgg = DB::table('customer_ledgers as cl')
+            ->leftJoin('sale_invoices as si', 'si.id', '=', 'cl.sale_invoice_id')
+            ->where('cl.customer_id', $customerId)
+            ->whereIn('cl.entry_type', ['invoice', 'manual'])
+            ->where(function ($q) {
+                $q->whereNull('cl.sale_invoice_id')
+                  ->orWhereNull('si.status')
+                  ->orWhere('si.status', '!=', 'reversed');
+            })
             ->selectRaw('
-                COALESCE(SUM(COALESCE(invoice_total, 0)), 0) as total_invoiced,
-                COALESCE(SUM(CASE WHEN COALESCE(total_received, 0) < COALESCE(invoice_total, 0) THEN COALESCE(total_received, 0) ELSE COALESCE(invoice_total, 0) END), 0) as received_on_inv
+                COALESCE(SUM(COALESCE(cl.invoice_total, 0)), 0) as total_invoiced,
+                COALESCE(SUM(CASE WHEN COALESCE(cl.total_received, 0) < COALESCE(cl.invoice_total, 0) THEN COALESCE(cl.total_received, 0) ELSE COALESCE(cl.invoice_total, 0) END), 0) as received_on_inv
             ')
             ->first();
 
@@ -82,16 +88,22 @@ class CustomerLedger extends Model
     {
         $walkInIds = Customer::walkInIds();
 
-        $invRows = DB::table('customer_ledgers')
-            ->whereNotNull('customer_id')
-            ->when(!empty($walkInIds), fn ($q) => $q->whereNotIn('customer_id', $walkInIds))
-            ->whereIn('entry_type', ['invoice', 'manual'])
+        $invRows = DB::table('customer_ledgers as cl')
+            ->leftJoin('sale_invoices as si', 'si.id', '=', 'cl.sale_invoice_id')
+            ->whereNotNull('cl.customer_id')
+            ->when(!empty($walkInIds), fn ($q) => $q->whereNotIn('cl.customer_id', $walkInIds))
+            ->whereIn('cl.entry_type', ['invoice', 'manual'])
+            ->where(function ($q) {
+                $q->whereNull('cl.sale_invoice_id')
+                  ->orWhereNull('si.status')
+                  ->orWhere('si.status', '!=', 'reversed');
+            })
             ->selectRaw('
-                customer_id,
-                SUM(COALESCE(invoice_total, 0)) as total_inv,
-                SUM(CASE WHEN COALESCE(total_received, 0) < COALESCE(invoice_total, 0) THEN COALESCE(total_received, 0) ELSE COALESCE(invoice_total, 0) END) as received_on_inv
+                cl.customer_id,
+                SUM(COALESCE(cl.invoice_total, 0)) as total_inv,
+                SUM(CASE WHEN COALESCE(cl.total_received, 0) < COALESCE(cl.invoice_total, 0) THEN COALESCE(cl.total_received, 0) ELSE COALESCE(cl.invoice_total, 0) END) as received_on_inv
             ')
-            ->groupBy('customer_id')
+            ->groupBy('cl.customer_id')
             ->get()
             ->keyBy('customer_id');
 

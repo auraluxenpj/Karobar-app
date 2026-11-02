@@ -292,27 +292,27 @@ class AccountingService
         // 3. Accounts Payable (Supplier Net Balances)
         $totalPayables = 0.0;
         if (Schema::hasTable('supplier_ledgers')) {
-            $invRows = DB::table('supplier_ledgers')
-                ->whereIn('entry_type', ['invoice', 'manual'])
-                ->selectRaw('supplier_id, SUM(COALESCE(invoice_total, 0)) as total_inv, SUM(CASE WHEN COALESCE(total_paid, 0) < COALESCE(invoice_total, 0) THEN COALESCE(total_paid, 0) ELSE COALESCE(invoice_total, 0) END) as paid_on_inv')
-                ->groupBy('supplier_id')
-                ->get()
-                ->keyBy('supplier_id');
-
-            $payRows = DB::table('supplier_ledgers')
-                ->where('entry_type', 'payment')
-                ->selectRaw('supplier_id, SUM(COALESCE(debited_amount, 0)) as total_debited')
-                ->groupBy('supplier_id')
-                ->get()
-                ->keyBy('supplier_id');
-
-            $allSupIds = $invRows->keys()->merge($payRows->keys())->unique();
-            foreach ($allSupIds as $sid) {
-                $inv = $invRows->get($sid);
-                $pay = $payRows->get($sid);
-                $net = (($inv->total_inv ?? 0) - ($inv->paid_on_inv ?? 0)) - ($pay->total_debited ?? 0);
-                if ($net > 0) {
-                    $totalPayables += $net;
+            $ledgerSupIds = DB::table('supplier_ledgers')
+                ->whereNotNull('supplier_id')
+                ->distinct()
+                ->pluck('supplier_id')
+                ->all();
+            $creditInvSupIds = Schema::hasTable('purchase_invoices')
+                ? DB::table('purchase_invoices')
+                    ->where('invoice_type', 'credit')
+                    ->whereNotNull('supplier_id')
+                    ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'))
+                    ->distinct()
+                    ->pluck('supplier_id')
+                    ->all()
+                : [];
+            $allSupIds = array_values(array_unique(array_merge($ledgerSupIds, $creditInvSupIds)));
+            if (!empty($allSupIds)) {
+                $netBalances = \App\Models\SupplierLedger::getBulkSupplierNetBalances($allSupIds);
+                foreach ($netBalances as $net) {
+                    if ($net > 0) {
+                        $totalPayables += $net;
+                    }
                 }
             }
         }
@@ -371,6 +371,10 @@ class AccountingService
 
         $cumulativePurchaseReturnTax = (float) DB::table('purchase_returns')
             ->where(DB::raw('DATE(date)'), '<=', $to)
+            ->sum(DB::raw('COALESCE(tax_amount, 0)'));
+
+        $periodPurchaseReturnTax = (float) DB::table('purchase_returns')
+            ->whereBetween(DB::raw('DATE(date)'), [$from, $to])
             ->sum(DB::raw('COALESCE(tax_amount, 0)'));
 
         // 7. Period COGS
@@ -453,7 +457,7 @@ class AccountingService
             'period_shrinkage'    => $periodShrinkage,
             'period_expenses'     => $periodExpenses,
             'period_output_tax'   => round((float) ($periodSales->tax_amount ?? 0) - (float) ($periodSaleReturns->tax_amount ?? 0), 2),
-            'period_input_tax'    => round((float) ($periodPurchases->tax_amount ?? 0), 2),
+            'period_input_tax'    => round((float) ($periodPurchases->tax_amount ?? 0) - $periodPurchaseReturnTax, 2),
         ];
     }
 

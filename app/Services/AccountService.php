@@ -524,9 +524,81 @@ class AccountService
                 }
             }
 
-            $acc = $this->resolveAccount($invoice->account_id, $invoice->payment_method ?? 'cash');
-            if ($acc) {
-                $this->withdraw($acc, $revAmount, $refType, $invoice->id, $descriptionPrefix, $user);
+            if ($invoice->account_id !== null) {
+                $acc = $this->resolveAccount($invoice->account_id, $invoice->payment_method ?? 'cash');
+                if ($acc) {
+                    $this->withdraw($acc, $revAmount, $refType, $invoice->id, $descriptionPrefix, $user);
+                }
+            }
+        });
+    }
+
+    /**
+     * Refund direct payment made on a purchase invoice back into its exact withdrawal account(s).
+     */
+    public function refundPurchaseInvoice(
+        $invoice,
+        float $revAmount,
+        string $refType,
+        string $descriptionPrefix,
+        ?User $user = null
+    ): void {
+        if (!Schema::hasTable('accounts') || $revAmount <= 0) {
+            return;
+        }
+
+        DB::transaction(function () use ($invoice, $revAmount, $refType, $descriptionPrefix, $user) {
+            $txns = AccountTransaction::query()
+                ->whereIn('reference_type', ['purchase_invoice', 'purchase_invoice_update'])
+                ->where('reference_id', $invoice->id)
+                ->get();
+
+            if ($txns->isNotEmpty()) {
+                $netWithdrawnByAccount = [];
+                foreach ($txns as $txn) {
+                    $accId = (int) $txn->account_id;
+                    $amt = (float) $txn->amount;
+                    $delta = in_array($txn->type, ['withdrawal', 'transfer_out'], true) ? $amt : -$amt;
+                    $netWithdrawnByAccount[$accId] = round(($netWithdrawnByAccount[$accId] ?? 0.0) + $delta, 2);
+                }
+
+                $positiveLegs = array_filter($netWithdrawnByAccount, fn ($v) => $v > 0.001);
+                if (!empty($positiveLegs)) {
+                    $remainingToRefund = round($revAmount, 2);
+                    foreach ($positiveLegs as $accId => $legNet) {
+                        if ($remainingToRefund <= 0.001) {
+                            break;
+                        }
+                        $refundLeg = round(min($remainingToRefund, $legNet), 2);
+                        $acc = Account::find($accId);
+                        if ($acc && $refundLeg > 0) {
+                            $this->deposit(
+                                $acc,
+                                $refundLeg,
+                                $refType,
+                                $invoice->id,
+                                "{$descriptionPrefix} ({$acc->name})",
+                                $user
+                            );
+                            $remainingToRefund = round($remainingToRefund - $refundLeg, 2);
+                        }
+                    }
+
+                    if ($remainingToRefund > 0.001 && $invoice->account_id !== null) {
+                        $fallbackAcc = $this->resolveAccount($invoice->account_id, $invoice->payment_method ?? 'cash');
+                        if ($fallbackAcc) {
+                            $this->deposit($fallbackAcc, $remainingToRefund, $refType, $invoice->id, $descriptionPrefix, $user);
+                        }
+                    }
+                }
+                return;
+            }
+
+            if ($invoice->account_id !== null) {
+                $acc = $this->resolveAccount($invoice->account_id, $invoice->payment_method ?? 'cash');
+                if ($acc) {
+                    $this->deposit($acc, $revAmount, $refType, $invoice->id, $descriptionPrefix, $user);
+                }
             }
         });
     }

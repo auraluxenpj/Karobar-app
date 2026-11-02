@@ -247,10 +247,17 @@ class BarcodeController extends Controller
         ->withCount('items')
         ->withSum('items', 'ordered_quantity');
 
+        $user = $request->user();
+        $canViewPurchaseCosts = $user && ($user->hasRole(['Admin', 'admin', 'super-admin']) || $user->can('purchase-order.view'));
+
         if (!empty($id)) {
             $po = $query->find($id);
             if (!$po) {
                 return response()->json(['message' => 'Purchase order not found'], 404);
+            }
+            if (!$canViewPurchaseCosts) {
+                $po->makeHidden(['subtotal', 'tax', 'total', 'total_amount']);
+                $po->items->each(fn ($it) => $it->makeHidden(['unit_price', 'pack_purchase_price', 'unit_purchase_price', 'line_total', 'total']));
             }
             return response()->json(['purchase_order' => $po]);
         }
@@ -276,6 +283,12 @@ class BarcodeController extends Controller
         }
 
         $orders = $query->orderByDesc('id')->limit($limit)->get();
+        if (!$canViewPurchaseCosts) {
+            $orders->each(function ($po) {
+                $po->makeHidden(['subtotal', 'tax', 'total', 'total_amount']);
+                $po->items->each(fn ($it) => $it->makeHidden(['unit_price', 'pack_purchase_price', 'unit_purchase_price', 'line_total', 'total']));
+            });
+        }
 
         return response()->json([
             'purchase_orders' => $orders,
@@ -294,6 +307,8 @@ class BarcodeController extends Controller
         $brandId = $request->input('brand_id');
         $search = trim((string) $request->input('search', ''));
         $limit = max(1, min((int) $request->input('limit', 50), 100));
+        $user = $request->user();
+        $canViewInvoiceCosts = $user && ($user->hasRole(['Admin', 'admin', 'super-admin']) || $user->can('purchase-invoice.view'));
 
         $query = \App\Models\PurchaseInvoice::with([
             'supplier:id,name',
@@ -333,6 +348,10 @@ class BarcodeController extends Controller
             if (!$pi) {
                 return response()->json(['message' => 'Purchase invoice not found'], 404);
             }
+            if (!$canViewInvoiceCosts) {
+                $pi->makeHidden(['total_amount', 'total_paid', 'tax_amount', 'discount_amount']);
+                $pi->items->each(fn ($it) => $it->makeHidden(['pack_purchase_price', 'unit_purchase_price', 'sub_total', 'item_discount_percentage', 'margin']));
+            }
             return response()->json(['purchase_invoice' => $pi]);
         }
 
@@ -357,6 +376,12 @@ class BarcodeController extends Controller
         }
 
         $invoices = $query->orderByDesc('id')->limit($limit)->get();
+        if (!$canViewInvoiceCosts) {
+            $invoices->each(function ($pi) {
+                $pi->makeHidden(['total_amount', 'total_paid', 'tax_amount', 'discount_amount']);
+                $pi->items->each(fn ($it) => $it->makeHidden(['pack_purchase_price', 'unit_purchase_price', 'sub_total', 'item_discount_percentage', 'margin']));
+            });
+        }
 
         return response()->json([
             'purchase_invoices' => $invoices,

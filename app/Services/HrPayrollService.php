@@ -160,6 +160,9 @@ class HrPayrollService
                 ? '(COALESCE(sii.quantity, 0) + COALESCE(sii.bonus, 0))'
                 : 'COALESCE(sii.quantity, 0)';
             $cogsAccum = 0.0;
+            $returnedNetAccum = 0.0;
+            $returnedGrossAccum = 0.0;
+            $returnedCogsAccum = 0.0;
             foreach (array_chunk($invoiceIds, 500) as $chunkIds) {
                 $cogsRow = DB::table('sale_invoice_items as sii')
                     ->leftJoin('products as p', 'p.id', '=', 'sii.product_id')
@@ -167,8 +170,29 @@ class HrPayrollService
                     ->selectRaw("COALESCE(SUM(COALESCE(sii.cost_price_snapshot, p.avg_price, p.unit_purchase_price, 0) * {$saleUnitsExpr}), 0) as total_cogs")
                     ->first();
                 $cogsAccum += (float) ($cogsRow->total_cogs ?? 0);
+
+                if (Schema::hasTable('sale_returns')) {
+                    $retRow = DB::table('sale_returns as sr')
+                        ->whereIn('sr.sale_invoice_id', $chunkIds)
+                        ->selectRaw('COALESCE(SUM(COALESCE(sr.gross_total, sr.total, 0)), 0) as gross_ret, COALESCE(SUM(MAX(0, COALESCE(sr.total, 0) - COALESCE(sr.tax_amount, 0))), 0) as net_ret')
+                        ->first();
+                    $returnedGrossAccum += (float) ($retRow->gross_ret ?? 0);
+                    $returnedNetAccum += (float) ($retRow->net_ret ?? 0);
+
+                    if (Schema::hasTable('sale_return_items')) {
+                        $retCogsRow = DB::table('sale_return_items as sri')
+                            ->join('sale_returns as sr', 'sr.id', '=', 'sri.sale_return_id')
+                            ->leftJoin('products as p', 'p.id', '=', 'sri.product_id')
+                            ->whereIn('sr.sale_invoice_id', $chunkIds)
+                            ->selectRaw('COALESCE(SUM(COALESCE(sri.cost_price_snapshot, p.avg_price, p.unit_purchase_price, 0) * COALESCE(sri.unit_return_quantity, 0)), 0) as ret_cogs')
+                            ->first();
+                        $returnedCogsAccum += (float) ($retCogsRow->ret_cogs ?? 0);
+                    }
+                }
             }
-            $cogsTotal = round($cogsAccum, 2);
+            $grossSales = round(max(0.0, $grossSales - $returnedGrossAccum), 2);
+            $netSales = round(max(0.0, $netSales - $returnedNetAccum), 2);
+            $cogsTotal = round(max(0.0, $cogsAccum - $returnedCogsAccum), 2);
         }
 
         $grossProfit = round(max(0.0, $netSales - $cogsTotal), 2);
@@ -477,8 +501,13 @@ class HrPayrollService
                 );
 
                 $preAdvanceNet = max(0.0, $grossEarnings - ($absenceDeduction + $lateOrFineDeduction + $otherDeduction));
+                $scheduledElsewhere = (float) PayrollItem::where('employee_id', $employee->id)
+                    ->where('payroll_run_id', '!=', $run->id)
+                    ->where('payment_status', '!=', 'paid')
+                    ->sum('advance_deduction');
+                $availableAdvanceBalance = max(0.0, (float) ($employee->advance_balance ?? 0) - $scheduledElsewhere);
                 $advanceDeduction = $autoDeductAdvances
-                    ? round(min((float) ($employee->advance_balance ?? 0), $preAdvanceNet), 2)
+                    ? round(min($availableAdvanceBalance, $preAdvanceNet), 2)
                     : 0.0;
 
                 $totalDeductions = round(

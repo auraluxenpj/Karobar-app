@@ -154,6 +154,23 @@ class FlushWalkInCreditCommand extends Command
             }
 
             $ledgerRowsDeletedCount = 0;
+            if (!$dryRun && !empty($flushedInvoiceIds) && Schema::hasTable('payment_allocations')) {
+                $allocs = \App\Models\PaymentAllocation::where('invoice_type', 'sale_invoice')
+                    ->whereIn('invoice_id', $flushedInvoiceIds)
+                    ->get();
+                $paymentIds = $allocs->pluck('payment_id')->filter()->unique()->all();
+                \App\Models\PaymentAllocation::where('invoice_type', 'sale_invoice')
+                    ->whereIn('invoice_id', $flushedInvoiceIds)
+                    ->delete();
+                if (!empty($paymentIds) && Schema::hasTable('payments')) {
+                    foreach (\App\Models\Payment::whereIn('id', $paymentIds)->get() as $pay) {
+                        $newAlloc = (float) \App\Models\PaymentAllocation::where('payment_id', $pay->id)->sum('amount');
+                        $pay->allocated_amount = round($newAlloc, 2);
+                        $pay->unapplied_amount = round(max(0.0, (float) $pay->amount - $newAlloc), 2);
+                        $pay->save();
+                    }
+                }
+            }
             if (Schema::hasTable('customer_ledgers')) {
                 $ledgerQuery = CustomerLedger::query()
                     ->where(function ($q) use ($walkInIds, $flushedInvoiceIds) {

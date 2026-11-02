@@ -606,9 +606,18 @@ class ReportsController extends Controller
 
             // ===== Sale returns header sums (per day) =====
             // sale_returns has: date, total (also gross_total but we need total for NetSale)
-            // Note: Sale returns are not filtered by invoice_type as they are always linked to original invoices
-            $returns = DB::table('sale_returns as sr')
-                ->whereBetween('sr.date', [$fromDateStr, $toDateStr])
+            $returnsQuery = DB::table('sale_returns as sr')
+                ->leftJoin('sale_invoices as rsi', 'rsi.id', '=', 'sr.sale_invoice_id')
+                ->whereBetween('sr.date', [$fromDateStr, $toDateStr]);
+            if ($invoiceType !== 'all') {
+                $returnsQuery->where(function ($q) use ($invoiceType) {
+                    $q->where('rsi.invoice_type', $invoiceType);
+                    if ($invoiceType === 'debit') {
+                        $q->orWhereNull('sr.sale_invoice_id');
+                    }
+                });
+            }
+            $returns = $returnsQuery
                 ->selectRaw('DATE(sr.date) as sale_date')
                 ->selectRaw('SUM(COALESCE(sr.total, 0)) as sale_return')
                 ->groupBy('sale_date')
@@ -646,11 +655,20 @@ class ReportsController extends Controller
                 ->keyBy('sale_date');
 
             // ===== COGS reversed on returns (per day) =====
-            // Note: Returns are not filtered by invoice_type as they relate to original sale invoices
-            $cogsReturns = DB::table('sale_return_items as sri')
+            $cogsReturnsQuery = DB::table('sale_return_items as sri')
                 ->join('sale_returns as sr', 'sr.id', '=', 'sri.sale_return_id')
+                ->leftJoin('sale_invoices as rsi', 'rsi.id', '=', 'sr.sale_invoice_id')
                 ->join('products as p', 'p.id', '=', 'sri.product_id')
-                ->whereBetween('sr.date', [$fromDateStr, $toDateStr])
+                ->whereBetween('sr.date', [$fromDateStr, $toDateStr]);
+            if ($invoiceType !== 'all') {
+                $cogsReturnsQuery->where(function ($q) use ($invoiceType) {
+                    $q->where('rsi.invoice_type', $invoiceType);
+                    if ($invoiceType === 'debit') {
+                        $q->orWhereNull('sr.sale_invoice_id');
+                    }
+                });
+            }
+            $cogsReturns = $cogsReturnsQuery
                 ->selectRaw('DATE(sr.date) as sale_date')
                 ->selectRaw('SUM(COALESCE(sri.unit_return_quantity, 0) * COALESCE(sri.cost_price_snapshot, CASE WHEN p.avg_price IS NULL OR p.avg_price = 0 THEN COALESCE(p.unit_purchase_price, 0) ELSE p.avg_price END)) as cogs_returns')
                 ->selectRaw('SUM(CASE WHEN sri.cost_price_snapshot IS NULL THEN 1 ELSE 0 END) as estimated_items')
@@ -1419,9 +1437,10 @@ class ReportsController extends Controller
             $unitPurchasePrice = (float)($p->unit_purchase_price ?? 0);
             $unitSalePrice = (float)($p->unit_sale_price ?? 0);
             $avgPrice = (float)($p->avg_price ?? 0);
+            $effectiveCost = $avgPrice > 0 ? $avgPrice : ($unitPurchasePrice > 0 ? $unitPurchasePrice : ($packSize > 0 ? ($packPurchasePrice / $packSize) : 0));
 
             // Calculate values
-            $totalPurchaseValue = $quantity * $avgPrice; // At average cost
+            $totalPurchaseValue = $quantity * $effectiveCost; // At average cost (with unit/pack cost fallback)
             $totalSaleValue = $quantity * $unitSalePrice; // At retail price
 
             return [
@@ -1501,10 +1520,12 @@ class ReportsController extends Controller
                 $packSize = (int)($p->pack_size ?? 1);
                 $packPurchasePrice = (float)($p->pack_purchase_price ?? 0);
                 $packSalePrice = (float)($p->pack_sale_price ?? 0);
+                $unitPurchasePrice = (float)($p->unit_purchase_price ?? 0);
                 $avgPrice = (float)($p->avg_price ?? 0);
                 $unitSalePrice = (float)($p->unit_sale_price ?? 0);
+                $effectiveCost = $avgPrice > 0 ? $avgPrice : ($unitPurchasePrice > 0 ? $unitPurchasePrice : ($packSize > 0 ? ($packPurchasePrice / $packSize) : 0));
 
-                $rowTotalPurchase = round($quantity * $avgPrice, 2);
+                $rowTotalPurchase = round($quantity * $effectiveCost, 2);
                 $rowTotalSale = round($quantity * $unitSalePrice, 2);
 
                 $rows[] = [

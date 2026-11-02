@@ -15,8 +15,14 @@ class AuthServiceProvider extends ServiceProvider
     protected $policies = [
         \App\Models\BackupLog::class => \App\Policies\BackupPolicy::class,
         \App\Models\StocktakeSession::class => \App\Policies\StocktakePolicy::class,
+        \App\Authorizables\CostOfSaleReport::class => \App\Policies\CostOfSaleReportPolicy::class,
         \App\Authorizables\CurrentStockReport::class => \App\Policies\CurrentStockReportPolicy::class,
         \App\Authorizables\NearExpiryProductReport::class => \App\Policies\NearExpiryProductReportPolicy::class,
+        \App\Authorizables\ProductComprehensiveReport::class => \App\Policies\ProductComprehensiveReportPolicy::class,
+        \App\Authorizables\PurchaseDetailReport::class => \App\Policies\PurchaseDetailReportPolicy::class,
+        \App\Authorizables\PurchaseOrderForecast::class => \App\Policies\PurchaseOrderForecastPolicy::class,
+        \App\Authorizables\SaleDetailReport::class => \App\Policies\SaleDetailReportPolicy::class,
+        \App\Authorizables\StockAdjustmentReport::class => \App\Policies\StockAdjustmentReportPolicy::class,
     ];
 
     /**

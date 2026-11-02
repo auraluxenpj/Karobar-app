@@ -36,5 +36,12 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 /docs
+/docs/*
 /doc
 /guidelines
+/PROJECT_ARCHITECTURE.md
+/AUDIT_REPORT.md
+/FIX_PLAN.md
+/FIX_LOG.md
+/TEST_REPORT.md
+/SECURITY_REPORT.md

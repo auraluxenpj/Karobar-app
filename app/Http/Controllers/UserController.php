@@ -65,6 +65,44 @@ class UserController extends Controller
         }
     }
 
+    private function assertCanAssignRoles(Request $request, array $requestedRoles): void
+    {
+        $actor = $request->user();
+        if ($this->isSuperOrAdmin($actor) || empty($requestedRoles)) {
+            return;
+        }
+
+        $roles = \Spatie\Permission\Models\Role::with('permissions:id,name')
+            ->whereIn('name', $requestedRoles)
+            ->get();
+
+        $rolePermissions = $roles
+            ->flatMap(fn ($r) => $r->permissions->pluck('name'))
+            ->unique()
+            ->values()
+            ->all();
+
+        $this->assertCanGrantPermissions($request, $rolePermissions);
+    }
+
+    private function hasLinkedTransactions(User $user): bool
+    {
+        $db = \Illuminate\Support\Facades\DB::class;
+        $schema = \Illuminate\Support\Facades\Schema::class;
+
+        if ($schema::hasTable('sale_invoices') && $db::table('sale_invoices')->where('user_id', $user->id)->exists()) {
+            return true;
+        }
+        if ($schema::hasTable('sale_returns') && $db::table('sale_returns')->where('user_id', $user->id)->exists()) {
+            return true;
+        }
+        if ($schema::hasTable('cash_drawer_sessions') && $db::table('cash_drawer_sessions')->where('user_id', $user->id)->exists()) {
+            return true;
+        }
+
+        return false;
+    }
+
     private function isLastActiveAdmin(User $user): bool
     {
         if (!$this->isSuperOrAdmin($user)) {
@@ -135,6 +173,7 @@ class UserController extends Controller
         }
 
         $this->assertCanTouchAdminRoleOrUser($request, null, $data['roles'] ?? []);
+        $this->assertCanAssignRoles($request, $data['roles'] ?? []);
         $this->assertCanGrantPermissions($request, $data['permissions'] ?? []);
 
         $user = new User();
@@ -179,6 +218,9 @@ class UserController extends Controller
         }
 
         $this->assertCanTouchAdminRoleOrUser($request, $user, $data['roles'] ?? []);
+        if (array_key_exists('roles', $data)) {
+            $this->assertCanAssignRoles($request, $data['roles'] ?? []);
+        }
         if (array_key_exists('permissions', $data)) {
             $this->assertCanGrantPermissions($request, $data['permissions'] ?? []);
         }
@@ -231,6 +273,12 @@ class UserController extends Controller
             return response()->json(['message' => 'Cannot delete the last active Admin account.'], 422);
         }
 
+        if ($this->hasLinkedTransactions($user)) {
+            return response()->json([
+                'message' => 'Cannot delete user with existing sales, returns, or cash drawer history. Please deactivate the account instead.',
+            ], 422);
+        }
+
         $user->tokens()->delete();
         $user->delete();
         return response()->json(['message' => 'Deleted']);
@@ -246,6 +294,7 @@ class UserController extends Controller
             'roles.*' => ['string','exists:roles,name'],
         ]);
         $this->assertCanTouchAdminRoleOrUser($request, $user, $data['roles'] ?? []);
+        $this->assertCanAssignRoles($request, $data['roles'] ?? []);
 
         if ($this->isSuperOrAdmin($user) && !in_array('Admin', $data['roles'] ?? [], true)) {
             if ($request->user()->id === $user->id) {
@@ -294,6 +343,7 @@ class UserController extends Controller
         } elseif ($action === 'assign_role') {
             $this->authorizeUserAction($request, ['user.assign.roles', 'user.update']);
             $this->assertCanTouchAdminRoleOrUser($request, null, [$data['role']]);
+            $this->assertCanAssignRoles($request, [(string) $data['role']]);
         } else {
             $this->authorizeUserAction($request, ['user.update']);
         }
@@ -338,6 +388,10 @@ class UserController extends Controller
                 $target->syncRoles([$roleName]);
                 $processed++;
             } elseif ($action === 'delete') {
+                if ($this->hasLinkedTransactions($target)) {
+                    $skipped[] = "{$target->name} (has transaction history; deactivate instead)";
+                    continue;
+                }
                 if (\Illuminate\Support\Facades\Schema::hasTable('personal_access_tokens')) {
                     $target->tokens()->delete();
                 }

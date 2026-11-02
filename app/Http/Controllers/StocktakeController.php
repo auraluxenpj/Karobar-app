@@ -71,6 +71,8 @@ class StocktakeController extends Controller
                 foreach ($data['items'] as &$item) {
                     $item['system_qty'] = null;
                     $item['variance_qty'] = null;
+                    $item['variance_value'] = null;
+                    $item['unit_purchase_price'] = null;
                     $item['unit_cost'] = null;
                 }
                 unset($item);
@@ -202,10 +204,12 @@ class StocktakeController extends Controller
         );
         if ($session->is_blind && !$canReveal) {
             $items->getCollection()->transform(function (StocktakeItem $item) {
-                $arr                 = $item->toArray();
-                $arr['system_qty']   = null;
-                $arr['variance_qty'] = null;
-                $arr['unit_cost']    = null;
+                $arr                        = $item->toArray();
+                $arr['system_qty']          = null;
+                $arr['variance_qty']        = null;
+                $arr['variance_value']      = null;
+                $arr['unit_purchase_price'] = null;
+                $arr['unit_cost']           = null;
                 return $arr;
             });
         }
@@ -253,14 +257,30 @@ class StocktakeController extends Controller
             'discrepancy_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $updated = $this->service->recordCount(
-            $item,
-            (float) $data['counted_qty'],
-            $data['discrepancy_reason'] ?? null,
-            optional($request->user())->id,
-        );
+        try {
+            $updated = $this->service->recordCount(
+                $item,
+                (float) $data['counted_qty'],
+                $data['discrepancy_reason'] ?? null,
+                optional($request->user())->id,
+            );
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
-        return response()->json($updated->load('product:id,name,barcode,rack'));
+        $loaded = $updated->load('product:id,name,barcode,rack');
+        $canReveal = $request->user()?->can('finalize', $session) || $session->status !== 'in_progress';
+        if ($session->is_blind && !$canReveal) {
+            $arr                        = $loaded->toArray();
+            $arr['system_qty']          = null;
+            $arr['variance_qty']        = null;
+            $arr['variance_value']      = null;
+            $arr['unit_purchase_price'] = null;
+            $arr['unit_cost']           = null;
+            return response()->json($arr);
+        }
+
+        return response()->json($loaded);
     }
 
     // ===== Delete session (only draft or cancelled) =====

@@ -79,6 +79,34 @@ class SaleInvoiceController extends Controller
             $pBefore = $this->i($product->quantity);
             $pAfter  = $pBefore + $actualApplied;
             if ($pAfter < 0) throw \Illuminate\Validation\ValidationException::withMessages(['items' => 'Product has insufficient stock.']);
+
+            // If an unbatched sale reduces product stock below total batch stock, deduct excess from batches in FEFO order
+            if ($batchNo === '' && $deltaUnits < 0 && $matchingBatches->isEmpty()) {
+                $activeBatches = Batch::where('product_id', $productId)
+                    ->where('quantity', '>', 0)
+                    ->orderByRaw('CASE WHEN expiry_date IS NOT NULL AND expiry_date >= ? THEN 0 ELSE 1 END ASC', [now()->toDateString()])
+                    ->orderBy('expiry_date', 'asc')
+                    ->orderBy('id', 'asc')
+                    ->lockForUpdate()
+                    ->get();
+                $totalBatchQty = (int) $activeBatches->sum('quantity');
+                if ($totalBatchQty > $pAfter) {
+                    $excessBatchQty = $totalBatchQty - $pAfter;
+                    foreach ($activeBatches as $b) {
+                        if ($excessBatchQty <= 0) {
+                            break;
+                        }
+                        $bBefore = $this->i($b->quantity);
+                        $deduct = min($bBefore, $excessBatchQty);
+                        if ($deduct > 0) {
+                            $b->quantity = $bBefore - $deduct;
+                            $b->save();
+                            $excessBatchQty -= $deduct;
+                        }
+                    }
+                }
+            }
+
             $product->quantity = $pAfter;
             
             // If stock becomes zero, reset average price and margins
@@ -792,6 +820,10 @@ class SaleInvoiceController extends Controller
 
         $effectiveUpdateInvoiceType = $data['invoice_type'] ?? ($invoice->invoice_type ?? 'debit');
         $hasExplicitUpdateReceive = $request->has('total_receive') && $request->input('total_receive') !== null && $request->input('total_receive') !== '';
+        if (!empty($data['split_payments']) && !$hasExplicitUpdateReceive) {
+            $data['total_receive'] = round(collect($data['split_payments'])->sum(fn($leg) => (float)($leg['amount'] ?? 0)), 2);
+            $hasExplicitUpdateReceive = true;
+        }
         if ($effectiveUpdateInvoiceType === 'debit' && !$hasExplicitUpdateReceive) {
             if ($request->filled('cash_given') && is_numeric($request->input('cash_given'))) {
                 $data['total_receive'] = min((float) $data['total'], (float) $request->input('cash_given'));
@@ -805,6 +837,16 @@ class SaleInvoiceController extends Controller
 
         return DB::transaction(function () use ($invoice, $data, $request, $auditService, $beforeSnapshot, $dueDate) {
             $invoice = SaleInvoice::lockForUpdate()->findOrFail($invoice->id);
+            $allocatedOnInvoice = app(\App\Services\PaymentService::class)->getAllocatedAmountForInvoice('sale_invoice', (int) $invoice->id);
+            $oldInvoiceType = $invoice->invoice_type ?? 'debit';
+            $newInvoiceType = $data['invoice_type'] ?? $oldInvoiceType;
+
+            if ($allocatedOnInvoice > 0.009 && ($newInvoiceType !== 'credit' || (int) $data['customer_id'] !== (int) $invoice->customer_id)) {
+                throw ValidationException::withMessages([
+                    'invoice_type' => ['Cannot change customer or convert a credit invoice with active payment/credit allocations to cash/debit. Detach or reverse payments first.'],
+                ]);
+            }
+
             $originalItems = $invoice->items()->get();
             app(\App\Services\SaleStockAvailability::class)->validate(
                 $data['items'],
@@ -818,10 +860,8 @@ class SaleInvoiceController extends Controller
             $invoice->items()->delete();
 
             // Capture old cash state before update (excluding standalone PaymentAllocation amounts)
-            $allocatedOnInvoice = app(\App\Services\PaymentService::class)->getAllocatedAmountForInvoice('sale_invoice', (int) $invoice->id);
             $oldAccountId = $invoice->account_id;
             $oldPayMethod = $invoice->payment_method ?? 'cash';
-            $oldInvoiceType = $invoice->invoice_type ?? 'debit';
             $oldRawReceived = (float) ($invoice->total_receive ?? 0);
             if ($oldInvoiceType === 'debit' && $oldRawReceived <= 0) {
                 $oldRawReceived = (float) $invoice->total;
@@ -831,7 +871,6 @@ class SaleInvoiceController extends Controller
 
             // Store old invoice type and sale type before update
             $oldSaleType = $invoice->sale_type ?? 'retail';
-            $newInvoiceType = $data['invoice_type'] ?? $oldInvoiceType;
             $newSaleType = $data['sale_type'] ?? $oldSaleType;
 
             $submittedTotalReceive = round((float) ($data['total_receive'] ?? 0), 2);
@@ -915,7 +954,7 @@ class SaleInvoiceController extends Controller
                 $rawTotalRecv = (float) ($invoice->total_receive ?? 0);
                 $directRecv = max(0.0, round($rawTotalRecv - $allocatedOnInvoice, 2));
                 $recvOnInv = min($directRecv, $invTotal);
-                $excessRecv = max(0.0, round($directRecv - $invTotal, 2));
+                $excessRecv = max(0.0, round($directRecv - max(0.0, $invTotal - $allocatedOnInvoice), 2));
 
                 $ledger = new CustomerLedger();
                 $ledger->customer_id       = $data['customer_id'];
@@ -1080,85 +1119,92 @@ class SaleInvoiceController extends Controller
         $invoice = SaleInvoice::with(['items', 'customer'])->findOrFail($id);
         $this->authorize('delete', $invoice);
 
+        if (\App\Models\SaleReturn::where('sale_invoice_id', $invoice->id)->exists()) {
+            return response()->json([
+                'message' => 'Cannot delete this invoice because linked sale returns exist. Please delete the returns first.',
+            ], 422);
+        }
+
         $mode = strtolower(trim((string)($request->query('mode', $request->input('mode', 'none')))));
         if (!in_array($mode, ['none', 'credit', 'refund'], true)) {
             $mode = 'none';
         }
 
-        $invTotal = (float)($invoice->total ?? $invoice->grand_total ?? $invoice->gross_amount ?? 0);
-        $received = (float)($invoice->total_receive ?? $invoice->total_recieve ?? $invoice->received ?? 0);
-        $remaining = max($invTotal - $received, 0);
-
-        return DB::transaction(function () use ($invoice, $mode, $invTotal, $received, $remaining, $request) {
+        return DB::transaction(function () use ($invoice, $mode, $request) {
             $invoice = SaleInvoice::lockForUpdate()->findOrFail($invoice->id);
-            app(\App\Services\SaleStockAvailability::class)->validate([], $invoice->items()->get());
-            $this->revertItems($invoice);
 
-            // Only handle customer ledger entries for credit invoices
-            // Debit invoices (cash sales) are not tracked in customer ledger
-            $isCreditInvoice = ($invoice->invoice_type ?? 'debit') === 'credit';
+            if ($invoice->status !== 'reversed') {
+                app(\App\Services\SaleStockAvailability::class)->validate([], $invoice->items()->get());
+                $this->revertItems($invoice);
 
-            if ($isCreditInvoice) {
-                // Delete the original ledger entry and any excess payment for this invoice
-                CustomerLedger::where('sale_invoice_id', $invoice->id)->delete();
-                CustomerLedger::where('customer_id', $invoice->customer_id)
-                    ->where('payment_ref', 'Inv #' . $invoice->posted_number)
-                    ->where('entry_type', 'payment')
-                    ->delete();
+                // Unwind any Payment / Credit Note allocations FIRST so standalone payments
+                // and credit notes are restored to customer unapplied credit and not double-credited or refunded as cash
+                app(\App\Services\PaymentService::class)->detachInvoiceAllocations('sale_invoice', (int) $invoice->id, $request->user());
+                $invoice->refresh();
 
-                $customerId   = (int)$invoice->customer_id;
-                $postedNumber = $invoice->posted_number;
-                $entryDate    = $invoice->date ?? now()->toDateString();
-                $userId       = optional(Auth::user())->id;
+                $received = (float)($invoice->total_receive ?? $invoice->total_recieve ?? $invoice->received ?? 0);
 
-                // mode 'credit' = Store Credit (create negative entry to credit the customer for what they actually paid)
-                if ($mode === 'credit' && $received > 0) {
-                    $creditEntry = new CustomerLedger();
-                    $creditEntry->customer_id       = $customerId;
-                    $creditEntry->entry_type        = 'manual';
-                    $creditEntry->is_manual         = true;
-                    $creditEntry->entry_date        = $entryDate;
-                    $creditEntry->posted_number     = $postedNumber;
-                    $creditEntry->invoice_total     = -$received;
-                    $creditEntry->total_received    = 0;
-                    $creditEntry->balance_remaining = 0;
-                    $creditEntry->credited_amount   = 0;
-                    $creditEntry->payment_ref       = null;
-                    $creditEntry->sale_invoice_id   = null;
-                    $creditEntry->description       = 'Store credit for deleted invoice ' . $postedNumber;
-                    $creditEntry->created_by        = $userId;
-                    $creditEntry->save();
+                // Only handle customer ledger entries for credit invoices
+                // Debit invoices (cash sales) are not tracked in customer ledger
+                $isCreditInvoice = ($invoice->invoice_type ?? 'debit') === 'credit';
+
+                if ($isCreditInvoice) {
+                    // Delete the original ledger entry and any excess payment for this invoice
+                    CustomerLedger::where('sale_invoice_id', $invoice->id)->delete();
+                    CustomerLedger::where('customer_id', $invoice->customer_id)
+                        ->where('payment_ref', 'Inv #' . $invoice->posted_number)
+                        ->where('entry_type', 'payment')
+                        ->delete();
+
+                    $customerId   = (int)$invoice->customer_id;
+                    $postedNumber = $invoice->posted_number;
+                    $entryDate    = $invoice->date ?? now()->toDateString();
+                    $userId       = optional(Auth::user())->id;
+
+                    // mode 'credit' = Store Credit (create negative entry to credit the customer for direct tender paid on the invoice)
+                    if ($mode === 'credit' && $received > 0) {
+                        $creditEntry = new CustomerLedger();
+                        $creditEntry->customer_id       = $customerId;
+                        $creditEntry->entry_type        = 'manual';
+                        $creditEntry->is_manual         = true;
+                        $creditEntry->entry_date        = $entryDate;
+                        $creditEntry->posted_number     = $postedNumber;
+                        $creditEntry->invoice_total     = -$received;
+                        $creditEntry->total_received    = 0;
+                        $creditEntry->balance_remaining = 0;
+                        $creditEntry->credited_amount   = 0;
+                        $creditEntry->payment_ref       = null;
+                        $creditEntry->sale_invoice_id   = null;
+                        $creditEntry->description       = 'Store credit for deleted invoice ' . $postedNumber;
+                        $creditEntry->created_by        = $userId;
+                        $creditEntry->save();
+                    }
+
+                    // mode 'refund' / 'none' = Void & Refund (delete ledger entry and unwind cash/account receipt)
                 }
 
-                // mode 'refund' / 'none' = Void & Refund (delete ledger entry and unwind cash/account receipt)
-            }
+                // Adjust cash drawer for deleted invoice
+                app(\App\Services\CashDrawerService::class)->handleSaleInvoiceDeletion(
+                    $invoice,
+                    $mode,
+                    $request->user()
+                );
 
-            // Unwind any Payment / Credit Note allocations before deletion so standalone payments
-            // and credit notes are restored to customer unapplied credit and not refunded as cash
-            app(\App\Services\PaymentService::class)->detachInvoiceAllocations('sale_invoice', (int) $invoice->id, $request->user());
-            $invoice->refresh();
-
-            // Adjust cash drawer for deleted invoice
-            app(\App\Services\CashDrawerService::class)->handleSaleInvoiceDeletion(
-                $invoice,
-                $mode,
-                $request->user()
-            );
-
-            // Adjust financial accounts for deleted invoice unless retained as store credit
-            if ($mode !== 'credit') {
-                $delAmount = (float) ($invoice->total_receive ?? 0);
-                if (($invoice->invoice_type ?? 'debit') === 'debit' && $delAmount <= 0) {
-                    $delAmount = (float) $invoice->total;
-                }
-                if ($delAmount > 0) {
-                    app(\App\Services\AccountService::class)->refundSaleInvoice(
-                        $invoice,
-                        $delAmount,
-                        'sale_invoice_deletion',
-                        "Refund for deleted sale invoice #{$invoice->posted_number}",
-                        $request->user()
-                    );
+                // Adjust financial accounts for deleted invoice unless retained as store credit
+                if ($mode !== 'credit') {
+                    $delAmount = (float) ($invoice->total_receive ?? 0);
+                    if (($invoice->invoice_type ?? 'debit') === 'debit' && $delAmount <= 0) {
+                        $delAmount = (float) $invoice->total;
+                    }
+                    if ($delAmount > 0) {
+                        app(\App\Services\AccountService::class)->refundSaleInvoice(
+                            $invoice,
+                            $delAmount,
+                            'sale_invoice_deletion',
+                            "Refund for deleted sale invoice #{$invoice->posted_number}",
+                            $request->user()
+                        );
+                    }
                 }
             }
 

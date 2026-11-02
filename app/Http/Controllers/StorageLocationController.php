@@ -30,8 +30,42 @@ class StorageLocationController extends Controller
         }
     }
 
+    private function authorizeView(Request $request): void
+    {
+        $user = $request->user();
+        if (!$user) {
+            abort(401, 'Unauthenticated.');
+        }
+        if ($user->hasRole(['Admin', 'admin', 'super-admin'])) {
+            return;
+        }
+        $allowed = [
+            'storage-location.view',
+            'product.view',
+            'product.create',
+            'product.update',
+            'batch-expiry.view',
+            'batch-expiry.update',
+            'purchase-invoice.view',
+            'purchase-invoice.create',
+            'sale-invoice.view',
+            'sale-invoice.create',
+            'stocktake.view',
+            'stock-adjustment.view',
+            'stock-adjustment.create',
+        ];
+        foreach ($allowed as $perm) {
+            if ($user->can($perm)) {
+                return;
+            }
+        }
+        abort(403, 'This action is unauthorized.');
+    }
+
     public function index(Request $request)
     {
+        $this->authorizeView($request);
+
         $query = StorageLocation::query()
             ->withCount(['products', 'batches'])
             ->orderByDesc('is_default')

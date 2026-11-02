@@ -71,11 +71,34 @@ class DocumentShareController extends Controller
                 break;
 
             case 'stock_disposal':
-            case 'cash_drawer_session':
-            case 'stocktake_session':
-                if (!request()->user()) {
+                $user = request()->user();
+                if (!$user) {
                     abort(401);
                 }
+                \App\Models\StockDisposal::findOrFail((int) ($params['id'] ?? 0));
+                if (!$user->hasRole(['Admin', 'admin', 'super-admin']) && !$user->can('stock-disposal.view')) {
+                    abort(403, 'This action is unauthorized.');
+                }
+                break;
+
+            case 'cash_drawer_session':
+                $user = request()->user();
+                if (!$user) {
+                    abort(401);
+                }
+                \App\Models\CashDrawerSession::findOrFail((int) ($params['id'] ?? 0));
+                if (!$user->hasRole(['Admin', 'admin', 'super-admin']) && !$user->can('cash-drawer.view')) {
+                    abort(403, 'This action is unauthorized.');
+                }
+                break;
+
+            case 'stocktake_session':
+                $user = request()->user();
+                if (!$user) {
+                    abort(401);
+                }
+                $session = \App\Models\StocktakeSession::findOrFail((int) ($params['id'] ?? 0));
+                $this->authorize('view', $session);
                 break;
 
             case 'regular_refill_reminder':
@@ -165,10 +188,18 @@ class DocumentShareController extends Controller
 
         // Optionally persist the email back to the Customer or Supplier profile
         if (!empty($validated['save_email']) && !empty($context['party_type']) && !empty($context['party_id'])) {
+            $actor = $request->user();
+            $isAdmin = $actor && $actor->hasRole(['Admin', 'admin', 'super-admin']);
             if ($context['party_type'] === 'customer') {
-                Customer::where('id', $context['party_id'])->update(['email' => $validated['email']]);
+                $cust = Customer::find($context['party_id']);
+                if ($cust && (trim((string) $cust->email) === '' || $isAdmin || ($actor && $actor->can('customer.update')))) {
+                    $cust->update(['email' => $validated['email']]);
+                }
             } elseif ($context['party_type'] === 'supplier') {
-                Supplier::where('id', $context['party_id'])->update(['email' => $validated['email']]);
+                $sup = Supplier::find($context['party_id']);
+                if ($sup && (trim((string) $sup->email) === '' || $isAdmin || ($actor && $actor->can('supplier.update')))) {
+                    $sup->update(['email' => $validated['email']]);
+                }
             }
         }
 
@@ -251,16 +282,25 @@ class DocumentShareController extends Controller
                     ->find($customerId);
 
                 if ($customer) {
+                    $actor = $request->user();
+                    $canMutateCustomer = $actor && (
+                        $actor->hasRole(['Admin', 'admin', 'super-admin'])
+                        || $actor->can('customer.update')
+                        || $actor->can('customer.create')
+                        || $actor->can('sale-invoice.create')
+                    );
                     $customerCtrl = app(CustomerController::class);
-                    $customer->last_refill_reminded_at = now();
-                    if (!empty($validated['language'])) {
-                        $customer->reminder_language = $validated['language'];
+                    if ($canMutateCustomer) {
+                        $customer->last_refill_reminded_at = now();
+                        if (!empty($validated['language'])) {
+                            $customer->reminder_language = $validated['language'];
+                        }
+                        if ($request->boolean('advance_cycle')) {
+                            $customer->next_refill_date = $customerCtrl->calculateNextRefillDate($customer);
+                            $customer->last_refill_collected_at = now();
+                        }
+                        $customer->save();
                     }
-                    if ($request->boolean('advance_cycle')) {
-                        $customer->next_refill_date = $customerCtrl->calculateNextRefillDate($customer);
-                        $customer->last_refill_collected_at = now();
-                    }
-                    $customer->save();
                     $response['customer'] = $customerCtrl->appendRegularMetadata($customer);
                 }
 

@@ -326,7 +326,7 @@ public function nearExpiryFilters(Request $request)
         $productStats = DB::table('products')
             ->selectRaw(
                 $canViewValuation
-                    ? 'COUNT(*) as active_products, COALESCE(SUM(quantity), 0) as stock_units, COALESCE(SUM(COALESCE(quantity,0) * COALESCE(avg_price, unit_purchase_price, pack_purchase_price, 0)), 0) as stock_value'
+                    ? 'COUNT(*) as active_products, COALESCE(SUM(quantity), 0) as stock_units, COALESCE(SUM(COALESCE(quantity,0) * CASE WHEN COALESCE(avg_price, 0) > 0 THEN avg_price WHEN COALESCE(unit_purchase_price, 0) > 0 THEN unit_purchase_price WHEN COALESCE(pack_purchase_price, 0) > 0 AND COALESCE(pack_size, 0) > 0 THEN (pack_purchase_price * 1.0 / pack_size) ELSE 0 END), 0) as stock_value'
                     : 'COUNT(*) as active_products, COALESCE(SUM(quantity), 0) as stock_units'
             )
             ->first();
@@ -346,7 +346,7 @@ public function nearExpiryFilters(Request $request)
                 (SELECT COUNT(*) FROM users) as users,
                 (SELECT COUNT(*) FROM stock_adjustments) as stock_adjustments,
                 (SELECT COUNT(*) FROM user_demands WHERE status = 'pending') as pending_demands,
-                (SELECT COUNT(*) FROM batches b WHERE b.expiry_date IS NOT NULL AND b.expiry_date > ? AND b.expiry_date <= ?) as near_expiry
+                (SELECT COUNT(*) FROM batches b WHERE b.expiry_date IS NOT NULL AND b.quantity > 0 AND b.expiry_date > ? AND b.expiry_date <= ?) as near_expiry
         ", [$today, $threeMonthsOut]);
 
         $supplierCount = (int) ($counts->suppliers ?? 0);

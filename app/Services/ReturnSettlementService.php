@@ -777,8 +777,35 @@ class ReturnSettlementService
             ]);
         }
 
-        // Trim existing allocations if return amount decreased
+        // Detach existing auto-allocations if mode switched away from invoice_offset or invoice/customer changed
         $existingAllocs = PaymentAllocation::where('payment_id', $payment->id)->orderByDesc('id')->get();
+        if ($mode !== 'invoice_offset' || (int) $payment->party_id !== (int) $saleReturn->customer_id) {
+            foreach ($existingAllocs as $alloc) {
+                if ($alloc->invoice_type === 'sale_invoice') {
+                    $inv = SaleInvoice::lockForUpdate()->find($alloc->invoice_id);
+                    if ($inv) {
+                        $inv->total_receive = round(max((float) ($inv->total_receive ?? 0) - (float) $alloc->amount, 0), 2);
+                        $inv->save();
+                    }
+                }
+                $alloc->delete();
+            }
+            $existingAllocs = collect();
+        } elseif ($saleReturn->sale_invoice_id) {
+            foreach ($existingAllocs as $alloc) {
+                if ($alloc->invoice_type === 'sale_invoice' && (int) $alloc->invoice_id !== (int) $saleReturn->sale_invoice_id) {
+                    $inv = SaleInvoice::lockForUpdate()->find($alloc->invoice_id);
+                    if ($inv) {
+                        $inv->total_receive = round(max((float) ($inv->total_receive ?? 0) - (float) $alloc->amount, 0), 2);
+                        $inv->save();
+                    }
+                    $alloc->delete();
+                }
+            }
+            $existingAllocs = PaymentAllocation::where('payment_id', $payment->id)->orderByDesc('id')->get();
+        }
+
+        // Trim existing allocations if return amount decreased
         $allocatedSum = round((float) $existingAllocs->sum('amount'), 2);
 
         if ($allocatedSum > $amount) {
@@ -929,6 +956,32 @@ class ReturnSettlementService
         }
 
         $existingAllocs = PaymentAllocation::where('payment_id', $payment->id)->orderByDesc('id')->get();
+        if ($mode !== 'invoice_offset' || (int) $payment->party_id !== (int) $purchaseReturn->supplier_id) {
+            foreach ($existingAllocs as $alloc) {
+                if ($alloc->invoice_type === 'purchase_invoice') {
+                    $inv = PurchaseInvoice::lockForUpdate()->find($alloc->invoice_id);
+                    if ($inv) {
+                        $inv->total_paid = round(max((float) ($inv->total_paid ?? 0) - (float) $alloc->amount, 0), 2);
+                        $inv->save();
+                    }
+                }
+                $alloc->delete();
+            }
+            $existingAllocs = collect();
+        } elseif ($purchaseReturn->purchase_invoice_id) {
+            foreach ($existingAllocs as $alloc) {
+                if ($alloc->invoice_type === 'purchase_invoice' && (int) $alloc->invoice_id !== (int) $purchaseReturn->purchase_invoice_id) {
+                    $inv = PurchaseInvoice::lockForUpdate()->find($alloc->invoice_id);
+                    if ($inv) {
+                        $inv->total_paid = round(max((float) ($inv->total_paid ?? 0) - (float) $alloc->amount, 0), 2);
+                        $inv->save();
+                    }
+                    $alloc->delete();
+                }
+            }
+            $existingAllocs = PaymentAllocation::where('payment_id', $payment->id)->orderByDesc('id')->get();
+        }
+
         $allocatedSum = round((float) $existingAllocs->sum('amount'), 2);
 
         if ($allocatedSum > $amount) {

@@ -367,19 +367,27 @@ class SupplierController extends Controller
             // Header
             fputcsv($out, ['name', 'address', 'phone', 'expiry_return_policy', 'expiry_return_months', 'expiry_return_days', 'expiry_return_notes']);
 
+            $sanitizeCsv = static function ($val) {
+                $str = (string) ($val ?? '');
+                if ($str !== '' && in_array($str[0], ['=', '+', '-', '@', "\t", "\r"], true) && !preg_match('/^[+-]?\d+(\.\d+)?$/', $str)) {
+                    return "'" . $str;
+                }
+                return $str;
+            };
+
             // Rows (streamed)
             Supplier::select('name', 'address', 'phone', 'expiry_return_policy', 'expiry_return_months', 'expiry_return_days', 'expiry_return_notes')
                 ->orderBy('name')
-                ->chunk(1000, function ($chunk) use ($out) {
+                ->chunk(1000, function ($chunk) use ($out, $sanitizeCsv) {
                     foreach ($chunk as $s) {
                         fputcsv($out, [
-                            (string) ($s->name ?? ''),
-                            (string) ($s->address ?? ''),
-                            (string) ($s->phone ?? ''),
-                            (string) ($s->expiry_return_policy ?? 'before_expiry'),
+                            $sanitizeCsv($s->name ?? ''),
+                            $sanitizeCsv($s->address ?? ''),
+                            $sanitizeCsv($s->phone ?? ''),
+                            $sanitizeCsv($s->expiry_return_policy ?? 'before_expiry'),
                             (string) ($s->expiry_return_months ?? 3),
                             (string) ($s->expiry_return_days ?? 90),
-                            (string) ($s->expiry_return_notes ?? ''),
+                            $sanitizeCsv($s->expiry_return_notes ?? ''),
                         ]);
                     }
                 });
