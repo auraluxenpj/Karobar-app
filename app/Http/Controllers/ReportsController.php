@@ -577,10 +577,14 @@ class ReportsController extends Controller
                 $invoiceType = 'all';
             }
 
+            $hasStatusCol = \Illuminate\Support\Facades\Schema::hasColumn('sale_invoices', 'status');
+
             // Build base query for sale_invoices
             $saleQuery = DB::table('sale_invoices as si')
-                ->whereBetween('si.date', [$fromDateStr, $toDateStr])
-                ->where(fn ($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'));
+                ->whereBetween('si.date', [$fromDateStr, $toDateStr]);
+            if ($hasStatusCol) {
+                $saleQuery->where(fn ($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'));
+            }
 
             // Apply invoice_type filter if not 'all'
             if ($invoiceType !== 'all') {
@@ -615,8 +619,10 @@ class ReportsController extends Controller
             $cogsQuery = DB::table('sale_invoice_items as sii')
                 ->join('sale_invoices as si', 'si.id', '=', 'sii.sale_invoice_id')
                 ->join('products as p', 'p.id', '=', 'sii.product_id')
-                ->whereBetween('si.date', [$fromDateStr, $toDateStr])
-                ->where(fn ($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'));
+                ->whereBetween('si.date', [$fromDateStr, $toDateStr]);
+            if ($hasStatusCol) {
+                $cogsQuery->where(fn ($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'));
+            }
 
             // Apply invoice_type filter if not 'all'
             if ($invoiceType !== 'all') {
@@ -624,12 +630,16 @@ class ReportsController extends Controller
             }
 
             // ===== COGS on sales (per day) =====
-            // Calculate cost using products.avg_price * sale_invoice_items.quantity
+            // Calculate cost using products.avg_price * (sale_invoice_items.quantity + bonus)
             // Fallback to unit_purchase_price if avg_price is 0 or NULL
-            // Note: We use quantity * cost_price (not sub_total) because cost remains the same regardless of discounts
+            // Note: We use (quantity + bonus) * cost_price (not sub_total) because cost remains the same regardless of discounts/bonuses
+            $hasBonusCol = \Illuminate\Support\Facades\Schema::hasColumn('sale_invoice_items', 'bonus');
+            $saleUnitsExpr = $hasBonusCol
+                ? '(COALESCE(sii.quantity, 0) + COALESCE(sii.bonus, 0))'
+                : 'COALESCE(sii.quantity, 0)';
             $cogsSales = $cogsQuery
                 ->selectRaw('DATE(si.date) as sale_date')
-                ->selectRaw('SUM(COALESCE(sii.quantity, 0) * COALESCE(sii.cost_price_snapshot, CASE WHEN p.avg_price IS NULL OR p.avg_price = 0 THEN COALESCE(p.unit_purchase_price, 0) ELSE p.avg_price END)) as cogs_sales')
+                ->selectRaw("SUM({$saleUnitsExpr} * COALESCE(sii.cost_price_snapshot, CASE WHEN p.avg_price IS NULL OR p.avg_price = 0 THEN COALESCE(p.unit_purchase_price, 0) ELSE p.avg_price END)) as cogs_sales")
                 ->selectRaw('SUM(CASE WHEN sii.cost_price_snapshot IS NULL THEN 1 ELSE 0 END) as estimated_items')
                 ->groupBy('sale_date')
                 ->get()
@@ -749,8 +759,10 @@ class ReportsController extends Controller
             $to = $req->query('to');
 
             // Build base query for sale invoices
-            $query = SaleInvoice::with(['customer', 'user', 'items.product'])
-                ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'));
+            $query = SaleInvoice::with(['customer', 'user', 'items.product']);
+            if (\Illuminate\Support\Facades\Schema::hasColumn('sale_invoices', 'status')) {
+                $query->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'));
+            }
 
             // Filter by specific invoice
             if ($invoiceId) {
@@ -785,9 +797,11 @@ class ReportsController extends Controller
                     }
                     
                     $quantity = $item->quantity ?? 0;
+                    $bonus = (int) ($item->bonus ?? 0);
                     $salePrice = $item->price ?? 0;
                     // Use sub_total (actual sale amount after item-level discounts) instead of quantity * price
-                    $totalCost = $quantity * $costPrice;
+                    // Include bonus units in COGS since bonus units leave inventory at zero revenue
+                    $totalCost = ($quantity + $bonus) * $costPrice;
                     $totalSale = $item->sub_total ?? 0;
                     $profit = $totalSale - $totalCost;
 
@@ -798,6 +812,7 @@ class ReportsController extends Controller
                         'product_name' => $item->product->name ?? null,
                         'pack_size' => $item->pack_size ?? 0,
                         'quantity' => $quantity,
+                        'bonus' => $bonus,
                         'cost_price' => round($costPrice, 2),
                         'cost_is_estimated' => $item->cost_price_snapshot === null,
                         'sale_price' => round($salePrice, 2),
@@ -877,8 +892,10 @@ class ReportsController extends Controller
         $to = $req->query('to');
 
         // Build query
-        $query = SaleInvoice::with(['customer', 'items.product'])
-            ->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'));
+        $query = SaleInvoice::with(['customer', 'items.product']);
+        if (\Illuminate\Support\Facades\Schema::hasColumn('sale_invoices', 'status')) {
+            $query->where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'reversed'));
+        }
 
         if ($invoiceId) {
             $query->where('id', $invoiceId);
@@ -906,9 +923,10 @@ class ReportsController extends Controller
                 }
                 
                 $quantity = (int) ($item->quantity ?? 0);
+                $bonus = (int) ($item->bonus ?? 0);
                 $salePrice = (float) ($item->price ?? 0);
                 // Use sub_total (actual sale amount after item-level discounts) instead of quantity * price
-                $totalCost = $quantity * $costPrice;
+                $totalCost = ($quantity + $bonus) * $costPrice;
                 $totalSale = (float) ($item->sub_total ?? 0);
                 $profit = $totalSale - $totalCost;
 
@@ -917,6 +935,7 @@ class ReportsController extends Controller
                     'product_name' => (string) ($item->product->name ?? ''),
                     'pack_size' => (int) ($item->pack_size ?? 0),
                     'quantity' => (int) $quantity,
+                    'bonus' => (int) $bonus,
                     'cost_price' => round($costPrice, 2),
                     'cost_is_estimated' => $item->cost_price_snapshot === null,
                     'sale_price' => round($salePrice, 2),
@@ -1199,13 +1218,18 @@ class ReportsController extends Controller
                 'user:id,name',
                 'items' => function ($q) use ($productId) {
                     if ($productId) $q->where('product_id', $productId);
-                    $q->with('product:id,name')
-                      ->select([
-                          'id','sale_invoice_id','product_id',
-                          'pack_size','batch_number','expiry',
-                          'current_quantity','quantity','price',
-                          'item_discount_percentage','sub_total',
-                      ]);
+                    $cols = [
+                        'id','sale_invoice_id','product_id',
+                        'pack_size','batch_number','expiry',
+                        'current_quantity','quantity','price',
+                        'item_discount_percentage','sub_total',
+                    ];
+                    foreach (['pack_quantity', 'unit_quantity', 'bonus', 'pack_price'] as $col) {
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('sale_invoice_items', $col)) {
+                            $cols[] = $col;
+                        }
+                    }
+                    $q->with('product:id,name')->select($cols);
                 },
             ])
             // Sales filter by `date`
@@ -1227,6 +1251,7 @@ class ReportsController extends Controller
                 'user_name'      => $inv->user->name ?? null,
                 'doctor_name'    => $inv->doctor_name ?? null,
                 'patient_name'   => $inv->patient_name ?? null,
+                'sale_type'      => $inv->sale_type ?? 'retail',
 
                 // Footer (header totals on SaleInvoice)
                 'discount_percentage' => (float)($inv->discount_percentage ?? 0),
@@ -1247,7 +1272,10 @@ class ReportsController extends Controller
                         'batch_number'              => $it->batch_number,
                         'expiry'                    => $it->expiry,
                         'current_quantity'          => (int)($it->current_quantity ?? 0),
+                        'pack_quantity'             => (float)($it->pack_quantity ?? 0),
+                        'unit_quantity'             => (int)($it->unit_quantity ?? 0),
                         'quantity'                  => (int)($it->quantity ?? 0),
+                        'bonus'                     => (int)($it->bonus ?? 0),
                         'price'                     => (float)($it->price ?? 0),
                         'item_discount_percentage'  => (float)($it->item_discount_percentage ?? 0),
                         'sub_total'                 => (float)($it->sub_total ?? 0),
@@ -1274,13 +1302,18 @@ class ReportsController extends Controller
                 'user:id,name',
                 'items' => function ($q) use ($productId) {
                     if ($productId) $q->where('product_id', $productId);
-                    $q->with('product:id,name')
-                      ->select([
-                          'id','sale_invoice_id','product_id',
-                          'pack_size','batch_number','expiry',
-                          'current_quantity','quantity','price',
-                          'item_discount_percentage','sub_total',
-                      ]);
+                    $cols = [
+                        'id','sale_invoice_id','product_id',
+                        'pack_size','batch_number','expiry',
+                        'current_quantity','quantity','price',
+                        'item_discount_percentage','sub_total',
+                    ];
+                    foreach (['pack_quantity', 'unit_quantity', 'bonus', 'pack_price'] as $col) {
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('sale_invoice_items', $col)) {
+                            $cols[] = $col;
+                        }
+                    }
+                    $q->with('product:id,name')->select($cols);
                 },
             ])
             ->whereBetween('date', [$fromDate, $toDate])
@@ -1300,6 +1333,7 @@ class ReportsController extends Controller
                 'user_name'           => $inv->user->name ?? null,
                 'doctor_name'         => $inv->doctor_name ?? null,
                 'patient_name'        => $inv->patient_name ?? null,
+                'sale_type'           => $inv->sale_type ?? 'retail',
                 'discount_percentage' => (float)($inv->discount_percentage ?? 0),
                 'discount_amount'     => (float)($inv->discount_amount ?? 0),
                 'tax_percentage'      => (float)($inv->tax_percentage ?? 0),
@@ -1314,7 +1348,10 @@ class ReportsController extends Controller
                         'batch_number'             => $it->batch_number,
                         'expiry'                   => $it->expiry,
                         'current_quantity'         => (int)($it->current_quantity ?? 0),
+                        'pack_quantity'            => (float)($it->pack_quantity ?? 0),
+                        'unit_quantity'            => (int)($it->unit_quantity ?? 0),
                         'quantity'                 => (int)($it->quantity ?? 0),
+                        'bonus'                    => (int)($it->bonus ?? 0),
                         'price'                    => (float)($it->price ?? 0),
                         'item_discount_percentage' => (float)($it->item_discount_percentage ?? 0),
                         'sub_total'                => (float)($it->sub_total ?? 0),
@@ -1709,6 +1746,8 @@ class ReportsController extends Controller
         if ($fromDate->gt($toDate)) {
             [$fromDate, $toDate] = [$toDate->copy()->startOfDay(), $fromDate->copy()->endOfDay()];
         }
+        $fromDateStr = $fromDate->toDateString();
+        $toDateStr = $toDate->toDateString();
 
         // Get product with related data
         $productData = [
@@ -1726,7 +1765,7 @@ class ReportsController extends Controller
             ->join('purchase_invoices as pi', 'pi.id', '=', 'pii.purchase_invoice_id')
             ->join('suppliers as s', 's.id', '=', 'pi.supplier_id')
             ->where('pii.product_id', $productId)
-            ->whereBetween('pi.posted_date', [$fromDate, $toDate])
+            ->whereBetween('pi.posted_date', [$fromDateStr, $toDateStr])
             ->where(fn($q) => $q->whereNull('pi.status')->orWhere('pi.status', '!=', 'reversed'))
             ->select([
                 'pi.posted_date as date',
@@ -1762,7 +1801,7 @@ class ReportsController extends Controller
             ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
             ->join('suppliers as s', 's.id', '=', 'pr.supplier_id')
             ->where('pri.product_id', $productId)
-            ->whereBetween('pr.date', [$fromDate, $toDate])
+            ->whereBetween('pr.date', [$fromDateStr, $toDateStr])
             ->select([
                 'pr.date',
                 'pr.posted_number as reference_number',
@@ -1792,22 +1831,26 @@ class ReportsController extends Controller
             });
 
         // ===== Sale Invoices =====
+        $saleSelectCols = [
+            'si.date',
+            'si.posted_number as reference_number',
+            'c.name as counter_party',
+            'sii.batch_number as batch',
+            'sii.expiry',
+            'sii.quantity',
+            'sii.price as unit_price',
+            'sii.sub_total',
+        ];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('sale_invoice_items', 'bonus')) {
+            $saleSelectCols[] = 'sii.bonus';
+        }
         $sales = DB::table('sale_invoice_items as sii')
             ->join('sale_invoices as si', 'si.id', '=', 'sii.sale_invoice_id')
             ->join('customers as c', 'c.id', '=', 'si.customer_id')
             ->where('sii.product_id', $productId)
-            ->whereBetween('si.date', [$fromDate, $toDate])
+            ->whereBetween('si.date', [$fromDateStr, $toDateStr])
             ->where(fn($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'))
-            ->select([
-                'si.date',
-                'si.posted_number as reference_number',
-                'c.name as counter_party',
-                'sii.batch_number as batch',
-                'sii.expiry',
-                'sii.quantity',
-                'sii.price as unit_price',
-                'sii.sub_total',
-            ])
+            ->select($saleSelectCols)
             ->orderBy('date', 'asc')
             ->get()
             ->map(function ($item) {
@@ -1820,7 +1863,7 @@ class ReportsController extends Controller
                     'batch' => $item->batch,
                     'expiry' => $item->expiry ? (($item->expiry instanceof \Carbon\Carbon) ? $item->expiry->format('Y-m-d') : (is_string($item->expiry) ? substr($item->expiry, 0, 10) : $item->expiry)) : null,
                     'quantity_in' => 0,
-                    'quantity_out' => (int)($item->quantity ?? 0),
+                    'quantity_out' => (int)($item->quantity ?? 0) + (int)($item->bonus ?? 0),
                     'unit_price' => (float)($item->unit_price ?? 0),
                     'sub_total' => (float)($item->sub_total ?? 0),
                 ];
@@ -1831,7 +1874,7 @@ class ReportsController extends Controller
             ->join('sale_returns as sr', 'sr.id', '=', 'sri.sale_return_id')
             ->join('customers as c', 'c.id', '=', 'sr.customer_id')
             ->where('sri.product_id', $productId)
-            ->whereBetween('sr.date', [$fromDate, $toDate])
+            ->whereBetween('sr.date', [$fromDateStr, $toDateStr])
             ->select([
                 'sr.date',
                 'sr.posted_number as reference_number',
@@ -1864,7 +1907,7 @@ class ReportsController extends Controller
         $stockAdjustments = DB::table('stock_adjustment_items as sai')
             ->join('stock_adjustments as sa', 'sa.id', '=', 'sai.stock_adjustment_id')
             ->where('sai.product_id', $productId)
-            ->whereBetween('sa.posted_date', [$fromDate, $toDate])
+            ->whereBetween('sa.posted_date', [$fromDateStr, $toDateStr])
             ->select([
                 'sa.posted_date as date',
                 'sa.posted_number as reference_number',
@@ -1990,6 +2033,8 @@ class ReportsController extends Controller
         if ($fromDate->gt($toDate)) {
             [$fromDate, $toDate] = [$toDate->copy()->startOfDay(), $fromDate->copy()->endOfDay()];
         }
+        $fromDateStr = $fromDate->toDateString();
+        $toDateStr = $toDate->toDateString();
 
         // Get product with related data
         $productData = [
@@ -2007,7 +2052,7 @@ class ReportsController extends Controller
             ->join('purchase_invoices as pi', 'pi.id', '=', 'pii.purchase_invoice_id')
             ->join('suppliers as s', 's.id', '=', 'pi.supplier_id')
             ->where('pii.product_id', $productId)
-            ->whereBetween('pi.posted_date', [$fromDate, $toDate])
+            ->whereBetween('pi.posted_date', [$fromDateStr, $toDateStr])
             ->where(fn($q) => $q->whereNull('pi.status')->orWhere('pi.status', '!=', 'reversed'))
             ->select([
                 'pi.posted_date as date',
@@ -2043,7 +2088,7 @@ class ReportsController extends Controller
             ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
             ->join('suppliers as s', 's.id', '=', 'pr.supplier_id')
             ->where('pri.product_id', $productId)
-            ->whereBetween('pr.date', [$fromDate, $toDate])
+            ->whereBetween('pr.date', [$fromDateStr, $toDateStr])
             ->select([
                 'pr.date',
                 'pr.posted_number as reference_number',
@@ -2073,22 +2118,26 @@ class ReportsController extends Controller
             });
 
         // ===== Sale Invoices =====
+        $saleSelectCols = [
+            'si.date',
+            'si.posted_number as reference_number',
+            'c.name as counter_party',
+            'sii.batch_number as batch',
+            'sii.expiry',
+            'sii.quantity',
+            'sii.price as unit_price',
+            'sii.sub_total',
+        ];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('sale_invoice_items', 'bonus')) {
+            $saleSelectCols[] = 'sii.bonus';
+        }
         $sales = DB::table('sale_invoice_items as sii')
             ->join('sale_invoices as si', 'si.id', '=', 'sii.sale_invoice_id')
             ->join('customers as c', 'c.id', '=', 'si.customer_id')
             ->where('sii.product_id', $productId)
-            ->whereBetween('si.date', [$fromDate, $toDate])
+            ->whereBetween('si.date', [$fromDateStr, $toDateStr])
             ->where(fn($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'))
-            ->select([
-                'si.date',
-                'si.posted_number as reference_number',
-                'c.name as counter_party',
-                'sii.batch_number as batch',
-                'sii.expiry',
-                'sii.quantity',
-                'sii.price as unit_price',
-                'sii.sub_total',
-            ])
+            ->select($saleSelectCols)
             ->orderBy('date', 'asc')
             ->get()
             ->map(function ($item) {
@@ -2101,7 +2150,7 @@ class ReportsController extends Controller
                     'batch' => $item->batch,
                     'expiry' => $item->expiry ? (($item->expiry instanceof \Carbon\Carbon) ? $item->expiry->format('Y-m-d') : (is_string($item->expiry) ? substr($item->expiry, 0, 10) : $item->expiry)) : null,
                     'quantity_in' => 0,
-                    'quantity_out' => (int)($item->quantity ?? 0),
+                    'quantity_out' => (int)($item->quantity ?? 0) + (int)($item->bonus ?? 0),
                     'unit_price' => (float)($item->unit_price ?? 0),
                     'sub_total' => (float)($item->sub_total ?? 0),
                 ];
@@ -2112,7 +2161,7 @@ class ReportsController extends Controller
             ->join('sale_returns as sr', 'sr.id', '=', 'sri.sale_return_id')
             ->join('customers as c', 'c.id', '=', 'sr.customer_id')
             ->where('sri.product_id', $productId)
-            ->whereBetween('sr.date', [$fromDate, $toDate])
+            ->whereBetween('sr.date', [$fromDateStr, $toDateStr])
             ->select([
                 'sr.date',
                 'sr.posted_number as reference_number',
@@ -2145,7 +2194,7 @@ class ReportsController extends Controller
         $stockAdjustments = DB::table('stock_adjustment_items as sai')
             ->join('stock_adjustments as sa', 'sa.id', '=', 'sai.stock_adjustment_id')
             ->where('sai.product_id', $productId)
-            ->whereBetween('sa.posted_date', [$fromDate, $toDate])
+            ->whereBetween('sa.posted_date', [$fromDateStr, $toDateStr])
             ->select([
                 'sa.posted_date as date',
                 'sa.posted_number as reference_number',

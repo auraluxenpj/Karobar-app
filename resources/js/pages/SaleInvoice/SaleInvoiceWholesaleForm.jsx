@@ -58,47 +58,40 @@ const normalizeFormLoaded = (f) => {
     ? safe.items.map((it, idx) => {
         const isUnbatched = Boolean(it?.is_unbatched || (!it?.batch_number && it?.product_id));
         const packSize = Math.max(1, Number(it?.pack_size || it?.product?.pack_size || 1));
-        const totalUnits = Math.max(0, Number(it?.quantity || 0));
+        const rawQty = Math.max(0, Math.floor(Number(it?.quantity || 0)));
+        const rawUnitQty = Math.max(0, Math.floor(Number(it?.unit_quantity || 0)));
+        const rawPackQty = Math.max(0, Number(it?.pack_quantity || 0));
 
-        let packQty = it?.pack_quantity !== undefined && it?.pack_quantity !== null && it?.pack_quantity !== ""
-          ? Number(it.pack_quantity)
-          : 0;
-        let unitQty = it?.unit_quantity !== undefined && it?.unit_quantity !== null && it?.unit_quantity !== ""
-          ? Number(it.unit_quantity)
-          : 0;
-
-        // Decompose legacy quantity into packs + loose units if pack_quantity/unit_quantity were not stored
-        if (packQty === 0 && unitQty === 0 && totalUnits > 0) {
-          if (packSize > 1) {
-            packQty = Math.floor(totalUnits / packSize);
-            unitQty = totalUnits % packSize;
-          } else {
-            unitQty = totalUnits;
-          }
+        // Resolve total billed units without double-counting synced pack_quantity & unit_quantity
+        let totalUnits = rawQty;
+        if (totalUnits <= 0) {
+          totalUnits = rawUnitQty > 0 ? rawUnitQty : Math.round(rawPackQty * packSize);
         }
+        const unitQty = totalUnits;
+        const packQty = packSize > 0 ? Number((totalUnits / packSize).toFixed(2)) : 0;
 
         const unitPrice = Number(it?.price || 0);
         const packPrice =
           it?.pack_price !== undefined && it?.pack_price !== null && Number(it.pack_price) > 0
             ? Number(it.pack_price)
             : Number((unitPrice * packSize).toFixed(2));
-        const bonusQty = Math.max(0, Number(it?.bonus || 0));
-        let packBonus =
-          it?.pack_bonus !== undefined && it?.pack_bonus !== null && it?.pack_bonus !== ""
-            ? Number(it.pack_bonus)
-            : 0;
-        let unitBonus =
-          it?.unit_bonus !== undefined && it?.unit_bonus !== null && it?.unit_bonus !== ""
-            ? Number(it.unit_bonus)
-            : 0;
-        if (packBonus === 0 && unitBonus === 0 && bonusQty > 0) {
-          if (packSize > 1) {
-            packBonus = Math.floor(bonusQty / packSize);
-            unitBonus = bonusQty % packSize;
-          } else {
-            unitBonus = bonusQty;
-          }
+
+        const rawBonus = Math.max(0, Math.floor(Number(it?.bonus || 0)));
+        const rawUnitBonus = Math.max(0, Math.floor(Number(it?.unit_bonus || 0)));
+        const rawPackBonus = Math.max(0, Number(it?.pack_bonus || 0));
+        let bonusQty = rawBonus;
+        if (bonusQty <= 0) {
+          bonusQty = rawUnitBonus > 0 ? rawUnitBonus : Math.round(rawPackBonus * packSize);
         }
+        const unitBonus = bonusQty;
+        const packBonus = packSize > 0 ? Number((bonusQty / packSize).toFixed(2)) : 0;
+
+        const avgPrice = Number(it?.avg_price || it?.product?.avg_price || it?.cost_price_snapshot || 0);
+        const unitPurchasePrice =
+          Number(it?.unit_purchase_price || it?.product?.unit_purchase_price || 0) ||
+          (Number(it?.product?.pack_purchase_price || 0) > 0
+            ? Number(it.product.pack_purchase_price) / packSize
+            : 0);
 
         return recalcWholesaleItem({
           id: it?.id ?? `row_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 9)}`,
@@ -118,6 +111,8 @@ const normalizeFormLoaded = (f) => {
           bonus: bonusQty > 0 ? String(bonusQty) : "",
           pack_price: packPrice > 0 ? packPrice : "",
           price: unitPrice > 0 ? unitPrice : "",
+          avg_price: avgPrice > 0 ? avgPrice : "",
+          unit_purchase_price: unitPurchasePrice > 0 ? unitPurchasePrice : "",
           item_discount_percentage: it?.item_discount_percentage ?? "",
           sub_total: it?.sub_total ?? "",
           is_narcotic: it?.is_narcotic ?? it?.narcotic === "yes" ?? false,
@@ -201,6 +196,9 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
 
   const [customerWholesalePrices, setCustomerWholesalePrices] = useState({});
   const [productDataCache, setProductDataCache] = useState({});
+  const [products, setProducts] = useState([]);
+  const [batchesByProduct, setBatchesByProduct] = useState({});
+  const byIdsSupportedRef = useRef(true);
   const [invalidPriceRows, setInvalidPriceRows] = useState({});
   const [receiveTouched, setReceiveTouched] = useState(false);
   const [marginPct, setMarginPct] = useState("");
@@ -296,40 +294,76 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
     },
   });
 
-  // Calculate margin % for focused row (or first populated row)
+  // Helper: Resolve unit cost for a row using avg_price (with fallback to unit_purchase_price)
+  const getRowUnitCost = (row) => {
+    if (!row?.product_id) return 0;
+    const productObj =
+      productDataCache[row.product_id] ||
+      products.find((p) => String(p?.id ?? "") === String(row.product_id ?? "")) ||
+      row.product ||
+      {};
+    const packSize = Math.max(1, Number(row.pack_size || productObj?.pack_size || 1));
+    const avgPrice = Number(productObj?.avg_price || row.avg_price || 0);
+    if (avgPrice > 0) return avgPrice;
+    const unitPurchase =
+      Number(productObj?.unit_purchase_price || row.unit_purchase_price || 0) ||
+      (Number(productObj?.pack_purchase_price || 0) > 0
+        ? Number(productObj.pack_purchase_price) / packSize
+        : 0);
+    return unitPurchase > 0 ? unitPurchase : 0;
+  };
+
+  // Helper: Compute live margin % for a row (accounts for unit/pack price, item discount %, and bonus units)
+  const computeRowMargin = (row) => {
+    if (!row?.product_id) return null;
+    const unitPrice = Number(row.price || 0);
+    const unitCost = getRowUnitCost(row);
+    if (unitPrice <= 0 || unitCost <= 0) return null;
+    const discPct = Number(row.item_discount_percentage || 0);
+    const netUnitPrice = unitPrice * (1 - discPct / 100);
+    const qty = Number(row.quantity || 0);
+    const bonus = Number(row.bonus || 0);
+    const subTotal = Number(row.sub_total ?? qty * netUnitPrice);
+    if (qty > 0 && bonus > 0) {
+      if (subTotal <= 0) return -100;
+      const totalRowCost = (qty + bonus) * unitCost;
+      return Number((((subTotal - totalRowCost) / subTotal) * 100).toFixed(2));
+    }
+    if (netUnitPrice <= 0) return -100;
+    return Number((((netUnitPrice - unitCost) / netUnitPrice) * 100).toFixed(2));
+  };
+
+  // Calculate live margin % for focused row (or first populated row) and track rows with margin < 0
   useEffect(() => {
+    const nextInvalid = {};
+    form.items.forEach((r, idx) => {
+      if (!r?.product_id) return;
+      const m = computeRowMargin(r);
+      if (m !== null && m < 0) {
+        nextInvalid[idx] = true;
+      }
+    });
+    setInvalidPriceRows(nextInvalid);
+
     const activeRow =
       form.items[focusedRowIndex]?.product_id
         ? form.items[focusedRowIndex]
         : form.items.find((r) => r.product_id);
 
     if (activeRow && activeRow.product_id && Number(activeRow.price || 0) > 0) {
-      const productData = productDataCache[activeRow.product_id] || activeRow.product || {};
-      const packSize = Math.max(1, Number(activeRow.pack_size || productData?.pack_size || 1));
-      const unitPurchasePrice =
-        Number(productData?.unit_purchase_price || 0) ||
-        (Number(productData?.pack_purchase_price || 0) > 0
-          ? Number(productData.pack_purchase_price) / packSize
-          : 0);
-      const unitSalePrice = Number(activeRow.price) || 0;
-
-      if (unitPurchasePrice > 0 && unitSalePrice > 0) {
-        const margin = ((unitSalePrice - unitPurchasePrice) / unitSalePrice) * 100;
-        setMarginPct(String(Number(margin.toFixed(2))));
+      const m = computeRowMargin(activeRow);
+      if (m !== null) {
+        setMarginPct(String(m));
         return;
       }
     }
     setMarginPct("");
-  }, [form.items, focusedRowIndex, productDataCache]);
+  }, [form.items, focusedRowIndex, productDataCache, products]);
 
   useEffect(() => {
     setMarginPct("");
     setReceiveTouched(false);
   }, [saleId]);
-
-  const [products, setProducts] = useState([]);
-  const [batchesByProduct, setBatchesByProduct] = useState({});
-  const byIdsSupportedRef = useRef(true);
 
   // refs for grid navigation
   const productRefs = useRef([]);
@@ -471,12 +505,15 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
     let totalBonusUnits = 0;
     for (const it of form.items) {
       if (!it.product_id) continue;
-      totalPacks += Number(it.pack_quantity || 0);
-      totalLooseUnits += Number(it.unit_quantity || 0);
-      totalBilledUnits += Number(it.quantity || 0);
-      totalPackBonus += Number(it.pack_bonus || 0);
-      totalUnitBonus += Number(it.unit_bonus || 0);
-      totalBonusUnits += Number(it.bonus || 0);
+      const ps = Math.max(1, Number(it.pack_size || 1));
+      const billedU = Math.max(0, Math.floor(Number(it.quantity || 0)));
+      const bonusU = Math.max(0, Math.floor(Number(it.bonus || 0)));
+      totalBilledUnits += billedU;
+      totalPacks += ps > 1 ? Math.floor(billedU / ps) : 0;
+      totalLooseUnits += ps > 1 ? billedU % ps : billedU;
+      totalBonusUnits += bonusU;
+      totalPackBonus += ps > 1 ? Math.floor(bonusU / ps) : 0;
+      totalUnitBonus += ps > 1 ? bonusU % ps : bonusU;
     }
     return {
       totalPacks,
@@ -883,10 +920,10 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
           items[index] = { ...items[index], item_discount_percentage: value };
           return { ...prev, items };
         });
+    } else if (field === "pack_quantity" || field === "pack_bonus") {
+      value = sanitizeNumberInput(value, true, false);
     } else if (
-      field === "pack_quantity" ||
       field === "unit_quantity" ||
-      field === "pack_bonus" ||
       field === "unit_bonus" ||
       field === "bonus" ||
       field === "pack_size"
@@ -896,35 +933,33 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
 
     setForm((prev) => {
       const items = [...prev.items];
-      const currentRow = { ...items[index], [field]: value };
+      const existingRow = items[index] || {};
+      const productObj =
+        productDataCache[existingRow.product_id] ||
+        products.find((p) => eqId(p.id, existingRow.product_id)) ||
+        existingRow.product ||
+        {};
+      const ps = Math.max(1, Number(existingRow.pack_size || productObj?.pack_size || 1));
+      const avgPrice = Number(productObj?.avg_price || existingRow.avg_price || 0);
+      const unitPurchasePrice =
+        Number(productObj?.unit_purchase_price || existingRow.unit_purchase_price || 0) ||
+        (Number(productObj?.pack_purchase_price || 0) > 0
+          ? Number(productObj.pack_purchase_price) / ps
+          : 0);
+
+      const currentRow = {
+        ...existingRow,
+        avg_price: avgPrice > 0 ? avgPrice : existingRow.avg_price,
+        unit_purchase_price:
+          unitPurchasePrice > 0 ? unitPurchasePrice : existingRow.unit_purchase_price,
+        [field]: value,
+      };
 
       if (field === "price" || field === "pack_price") {
         currentRow.is_custom_price = true;
       }
 
       const row = recalcWholesaleItem(currentRow, field);
-
-      if (field === "price" || field === "pack_price") {
-        const productId = row.product_id;
-        const productData = productDataCache[productId] || row.product || {};
-        const packSize = Math.max(1, Number(row.pack_size || productData?.pack_size || 1));
-        const minUnitPrice =
-          Number(productData?.unit_purchase_price || 0) ||
-          (Number(productData?.pack_purchase_price || 0) > 0
-            ? Number(productData.pack_purchase_price) / packSize
-            : 0);
-        const currentUnitPrice = Number(row.price || 0);
-
-        if (currentUnitPrice > 0 && minUnitPrice > 0 && currentUnitPrice < minUnitPrice - 0.005) {
-          setInvalidPriceRows((p) => ({ ...p, [index]: true }));
-        } else {
-          setInvalidPriceRows((p) => {
-            const nextState = { ...p };
-            delete nextState[index];
-            return nextState;
-          });
-        }
-      }
 
       items[index] = row;
       let updated = recalcFooter({ ...prev, items }, "items");
@@ -998,6 +1033,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
         setProductDataCache((prev) => ({
           ...prev,
           [productId]: {
+            avg_price: Number(data?.avg_price || 0),
             pack_purchase_price: Number(data?.pack_purchase_price || 0),
             unit_purchase_price: Number(data?.unit_purchase_price || 0),
             whole_sale_pack_price: Number(data?.whole_sale_pack_price || 0),
@@ -1013,6 +1049,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
           setProductDataCache((prev) => ({
             ...prev,
             [productId]: {
+              avg_price: Number(selected?.avg_price || 0),
               pack_purchase_price: Number(selected?.pack_purchase_price || 0),
               unit_purchase_price: Number(selected?.unit_purchase_price || 0),
               whole_sale_pack_price: Number(selected?.whole_sale_pack_price || 0),
@@ -1211,6 +1248,13 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
         ? "1"
         : "";
 
+      const resolvedAvgPrice = Number(freshProductData?.avg_price ?? selected?.avg_price ?? 0);
+      const resolvedUnitPurchase =
+        Number(freshProductData?.unit_purchase_price ?? selected?.unit_purchase_price ?? 0) ||
+        (Number(freshProductData?.pack_purchase_price ?? selected?.pack_purchase_price ?? 0) > 0
+          ? Number(freshProductData?.pack_purchase_price ?? selected?.pack_purchase_price) / packSize
+          : 0);
+
       items[rowIndex] = recalcWholesaleItem(
         {
           ...items[rowIndex],
@@ -1221,6 +1265,8 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
           pack_size: packSize,
           pack_price: effectivePackPrice,
           price: effectiveUnitPrice,
+          avg_price: resolvedAvgPrice > 0 ? resolvedAvgPrice : "",
+          unit_purchase_price: resolvedUnitPurchase > 0 ? resolvedUnitPurchase : "",
           batch_number: allocatedBatchNumber,
           is_unbatched: allocatedIsUnbatched,
           expiry: allocatedExpiry,
@@ -1234,7 +1280,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
           is_narcotic: isNarcotic,
           is_custom_price: isCustomPrice,
         },
-        "product_select"
+        defaultPackQty ? "pack_quantity" : "unit_quantity"
       );
 
       let next = recalcFooter({ ...prev, items }, "items");
@@ -1368,6 +1414,24 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
       list.forEach((p) => p?.id != null && map.set(String(p.id), p));
       return Array.from(map.values());
     });
+    setProductDataCache((prev) => {
+      const next = { ...prev };
+      list.forEach((p) => {
+        if (!p || p.id == null) return;
+        next[p.id] = {
+          avg_price: Number(p?.avg_price || 0),
+          pack_purchase_price: Number(p?.pack_purchase_price || 0),
+          unit_purchase_price: Number(p?.unit_purchase_price || 0),
+          whole_sale_pack_price: Number(p?.whole_sale_pack_price || 0),
+          whole_sale_unit_price: Number(p?.whole_sale_unit_price || 0),
+          pack_sale_price: Number(p?.pack_sale_price || 0),
+          unit_sale_price: Number(p?.unit_sale_price || 0),
+          pack_size: Number(p?.pack_size || 1),
+          margin: p?.whole_sale_margin || p?.margin || "",
+        };
+      });
+      return next;
+    });
   };
 
   const ensureProductsForItems = async (items = []) => {
@@ -1474,18 +1538,16 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
         );
       }
 
-      // Validate minimum price against unit purchase price
-      const productData = productDataCache[it.product_id] || it.product || {};
-      const packSize = Math.max(1, Number(it.pack_size || productData?.pack_size || 1));
-      const minUnitPrice =
-        Number(productData?.unit_purchase_price || 0) ||
-        (Number(productData?.pack_purchase_price || 0) > 0
-          ? Number(productData.pack_purchase_price) / packSize
-          : 0);
-
-      if (Number(it.price || 0) < minUnitPrice - 0.005 && minUnitPrice > 0) {
+      // Never allow saving if margin of any product is < 0 (calculated from avg_price with fallback to unit_purchase_price)
+      const unitCost = getRowUnitCost(it);
+      const rowMargin = computeRowMargin(it);
+      if (
+        unitCost > 0 &&
+        ((rowMargin !== null && rowMargin < 0) || Number(it.price || 0) < unitCost - 0.005)
+      ) {
+        setInvalidPriceRows((p) => ({ ...p, [i]: true }));
         return invoiceErrors.showMessage(
-          `Row ${i + 1}: Unit price (${Number(it.price || 0).toFixed(2)}) cannot be less than unit purchase cost (${minUnitPrice.toFixed(2)})`,
+          `Row ${i + 1}: Margin (${rowMargin ?? -100}%) cannot be less than 0%. Sale price after discount/bonus must cover average cost (${unitCost.toFixed(2)}/unit).`,
           i
         );
       }
@@ -1558,13 +1620,32 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
           : form.discount_percentage,
       items: form.items.map((it) => {
         const packSize = Math.max(1, Number(it.pack_size || 1));
-        const packQty = Math.max(0, Math.floor(Number(it.pack_quantity || 0)));
-        const unitQty = Math.max(0, Math.floor(Number(it.unit_quantity || 0)));
-        const totalUnits = packQty * packSize + unitQty || Math.max(0, Math.floor(Number(it.quantity || 0)));
-        const packBonus = Math.max(0, Math.floor(Number(it.pack_bonus || 0)));
-        const unitBonus = Math.max(0, Math.floor(Number(it.unit_bonus || 0)));
-        const bonusUnits =
-          packBonus * packSize + unitBonus || Math.max(0, Math.floor(Number(it.bonus || 0)));
+        const totalUnits = Math.max(
+          0,
+          Math.floor(
+            Number(
+              it.unit_quantity ||
+                it.quantity ||
+                Math.round(Number(it.pack_quantity || 0) * packSize) ||
+                0
+            )
+          )
+        );
+        const packQty = Number((totalUnits / packSize).toFixed(2));
+        const unitQty = totalUnits;
+        const bonusUnits = Math.max(
+          0,
+          Math.floor(
+            Number(
+              it.unit_bonus ||
+                it.bonus ||
+                Math.round(Number(it.pack_bonus || 0) * packSize) ||
+                0
+            )
+          )
+        );
+        const packBonus = Number((bonusUnits / packSize).toFixed(2));
+        const unitBonus = bonusUnits;
         const unitPrice = Number(it.price || 0);
         const packPrice =
           Number(it.pack_price || 0) > 0
@@ -1612,8 +1693,8 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
             localStorage.setItem("accounts_sync", String(Date.now()));
           } catch {}
           toast.success("Wholesale invoice updated");
-          if (onSuccess) onSuccess(res.data);
-          else navigate(`/sale-invoices/${id}`);
+          if (onSuccess) onSuccess(res.data, id);
+          else navigate(`/wholesale-invoices/${id}`);
         } else {
           if (draftHook.activeDraftId) {
             dataPayload.draft_id = draftHook.activeDraftId;
@@ -1630,8 +1711,8 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
           } catch {}
           draftHook.resetToNew();
           toast.success("Wholesale invoice created");
-          if (onSuccess) onSuccess(res.data);
-          else if (id) navigate(`/sale-invoices/${id}`);
+          if (onSuccess) onSuccess(res.data, id);
+          else if (id) navigate(`/wholesale-invoices/${id}`);
           else invoiceErrors.showMessage("Missing invoice ID from server response.");
         }
       } catch (err) {
@@ -1754,17 +1835,17 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
     }
   };
 
-  // --- keyboard nav (Wholesale: product -> batch -> pack_quantity -> unit_quantity -> pack_bonus -> unit_bonus -> pack_price -> price -> disc) ---
+  // --- keyboard nav (Wholesale: product -> batch -> pack_quantity -> unit_quantity -> disc -> pack_bonus -> unit_bonus -> pack_price -> price) ---
   const COLS = [
     "product",
     "batch",
     "pack_quantity",
     "unit_quantity",
+    "disc",
     "pack_bonus",
     "unit_bonus",
     "pack_price",
     "price",
-    "disc",
   ];
   const focusCell = (row, col) => {
     const map = {
@@ -2308,31 +2389,37 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                       </th>
                       <th
                         className="w-12 text-center sale-th-editable"
-                        title="Number of Full Packs"
+                        title="Number of Packs (Auto-syncs with Unit.Q)"
                       >
                         Pack.Q
                       </th>
                       <th
                         className="w-12 text-center sale-th-editable"
-                        title="Number of Loose Units"
+                        title="Number of Units (Auto-syncs with Pack.Q)"
                       >
                         Unit.Q
                       </th>
                       <th
+                        className="w-12 text-center sale-th-editable"
+                        title="Item Discount Percentage"
+                      >
+                        Disc %
+                      </th>
+                      <th
                         className="w-11 text-center sale-th-editable"
-                        title="Free Bonus Packs (deducted from stock, not billed)"
+                        title="Free Bonus Packs (Auto-syncs with Unit.B; deducted from stock & COGS)"
                       >
                         Pack.B
                       </th>
                       <th
                         className="w-11 text-center sale-th-editable"
-                        title="Free Bonus Loose Units (deducted from stock, not billed)"
+                        title="Free Bonus Units (Auto-syncs with Pack.B; deducted from stock & COGS)"
                       >
                         Unit.B
                       </th>
                       <th
                         className="w-13 text-center sale-th-readonly"
-                        title="Total Billed Units (Pack.Q × PSize + Unit.Q)"
+                        title="Total Units Out (Billed Units + Bonus Units)"
                       >
                         Tot.U
                       </th>
@@ -2348,7 +2435,12 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                       >
                         Unit.P *
                       </th>
-                      <th className="w-12 text-center sale-th-editable">Disc %</th>
+                      <th
+                        className="w-14 text-center sale-th-readonly"
+                        title="Live Margin % from Average Cost"
+                      >
+                        Margin %
+                      </th>
                       <th
                         className="w-20 text-center sale-th-readonly"
                         title="Row Sub Total (Auto)"
@@ -2513,7 +2605,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                               ref={(el) => (packQtyRefs.current[i] = el)}
                               type="text"
                               name="pack_quantity"
-                              inputMode="numeric"
+                              inputMode="decimal"
                               placeholder="0"
                               value={zeroToEmpty(it.pack_quantity)}
                               onChange={(e) =>
@@ -2553,13 +2645,49 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                             />
                           </td>
 
+                          {/* Disc % (Next to Quantity) */}
+                          <td data-label="Disc %" className="text-center">
+                            <input
+                              ref={(el) => (discRefs.current[i] = el)}
+                              type="text"
+                              name="item_discount_percentage"
+                              inputMode="decimal"
+                              placeholder="0"
+                              value={zeroToEmpty(it.item_discount_percentage)}
+                              onChange={(e) =>
+                                handleItemChange(i, "item_discount_percentage", e.target.value)
+                              }
+                              onBlur={(e) => {
+                                const v = e.target.value;
+                                if (v !== "" && v !== "-" && v !== "-.") {
+                                  const num = Number(v);
+                                  if (Number.isFinite(num)) {
+                                    handleItemChange(
+                                      i,
+                                      "item_discount_percentage",
+                                      num.toFixed(2)
+                                    );
+                                  }
+                                }
+                              }}
+                              autoComplete="off"
+                              className={`w-full h-7 border rounded-md px-1.5 text-center ${
+                                isDark
+                                  ? "bg-slate-700 border-slate-500 text-slate-100"
+                                  : "bg-white border-gray-300 text-gray-900"
+                              }`}
+                              onKeyDown={(e) => onKeyNav(e, i, "disc")}
+                              onFocus={(e) => e.target.select()}
+                            />
+                          </td>
+
                           {/* Pack Bonus */}
                           <td data-label="Pack Bonus" className="text-center">
                             <input
                               ref={(el) => (packBonusRefs.current[i] = el)}
                               type="text"
                               name="pack_bonus"
-                              inputMode="numeric"
+                              inputMode="decimal"
                               placeholder="0"
                               value={zeroToEmpty(it.pack_bonus)}
                               onChange={(e) => handleItemChange(i, "pack_bonus", e.target.value)}
@@ -2707,39 +2835,33 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                             />
                           </td>
 
-                          {/* Disc % */}
-                          <td data-label="Disc %" className="text-center">
-                            <input
-                              ref={(el) => (discRefs.current[i] = el)}
-                              type="text"
-                              inputMode="decimal"
-                              placeholder="0"
-                              value={zeroToEmpty(it.item_discount_percentage)}
-                              onChange={(e) =>
-                                handleItemChange(i, "item_discount_percentage", e.target.value)
-                              }
-                              onBlur={(e) => {
-                                const v = e.target.value;
-                                if (v !== "" && v !== "-" && v !== "-.") {
-                                  const num = Number(v);
-                                  if (Number.isFinite(num)) {
-                                    handleItemChange(
-                                      i,
-                                      "item_discount_percentage",
-                                      num.toFixed(2)
-                                    );
+                          {/* Live Margin % (Read-Only) */}
+                          <td data-label="Margin %" className="text-center">
+                            {(() => {
+                              const liveMrg = computeRowMargin(it);
+                              const isNeg = liveMrg !== null && liveMrg < 0;
+                              return (
+                                <input
+                                  type="text"
+                                  readOnly
+                                  tabIndex={-1}
+                                  value={liveMrg !== null ? `${liveMrg}%` : ""}
+                                  placeholder="—"
+                                  title={
+                                    liveMrg !== null
+                                      ? `Margin from Avg Cost (${getRowUnitCost(it).toFixed(2)}/unit): ${liveMrg}%`
+                                      : "Margin %"
                                   }
-                                }
-                              }}
-                              autoComplete="off"
-                              className={`w-full h-7 border rounded-md px-1.5 text-center ${
-                                isDark
-                                  ? "bg-slate-700 border-slate-500 text-slate-100"
-                                  : "bg-white border-gray-300 text-gray-900"
-                              }`}
-                              onKeyDown={(e) => onKeyNav(e, i, "disc")}
-                              onFocus={(e) => e.target.select()}
-                            />
+                                  className={`sale-readonly-field w-full h-7 rounded-md px-1 text-center font-mono font-bold text-[10.5px] ${
+                                    isNeg
+                                      ? "!bg-red-100 dark:!bg-red-950/80 !text-red-700 dark:!text-red-300 !border-red-500"
+                                      : liveMrg !== null
+                                      ? "!text-emerald-700 dark:!text-emerald-300"
+                                      : ""
+                                  }`}
+                                />
+                              );
+                            })()}
                           </td>
 
                           {/* Sub Total */}

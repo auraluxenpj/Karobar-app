@@ -264,6 +264,14 @@ export default function AppRoutes() {
           />
           <Route path="/sale-invoices/:id/edit" element={<EditSaleInvoice />} />
           <Route path="/sale-invoices/:id" element={<ShowSaleInvoice />} />
+          <Route
+            path="/wholesale-invoices/:id"
+            element={
+              <SaleSystemGuard requiredSaleSystem="wholesale">
+                <ShowSaleInvoice defaultSaleType="wholesale" />
+              </SaleSystemGuard>
+            }
+          />
 
           {/* Sale Returns */}
           <Route path="/sale-returns" element={<IndexSaleReturn />} />

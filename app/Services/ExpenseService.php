@@ -395,12 +395,16 @@ class ExpenseService
         $netSales = round(max(0.0, $totalSales - $totalReturns), 2);
 
         // 3. Cost of Goods Sold (COGS) (excluding reversed invoices)
+        $hasBonusCol = \Illuminate\Support\Facades\Schema::hasColumn('sale_invoice_items', 'bonus');
+        $saleUnitsExpr = $hasBonusCol
+            ? '(COALESCE(sii.quantity, 0) + COALESCE(sii.bonus, 0))'
+            : 'COALESCE(sii.quantity, 0)';
         $cogsSales = (float) DB::table('sale_invoice_items as sii')
             ->join('sale_invoices as si', 'si.id', '=', 'sii.sale_invoice_id')
             ->join('products as p', 'p.id', '=', 'sii.product_id')
             ->whereBetween('si.date', [$from, $to])
             ->where(fn ($q) => $q->whereNull('si.status')->orWhere('si.status', '!=', 'reversed'))
-            ->sum(DB::raw('COALESCE(sii.quantity, 0) * COALESCE(sii.cost_price_snapshot, CASE WHEN p.avg_price IS NULL OR p.avg_price = 0 THEN COALESCE(p.unit_purchase_price, 0) ELSE p.avg_price END)'));
+            ->sum(DB::raw("{$saleUnitsExpr} * COALESCE(sii.cost_price_snapshot, CASE WHEN p.avg_price IS NULL OR p.avg_price = 0 THEN COALESCE(p.unit_purchase_price, 0) ELSE p.avg_price END)"));
 
         $cogsReturns = (float) DB::table('sale_return_items as sri')
             ->join('sale_returns as sr', 'sr.id', '=', 'sri.sale_return_id')

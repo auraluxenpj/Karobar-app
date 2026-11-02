@@ -32,11 +32,12 @@ const getButtonTextColor = (primaryColor, primaryHoverColor) => {
   return getContrastText(primaryHoverColor || primaryColor);
 };
 
-export default function SaleInvoiceShow() {
+export default function SaleInvoiceShow({ defaultSaleType = null }) {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [inv, setInv] = useState(null);
+  const isWholesale = (inv?.sale_type || defaultSaleType) === "wholesale";
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [printerType, setPrinterType] = useState("a4");
@@ -232,17 +233,24 @@ export default function SaleInvoiceShow() {
 
   // After delete, go to previous or index
   const goToPrevOrIndex = async (deletedId) => {
+    const indexPath = isWholesale ? "/wholesale-invoices" : "/sale-invoices";
     try {
-      const res = await axios.get("/api/sale-invoices");
+      const res = await axios.get("/api/sale-invoices", {
+        params: isWholesale ? { sale_type: "wholesale" } : undefined,
+      });
       const list = Array.isArray(res.data) ? res.data : [];
       const prev = list
         .filter((x) => Number(x?.id) < Number(deletedId))
         .sort((a, b) => Number(b?.id) - Number(a?.id))[0];
 
-      if (prev?.id) navigate(`/sale-invoices/${prev.id}`);
-      else navigate("/sale-invoices");
+      if (prev?.id) {
+        const prevType = prev?.sale_type || (isWholesale ? "wholesale" : "retail");
+        navigate(prevType === "wholesale" ? `/wholesale-invoices/${prev.id}` : `/sale-invoices/${prev.id}`);
+      } else {
+        navigate(indexPath);
+      }
     } catch {
-      navigate("/sale-invoices");
+      navigate(indexPath);
     }
   };
 
@@ -393,9 +401,7 @@ export default function SaleInvoiceShow() {
       if (k === "n" || e.code === "KeyN") {
         if (!can.create) return;
         e.preventDefault();
-        // Navigate based on the current invoice's sale_type
-        const saleType = inv?.sale_type || "retail";
-        if (saleType === "wholesale") {
+        if (isWholesale) {
           navigate("/sale-invoices/create/wholesale");
         } else {
           navigate("/sale-invoices/create/retail");
@@ -412,18 +418,82 @@ export default function SaleInvoiceShow() {
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [navigate, id, can, inv]);
+  }, [navigate, id, can, inv, isWholesale]);
+
+  const wholesaleTotals = useMemo(() => {
+    if (!isWholesale || !inv) return null;
+    let totalPacks = 0;
+    let billedUnits = 0;
+    let bonusPacks = 0;
+    let bonusUnits = 0;
+    let totalCost = 0;
+    let totalSubTotal = 0;
+
+    for (const it of inv?.items || []) {
+      const ps = Math.max(1, Number(it.pack_size || 1));
+      const qty = Number(it.quantity || 0);
+      const pQty =
+        it.pack_quantity !== undefined && it.pack_quantity !== null && Number(it.pack_quantity) > 0
+          ? Number(it.pack_quantity)
+          : Number((qty / ps).toFixed(2));
+      const bQty = Number(it.bonus || 0);
+      const pBonus =
+        it.pack_bonus !== undefined && it.pack_bonus !== null && Number(it.pack_bonus) > 0
+          ? Number(it.pack_bonus)
+          : Number((bQty / ps).toFixed(2));
+      const avgCost = Number(
+        it.cost_price_snapshot || it.product?.avg_price || it.product?.unit_purchase_price || 0
+      );
+
+      totalPacks += pQty;
+      billedUnits += qty;
+      bonusPacks += pBonus;
+      bonusUnits += bQty;
+      totalCost += (qty + bQty) * avgCost;
+      totalSubTotal += Number(it.sub_total || 0);
+    }
+
+    const totalUnitsOut = billedUnits + bonusUnits;
+    const invoiceMarginPct =
+      totalCost > 0 ? Number((((totalSubTotal - totalCost) / totalCost) * 100).toFixed(2)) : 0;
+
+    return {
+      totalPacks: Number(totalPacks.toFixed(2)),
+      billedUnits,
+      bonusPacks: Number(bonusPacks.toFixed(2)),
+      bonusUnits,
+      totalUnitsOut,
+      totalCost: Number(totalCost.toFixed(2)),
+      invoiceMarginPct,
+    };
+  }, [inv, isWholesale]);
 
   if (loading || permsLoading) return <PageSkeleton />;
   if (!inv) return <div className="p-4 text-sm dark:text-gray-400">Invoice not found.</div>;
 
   const fmt = (v) => ((v ?? "") === "" ? "" : String(v));
 
+  const formatAvailBadge = (units, packSize) => {
+    if (units === "" || units === null || units === undefined) return "—";
+    const u = Number(units || 0);
+    const ps = Math.max(1, Number(packSize || 1));
+    if (ps > 1) {
+      const p = Math.floor(u / ps);
+      const rem = u % ps;
+      return rem > 0 ? `${p}P+${rem}U (${u})` : `${p}P (${u})`;
+    }
+    return String(u);
+  };
+
   const hasClinicalCols = Boolean(isPharmacy || inv?.doctor_name || inv?.patient_name);
   const headerColCount = hasClinicalCols ? 6 : 4;
 
   return (
-    <div className={`sale-entry h-[calc(100vh-130px)] flex flex-col ${isDark ? "bg-slate-900" : "bg-white"}`}>
+    <div
+      className={`sale-entry h-[calc(100vh-130px)] flex flex-col ${
+        isDark ? "bg-slate-900" : "bg-white"
+      }`}
+    >
       <style>{`
         @media print {
           .no-print { display: none !important; }
@@ -434,28 +504,46 @@ export default function SaleInvoiceShow() {
       {/* === Header (branded banner, matches Sale Invoice form) === */}
       <div className={`sale-entry-header shrink-0 sticky top-0 z-20 border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
         {/* Branded Banner */}
-        <div className="sale-entry-banner px-4 py-2.5 flex items-center justify-between gap-3">
+        <div className="sale-entry-banner px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center shadow-inner"
               style={{ backgroundColor: "rgba(255,255,255,0.18)", backdropFilter: "blur(4px)" }}
             >
-              {/* Receipt icon */}
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z" />
-                <line x1="8" y1="7" x2="16" y2="7" />
-                <line x1="8" y1="11" x2="16" y2="11" />
-                <line x1="8" y1="15" x2="13" y2="15" />
-              </svg>
+              {isWholesale ? (
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                  <line x1="12" y1="22.08" x2="12" y2="12" />
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z" />
+                  <line x1="8" y1="7" x2="16" y2="7" />
+                  <line x1="8" y1="11" x2="16" y2="11" />
+                  <line x1="8" y1="15" x2="13" y2="15" />
+                </svg>
+              )}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-extrabold tracking-wide text-white leading-none">Sale Invoice</h2>
+                <h2 className="text-lg font-extrabold tracking-wide text-white leading-none">
+                  {isWholesale ? "Wholesale Invoice" : "Sale Invoice"}
+                </h2>
                 <span
                   className="px-2 py-0.5 rounded-md text-[9px] font-bold tracking-widest text-white"
                   style={{ backgroundColor: "rgba(255,255,255,0.22)", backdropFilter: "blur(4px)" }}
                 >
-                  {(inv?.sale_type || "retail").toUpperCase()}
+                  {isWholesale ? "B2B PACK & UNIT" : (inv?.sale_type || "retail").toUpperCase()}
                 </span>
                 <span
                   className="px-2 py-0.5 rounded-md text-[9px] font-bold tracking-widest text-white"
@@ -470,7 +558,7 @@ export default function SaleInvoiceShow() {
                 )}
               </div>
               <p className="text-[10px] text-white/80 mt-0.5">
-                Alt+F search · Alt+E edit · Alt+P print · Alt+B back
+                Alt+F search · Alt+E edit · Alt+P print · Alt+N new · Alt+B back
               </p>
             </div>
           </div>
@@ -494,7 +582,7 @@ export default function SaleInvoiceShow() {
                       backdropFilter: active ? "blur(4px)" : "none",
                     }}
                   >
-                    {type === "debit" ? "Debit" : "Credit"}
+                    {type === "debit" ? (isWholesale ? "Debit (Cash)" : "Debit") : (isWholesale ? "Credit (Ledger)" : "Credit")}
                   </span>
                 );
               })}
@@ -627,8 +715,7 @@ export default function SaleInvoiceShow() {
               <button
                 type="button"
                 onClick={() => {
-                  const saleType = inv?.sale_type || "retail";
-                  if (saleType === "wholesale") navigate("/sale-invoices/create/wholesale");
+                  if (isWholesale) navigate("/sale-invoices/create/wholesale");
                   else navigate("/sale-invoices/create/retail");
                 }}
                 className={`px-3 py-2 text-[11px] font-bold transition-all duration-200 ${btnPrimary.className}`}
@@ -650,140 +737,1038 @@ export default function SaleInvoiceShow() {
           </div>
         </div>
 
-        {/* Fields Card (Table Style instead of Form Inputs) */}
-        <div className="sale-entry-details px-3 py-2">
-          <div className={`overflow-x-auto rounded-lg border ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-            <table className="w-full text-[11px] border-collapse">
-              <thead>
-                <tr className={`border-b text-[9.5px] font-semibold uppercase tracking-wide ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
-                  <th className={`px-3 py-1 text-left border-r w-36 ${isDark ? "border-slate-700" : "border-gray-200"}`}>Posted #</th>
-                  <th className={`px-3 py-1 text-left border-r w-36 ${isDark ? "border-slate-700" : "border-gray-200"}`}>Date</th>
-                  <th className={`px-3 py-1 text-left border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>Customer</th>
-                  {hasClinicalCols && (
-                    <>
-                      <th className={`px-3 py-1 text-left border-r w-44 ${isDark ? "border-slate-700" : "border-gray-200"}`}>Doctor</th>
-                      <th className={`px-3 py-1 text-left border-r w-44 ${isDark ? "border-slate-700" : "border-gray-200"}`}>Patient</th>
-                    </>
-                  )}
-                  <th className="px-3 py-1 text-center w-24">Items</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className={`border-b ${isDark ? "bg-slate-800/60 text-slate-200 border-slate-700" : "bg-white text-gray-800 border-gray-200"}`}>
-                  <td className={`px-3 py-1.5 font-mono font-semibold border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                    {fmt(inv.posted_number) || "—"}
-                  </td>
-                  <td className={`px-3 py-1.5 font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                    {fmt(inv.date) || "—"}
-                  </td>
-                  <td className={`px-3 py-1.5 font-medium border-r ${isDark ? "border-slate-700 text-blue-300" : "border-gray-200 text-blue-700"}`}>
-                    <span className="inline-flex items-center gap-1.5">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                      <span>{inv.customer?.name ?? inv.customer_id ?? "Walk-in Customer"}</span>
-                    </span>
-                  </td>
-                  {hasClinicalCols && (
-                    <>
-                      <td className={`px-3 py-1.5 border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                        {fmt(inv.doctor_name) || "—"}
-                      </td>
-                      <td className={`px-3 py-1.5 border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                        {fmt(inv.patient_name) || "—"}
-                      </td>
-                    </>
-                  )}
-                  <td className="px-3 py-1.5 text-center font-mono font-bold">
-                    {(inv.items || []).length}
-                  </td>
-                </tr>
-                <tr className={`border-b text-[9.5px] font-semibold uppercase tracking-wide ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
-                  <th colSpan={headerColCount} className="px-3 py-1 text-left">Remarks</th>
-                </tr>
-                <tr className={isDark ? "bg-slate-800/60 text-slate-200" : "bg-white text-gray-800"}>
-                  <td colSpan={headerColCount} className="px-3 py-1.5">
-                    {fmt(inv.remarks) || "—"}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+        {/* Retail Fields Card (only for non-wholesale) */}
+        {!isWholesale && (
+          <div className="sale-entry-details px-3 py-2">
+            <div className={`overflow-x-auto rounded-lg border ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+              <table className="w-full text-[11px] border-collapse">
+                <thead>
+                  <tr className={`border-b text-[9.5px] font-semibold uppercase tracking-wide ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
+                    <th className={`px-3 py-1 text-left border-r w-36 ${isDark ? "border-slate-700" : "border-gray-200"}`}>Posted #</th>
+                    <th className={`px-3 py-1 text-left border-r w-36 ${isDark ? "border-slate-700" : "border-gray-200"}`}>Date</th>
+                    <th className={`px-3 py-1 text-left border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>Customer</th>
+                    {hasClinicalCols && (
+                      <>
+                        <th className={`px-3 py-1 text-left border-r w-44 ${isDark ? "border-slate-700" : "border-gray-200"}`}>Doctor</th>
+                        <th className={`px-3 py-1 text-left border-r w-44 ${isDark ? "border-slate-700" : "border-gray-200"}`}>Patient</th>
+                      </>
+                    )}
+                    <th className="px-3 py-1 text-center w-24">Items</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className={`border-b ${isDark ? "bg-slate-800/60 text-slate-200 border-slate-700" : "bg-white text-gray-800 border-gray-200"}`}>
+                    <td className={`px-3 py-1.5 font-mono font-semibold border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                      {fmt(inv.posted_number) || "—"}
+                    </td>
+                    <td className={`px-3 py-1.5 font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                      {fmt(inv.date) || "—"}
+                    </td>
+                    <td className={`px-3 py-1.5 font-medium border-r ${isDark ? "border-slate-700 text-blue-300" : "border-gray-200 text-blue-700"}`}>
+                      <span className="inline-flex flex-wrap items-center gap-1.5">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                        <span>{inv.customer?.name ?? inv.customer_id ?? "Walk-in Customer"}</span>
+                      </span>
+                    </td>
+                    {hasClinicalCols && (
+                      <>
+                        <td className={`px-3 py-1.5 border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                          {fmt(inv.doctor_name) || "—"}
+                        </td>
+                        <td className={`px-3 py-1.5 border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                          {fmt(inv.patient_name) || "—"}
+                        </td>
+                      </>
+                    )}
+                    <td className="px-3 py-1.5 text-center font-mono font-bold">
+                      {(inv.items || []).length}
+                    </td>
+                  </tr>
+                  <tr className={`border-b text-[9.5px] font-semibold uppercase tracking-wide ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-500 border-gray-200"}`}>
+                    <th colSpan={headerColCount} className="px-3 py-1 text-left">Remarks</th>
+                  </tr>
+                  <tr className={isDark ? "bg-slate-800/60 text-slate-200" : "bg-white text-gray-800"}>
+                    <td colSpan={headerColCount} className="px-3 py-1.5">
+                      {fmt(inv.remarks) || "—"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* === Main workspace: Items (fluid) + Summary (280px) === */}
-      <div className={`sale-entry-workspace flex-1 flex flex-col lg:grid lg:grid-cols-[1fr_280px] gap-2 px-2 py-2 overflow-visible lg:overflow-hidden ${isDark ? "bg-slate-900" : "bg-white"}`}>
-        {/* LEFT: Items */}
-        <div className="flex flex-col min-h-0">
-          <div className={`text-[11px] font-semibold mb-1 ${isDark ? "text-slate-300" : "text-gray-700"}`}>Items</div>
-          <div ref={itemsScrollRef} className={`sale-entry-items flex-1 overflow-auto border-2 rounded-sm relative ${isDark ? "border-slate-700 bg-slate-800" : "border-gray-200 bg-white"}`}>
-            <table className="invoice-repeater-table w-full text-[11px] lg:table-fixed border-collapse print-table">
-              <thead className={`sticky top-0 z-20 ${isDark ? "bg-slate-800/90 backdrop-blur-xs" : "bg-white/80 backdrop-blur-xs"} border-b ${isDark ? "border-slate-700" : "border-gray-200/70"}`}>
-                <tr className="[&>th]:py-1.5 [&>th]:px-1.5 [&>th]:text-left">
-                  <th className={`w-7 text-center border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-500 border-gray-200"}`}>#</th>
-                  <th className={`w-[30%] min-w-[220px] border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Product</th>
-                  <th className={`w-11 text-center border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>PSize</th>
-                  <th className={`w-18 border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Batch</th>
-                  <th className={`w-[74px] text-center border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Expiry</th>
-                  <th className={`w-14 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Avail</th>
-                  {inv?.sale_type === "wholesale" ? (
-                    <>
-                      <th className={`w-12 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Pack.Q</th>
-                      <th className={`w-12 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Unit.Q</th>
-                      <th className={`w-12 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Pack.B</th>
-                      <th className={`w-12 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Unit.B</th>
-                      <th className={`w-13 text-center border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Tot.U</th>
-                      <th className={`w-16 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Pack.P</th>
-                      <th className={`w-16 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Unit.P</th>
-                    </>
-                  ) : (
-                    <>
-                      <th className={`w-14 text-right border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Qty</th>
-                      <th className={`w-18 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Price</th>
-                    </>
-                  )}
-                  <th className={`w-13 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Disc%</th>
-                  <th className={`w-20 text-right ${isDark ? "text-slate-300" : "text-gray-700"}`}>Sub Total</th>
-                </tr>
-              </thead>
-              <tbody className={`[&>tr>td]:py-1.5 [&>tr>td]:px-2 ${isDark ? "[&>tr]:border-slate-700 [&>tr>td]:text-slate-200" : "[&>tr]:border-gray-200 [&>tr>td]:text-gray-800"}`}>
-                {(inv.items || []).map((it, i) => {
-                  const ps = Math.max(1, Number(it.pack_size || 1));
-                  const totalUnits = Number(it.quantity || 0);
-                  const packQty =
-                    it.pack_quantity !== undefined && it.pack_quantity !== null && Number(it.pack_quantity) > 0
-                      ? Number(it.pack_quantity)
-                      : ps > 1
-                      ? Math.floor(totalUnits / ps)
-                      : 0;
-                  const unitQty =
-                    it.unit_quantity !== undefined && it.unit_quantity !== null && (Number(it.unit_quantity) > 0 || Number(it.pack_quantity) > 0)
-                      ? Number(it.unit_quantity)
-                      : ps > 1
-                      ? totalUnits % ps
-                      : totalUnits;
-                  const bonusQty = Number(it.bonus || 0);
-                  const hasExplicitBonusBreakdown =
-                    Number(it.pack_bonus || 0) > 0 || Number(it.unit_bonus || 0) > 0;
-                  const packBonus = hasExplicitBonusBreakdown
-                    ? Number(it.pack_bonus || 0)
-                    : ps > 1
-                    ? Math.floor(bonusQty / ps)
-                    : 0;
-                  const unitBonus = hasExplicitBonusBreakdown
-                    ? Number(it.unit_bonus || 0)
-                    : ps > 1
-                    ? bonusQty % ps
-                    : bonusQty;
-                  const unitPrice = Number(it.price || 0);
-                  const packPrice =
-                    it.pack_price !== undefined && it.pack_price !== null && Number(it.pack_price) > 0
-                      ? Number(it.pack_price)
-                      : Number((unitPrice * ps).toFixed(2));
+      {isWholesale ? (
+        /* === WHOLESALE WORKSPACE (Wholesale layout: Full-width Top Details + Full-width Items + Bottom Summary Footer, using Retail Show table style) === */
+        <div
+          className={`sale-entry-workspace flex-1 min-h-0 flex flex-col gap-2 p-2 overflow-visible lg:overflow-hidden ${
+            isDark ? "bg-slate-900" : "bg-white"
+          }`}
+        >
+          {/* FULL-WIDTH TOP + ITEMS SECTION */}
+          <div className="flex flex-col min-h-0 flex-1 gap-2 overflow-hidden">
+            {/* Top Banner Details Card (Table style like Retail Show) */}
+            <div className="sale-entry-details shrink-0">
+              <div
+                className={`overflow-x-auto rounded-lg border ${
+                  isDark ? "border-slate-700" : "border-gray-200"
+                }`}
+              >
+                <table className="w-full text-[11px] border-collapse">
+                  <thead>
+                    <tr
+                      className={`border-b text-[9.5px] font-semibold uppercase tracking-wide ${
+                        isDark
+                          ? "bg-slate-800/90 text-slate-400 border-slate-700"
+                          : "bg-gray-50 text-gray-500 border-gray-200"
+                      }`}
+                    >
+                      <th
+                        className={`px-3 py-1 text-left border-r w-36 ${
+                          isDark ? "border-slate-700" : "border-gray-200"
+                        }`}
+                      >
+                        Posted #
+                      </th>
+                      <th
+                        className={`px-3 py-1 text-left border-r w-36 ${
+                          isDark ? "border-slate-700" : "border-gray-200"
+                        }`}
+                      >
+                        Date
+                      </th>
+                      <th
+                        className={`px-3 py-1 text-left border-r ${
+                          isDark ? "border-slate-700" : "border-gray-200"
+                        }`}
+                      >
+                        Wholesale Customer
+                      </th>
+                      {hasClinicalCols && (
+                        <>
+                          <th
+                            className={`px-3 py-1 text-left border-r w-44 ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            Doctor
+                          </th>
+                          <th
+                            className={`px-3 py-1 text-left border-r w-44 ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            Patient
+                          </th>
+                        </>
+                      )}
+                      <th className="px-3 py-1 text-center w-64">Order Breakdown</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      className={`border-b ${
+                        isDark
+                          ? "bg-slate-800/60 text-slate-200 border-slate-700"
+                          : "bg-white text-gray-800 border-gray-200"
+                      }`}
+                    >
+                      <td
+                        className={`px-3 py-1.5 font-mono font-semibold border-r ${
+                          isDark ? "border-slate-700" : "border-gray-200"
+                        }`}
+                      >
+                        {fmt(inv.posted_number) || "—"}
+                      </td>
+                      <td
+                        className={`px-3 py-1.5 font-mono border-r ${
+                          isDark ? "border-slate-700" : "border-gray-200"
+                        }`}
+                      >
+                        {fmt(inv.date) || "—"}
+                      </td>
+                      <td
+                        className={`px-3 py-1.5 font-medium border-r ${
+                          isDark
+                            ? "border-slate-700 text-blue-300"
+                            : "border-gray-200 text-blue-700"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="inline-flex flex-wrap items-center gap-1.5">
+                            <svg
+                              width="13"
+                              height="13"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="shrink-0"
+                            >
+                              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                              <circle cx="12" cy="7" r="4" />
+                            </svg>
+                            <span>
+                              {inv.customer?.name ?? inv.customer_id ?? "Walk-in Customer"}
+                            </span>
+                          </span>
+                          {(inv.customer?.phone || inv.customer?.address) && (
+                            <span className="text-[10px] font-mono opacity-80">
+                              {[inv.customer?.phone, inv.customer?.address]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      {hasClinicalCols && (
+                        <>
+                          <td
+                            className={`px-3 py-1.5 border-r ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            {fmt(inv.doctor_name) || "—"}
+                          </td>
+                          <td
+                            className={`px-3 py-1.5 border-r ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            {fmt(inv.patient_name) || "—"}
+                          </td>
+                        </>
+                      )}
+                      <td className="px-3 py-1.5 text-center font-mono font-bold">
+                        <span>
+                          {(inv.items || []).length}{" "}
+                          {(inv.items || []).length === 1 ? "line" : "lines"}
+                        </span>
+                        {wholesaleTotals && (
+                          <span className="ml-2 text-blue-600 dark:text-blue-400">
+                            · {wholesaleTotals.totalPacks}P ({wholesaleTotals.billedUnits}U)
+                            {wholesaleTotals.bonusUnits > 0
+                              ? ` +${wholesaleTotals.bonusPacks}PB (${wholesaleTotals.bonusUnits}B)`
+                              : ""}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                    <tr
+                      className={`border-b text-[9.5px] font-semibold uppercase tracking-wide ${
+                        isDark
+                          ? "bg-slate-800/90 text-slate-400 border-slate-700"
+                          : "bg-gray-50 text-gray-500 border-gray-200"
+                      }`}
+                    >
+                      <th colSpan={headerColCount} className="px-3 py-1 text-left">
+                        Remarks / Delivery Note
+                      </th>
+                    </tr>
+                    <tr
+                      className={
+                        isDark
+                          ? "bg-slate-800/60 text-slate-200"
+                          : "bg-white text-gray-800"
+                      }
+                    >
+                      <td colSpan={headerColCount} className="px-3 py-1.5">
+                        {fmt(inv.remarks) || "—"}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-                  return (
+            {/* Items Table Card (Retail Show table style with Wholesale columns) */}
+            <div className="flex flex-col min-h-0 flex-1">
+              <div className="flex items-center justify-between mb-1 px-0.5">
+                <div
+                  className={`text-[11px] font-semibold ${
+                    isDark ? "text-slate-300" : "text-gray-700"
+                  }`}
+                >
+                  Wholesale Line Items (Packs + Loose Units + Bonus Scheme)
+                </div>
+                {wholesaleTotals && (
+                  <div className="flex items-center gap-3 text-[10.5px] font-mono">
+                    <span className="text-gray-500 dark:text-slate-400">
+                      Total Stock Out:{" "}
+                      <strong className={isDark ? "text-slate-200" : "text-gray-800"}>
+                        {wholesaleTotals.totalUnitsOut} units
+                      </strong>
+                    </span>
+                    <span className="text-gray-500 dark:text-slate-400">
+                      Est. Cost:{" "}
+                      <strong className={isDark ? "text-slate-200" : "text-gray-800"}>
+                        {wholesaleTotals.totalCost.toFixed(2)}
+                      </strong>
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div
+                ref={itemsScrollRef}
+                className={`sale-entry-items flex-1 overflow-auto border-2 rounded-sm relative ${
+                  isDark ? "border-slate-700 bg-slate-800" : "border-gray-200 bg-white"
+                }`}
+              >
+                <table className="invoice-repeater-table w-full min-w-[960px] text-[11px] lg:table-fixed border-collapse print-table">
+                  <thead
+                    className={`sticky top-0 z-20 ${
+                      isDark
+                        ? "bg-slate-800/90 backdrop-blur-xs border-slate-700"
+                        : "bg-white/80 backdrop-blur-xs border-gray-200/70"
+                    } border-b`}
+                  >
+                    <tr className="[&>th]:py-1.5 [&>th]:px-1.5 [&>th]:text-left">
+                      <th
+                        className={`w-7 text-center border-r ${
+                          isDark
+                            ? "text-slate-400 border-slate-700"
+                            : "text-gray-500 border-gray-200"
+                        }`}
+                      >
+                        #
+                      </th>
+                      <th
+                        className={`w-[24%] min-w-[200px] border-r ${
+                          isDark
+                            ? "text-slate-300 border-slate-700"
+                            : "text-gray-700 border-gray-200"
+                        }`}
+                      >
+                        Product
+                      </th>
+                      <th
+                        className={`w-11 text-center border-r ${
+                          isDark
+                            ? "text-slate-400 border-slate-700"
+                            : "text-gray-600 border-gray-200"
+                        }`}
+                        title="Pack Size"
+                      >
+                        PSize
+                      </th>
+                      <th
+                        className={`w-18 border-r ${
+                          isDark
+                            ? "text-slate-300 border-slate-700"
+                            : "text-gray-700 border-gray-200"
+                        }`}
+                      >
+                        Batch
+                      </th>
+                      <th
+                        className={`w-[74px] text-center border-r ${
+                          isDark
+                            ? "text-slate-400 border-slate-700"
+                            : "text-gray-600 border-gray-200"
+                        }`}
+                        title="Expiry Date"
+                      >
+                        Expiry
+                      </th>
+                      <th
+                        className={`w-18 text-center border-r ${
+                          isDark
+                            ? "text-slate-400 border-slate-700"
+                            : "text-gray-600 border-gray-200"
+                        }`}
+                        title="Available Stock (Packs / Units)"
+                      >
+                        Avail (P/U)
+                      </th>
+                      <th
+                        className={`w-13 text-right border-r ${
+                          isDark
+                            ? "text-slate-300 border-slate-700"
+                            : "text-gray-700 border-gray-200"
+                        }`}
+                        title="Number of Packs"
+                      >
+                        Pack.Q
+                      </th>
+                      <th
+                        className={`w-13 text-right border-r ${
+                          isDark
+                            ? "text-slate-300 border-slate-700"
+                            : "text-gray-700 border-gray-200"
+                        }`}
+                        title="Number of Units"
+                      >
+                        Unit.Q
+                      </th>
+                      <th
+                        className={`w-12 text-right border-r ${
+                          isDark
+                            ? "text-slate-400 border-slate-700"
+                            : "text-gray-600 border-gray-200"
+                        }`}
+                        title="Item Discount %"
+                      >
+                        Disc%
+                      </th>
+                      <th
+                        className={`w-12 text-right border-r ${
+                          isDark
+                            ? "text-slate-400 border-slate-700"
+                            : "text-gray-600 border-gray-200"
+                        }`}
+                        title="Bonus Packs"
+                      >
+                        Pack.B
+                      </th>
+                      <th
+                        className={`w-12 text-right border-r ${
+                          isDark
+                            ? "text-slate-400 border-slate-700"
+                            : "text-gray-600 border-gray-200"
+                        }`}
+                        title="Bonus Units"
+                      >
+                        Unit.B
+                      </th>
+                      <th
+                        className={`w-14 text-right border-r ${
+                          isDark
+                            ? "text-slate-400 border-slate-700"
+                            : "text-gray-600 border-gray-200"
+                        }`}
+                        title="Total Units Out"
+                      >
+                        Tot.U
+                      </th>
+                      <th
+                        className={`w-17 text-right border-r ${
+                          isDark
+                            ? "text-slate-300 border-slate-700"
+                            : "text-gray-700 border-gray-200"
+                        }`}
+                        title="Wholesale Pack Price"
+                      >
+                        Pack.P
+                      </th>
+                      <th
+                        className={`w-17 text-right border-r ${
+                          isDark
+                            ? "text-slate-300 border-slate-700"
+                            : "text-gray-700 border-gray-200"
+                        }`}
+                        title="Wholesale Unit Price"
+                      >
+                        Unit.P
+                      </th>
+                      <th
+                        className={`w-15 text-right border-r no-print ${
+                          isDark
+                            ? "text-slate-400 border-slate-700"
+                            : "text-gray-600 border-gray-200"
+                        }`}
+                        title="Margin % from Average Cost"
+                      >
+                        Margin%
+                      </th>
+                      <th
+                        className={`w-20 text-right ${
+                          isDark ? "text-slate-300" : "text-gray-700"
+                        }`}
+                        title="Row Sub Total"
+                      >
+                        Sub Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody
+                    className={`[&>tr>td]:py-1.5 [&>tr>td]:px-2 ${
+                      isDark
+                        ? "[&>tr]:border-slate-700 [&>tr>td]:text-slate-200"
+                        : "[&>tr]:border-gray-200 [&>tr>td]:text-gray-800"
+                    }`}
+                  >
+                    {(inv.items || []).map((it, i) => {
+                      const ps = Math.max(1, Number(it.pack_size || 1));
+                      const totalUnits = Number(it.quantity || 0);
+                      const packQty =
+                        it.pack_quantity !== undefined &&
+                        it.pack_quantity !== null &&
+                        Number(it.pack_quantity) > 0
+                          ? Number(it.pack_quantity)
+                          : Number((totalUnits / ps).toFixed(2));
+                      const unitQty = totalUnits;
+                      const bonusQty = Number(it.bonus || 0);
+                      const packBonus =
+                        it.pack_bonus !== undefined &&
+                        it.pack_bonus !== null &&
+                        Number(it.pack_bonus) > 0
+                          ? Number(it.pack_bonus)
+                          : Number((bonusQty / ps).toFixed(2));
+                      const unitBonus = bonusQty;
+                      const unitPrice = Number(it.price || 0);
+                      const packPrice =
+                        it.pack_price !== undefined &&
+                        it.pack_price !== null &&
+                        Number(it.pack_price) > 0
+                          ? Number(it.pack_price)
+                          : Number((unitPrice * ps).toFixed(2));
+                      const avgCost = Number(
+                        it.cost_price_snapshot ||
+                          it.product?.avg_price ||
+                          it.product?.unit_purchase_price ||
+                          0
+                      );
+                      const subTotal = Number(it.sub_total || 0);
+                      const totalUnitsOut = totalUnits + bonusQty;
+                      const totalRowCost = totalUnitsOut * avgCost;
+                      const discPct = Number(it.item_discount_percentage || 0);
+                      const effUnitPrice = unitPrice * (1 - discPct / 100);
+                      const rowMarginPct =
+                        avgCost > 0
+                          ? totalRowCost > 0
+                            ? ((subTotal - totalRowCost) / totalRowCost) * 100
+                            : ((effUnitPrice - avgCost) / avgCost) * 100
+                          : 0;
+                      const isNeg = rowMarginPct < 0;
+
+                      return (
+                        <tr
+                          key={i}
+                          className={`invoice-repeater-row border-b ${
+                            isDark
+                              ? "border-slate-700 hover:bg-slate-700/40"
+                              : "border-gray-200 hover:bg-gray-50"
+                          }`}
+                        >
+                          <td
+                            data-label="Item #"
+                            className={`invoice-cell-index-only text-center font-mono border-r ${
+                              isDark
+                                ? "border-slate-700 text-slate-400"
+                                : "border-gray-200 text-gray-500"
+                            }`}
+                          >
+                            {i + 1}
+                          </td>
+                          <td
+                            data-label="Product"
+                            title={it.product?.name ?? String(it.product_id)}
+                            className={`invoice-cell-product text-left font-medium lg:truncate border-r ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            {it.product?.name ?? it.product_id}
+                          </td>
+                          <td
+                            data-label="Pack Size"
+                            className={`text-center font-mono border-r ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            {fmt(it.pack_size) || "—"}
+                          </td>
+                          <td
+                            data-label="Batch"
+                            className={`text-left font-mono lg:truncate border-r ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            {fmt(it.batch_number) || "—"}
+                          </td>
+                          <td
+                            data-label="Expiry"
+                            title={
+                              it.expiry ? String(it.expiry).trim().slice(0, 10) : undefined
+                            }
+                            className={`text-center font-mono border-r ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            {it.expiry
+                              ? String(it.expiry)
+                                  .trim()
+                                  .slice(0, 10)
+                                  .replace(/^(\d{4})-(\d{2})(?:-\d{2})?$/, "$2/$1")
+                              : "—"}
+                          </td>
+                          <td
+                            data-label="Avail (P/U)"
+                            className={`text-center font-mono text-[10.5px] border-r ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            {formatAvailBadge(it.current_quantity, it.pack_size)}
+                          </td>
+                          <td
+                            data-label="Pack Qty"
+                            className={`text-right font-mono font-bold border-r ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            {packQty}
+                          </td>
+                          <td
+                            data-label="Unit Qty"
+                            className={`text-right font-mono font-bold border-r ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            {unitQty}
+                          </td>
+                          <td
+                            data-label="Disc %"
+                            className={`text-right font-mono border-r ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            {fmt(it.item_discount_percentage) || "0"}
+                          </td>
+                          <td
+                            data-label="Pack Bonus"
+                            className={`text-right font-mono font-semibold border-r ${
+                              packBonus > 0
+                                ? isDark
+                                  ? "text-emerald-400 border-slate-700"
+                                  : "text-emerald-600 border-gray-200"
+                                : isDark
+                                ? "border-slate-700"
+                                : "border-gray-200"
+                            }`}
+                          >
+                            {packBonus}
+                          </td>
+                          <td
+                            data-label="Unit Bonus"
+                            className={`text-right font-mono font-semibold border-r ${
+                              unitBonus > 0
+                                ? isDark
+                                  ? "text-emerald-400 border-slate-700"
+                                  : "text-emerald-600 border-gray-200"
+                                : isDark
+                                ? "border-slate-700"
+                                : "border-gray-200"
+                            }`}
+                          >
+                            {unitBonus}
+                          </td>
+                          <td
+                            data-label="Total Units"
+                            className={`text-right font-mono font-bold border-r ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            {totalUnits}
+                            {bonusQty > 0 ? `+${bonusQty}` : ""}
+                          </td>
+                          <td
+                            data-label="Pack Price"
+                            className={`text-right font-mono font-semibold border-r ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            {packPrice.toFixed(2)}
+                          </td>
+                          <td
+                            data-label="Unit Price"
+                            className={`text-right font-mono border-r ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            {unitPrice.toFixed(2)}
+                          </td>
+                          <td
+                            data-label="Margin %"
+                            title={`Avg Cost: ${avgCost.toFixed(2)}/unit`}
+                            className={`text-right font-mono font-bold border-r no-print ${
+                              isNeg
+                                ? isDark
+                                  ? "text-red-400 border-slate-700"
+                                  : "text-red-600 border-gray-200"
+                                : isDark
+                                ? "text-emerald-400 border-slate-700"
+                                : "text-emerald-600 border-gray-200"
+                            }`}
+                          >
+                            {rowMarginPct.toFixed(2)}%
+                          </td>
+                          <td
+                            data-label="Sub Total"
+                            className="invoice-cell-subtotal text-right font-mono font-bold"
+                          >
+                            {fmt(it.sub_total) || "0.00"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* BOTTOM: Wholesale Summary Footer (Wholesale 12-col footer layout with Retail Show table style) */}
+          <div id="wholesale-summary-footer" className="shrink-0 lg:sticky lg:bottom-0 z-10">
+            <div
+              className={`sale-entry-summary rounded-xl overflow-hidden border shadow-[0_-4px_16px_-6px_rgba(0,0,0,0.14)] ${
+                isDark
+                  ? "bg-slate-800 border-slate-700"
+                  : "bg-white border-gray-200"
+              }`}
+            >
+              <div className="px-3 py-2 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-3 items-center">
+                  {/* Col 1 (lg:4): Adjustments & Invoice Margin (Table style like Retail Show) */}
+                  <div className="lg:col-span-4 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">
+                        Wholesale Summary & Adjustments
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="text-xs font-extrabold uppercase tracking-wide"
+                          style={{ color: "#dc2626" }}
+                        >
+                          Margin %:
+                        </span>
+                        <span
+                          className="px-2 py-0.5 rounded-md text-sm font-black font-mono border border-red-500 bg-red-50 dark:bg-red-950/60"
+                          style={{ color: isDark ? "#f87171" : "#dc2626" }}
+                        >
+                          {wholesaleTotals ? `${wholesaleTotals.invoiceMarginPct.toFixed(2)}%` : "—"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`overflow-hidden rounded-lg border ${
+                        isDark ? "border-slate-700" : "border-gray-200"
+                      }`}
+                    >
+                      <table className="w-full text-[11px] border-collapse">
+                        <tbody>
+                          <tr
+                            className={`border-b ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            <th
+                              className={`px-2.5 py-1.5 text-left font-semibold border-r w-1/4 ${
+                                isDark
+                                  ? "bg-slate-800/90 text-slate-400 border-slate-700"
+                                  : "bg-gray-50 text-gray-600 border-gray-200"
+                              }`}
+                            >
+                              Disc %
+                            </th>
+                            <td
+                              className={`px-2.5 py-1.5 text-right font-mono border-r w-1/4 ${
+                                isDark
+                                  ? "bg-slate-800/40 text-slate-200 border-slate-700"
+                                  : "bg-white text-gray-800 border-gray-200"
+                              }`}
+                            >
+                              {fmt(inv.discount_percentage) || "0"}%
+                            </td>
+                            <th
+                              className={`px-2.5 py-1.5 text-left font-semibold border-r w-1/4 ${
+                                isDark
+                                  ? "bg-slate-800/90 text-slate-400 border-slate-700"
+                                  : "bg-gray-50 text-gray-600 border-gray-200"
+                              }`}
+                            >
+                              Disc Amt
+                            </th>
+                            <td
+                              className={`px-2.5 py-1.5 text-right font-mono font-semibold w-1/4 ${
+                                isDark
+                                  ? "bg-slate-800/40 text-slate-200"
+                                  : "bg-white text-gray-800"
+                              }`}
+                            >
+                              {fmt(inv.discount_amount) || "0.00"}
+                            </td>
+                          </tr>
+                          <tr>
+                            <th
+                              className={`px-2.5 py-1.5 text-left font-semibold border-r ${
+                                isDark
+                                  ? "bg-slate-800/90 text-slate-400 border-slate-700"
+                                  : "bg-gray-50 text-gray-600 border-gray-200"
+                              }`}
+                            >
+                              Tax %
+                            </th>
+                            <td
+                              className={`px-2.5 py-1.5 text-right font-mono border-r ${
+                                isDark
+                                  ? "bg-slate-800/40 text-slate-200 border-slate-700"
+                                  : "bg-white text-gray-800 border-gray-200"
+                              }`}
+                            >
+                              {fmt(inv.tax_percentage) || "0"}%
+                            </td>
+                            <th
+                              className={`px-2.5 py-1.5 text-left font-semibold border-r ${
+                                isDark
+                                  ? "bg-slate-800/90 text-slate-400 border-slate-700"
+                                  : "bg-gray-50 text-gray-600 border-gray-200"
+                              }`}
+                            >
+                              Tax Amt
+                            </th>
+                            <td
+                              className={`px-2.5 py-1.5 text-right font-mono font-semibold ${
+                                isDark
+                                  ? "bg-slate-800/40 text-slate-200"
+                                  : "bg-white text-gray-800"
+                              }`}
+                            >
+                              {fmt(inv.tax_amount) || "0.00"}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Col 2 (lg:3): Totals Breakdown Banner */}
+                  <div className="lg:col-span-3">
+                    <div
+                      className="px-4 py-2.5 rounded-xl"
+                      style={{
+                        background: `linear-gradient(135deg, ${themeColors.primary}1a, ${themeColors.primaryHover}26)`,
+                      }}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span
+                          className={`text-[10px] font-medium uppercase tracking-wide ${
+                            isDark ? "text-slate-400" : "text-gray-500"
+                          }`}
+                        >
+                          Gross Amount
+                        </span>
+                        <span
+                          className={`text-[13px] font-bold font-mono ${
+                            isDark ? "text-slate-200" : "text-gray-800"
+                          }`}
+                        >
+                          {fmt(inv.gross_amount) ?? 0}
+                        </span>
+                      </div>
+                      <div
+                        className="flex items-center justify-between border-t border-dashed pt-1.5"
+                        style={{ borderColor: `${themeColors.primary}33` }}
+                      >
+                        <span
+                          className={`text-[13px] font-bold ${
+                            isDark ? "text-slate-200" : "text-gray-800"
+                          }`}
+                        >
+                          Net Total
+                        </span>
+                        <span
+                          className={`text-xl font-extrabold font-mono ${
+                            isDark ? "text-red-400" : "text-red-600"
+                          }`}
+                        >
+                          {fmt(inv.total) ?? 0}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Col 3 (lg:3): Payment & Printer Info (Table style like Retail Show) */}
+                  <div className="lg:col-span-3">
+                    <div
+                      className={`overflow-hidden rounded-lg border ${
+                        isDark ? "border-slate-700" : "border-gray-200"
+                      }`}
+                    >
+                      <table className="w-full text-[11px] border-collapse">
+                        <tbody>
+                          <tr
+                            className={`border-b ${
+                              isDark ? "border-slate-700" : "border-gray-200"
+                            }`}
+                          >
+                            <th
+                              className={`px-2.5 py-1.5 text-left font-semibold border-r w-1/4 ${
+                                isDark
+                                  ? "bg-slate-800/90 text-slate-400 border-slate-700"
+                                  : "bg-gray-50 text-gray-600 border-gray-200"
+                              }`}
+                            >
+                              Method
+                            </th>
+                            <td
+                              className={`px-2.5 py-1.5 text-right font-mono font-bold uppercase border-r w-1/4 ${
+                                isDark
+                                  ? "bg-slate-800/40 text-slate-200 border-slate-700"
+                                  : "bg-white text-gray-800 border-gray-200"
+                              }`}
+                            >
+                              {inv.payment_method || "CASH"}
+                            </td>
+                            <th
+                              className={`px-2.5 py-1.5 text-left font-semibold border-r w-1/4 ${
+                                isDark
+                                  ? "bg-slate-800/90 text-slate-400 border-slate-700"
+                                  : "bg-gray-50 text-gray-600 border-gray-200"
+                              }`}
+                            >
+                              Printer
+                            </th>
+                            <td
+                              className={`px-2.5 py-1.5 text-right font-mono font-bold uppercase w-1/4 ${
+                                isDark
+                                  ? "bg-slate-800/40 text-slate-300"
+                                  : "bg-white text-gray-700"
+                              }`}
+                            >
+                              {(printerType || "a4").toUpperCase()}
+                            </td>
+                          </tr>
+                          <tr>
+                            <th
+                              className={`px-2.5 py-1.5 text-left font-semibold border-r ${
+                                isDark
+                                  ? "bg-slate-800/90 text-slate-400 border-slate-700"
+                                  : "bg-gray-50 text-gray-600 border-gray-200"
+                              }`}
+                            >
+                              Received
+                            </th>
+                            <td
+                              className={`px-2.5 py-1.5 text-right font-mono font-semibold border-r ${
+                                isDark
+                                  ? "bg-slate-800/40 text-slate-200 border-slate-700"
+                                  : "bg-white text-gray-800 border-gray-200"
+                              }`}
+                            >
+                              {invReceived.toLocaleString()}
+                            </td>
+                            <th
+                              className={`px-2.5 py-1.5 text-left font-semibold border-r ${
+                                isDark
+                                  ? "bg-slate-800/90 text-slate-400 border-slate-700"
+                                  : "bg-gray-50 text-gray-600 border-gray-200"
+                              }`}
+                            >
+                              Remaining
+                            </th>
+                            <td
+                              className={`px-2.5 py-1.5 text-right font-mono font-extrabold ${
+                                invRemaining > 0
+                                  ? "text-amber-500"
+                                  : isDark
+                                  ? "text-emerald-400"
+                                  : "text-emerald-600"
+                              } ${isDark ? "bg-slate-800/40" : "bg-white"}`}
+                            >
+                              {invRemaining.toLocaleString()}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Col 4 (lg:2): Quick Action Buttons */}
+                  <div className="lg:col-span-2 flex flex-col gap-1.5 no-print">
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handlePrint}
+                        className={`h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnSuccess.className}`}
+                        style={btnSuccess.style}
+                        title="Alt+P"
+                      >
+                        <PrinterIcon className="w-4 h-4" aria-hidden="true" />
+                        <span>Print</span>
+                      </button>
+                      <Guard when={can.update}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/sale-invoices/${id}/edit`)}
+                          className={`h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
+                          style={btnSecondary.style}
+                          title="Alt+E"
+                        >
+                          <PencilSquareIcon className="w-4 h-4" aria-hidden="true" />
+                          <span>Edit</span>
+                        </button>
+                      </Guard>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <Guard when={can.create}>
+                        <button
+                          type="button"
+                          onClick={() => navigate("/sale-invoices/create/wholesale")}
+                          className={`flex-1 h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnPrimary.className}`}
+                          style={btnPrimary.style}
+                        >
+                          <PlusIcon className="w-4 h-4" aria-hidden="true" />
+                          <span>New</span>
+                        </button>
+                      </Guard>
+                      <Guard when={can.delete}>
+                        <button
+                          type="button"
+                          onClick={openDeleteModal}
+                          className={`flex-1 h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnDanger.className}`}
+                          style={btnDanger.style}
+                        >
+                          <TrashIcon className="w-4 h-4" aria-hidden="true" />
+                          <span>Delete</span>
+                        </button>
+                      </Guard>
+                      <button
+                        type="button"
+                        onClick={() => navigate(-1)}
+                        className={`flex-1 h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnGlass.className}`}
+                        style={btnGlass.style}
+                      >
+                        <ArrowLeftIcon className="w-4 h-4" aria-hidden="true" />
+                        <span>Back</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* === RETAIL WORKSPACE: Items (fluid) + Summary (280px) === */
+        <div className={`sale-entry-workspace flex-1 flex flex-col lg:grid lg:grid-cols-[1fr_280px] gap-2 px-2 py-2 overflow-visible lg:overflow-hidden ${isDark ? "bg-slate-900" : "bg-white"}`}>
+          {/* LEFT: Items */}
+          <div className="flex flex-col min-h-0">
+            <div className={`text-[11px] font-semibold mb-1 ${isDark ? "text-slate-300" : "text-gray-700"}`}>Items</div>
+            <div ref={itemsScrollRef} className={`sale-entry-items flex-1 overflow-auto border-2 rounded-sm relative ${isDark ? "border-slate-700 bg-slate-800" : "border-gray-200 bg-white"}`}>
+              <table className="invoice-repeater-table w-full text-[11px] lg:table-fixed border-collapse print-table">
+                <thead className={`sticky top-0 z-20 ${isDark ? "bg-slate-800/90 backdrop-blur-xs" : "bg-white/80 backdrop-blur-xs"} border-b ${isDark ? "border-slate-700" : "border-gray-200/70"}`}>
+                  <tr className="[&>th]:py-1.5 [&>th]:px-1.5 [&>th]:text-left">
+                    <th className={`w-7 text-center border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-500 border-gray-200"}`}>#</th>
+                    <th className={`w-[30%] min-w-[220px] border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Product</th>
+                    <th className={`w-11 text-center border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>PSize</th>
+                    <th className={`w-18 border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Batch</th>
+                    <th className={`w-[74px] text-center border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Expiry</th>
+                    <th className={`w-14 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Avail</th>
+                    <th className={`w-14 text-right border-r ${isDark ? "text-slate-300 border-slate-700" : "text-gray-700 border-gray-200"}`}>Qty</th>
+                    <th className={`w-18 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Price</th>
+                    <th className={`w-13 text-right border-r ${isDark ? "text-slate-400 border-slate-700" : "text-gray-600 border-gray-200"}`}>Disc%</th>
+                    <th className={`w-20 text-right ${isDark ? "text-slate-300" : "text-gray-700"}`}>Sub Total</th>
+                  </tr>
+                </thead>
+                <tbody className={`[&>tr>td]:py-1.5 [&>tr>td]:px-2 ${isDark ? "[&>tr]:border-slate-700 [&>tr>td]:text-slate-200" : "[&>tr]:border-gray-200 [&>tr>td]:text-gray-800"}`}>
+                  {(inv.items || []).map((it, i) => (
                     <tr key={i} className={`invoice-repeater-row border-b ${isDark ? "border-slate-700 hover:bg-slate-700/40" : "border-gray-200 hover:bg-gray-50"}`}>
                       <td data-label="Item #" className={`invoice-cell-index-only text-center font-mono border-r ${isDark ? "border-slate-700 text-slate-400" : "border-gray-200 text-gray-500"}`}>{i + 1}</td>
                       <td data-label="Product" className={`invoice-cell-product text-left font-medium lg:truncate border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{it.product?.name ?? it.product_id}</td>
@@ -791,206 +1776,188 @@ export default function SaleInvoiceShow() {
                       <td data-label="Batch" className={`text-left font-mono lg:truncate border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{fmt(it.batch_number) || "—"}</td>
                       <td data-label="Expiry" title={it.expiry ? String(it.expiry).trim().slice(0, 10) : undefined} className={`text-center font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{it.expiry ? String(it.expiry).trim().slice(0, 10).replace(/^(\d{4})-(\d{2})(?:-\d{2})?$/, "$2/$1") : "—"}</td>
                       <td data-label="Available" className={`text-right font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{fmt(it.current_quantity) || "0"}</td>
-                      {inv?.sale_type === "wholesale" ? (
-                        <>
-                          <td data-label="Pack Qty" className={`text-center font-mono font-bold border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{packQty}</td>
-                          <td data-label="Unit Qty" className={`text-center font-mono font-bold border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{unitQty}</td>
-                          <td data-label="Pack Bonus" className={`text-center font-mono border-r ${packBonus > 0 ? "text-emerald-600 dark:text-emerald-400 font-bold" : ""} ${isDark ? "border-slate-700" : "border-gray-200"}`}>{packBonus}</td>
-                          <td data-label="Unit Bonus" className={`text-center font-mono border-r ${unitBonus > 0 ? "text-emerald-600 dark:text-emerald-400 font-bold" : ""} ${isDark ? "border-slate-700" : "border-gray-200"}`}>{unitBonus}</td>
-                          <td data-label="Total Units" className={`text-center font-mono font-bold border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{totalUnits}{bonusQty > 0 ? `+${bonusQty}` : ""}</td>
-                          <td data-label="Pack Price" className={`text-right font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{packPrice.toFixed(2)}</td>
-                          <td data-label="Unit Price" className={`text-right font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{unitPrice.toFixed(2)}</td>
-                        </>
-                      ) : (
-                        <>
-                          <td data-label="Qty" className={`text-right font-mono font-bold border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{fmt(it.quantity) || "0"}</td>
-                          <td data-label="Unit Price" className={`text-right font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{fmt(it.price) || "0.00"}</td>
-                        </>
-                      )}
+                      <td data-label="Qty" className={`text-right font-mono font-bold border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{fmt(it.quantity) || "0"}</td>
+                      <td data-label="Unit Price" className={`text-right font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{fmt(it.price) || "0.00"}</td>
                       <td data-label="Disc %" className={`text-right font-mono border-r ${isDark ? "border-slate-700" : "border-gray-200"}`}>{fmt(it.item_discount_percentage) || "0"}</td>
                       <td data-label="Sub Total" className="invoice-cell-subtotal text-right font-mono font-bold">{fmt(it.sub_total) || "0.00"}</td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* RIGHT: Summary panel (mirrors form layout, with table cells instead of inputs) */}
-        <div className="min-h-0">
-          <div className={`sale-entry-summary h-full flex flex-col rounded-2xl overflow-hidden ${isDark ? "bg-slate-800" : "bg-white"}`}>
-            {/* Panel Header */}
-            <div
-              className="sale-entry-summary-heading px-4 py-3 flex items-center justify-between shrink-0"
-              style={{ background: `linear-gradient(135deg, ${themeColors.primary}, ${themeColors.primaryHover})` }}
-            >
-              <span className="text-white font-bold text-sm tracking-wide">Invoice Summary</span>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="20" x2="18" y2="10" />
-                <line x1="12" y1="20" x2="12" y2="4" />
-                <line x1="6" y1="20" x2="6" y2="14" />
-              </svg>
+                  ))}
+                </tbody>
+              </table>
             </div>
+          </div>
 
-            {/* Content (Table Style instead of Form Inputs) */}
-            <div className="flex-1 flex flex-col min-h-0 px-3 py-3 text-[12px] overflow-y-auto">
-              <div className={`overflow-hidden rounded-xl border ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                <table className="w-full text-[11.5px] border-collapse">
-                  <tbody>
-                    <tr className={`border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                      <th className={`px-3 py-2 text-left font-semibold border-r w-1/2 ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
-                        Tax %
-                      </th>
-                      <td className={`px-3 py-2 text-right font-mono ${isDark ? "bg-slate-800/40 text-slate-200" : "bg-white text-gray-800"}`}>
-                        {fmt(inv.tax_percentage) || "0"}%
-                      </td>
-                    </tr>
-                    <tr className={`border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                      <th className={`px-3 py-2 text-left font-semibold border-r ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
-                        Tax Amt
-                      </th>
-                      <td className={`px-3 py-2 text-right font-mono font-semibold ${isDark ? "bg-slate-800/40 text-slate-200" : "bg-white text-gray-800"}`}>
-                        {fmt(inv.tax_amount) || "0.00"}
-                      </td>
-                    </tr>
-                    <tr className={`border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                      <th className={`px-3 py-2 text-left font-semibold border-r ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
-                        Disc %
-                      </th>
-                      <td className={`px-3 py-2 text-right font-mono ${isDark ? "bg-slate-800/40 text-slate-200" : "bg-white text-gray-800"}`}>
-                        {fmt(inv.discount_percentage) || "0"}%
-                      </td>
-                    </tr>
-                    <tr>
-                      <th className={`px-3 py-2 text-left font-semibold border-r ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
-                        Disc Amt
-                      </th>
-                      <td className={`px-3 py-2 text-right font-mono font-semibold ${isDark ? "bg-slate-800/40 text-slate-200" : "bg-white text-gray-800"}`}>
-                        {fmt(inv.discount_amount) || "0.00"}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Totals */}
+          {/* RIGHT: Summary panel (mirrors form layout, with table cells instead of inputs) */}
+          <div className="min-h-0">
+            <div className={`sale-entry-summary h-full flex flex-col rounded-2xl overflow-hidden ${isDark ? "bg-slate-800" : "bg-white"}`}>
+              {/* Panel Header */}
               <div
-                className="mt-3 px-4 py-3 rounded-xl"
-                style={{ background: `linear-gradient(135deg, ${themeColors.primary}1a, ${themeColors.primaryHover}26)` }}
+                className="sale-entry-summary-heading px-4 py-3 flex items-center justify-between shrink-0"
+                style={{ background: `linear-gradient(135deg, ${themeColors.primary}, ${themeColors.primaryHover})` }}
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span className={`text-[10px] font-medium uppercase tracking-wide ${isDark ? "text-slate-400" : "text-gray-500"}`}>Gross</span>
-                  <span className={`text-[13px] font-bold font-mono ${isDark ? "text-slate-200" : "text-gray-800"}`}>{fmt(inv.gross_amount) ?? 0}</span>
+                <span className="text-white font-bold text-sm tracking-wide">Invoice Summary</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="20" x2="18" y2="10" />
+                  <line x1="12" y1="20" x2="12" y2="4" />
+                  <line x1="6" y1="20" x2="6" y2="14" />
+                </svg>
+              </div>
+
+              {/* Content (Table Style instead of Form Inputs) */}
+              <div className="flex-1 flex flex-col min-h-0 px-3 py-3 text-[12px] overflow-y-auto">
+                <div className={`overflow-hidden rounded-xl border ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                  <table className="w-full text-[11.5px] border-collapse">
+                    <tbody>
+                      <tr className={`border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                        <th className={`px-3 py-2 text-left font-semibold border-r w-1/2 ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                          Tax %
+                        </th>
+                        <td className={`px-3 py-2 text-right font-mono ${isDark ? "bg-slate-800/40 text-slate-200" : "bg-white text-gray-800"}`}>
+                          {fmt(inv.tax_percentage) || "0"}%
+                        </td>
+                      </tr>
+                      <tr className={`border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                        <th className={`px-3 py-2 text-left font-semibold border-r ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                          Tax Amt
+                        </th>
+                        <td className={`px-3 py-2 text-right font-mono font-semibold ${isDark ? "bg-slate-800/40 text-slate-200" : "bg-white text-gray-800"}`}>
+                          {fmt(inv.tax_amount) || "0.00"}
+                        </td>
+                      </tr>
+                      <tr className={`border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                        <th className={`px-3 py-2 text-left font-semibold border-r ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                          Disc %
+                        </th>
+                        <td className={`px-3 py-2 text-right font-mono ${isDark ? "bg-slate-800/40 text-slate-200" : "bg-white text-gray-800"}`}>
+                          {fmt(inv.discount_percentage) || "0"}%
+                        </td>
+                      </tr>
+                      <tr>
+                        <th className={`px-3 py-2 text-left font-semibold border-r ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                          Disc Amt
+                        </th>
+                        <td className={`px-3 py-2 text-right font-mono font-semibold ${isDark ? "bg-slate-800/40 text-slate-200" : "bg-white text-gray-800"}`}>
+                          {fmt(inv.discount_amount) || "0.00"}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-                <div className="flex items-center justify-between border-t border-dashed pt-2" style={{ borderColor: `${themeColors.primary}33` }}>
-                  <span className={`text-[13px] font-bold ${isDark ? "text-slate-200" : "text-gray-800"}`}>Total</span>
-                  <span className={`text-2xl font-extrabold font-mono ${isDark ? "text-red-400" : "text-red-600"}`}>{fmt(inv.total) ?? 0}</span>
+
+                {/* Totals */}
+                <div
+                  className="mt-3 px-4 py-3 rounded-xl"
+                  style={{ background: `linear-gradient(135deg, ${themeColors.primary}1a, ${themeColors.primaryHover}26)` }}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className={`text-[10px] font-medium uppercase tracking-wide ${isDark ? "text-slate-400" : "text-gray-500"}`}>Gross</span>
+                    <span className={`text-[13px] font-bold font-mono ${isDark ? "text-slate-200" : "text-gray-800"}`}>{fmt(inv.gross_amount) ?? 0}</span>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-dashed pt-2" style={{ borderColor: `${themeColors.primary}33` }}>
+                    <span className={`text-[13px] font-bold ${isDark ? "text-slate-200" : "text-gray-800"}`}>Total</span>
+                    <span className={`text-2xl font-extrabold font-mono ${isDark ? "text-red-400" : "text-red-600"}`}>{fmt(inv.total) ?? 0}</span>
+                  </div>
+                </div>
+
+                {/* Payment & Printer Table */}
+                <div className={`mt-3 overflow-hidden rounded-xl border ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                  <table className="w-full text-[11.5px] border-collapse">
+                    <tbody>
+                      <tr className={`border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                        <th className={`px-3 py-2 text-left font-semibold border-r w-1/2 ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                          Received
+                        </th>
+                        <td className={`px-3 py-2 text-right font-mono font-semibold ${isDark ? "bg-slate-800/40 text-slate-200" : "bg-white text-gray-800"}`}>
+                          {invReceived.toLocaleString()}
+                        </td>
+                      </tr>
+                      <tr className={`border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
+                        <th className={`px-3 py-2 text-left font-semibold border-r ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                          Remaining
+                        </th>
+                        <td className={`px-3 py-2 text-right font-mono font-extrabold ${
+                          invRemaining > 0 ? "text-amber-500" : (isDark ? "text-emerald-400" : "text-emerald-600")
+                        } ${isDark ? "bg-slate-800/40" : "bg-white"}`}>
+                          {invRemaining.toLocaleString()}
+                        </td>
+                      </tr>
+                      <tr>
+                        <th className={`px-3 py-1.5 text-left font-semibold border-r ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
+                          Printer
+                        </th>
+                        <td className={`px-3 py-1.5 text-right font-mono font-bold uppercase ${isDark ? "bg-slate-800/40 text-slate-300" : "bg-white text-gray-700"}`}>
+                          {(printerType || "a4").toUpperCase()}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
-              {/* Payment & Printer Table */}
-              <div className={`mt-3 overflow-hidden rounded-xl border ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                <table className="w-full text-[11.5px] border-collapse">
-                  <tbody>
-                    <tr className={`border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                      <th className={`px-3 py-2 text-left font-semibold border-r w-1/2 ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
-                        Received
-                      </th>
-                      <td className={`px-3 py-2 text-right font-mono font-semibold ${isDark ? "bg-slate-800/40 text-slate-200" : "bg-white text-gray-800"}`}>
-                        {invReceived.toLocaleString()}
-                      </td>
-                    </tr>
-                    <tr className={`border-b ${isDark ? "border-slate-700" : "border-gray-200"}`}>
-                      <th className={`px-3 py-2 text-left font-semibold border-r ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
-                        Remaining
-                      </th>
-                      <td className={`px-3 py-2 text-right font-mono font-extrabold ${
-                        invRemaining > 0 ? "text-amber-500" : (isDark ? "text-emerald-400" : "text-emerald-600")
-                      } ${isDark ? "bg-slate-800/40" : "bg-white"}`}>
-                        {invRemaining.toLocaleString()}
-                      </td>
-                    </tr>
-                    <tr>
-                      <th className={`px-3 py-1.5 text-left font-semibold border-r ${isDark ? "bg-slate-800/90 text-slate-400 border-slate-700" : "bg-gray-50 text-gray-600 border-gray-200"}`}>
-                        Printer
-                      </th>
-                      <td className={`px-3 py-1.5 text-right font-mono font-bold uppercase ${isDark ? "bg-slate-800/40 text-slate-300" : "bg-white text-gray-700"}`}>
-                        {(printerType || "a4").toUpperCase()}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Actions (compact) */}
-            <div className="px-3 py-2 shrink-0 border-t space-y-1.5" style={{ borderColor: isDark ? "rgba(71,85,105,0.5)" : "rgba(229,231,235,0.8)" }}>
-              <div className="grid grid-cols-2 gap-1.5 no-print">
-                <button
-                  type="button"
-                  onClick={handlePrint}
-                  className={`h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnSuccess.className}`}
-                  style={btnSuccess.style}
-                  title="Alt+P"
-                >
-                  <PrinterIcon className="w-4 h-4" aria-hidden="true" />
-                  <span>Print</span>
-                </button>
-                <Guard when={can.update}>
+              {/* Actions (compact) */}
+              <div className="px-3 py-2 shrink-0 border-t space-y-1.5" style={{ borderColor: isDark ? "rgba(71,85,105,0.5)" : "rgba(229,231,235,0.8)" }}>
+                <div className="grid grid-cols-2 gap-1.5 no-print">
                   <button
                     type="button"
-                    onClick={() => navigate(`/sale-invoices/${id}/edit`)}
-                    className={`h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
-                    style={btnSecondary.style}
-                    title="Alt+E"
+                    onClick={handlePrint}
+                    className={`h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnSuccess.className}`}
+                    style={btnSuccess.style}
+                    title="Alt+P"
                   >
-                    <PencilSquareIcon className="w-4 h-4" aria-hidden="true" />
-                    <span>Edit</span>
+                    <PrinterIcon className="w-4 h-4" aria-hidden="true" />
+                    <span>Print</span>
                   </button>
-                </Guard>
-              </div>
-              <div className="flex gap-1.5 no-print">
-                <Guard when={can.create}>
+                  <Guard when={can.update}>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/sale-invoices/${id}/edit`)}
+                      className={`h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
+                      style={btnSecondary.style}
+                      title="Alt+E"
+                    >
+                      <PencilSquareIcon className="w-4 h-4" aria-hidden="true" />
+                      <span>Edit</span>
+                    </button>
+                  </Guard>
+                </div>
+                <div className="flex gap-1.5 no-print">
+                  <Guard when={can.create}>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/sale-invoices/create/retail")}
+                      className={`flex-1 h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnPrimary.className}`}
+                      style={btnPrimary.style}
+                    >
+                      <PlusIcon className="w-4 h-4" aria-hidden="true" />
+                      <span>New</span>
+                    </button>
+                  </Guard>
+                  <Guard when={can.delete}>
+                    <button
+                      type="button"
+                      onClick={openDeleteModal}
+                      className={`flex-1 h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnDanger.className}`}
+                      style={btnDanger.style}
+                    >
+                      <TrashIcon className="w-4 h-4" aria-hidden="true" />
+                      <span>Delete</span>
+                    </button>
+                  </Guard>
                   <button
                     type="button"
-                    onClick={() => {
-                      const saleType = inv?.sale_type || "retail";
-                      if (saleType === "wholesale") navigate("/sale-invoices/create/wholesale");
-                      else navigate("/sale-invoices/create/retail");
-                    }}
-                    className={`flex-1 h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnPrimary.className}`}
-                    style={btnPrimary.style}
+                    onClick={() => navigate(-1)}
+                    className={`flex-1 h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnGlass.className}`}
+                    style={btnGlass.style}
                   >
-                    <PlusIcon className="w-4 h-4" aria-hidden="true" />
-                    <span>New</span>
+                    <ArrowLeftIcon className="w-4 h-4" aria-hidden="true" />
+                    <span>Back</span>
                   </button>
-                </Guard>
-                <Guard when={can.delete}>
-                  <button
-                    type="button"
-                    onClick={openDeleteModal}
-                    className={`flex-1 h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnDanger.className}`}
-                    style={btnDanger.style}
-                  >
-                    <TrashIcon className="w-4 h-4" aria-hidden="true" />
-                    <span>Delete</span>
-                  </button>
-                </Guard>
-                <button
-                  type="button"
-                  onClick={() => navigate(-1)}
-                  className={`flex-1 h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnGlass.className}`}
-                  style={btnGlass.style}
-                >
-                  <ArrowLeftIcon className="w-4 h-4" aria-hidden="true" />
-                  <span>Back</span>
-                </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ===== Delete confirmation / choice / password modal ===== */}
       {deleteModalOpen && (
@@ -1142,7 +2109,12 @@ export default function SaleInvoiceShow() {
         onClose={() => setSearchOpen(false)} 
         onSelect={(invoice) => {
           if (invoice?.id) {
-            navigate(`/sale-invoices/${invoice.id}`);
+            const targetType = invoice?.sale_type || (isWholesale ? "wholesale" : "retail");
+            navigate(
+              targetType === "wholesale"
+                ? `/wholesale-invoices/${invoice.id}`
+                : `/sale-invoices/${invoice.id}`
+            );
           }
         }}
       />
@@ -1204,8 +2176,10 @@ export default function SaleInvoiceShow() {
             toast.error("Failed to discard draft");
           }
         }}
-        onStartBlank={() => navigate("/sale-invoices/create/retail")}
-        type="sale_retail"
+        onStartBlank={() =>
+          navigate(isWholesale ? "/sale-invoices/create/wholesale" : "/sale-invoices/create/retail")
+        }
+        type={isWholesale ? "sale_wholesale" : "sale_retail"}
       />
 
       {/* Outbound Document Share Modal (WhatsApp / Email PDF) */}

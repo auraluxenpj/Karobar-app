@@ -113,7 +113,7 @@
                 @if($license)<div class="store-meta">License #: {{ $license }}</div>@endif
             </td>
             <td style="width: 40%; vertical-align: top; text-align: right;">
-                <div class="doc-badge">Sale Invoice</div>
+                <div class="doc-badge">{{ ($invoice->sale_type ?? 'retail') === 'wholesale' ? 'Wholesale Sale Invoice' : 'Sale Invoice' }}</div>
                 <div style="margin-top: 6px; font-size: 12px; font-weight: bold;">
                     #{{ $invoice->posted_number ?? $invoice->id }}
                 </div>
@@ -179,7 +179,9 @@
                     $ps = max(1, (int) ($item->pack_size ?? $item->product?->pack_size ?? 1));
                     $qty = (float) ($item->quantity ?? 0);
                     if ($qty <= 0) {
-                        $qty = ((float) ($item->pack_quantity ?? 0) * $ps) + (float) ($item->unit_quantity ?? 0);
+                        $qty = ((float) ($item->unit_quantity ?? 0) > 0)
+                            ? (float) $item->unit_quantity
+                            : ((float) ($item->pack_quantity ?? 0) * $ps);
                     }
                     $qtyFormatted = fmod($qty, 1.0) == 0.0
                         ? number_format($qty, 0)

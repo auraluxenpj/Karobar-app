@@ -133,12 +133,12 @@
           <th style="width:8%">Expiry</th>
           <th class="right" style="width:6%">Pack.Q</th>
           <th class="right" style="width:6%">Unit.Q</th>
+          <th class="right" style="width:5%">Disc%</th>
           <th class="right" style="width:6%">Pack.B</th>
           <th class="right" style="width:6%">Unit.B</th>
           <th class="right" style="width:7%">Tot.U</th>
           <th class="right" style="width:8%">Pack.P</th>
           <th class="right" style="width:7%">Unit.P</th>
-          <th class="right" style="width:5%">Disc%</th>
           <th class="right" style="width:9%">Sub Total</th>
         </tr>
       @else
@@ -160,13 +160,13 @@
           @php
             $ps = max(1, (int)($it->pack_size ?? optional($it->product)->pack_size ?? 1));
             $totU = (int)($it->quantity ?? 0);
-            $hasExplicitPackBreakdown = ((float)($it->pack_quantity ?? 0) > 0) || ((float)($it->unit_quantity ?? 0) > 0);
-            $packQ = $hasExplicitPackBreakdown ? (int)($it->pack_quantity ?? 0) : intdiv($totU, $ps);
-            $unitQ = $hasExplicitPackBreakdown ? (int)($it->unit_quantity ?? 0) : ($totU % $ps);
+            $packQVal = ((float)($it->pack_quantity ?? 0) > 0) ? (float)$it->pack_quantity : round($totU / $ps, 2);
+            $packQ = fmod($packQVal, 1.0) == 0.0 ? number_format($packQVal, 0) : rtrim(rtrim(number_format($packQVal, 2), '0'), '.');
+            $unitQ = $totU;
             $bonusQ = (int)($it->bonus ?? 0);
-            $hasExplicitBonusBreakdown = ((int)($it->pack_bonus ?? 0) > 0) || ((int)($it->unit_bonus ?? 0) > 0);
-            $packB = $hasExplicitBonusBreakdown ? (int)($it->pack_bonus ?? 0) : ($ps > 1 ? intdiv($bonusQ, $ps) : 0);
-            $unitB = $hasExplicitBonusBreakdown ? (int)($it->unit_bonus ?? 0) : ($ps > 1 ? ($bonusQ % $ps) : $bonusQ);
+            $packBVal = ((float)($it->pack_bonus ?? 0) > 0) ? (float)$it->pack_bonus : round($bonusQ / $ps, 2);
+            $packB = fmod($packBVal, 1.0) == 0.0 ? number_format($packBVal, 0) : rtrim(rtrim(number_format($packBVal, 2), '0'), '.');
+            $unitB = $bonusQ;
             $unitP = (float)($it->price ?? 0);
             $packP = ((float)($it->pack_price ?? 0) > 0) ? (float)$it->pack_price : ($unitP * $ps);
           @endphp
@@ -177,12 +177,12 @@
             <td>{{ $it->expiry }}</td>
             <td class="right">{{ $packQ }}</td>
             <td class="right">{{ $unitQ }}</td>
+            <td class="right">{{ number_format((float)$it->item_discount_percentage, 2) }}</td>
             <td class="right">{{ $packB }}</td>
             <td class="right">{{ $unitB }}</td>
-            <td class="right">{{ $totU }}</td>
+            <td class="right">{{ $totU }}{{ $bonusQ > 0 ? '+' . $bonusQ : '' }}</td>
             <td class="right">{{ number_format($packP, 2) }}</td>
             <td class="right">{{ number_format($unitP, 2) }}</td>
-            <td class="right">{{ number_format((float)$it->item_discount_percentage, 2) }}</td>
             <td class="right">{{ number_format((float)$it->sub_total, 2) }}</td>
           </tr>
         @else

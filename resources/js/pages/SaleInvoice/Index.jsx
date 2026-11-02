@@ -359,23 +359,27 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
     return () => ctrl.abort();
   }, [page, pageSize, saleTypeFilter, permsLoading, can.view]);
 
-  // Alt+N -> create retail, Alt+W -> create wholesale
+  // Alt+N -> create wholesale (when on wholesale index) or retail, Alt+W -> create wholesale
   useEffect(() => {
     const onKeyDown = (e) => {
       if (!e.altKey) return;
       const key = (e.key || "").toLowerCase();
+      const code = e.code || "";
       const tag = (e.target?.tagName || "").toLowerCase();
       const isTyping = ["input", "textarea", "select"].includes(tag) || e.target?.isContentEditable;
       if (isTyping) return;
       if (!can.create) return;
-      e.preventDefault();
 
-      if (key === "n") {
-        // Alt+N -> retail sale
-        navigate("/sale-invoices/create/retail");
-      } else if (key === "w") {
-        // Alt+W -> wholesale sale - only if wholesale is enabled
-        if (saleSystemLoading) return; // sale system mode not known yet
+      if (key === "n" || code === "KeyN") {
+        e.preventDefault();
+        if (defaultSaleType === "wholesale" || saleTypeFilter === "wholesale") {
+          navigate("/sale-invoices/create/wholesale");
+        } else {
+          navigate("/sale-invoices/create/retail");
+        }
+      } else if (key === "w" || code === "KeyW") {
+        e.preventDefault();
+        if (saleSystemLoading) return;
         if (hasWholesale) {
           navigate("/sale-invoices/create/wholesale");
         } else {
@@ -385,7 +389,7 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [navigate, can.create, hasWholesale, saleSystemLoading]);
+  }, [navigate, can.create, hasWholesale, saleSystemLoading, defaultSaleType, saleTypeFilter]);
 
   // ===== search + pagination =====
   const didMountFiltersRef = useRef(false);
@@ -880,7 +884,11 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
                       <div className="flex items-center gap-1.5 justify-center">
                         {/* View Action */}
                         <Link
-                          to={`/sale-invoices/${invoice.id}`}
+                          to={
+                            invoice.sale_type === "wholesale" || defaultSaleType === "wholesale"
+                              ? `/wholesale-invoices/${invoice.id}`
+                              : `/sale-invoices/${invoice.id}`
+                          }
                           className="products-row-action"
                           title="View" aria-label="View sale invoice"
                         >
@@ -1064,8 +1072,18 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
         drafts={draftsList}
         onResumeDraft={handleResumeDraft}
         onDiscardDraft={handleDiscardDraft}
-        onStartBlank={() => navigate("/sale-invoices/create/retail")}
-        type="sale_retail"
+        onStartBlank={() =>
+          navigate(
+            defaultSaleType === "wholesale" || saleTypeFilter === "wholesale"
+              ? "/sale-invoices/create/wholesale"
+              : "/sale-invoices/create/retail"
+          )
+        }
+        type={
+          defaultSaleType === "wholesale" || saleTypeFilter === "wholesale"
+            ? "sale_wholesale"
+            : "sale_retail"
+        }
       />
 
       {/* Audit History Modal */}

@@ -1884,25 +1884,26 @@ body {
  .sale-entry-form:not(.wholesale-entry-form) .sale-entry-items th:nth-child(11) { width: 9.5%; } /* Sub Total (Read-only) */
  .sale-entry-form:not(.wholesale-entry-form) .sale-entry-items th:nth-child(12) { width: 3%; }   /* + */
 
- /* Balanced 17-column repeater layout summing to 100% (Wholesale Form) — wide Product, compact Batch & Expiry */
+ /* Balanced 18-column repeater layout summing to 100% (Wholesale Form) — wide Product, compact Batch & Expiry */
  .sale-entry-form.wholesale-entry-form .sale-entry-items th { width: auto; }
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(1) { width: 2.2%; }  /* DEL */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(2) { width: 2.2%; }  /* # */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(3) { width: 25.6%; } /* Product (Editable) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(4) { width: 3.5%; }  /* PSize (Read-only) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(5) { width: 6.5%; }  /* Batch (Editable) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(6) { width: 6.5%; }  /* Expiry (Read-only) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(7) { width: 6%; }    /* Avail P/U (Read-only) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(8) { width: 4.5%; }  /* Pack.Q (Editable) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(9) { width: 4.5%; }  /* Unit.Q (Editable) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(10) { width: 4.2%; } /* Pack.B (Editable) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(11) { width: 4.2%; } /* Unit.B (Editable) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(12) { width: 4.8%; } /* Tot.U (Read-only) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(13) { width: 5.8%; } /* Pack.P (Editable) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(14) { width: 5.5%; } /* Unit.P (Editable) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(15) { width: 4.5%; } /* Disc% (Editable) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(16) { width: 7.3%; } /* Sub Total (Read-only) */
- .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(17) { width: 2.2%; } /* + */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(1) { width: 2%; }     /* DEL */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(2) { width: 2%; }     /* # */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(3) { width: 22.5%; }  /* Product (Editable) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(4) { width: 3.5%; }   /* PSize (Read-only) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(5) { width: 6.5%; }   /* Batch (Editable) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(6) { width: 6.5%; }   /* Expiry (Read-only) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(7) { width: 5.8%; }   /* Avail P/U (Read-only) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(8) { width: 4.3%; }   /* Pack.Q (Editable) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(9) { width: 4.3%; }   /* Unit.Q (Editable) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(10) { width: 4.2%; }  /* Disc% (Editable) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(11) { width: 4.0%; }  /* Pack.B (Editable) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(12) { width: 4.0%; }  /* Unit.B (Editable) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(13) { width: 4.6%; }  /* Tot.U (Read-only) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(14) { width: 5.6%; }  /* Pack.P (Editable) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(15) { width: 5.3%; }  /* Unit.P (Editable) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(16) { width: 4.9%; }  /* Margin% (Read-only) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(17) { width: 6.8%; }  /* Sub Total (Read-only) */
+ .sale-entry-form.wholesale-entry-form .sale-entry-items th:nth-child(18) { width: 2.2%; }  /* + */
 
  .sale-entry-form .sale-entry-items td { min-width: 0; }
  .sale-entry-form .sale-summary-body > .space-y-2 > :not(:last-child) { margin-bottom: 2px; }

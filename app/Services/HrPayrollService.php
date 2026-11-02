@@ -155,10 +155,14 @@ class HrPayrollService
         $cogsTotal = 0.0;
         if ($invoicesCount > 0) {
             $invoiceIds = $invoices->pluck('id')->all();
+            $hasBonusCol = Schema::hasColumn('sale_invoice_items', 'bonus');
+            $saleUnitsExpr = $hasBonusCol
+                ? '(COALESCE(sii.quantity, 0) + COALESCE(sii.bonus, 0))'
+                : 'COALESCE(sii.quantity, 0)';
             $cogsRow = DB::table('sale_invoice_items as sii')
                 ->leftJoin('products as p', 'p.id', '=', 'sii.product_id')
                 ->whereIn('sii.sale_invoice_id', $invoiceIds)
-                ->selectRaw('COALESCE(SUM(COALESCE(sii.cost_price_snapshot, p.avg_price, p.unit_purchase_price, 0) * COALESCE(sii.quantity, 0)), 0) as total_cogs')
+                ->selectRaw("COALESCE(SUM(COALESCE(sii.cost_price_snapshot, p.avg_price, p.unit_purchase_price, 0) * {$saleUnitsExpr}), 0) as total_cogs")
                 ->first();
             $cogsTotal = round((float) ($cogsRow->total_cogs ?? 0), 2);
         }

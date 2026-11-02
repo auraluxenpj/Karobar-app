@@ -118,33 +118,51 @@ class InvoiceCalculationService
                 ]);
             }
 
+            $itemSaleType = $raw['sale_type'] ?? $invoiceSaleType;
             $packSize = max(1, (int)($raw['pack_size'] ?? ($product->pack_size ?: 1)));
-            $packQty = max(0, (int)($raw['pack_quantity'] ?? 0));
-            $unitQty = max(0, (int)($raw['unit_quantity'] ?? 0));
-            $packBonus = max(0, (int)($raw['pack_bonus'] ?? 0));
-            $unitBonus = max(0, (int)($raw['unit_bonus'] ?? 0));
-            $bonusQty = max(0, (int)($raw['bonus'] ?? 0));
-            if ($packBonus > 0 || $unitBonus > 0) {
-                $bonusQty = ($packBonus * $packSize) + $unitBonus;
+            $packQty = max(0.0, (float)($raw['pack_quantity'] ?? 0));
+            $unitQty = max(0, (int) round((float)($raw['unit_quantity'] ?? 0)));
+            $packBonus = max(0.0, (float)($raw['pack_bonus'] ?? 0));
+            $unitBonus = max(0, (int) round((float)($raw['unit_bonus'] ?? 0)));
+            $bonusQty = max(0, (int) round((float)($raw['bonus'] ?? 0)));
+
+            if ($unitBonus > 0 && ($bonusQty < 1 || $bonusQty === $unitBonus)) {
+                $bonusQty = $unitBonus;
+                $packBonus = round($bonusQty / $packSize, 2);
+            } elseif ($packBonus > 0 && ($bonusQty < 1 || $bonusQty === (int) round($packBonus * $packSize))) {
+                $bonusQty = (int) round($packBonus * $packSize);
+                $unitBonus = $bonusQty;
+                $packBonus = round($bonusQty / $packSize, 2);
             } elseif ($bonusQty > 0) {
-                $packBonus = intdiv($bonusQty, $packSize);
-                $unitBonus = $bonusQty % $packSize;
+                $unitBonus = $bonusQty;
+                $packBonus = round($bonusQty / $packSize, 2);
             }
 
-            $qty = (int)($raw['quantity'] ?? 0);
-            if ($qty < 1 && ($packQty > 0 || $unitQty > 0)) {
-                $qty = ($packQty * $packSize) + $unitQty;
+            $qty = max(0, (int) round((float)($raw['quantity'] ?? 0)));
+            if ($itemSaleType === 'wholesale') {
+                if ($unitQty > 0 && ($qty < 1 || $qty === $unitQty)) {
+                    $qty = $unitQty;
+                    $packQty = round($qty / $packSize, 2);
+                } elseif ($packQty > 0 && ($qty < 1 || $qty === (int) round($packQty * $packSize))) {
+                    $qty = (int) round($packQty * $packSize);
+                    $unitQty = $qty;
+                    $packQty = round($qty / $packSize, 2);
+                } elseif ($qty > 0) {
+                    $unitQty = $qty;
+                    $packQty = round($qty / $packSize, 2);
+                }
+            } else {
+                if ($qty < 1 && $unitQty > 0) {
+                    $qty = $unitQty;
+                } elseif ($qty < 1 && $packQty > 0) {
+                    $qty = (int) round($packQty * $packSize);
+                }
             }
+
             if ($qty < 1) {
                 throw ValidationException::withMessages([
                     "items.{$idx}.quantity" => ["Quantity must be at least 1."],
                 ]);
-            }
-
-            $itemSaleType = $raw['sale_type'] ?? $invoiceSaleType;
-            if ($itemSaleType === 'wholesale' && $packQty === 0 && $unitQty === 0 && $qty > 0) {
-                $packQty = intdiv($qty, $packSize);
-                $unitQty = $qty % $packSize;
             }
 
             $price = (float)($raw['price'] ?? 0);
@@ -175,7 +193,9 @@ class InvoiceCalculationService
 
             // Maximum Discount Enforcement per Product (explicit item discount + manual price reduction for non-override users)
             $maxDiscount = $product->max_discount !== null ? (float)$product->max_discount : null;
-            $catalogPrice = $itemSaleType === 'retail' ? (float)($product->unit_sale_price ?? 0) : 0.0;
+            $catalogPrice = $itemSaleType === 'retail'
+                ? (float)($product->unit_sale_price ?? 0)
+                : (float)($product->whole_sale_unit_price ?: (($product->whole_sale_pack_price && $packSize > 0) ? ($product->whole_sale_pack_price / $packSize) : 0));
             $effectiveItemDiscPct = $discPct;
             if (!$this->canOverrideDiscount($authorizingUser) && $maxDiscount !== null && $maxDiscount > 0 && $catalogPrice > 0 && $price < $catalogPrice) {
                 $effectivePriceAfterItemDisc = $price * (1 - ($discPct / 100));
@@ -215,6 +235,24 @@ class InvoiceCalculationService
             $lineGross = round($qty * $price, 2);
             $lineDiscAmt = round(($lineGross * $discPct) / 100, 2);
             $lineSubTotal = round($lineGross - $lineDiscAmt, 2);
+
+            // Prevent saving wholesale sale items with negative margin (< 0%) based on avg_price (fallback unit_purchase_price)
+            $unitCost = (float)($product->avg_price ?? 0) > 0
+                ? (float)$product->avg_price
+                : (float)($product->unit_purchase_price ?: (($product->pack_purchase_price && $packSize > 0) ? ($product->pack_purchase_price / $packSize) : 0));
+
+            if (($itemSaleType === 'wholesale' || $invoiceSaleType === 'wholesale') && $unitCost > 0) {
+                $effectiveUnitPrice = $price * (1 - ($discPct / 100));
+                $totalOutUnits = $qty + $bonusQty;
+                $totalLineCost = round($totalOutUnits * $unitCost, 2);
+                if ($effectiveUnitPrice < $unitCost - 0.005 || $lineSubTotal < $totalLineCost - 0.05) {
+                    throw ValidationException::withMessages([
+                        "items.{$idx}.price" => [
+                            "Margin for '{$product->name}' cannot be less than 0% (Net sale: {$lineSubTotal}, Cost: {$totalLineCost} at avg cost " . round($unitCost, 2) . "/unit)."
+                        ],
+                    ]);
+                }
+            }
 
             $grossSum += $lineGross;
             $itemDiscSum += $lineDiscAmt;

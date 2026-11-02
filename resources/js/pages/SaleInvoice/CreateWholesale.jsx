@@ -38,7 +38,14 @@ export default function CreateSaleInvoiceWholesale() {
 
   return (
     <div className="sale-entry-page">
-      <SaleInvoiceWholesaleForm onSubmit={onSubmit} onSuccess={() => navigate("/sale-invoices")} />
+      <SaleInvoiceWholesaleForm
+        onSubmit={onSubmit}
+        onSuccess={(data, savedId) => {
+          const targetId = savedId || data?.id;
+          if (targetId) navigate(`/wholesale-invoices/${targetId}`);
+          else navigate("/wholesale-invoices");
+        }}
+      />
     </div>
   );
 }

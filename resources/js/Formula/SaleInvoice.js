@@ -28,33 +28,56 @@ export function recalcItem(item, changedField = null) {
   };
 }
 
-// Recalculate a single wholesale sale item (supports simultaneous Pack Qty + Unit Qty + Pack Bonus + Unit Bonus + Pack Price + Unit Price)
+// Recalculate a single wholesale sale item (two-way Pack <-> Unit sync for quantity, bonus, and price, plus live margin from avg_price)
 export function recalcWholesaleItem(item, changedField = null) {
   const packSize = Math.max(1, n(item.pack_size));
-  const packQty = Math.max(0, Math.floor(n(item.pack_quantity)));
-  const unitQty = Math.max(0, Math.floor(n(item.unit_quantity)));
-  const packBonus = Math.max(0, Math.floor(n(item.pack_bonus)));
-  const unitBonus = Math.max(0, Math.floor(n(item.unit_bonus)));
+  let packQty = Math.max(0, n(item.pack_quantity));
+  let unitQty = Math.max(0, Math.floor(n(item.unit_quantity)));
+  const rawQty = Math.max(0, Math.floor(n(item.quantity)));
 
-  const hasSplitBonus =
-    changedField === "pack_bonus" ||
-    changedField === "unit_bonus" ||
-    item.pack_bonus !== undefined ||
-    item.unit_bonus !== undefined;
+  if (changedField === "pack_size") {
+    if (packQty > 0) unitQty = Math.round(packQty * packSize);
+    else if (unitQty > 0) packQty = r2(unitQty / packSize);
+  } else if (changedField === "pack_quantity") {
+    unitQty = Math.round(packQty * packSize);
+  } else if (changedField === "unit_quantity") {
+    packQty = packSize > 0 ? r2(unitQty / packSize) : 0;
+  } else {
+    if (unitQty > 0) {
+      packQty = packSize > 0 ? r2(unitQty / packSize) : 0;
+    } else if (packQty > 0) {
+      unitQty = Math.round(packQty * packSize);
+    } else if (rawQty > 0) {
+      unitQty = rawQty;
+      packQty = packSize > 0 ? r2(unitQty / packSize) : 0;
+    }
+  }
 
-  const bonusQty = hasSplitBonus
-    ? packBonus * packSize + unitBonus
-    : Math.max(0, Math.floor(n(item.bonus)));
+  const totalQty = unitQty;
 
-  const hasSplitQty =
-    changedField === "pack_quantity" ||
-    changedField === "unit_quantity" ||
-    item.pack_quantity !== undefined ||
-    item.unit_quantity !== undefined;
+  let packBonus = Math.max(0, n(item.pack_bonus));
+  let unitBonus = Math.max(0, Math.floor(n(item.unit_bonus)));
+  const rawBonus = Math.max(0, Math.floor(n(item.bonus)));
 
-  const totalQty = hasSplitQty
-    ? packQty * packSize + unitQty
-    : Math.max(0, Math.floor(n(item.quantity)));
+  if (changedField === "pack_size") {
+    if (packBonus > 0) unitBonus = Math.round(packBonus * packSize);
+    else if (unitBonus > 0) packBonus = r2(unitBonus / packSize);
+  } else if (changedField === "pack_bonus") {
+    unitBonus = Math.round(packBonus * packSize);
+  } else if (changedField === "unit_bonus") {
+    packBonus = packSize > 0 ? r2(unitBonus / packSize) : 0;
+  } else {
+    if (unitBonus > 0) {
+      packBonus = packSize > 0 ? r2(unitBonus / packSize) : 0;
+    } else if (packBonus > 0) {
+      unitBonus = Math.round(packBonus * packSize);
+    } else if (rawBonus > 0) {
+      unitBonus = rawBonus;
+      packBonus = packSize > 0 ? r2(unitBonus / packSize) : 0;
+    }
+  }
+
+  const bonusQty = unitBonus;
 
   let packPrice = n(item.pack_price);
   let unitPrice = n(item.price);
@@ -79,6 +102,23 @@ export function recalcWholesaleItem(item, changedField = null) {
   const itemDisc = (gross * discPct) / 100;
   const subTotal = gross - itemDisc;
 
+  const avgCost = n(item.avg_price);
+  const unitCost = avgCost > 0 ? avgCost : n(item.unit_purchase_price);
+  let margin = item.margin ?? "";
+  if (unitPrice > 0 && unitCost > 0) {
+    const netUnitPrice = unitPrice * (1 - discPct / 100);
+    if (totalQty > 0 && bonusQty > 0 && subTotal > 0) {
+      const totalRowCost = (totalQty + bonusQty) * unitCost;
+      margin = r2(((subTotal - totalRowCost) / subTotal) * 100);
+    } else if (netUnitPrice > 0) {
+      margin = r2(((netUnitPrice - unitCost) / netUnitPrice) * 100);
+    } else {
+      margin = -100;
+    }
+  } else if (unitPrice <= 0) {
+    margin = "";
+  }
+
   const preserve = (fieldName, computedValue) =>
     changedField === fieldName ? item[fieldName] : computedValue;
 
@@ -94,6 +134,7 @@ export function recalcWholesaleItem(item, changedField = null) {
     pack_price: preserve("pack_price", packPrice),
     price: preserve("price", unitPrice),
     item_discount_percentage: preserve("item_discount_percentage", discPct === 0 ? "" : discPct),
+    margin,
     sub_total: r2(subTotal),
   };
 }

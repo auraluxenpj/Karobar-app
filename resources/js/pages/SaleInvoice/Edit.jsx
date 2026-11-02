@@ -79,7 +79,10 @@ export default function EditSaleInvoice() {
           <SaleInvoiceWholesaleForm
             saleId={id}
             onSubmit={onSubmit}
-            onSuccess={() => navigate("/sale-invoices")}
+            onSuccess={(data, savedId) => {
+              const targetId = savedId || data?.id || id;
+              navigate(`/wholesale-invoices/${targetId}`);
+            }}
           />
         ) : (
           <SaleInvoiceRetailForm
