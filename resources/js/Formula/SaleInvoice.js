@@ -172,7 +172,7 @@ export function recalcFooter(form, changedField = null) {
   const totalFloat = taxableBase + taxAmt;
   const totalRounded = Math.round(totalFloat); // integer total
 
-  return {
+  const nextForm = {
     ...form,
     discount_percentage: discountPct === 0 ? "" : String(r2(discountPct)),
     discount_amount: discountAmt === 0 ? "" : String(r2(discountAmt)),
@@ -182,4 +182,10 @@ export function recalcFooter(form, changedField = null) {
     gross_amount: r2(grossSum),
     total: String(totalRounded), // integer string, no decimals
   };
+
+  if ((form.invoice_type ?? "debit") !== "credit") {
+    nextForm.total_receive = String(totalRounded);
+  }
+
+  return nextForm;
 }

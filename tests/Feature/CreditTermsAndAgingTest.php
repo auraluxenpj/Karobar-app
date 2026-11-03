@@ -565,6 +565,73 @@ class CreditTermsAndAgingTest extends TestCase
         ]);
 
         $paidRes->assertStatus(201);
+
+        // 4. Debit invoice on Walk-In Customer with a batched product where batch selection
+        // changes the item price (e.g. client initially had catalog total=300, total_receive=300,
+        // or cash_given=300, while the selected batch price is 45/unit -> 450 on server recalculation)
+        // must succeed and sync total_receive to server-authoritative total (450) without triggering Udhar error.
+        \App\Models\Batch::create([
+            'product_id'   => $this->product->id,
+            'batch_number' => 'BATCH-FRAC-01',
+            'expiry_date'  => '2028-12-31',
+            'quantity'     => 50,
+        ]);
+
+        $batchedDebitRes = $this->actingAs($this->user)->postJson('/api/sale-invoices', [
+            'customer_id'   => $walkIn->id,
+            'invoice_type'  => 'debit',
+            'sale_type'     => 'retail',
+            'date'          => '2026-10-31',
+            'gross_amount'  => 300,
+            'total'         => '300',
+            'total_receive' => '300',
+            'cash_given'    => '300',
+            'items'         => [
+                [
+                    'product_id'   => $this->product->id,
+                    'batch_number' => 'BATCH-FRAC-01',
+                    'expiry'       => '2028-12-31',
+                    'pack_size'    => 10,
+                    'quantity'     => 10,
+                    'price'        => 45,
+                    'sub_total'    => 450,
+                ],
+            ],
+        ]);
+
+        $batchedDebitRes->assertStatus(201);
+        $createdInv = SaleInvoice::findOrFail($batchedDebitRes->json('id'));
+        $this->assertEquals(450.0, (float) $createdInv->total);
+        $this->assertEquals(450.0, (float) $createdInv->total_receive);
+
+        // Updating that debit invoice with higher batch quantity/price while client total_receive matched old client total also succeeds
+        $updateBatchedDebitRes = $this->actingAs($this->user)->putJson("/api/sale-invoices/{$createdInv->id}", [
+            'posted_number' => $createdInv->posted_number,
+            'customer_id'   => $walkIn->id,
+            'invoice_type'  => 'debit',
+            'sale_type'     => 'retail',
+            'date'          => '2026-10-31',
+            'gross_amount'  => 450,
+            'total'         => '450',
+            'total_receive' => '450',
+            'items'         => [
+                [
+                    'id'           => $createdInv->items()->first()->id,
+                    'product_id'   => $this->product->id,
+                    'batch_number' => 'BATCH-FRAC-01',
+                    'expiry'       => '2028-12-31',
+                    'pack_size'    => 10,
+                    'quantity'     => 12,
+                    'price'        => 45,
+                    'sub_total'    => 540,
+                ],
+            ],
+        ]);
+
+        $updateBatchedDebitRes->assertStatus(200);
+        $createdInv->refresh();
+        $this->assertEquals(540.0, (float) $createdInv->total);
+        $this->assertEquals(540.0, (float) $createdInv->total_receive);
     }
 
     public function test_flush_walkin_credit_command_flushes_walk_in_udhar_and_preserves_named_customer_credit(): void

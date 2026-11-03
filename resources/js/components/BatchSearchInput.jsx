@@ -203,7 +203,6 @@ const BatchSearchInput = forwardRef(
             handleSelect(matching || { is_new: true, batch_number: trimmed });
             return;
           }
-          if (onChange) onChange(value);
         }
         if (onKeyDown) onKeyDown(e);
         return;

@@ -189,9 +189,13 @@ class SaleInvoiceController extends Controller
         $received = round((float) ($data['total_receive'] ?? 0), 2);
         $creditApplied = round((float) ($data['apply_credit_amount'] ?? 0), 2);
         $unpaidAmount = round(max($total - $received - $creditApplied, 0), 2);
+        $clientTotal = $request->has('total') && is_numeric($request->input('total')) && (float) $request->input('total') > 0
+            ? round((float) $request->input('total'), 2)
+            : $total;
+        $cashCheckTarget = min($total, $clientTotal);
         $cashGivenUnderpaid = $request->filled('cash_given')
             && is_numeric($request->input('cash_given'))
-            && round((float) $request->input('cash_given') + $creditApplied, 2) < ($total - 0.009);
+            && round((float) $request->input('cash_given') + $creditApplied, 2) < ($cashCheckTarget - 0.009);
 
         if ($customer && $customer->isWalkIn()) {
             if ($invoiceType === 'credit' || $unpaidAmount > 0.009 || $cashGivenUnderpaid) {
@@ -440,6 +444,14 @@ class SaleInvoiceController extends Controller
             'items.*.is_custom_price'          => 'nullable|boolean',
         ]);
 
+        $clientSubmittedTotal = $request->has('total') && is_numeric($request->input('total'))
+            ? round((float) $request->input('total'), 2)
+            : null;
+        $hasExplicitReceive = $request->has('total_receive') && $request->input('total_receive') !== null && $request->input('total_receive') !== '';
+        $clientSubmittedReceive = $hasExplicitReceive && is_numeric($request->input('total_receive'))
+            ? round((float) $request->input('total_receive'), 2)
+            : null;
+
         // 🛡️ Server-Authoritative Totals & Discount Controls
         $calculated = app(\App\Services\InvoiceCalculationService::class)->calculateAndValidateSale(
             $data,
@@ -466,14 +478,25 @@ class SaleInvoiceController extends Controller
             }
         }
 
-        // For debit (cash) sales where total_receive was not explicitly provided in the request, default to full bill total
+        // For debit (cash) sales, sync total_receive to the authoritative server total unless an explicit partial payment was sent
         $effectiveInvoiceType = $data['invoice_type'] ?? 'debit';
-        $hasExplicitReceive = $request->has('total_receive') && $request->input('total_receive') !== null && $request->input('total_receive') !== '';
-        if ($effectiveInvoiceType === 'debit' && !$hasExplicitReceive) {
-            if ($request->filled('cash_given') && is_numeric($request->input('cash_given'))) {
-                $data['total_receive'] = min((float) $data['total'], (float) $request->input('cash_given'));
-            } else {
-                $data['total_receive'] = $data['total'];
+        if ($effectiveInvoiceType === 'debit' && empty($data['split_payments'])) {
+            $isClientFullDebitReceive = !$hasExplicitReceive
+                || ($clientSubmittedReceive !== null && $clientSubmittedTotal !== null && $clientSubmittedReceive >= ($clientSubmittedTotal - 0.009))
+                || ($clientSubmittedReceive !== null && abs($clientSubmittedReceive - (float) $data['total']) <= 1.00);
+
+            if ($isClientFullDebitReceive) {
+                if ($request->filled('cash_given') && is_numeric($request->input('cash_given'))) {
+                    $cashGivenFloat = round((float) $request->input('cash_given'), 2);
+                    $isFullCashGiven = ($clientSubmittedTotal !== null && $cashGivenFloat >= ($clientSubmittedTotal - 0.009))
+                        || abs($cashGivenFloat - (float) $data['total']) <= 1.00
+                        || $cashGivenFloat >= (float) $data['total'];
+                    $data['total_receive'] = $isFullCashGiven
+                        ? $data['total']
+                        : min((float) $data['total'], $cashGivenFloat);
+                } else {
+                    $data['total_receive'] = $data['total'];
+                }
             }
         }
 
@@ -803,6 +826,14 @@ class SaleInvoiceController extends Controller
             'items.*.is_custom_price'          => 'nullable|boolean',
         ]);
 
+        $clientUpdateTotal = $request->has('total') && is_numeric($request->input('total'))
+            ? round((float) $request->input('total'), 2)
+            : null;
+        $hasExplicitUpdateReceive = $request->has('total_receive') && $request->input('total_receive') !== null && $request->input('total_receive') !== '';
+        $clientUpdateReceive = $hasExplicitUpdateReceive && is_numeric($request->input('total_receive'))
+            ? round((float) $request->input('total_receive'), 2)
+            : null;
+
         // 🛡️ Server-Authoritative Totals & Discount Controls
         $calculated = app(\App\Services\InvoiceCalculationService::class)->calculateAndValidateSale(
             $data,
@@ -819,16 +850,27 @@ class SaleInvoiceController extends Controller
         $data['items']               = $calculated['items'];
 
         $effectiveUpdateInvoiceType = $data['invoice_type'] ?? ($invoice->invoice_type ?? 'debit');
-        $hasExplicitUpdateReceive = $request->has('total_receive') && $request->input('total_receive') !== null && $request->input('total_receive') !== '';
         if (!empty($data['split_payments']) && !$hasExplicitUpdateReceive) {
             $data['total_receive'] = round(collect($data['split_payments'])->sum(fn($leg) => (float)($leg['amount'] ?? 0)), 2);
             $hasExplicitUpdateReceive = true;
         }
-        if ($effectiveUpdateInvoiceType === 'debit' && !$hasExplicitUpdateReceive) {
-            if ($request->filled('cash_given') && is_numeric($request->input('cash_given'))) {
-                $data['total_receive'] = min((float) $data['total'], (float) $request->input('cash_given'));
-            } else {
-                $data['total_receive'] = $data['total'];
+        if ($effectiveUpdateInvoiceType === 'debit' && empty($data['split_payments'])) {
+            $isClientFullDebitUpdateReceive = !$hasExplicitUpdateReceive
+                || ($clientUpdateReceive !== null && $clientUpdateTotal !== null && $clientUpdateReceive >= ($clientUpdateTotal - 0.009))
+                || ($clientUpdateReceive !== null && abs($clientUpdateReceive - (float) $data['total']) <= 1.00);
+
+            if ($isClientFullDebitUpdateReceive) {
+                if ($request->filled('cash_given') && is_numeric($request->input('cash_given'))) {
+                    $cashGivenFloat = round((float) $request->input('cash_given'), 2);
+                    $isFullCashGiven = ($clientUpdateTotal !== null && $cashGivenFloat >= ($clientUpdateTotal - 0.009))
+                        || abs($cashGivenFloat - (float) $data['total']) <= 1.00
+                        || $cashGivenFloat >= (float) $data['total'];
+                    $data['total_receive'] = $isFullCashGiven
+                        ? $data['total']
+                        : min((float) $data['total'], $cashGivenFloat);
+                } else {
+                    $data['total_receive'] = $data['total'];
+                }
             }
         }
 

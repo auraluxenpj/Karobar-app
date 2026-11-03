@@ -50,7 +50,10 @@ const normalizeFormLoaded = (f) => {
   safe.item_discount = safe.item_discount ?? "";
   safe.gross_amount = safe.gross_amount ?? "";
   safe.total = safe.total ?? "";
-  safe.total_receive = safe.total_receive ?? "";
+  safe.total_receive =
+    safe.invoice_type !== "credit" && safe.total !== ""
+      ? String(Math.round(Number(safe.total || 0)))
+      : (safe.total_receive ?? "");
   safe.cash_given = safe.cash_given ?? "";
   safe.payment_method = safe.payment_method ?? "cash";
   safe.account_id = safe.account_id ?? null;
@@ -650,7 +653,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
     }
     const tr = Math.round(Number(loaded?.total_receive ?? 0));
     const tt = Math.round(Number(loaded?.total ?? 0));
-    const shouldSync = loaded?.total_receive === "" || tr === tt;
+    const shouldSync = loaded?.invoice_type !== "credit" || loaded?.total_receive === "" || tr === tt;
 
     if (loaded.customer_id) {
       fetchCustomerWholesalePrices(loaded.customer_id);
@@ -774,7 +777,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
         });
         if (!changed) return prev;
         let updated = recalcFooter({ ...prev, items: nextItems }, "items");
-        if (!receiveTouched && prev.invoice_type !== "credit") updated.total_receive = updated.total ?? "";
+        if (prev.invoice_type !== "credit") updated.total_receive = updated.total ?? "";
         return updated;
       });
     } catch (error) {
@@ -800,9 +803,8 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
         if (!next.customer_id && customers.length > 0) {
           next.customer_id = getDefaultCustomerId(customers);
         }
-        if (!receiveTouched) {
-          next.total_receive = next.total ?? "";
-        }
+        setReceiveTouched(false);
+        next.total_receive = next.total ?? "";
       }
       return next;
     });
@@ -904,7 +906,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
     const tmp = { ...form, [name]: v };
     let next = recalcFooter(tmp, name);
     next[name] = v;
-    if (!receiveTouched && form.invoice_type !== "credit") next.total_receive = next.total ?? "";
+    if (form.invoice_type !== "credit") next.total_receive = next.total ?? "";
     if (!receiveTouched && form.invoice_type === "credit") next.total_receive = "";
     setForm(next);
   };
@@ -963,7 +965,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
 
       items[index] = row;
       let updated = recalcFooter({ ...prev, items }, "items");
-      if (!receiveTouched && prev.invoice_type !== "credit") updated.total_receive = updated.total ?? "";
+      if (prev.invoice_type !== "credit") updated.total_receive = updated.total ?? "";
       if (!receiveTouched && prev.invoice_type === "credit") updated.total_receive = "";
       return updated;
     });
@@ -975,7 +977,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
         ...prev,
         items: [...prev.items, createEmptyRow()],
       };
-      if (!receiveTouched) {
+      if (prev.invoice_type !== "credit" || !receiveTouched) {
         const afterFooter = recalcFooter(next, "items");
         if (prev.invoice_type !== "credit") {
           afterFooter.total_receive = afterFooter.total ?? "";
@@ -992,7 +994,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
     if (form.items.length <= 1) return;
     const items = form.items.filter((_, idx) => idx !== i);
     let next = recalcFooter({ ...form, items }, "items");
-    if (!receiveTouched && form.invoice_type !== "credit") next.total_receive = next.total ?? "";
+    if (form.invoice_type !== "credit") next.total_receive = next.total ?? "";
     if (!receiveTouched && form.invoice_type === "credit") next.total_receive = "";
     setForm(next);
   };
@@ -1005,7 +1007,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
       const items2 = [...prev.items];
       items2[rowIndex] = createEmptyRow();
       let next = recalcFooter({ ...prev, items: items2 }, "items");
-      if (!receiveTouched && prev.invoice_type !== "credit") next.total_receive = next.total ?? "";
+      if (prev.invoice_type !== "credit") next.total_receive = next.total ?? "";
       if (!receiveTouched && prev.invoice_type === "credit") next.total_receive = "";
       return next;
     });
@@ -1227,14 +1229,27 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
         : Boolean(fefoBatch?.is_unbatched);
 
       const batchAvailableUnits = Number(fefoBatch?.available_units ?? displayAvailableUnits);
-      const effectivePackPrice =
+      const fefoPackPrice =
         !isCustomPrice && !allocatedIsUnbatched && fefoBatch && Number(fefoBatch.whole_sale_pack_price) > 0
           ? Number(fefoBatch.whole_sale_pack_price)
-          : packPrice;
-      const effectiveUnitPrice =
+          : 0;
+      const fefoUnitPrice =
         !isCustomPrice && !allocatedIsUnbatched && fefoBatch && Number(fefoBatch.whole_sale_unit_price) > 0
           ? Number(fefoBatch.whole_sale_unit_price)
-          : unitPrice;
+          : 0;
+
+      let effectivePackPrice = packPrice;
+      let effectiveUnitPrice = unitPrice;
+      if (fefoPackPrice > 0 && fefoUnitPrice > 0) {
+        effectivePackPrice = fefoPackPrice;
+        effectiveUnitPrice = fefoUnitPrice;
+      } else if (fefoPackPrice > 0) {
+        effectivePackPrice = fefoPackPrice;
+        effectiveUnitPrice = Number((fefoPackPrice / packSize).toFixed(2));
+      } else if (fefoUnitPrice > 0) {
+        effectiveUnitPrice = fefoUnitPrice;
+        effectivePackPrice = Number((fefoUnitPrice * packSize).toFixed(2));
+      }
 
       // Default to 1 Pack if at least 1 pack is in stock and packSize > 1, otherwise 1 Unit
       const defaultPackQty = isSameProd
@@ -1284,7 +1299,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
       );
 
       let next = recalcFooter({ ...prev, items }, "items");
-      if (!receiveTouched && prev.invoice_type !== "credit") next.total_receive = next.total ?? "";
+      if (prev.invoice_type !== "credit") next.total_receive = next.total ?? "";
       if (!receiveTouched && prev.invoice_type === "credit") next.total_receive = "";
       return next;
     });
@@ -1306,7 +1321,13 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
     const row0 = form.items[rowIndex];
     if (!row0?.product_id) return;
 
-    if (batchObj?.is_unbatched || batchNum === "" || batchNum === "__unbatched__") {
+    if (
+      batchObj?.is_unbatched ||
+      batchNum === "" ||
+      batchNum === "__unbatched__" ||
+      batchNum === "[Unbatched Stock]" ||
+      batchNum === "[Unassigned Stock]"
+    ) {
       const batches = await fetchBatches(row0.product_id);
       const unbatchedItem = batchObj || (batches || []).find((x) => x.is_unbatched);
       let unbatchedAvailable = unbatchedItem?.available_units;
@@ -1328,7 +1349,6 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
       const batches = await fetchBatches(row0.product_id);
       const b = batchObj || (batches || []).find((x) => String(x.batch_number) === String(batchNum));
 
-      const baseAvailable = Number(b?.available_units ?? 0);
       const batchExpiry = b?.expiry || b?.expiry_date || "";
 
       if (b?.is_expired) {
@@ -1338,6 +1358,19 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
         );
       }
 
+      if (b?.available_units != null && Number.isFinite(Number(b.available_units))) {
+        handleBatchSelectWithCalculatedAvailable(
+          rowIndex,
+          batchNum,
+          Number(b.available_units),
+          batchExpiry,
+          false,
+          b
+        );
+        return;
+      }
+
+      const baseAvailable = Number(b?.available_units ?? 0);
       const params = new URLSearchParams({
         product_id: row0.product_id || "",
         batch: batchNum || "",
@@ -1373,14 +1406,30 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
     setForm((prev) => {
       const items = [...prev.items];
       const currentRow = items[rowIndex] || {};
-      const nextPackPrice =
-        !currentRow.is_custom_price && batchPricingObj && Number(batchPricingObj.whole_sale_pack_price) > 0
+      const batchPackPrice =
+        batchPricingObj && Number(batchPricingObj.whole_sale_pack_price) > 0
           ? Number(batchPricingObj.whole_sale_pack_price)
-          : currentRow.pack_price;
-      const nextUnitPrice =
-        !currentRow.is_custom_price && batchPricingObj && Number(batchPricingObj.whole_sale_unit_price) > 0
+          : 0;
+      const batchUnitPrice =
+        batchPricingObj && Number(batchPricingObj.whole_sale_unit_price) > 0
           ? Number(batchPricingObj.whole_sale_unit_price)
-          : currentRow.price;
+          : 0;
+
+      let nextPackPrice = currentRow.pack_price;
+      let nextUnitPrice = currentRow.price;
+      if (!currentRow.is_custom_price) {
+        if (batchPackPrice > 0 && batchUnitPrice > 0) {
+          nextPackPrice = batchPackPrice;
+          nextUnitPrice = batchUnitPrice;
+        } else if (batchPackPrice > 0) {
+          nextPackPrice = batchPackPrice;
+          nextUnitPrice = Number((batchPackPrice / packSize).toFixed(2));
+        } else if (batchUnitPrice > 0) {
+          nextUnitPrice = batchUnitPrice;
+          nextPackPrice = Number((batchUnitPrice * packSize).toFixed(2));
+        }
+      }
+
       const updated = {
         ...currentRow,
         pack_price: nextPackPrice,
@@ -1392,7 +1441,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
       };
       items[rowIndex] = recalcWholesaleItem(updated, "batch_select");
       let next = recalcFooter({ ...prev, items }, "items");
-      if (!receiveTouched && prev.invoice_type !== "credit") next.total_receive = next.total ?? "";
+      if (prev.invoice_type !== "credit") next.total_receive = next.total ?? "";
       if (!receiveTouched && prev.invoice_type === "credit") next.total_receive = "";
       return next;
     });
@@ -1582,9 +1631,12 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
     }
 
     // total_receive & Walk-In Customer unpaid credit (Udhar) validation
+    const totalNum = Math.round(Number(form.total || 0));
+    const recvNum =
+      form.invoice_type !== "credit"
+        ? totalNum
+        : Math.round(Number(form.total_receive || 0));
     {
-      const totalNum = Math.round(Number(form.total || 0));
-      const recvNum = Math.round(Number(form.total_receive || 0));
       if (recvNum < 0) return invoiceErrors.showMessage("Total Receive cannot be negative");
       if (form.invoice_type !== "credit" && recvNum > totalNum) {
         return invoiceErrors.showMessage("Total Receive cannot exceed Total");
@@ -1593,14 +1645,10 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
       const resolvedCustomer = (customersRef.current || customers || []).find(
         (c) => String(c.id) === String(effectiveCustomerId)
       );
-      const cashTenderedUnderpaid =
-        form.cash_given !== "" &&
-        form.cash_given !== undefined &&
-        Number(form.cash_given) < totalNum;
 
       if (
         isWalkInCustomer(resolvedCustomer) &&
-        (form.invoice_type === "credit" || recvNum < totalNum || cashTenderedUnderpaid)
+        (form.invoice_type === "credit" || recvNum < totalNum)
       ) {
         setCustomerSearchOpen(true);
         return invoiceErrors.showMessage(WALK_IN_CREDIT_ERROR);
@@ -1613,6 +1661,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
       sale_type: "wholesale",
       wholesale_type: "pack",
       invoice_type: form.invoice_type ?? "debit",
+      total_receive: form.invoice_type !== "credit" ? String(totalNum) : form.total_receive,
       due_date: form.due_date || undefined,
       discount_percentage:
         form.discount_percentage === "-" || form.discount_percentage === "-."
@@ -3174,11 +3223,13 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
                           readOnly={form.invoice_type === "debit"}
                           value={form.total_receive ?? ""}
                           onChange={(e) => {
+                            if (form.invoice_type === "debit") return;
                             const v = sanitizeNumberInput(e.target.value, true, false);
                             setReceiveTouched(true);
                             setForm((prev) => ({ ...prev, total_receive: v }));
                           }}
                           onBlur={() => {
+                            if (form.invoice_type === "debit") return;
                             setForm((prev) => ({
                               ...prev,
                               total_receive: String(Math.round(Number(prev.total_receive || 0))),

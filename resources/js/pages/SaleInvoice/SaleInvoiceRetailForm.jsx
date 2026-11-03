@@ -67,7 +67,10 @@ const normalizeFormLoaded = (f) => {
   safe.item_discount = safe.item_discount ?? "";
   safe.gross_amount = safe.gross_amount ?? "";
   safe.total = safe.total ?? "";
-  safe.total_receive = safe.total_receive ?? "";
+  safe.total_receive =
+    safe.invoice_type !== "credit" && safe.total !== ""
+      ? String(Math.round(Number(safe.total || 0)))
+      : (safe.total_receive ?? "");
   safe.cash_given = safe.cash_given ?? "";
   safe.payment_method = safe.payment_method ?? "cash";
   safe.account_id = safe.account_id ?? null;
@@ -869,7 +872,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
     }
     const tr = Math.round(Number(loaded?.total_receive ?? 0));
     const tt = Math.round(Number(loaded?.total ?? 0));
-    const shouldSync = loaded?.total_receive === "" || tr === tt;
+    const shouldSync = loaded?.invoice_type !== "credit" || loaded?.total_receive === "" || tr === tt;
     
     await ensureProductsForItems(loaded?.items || []);
     const batchMap = await ensureBatchesForItems(loaded?.items || []);
@@ -961,15 +964,13 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
         next.total_receive = "";
         setReceiveTouched(true); // Mark as touched so it stays at 0
       } else {
-        // Debit - auto-select lowest ID customer if none selected
+        // Debit - auto-select default customer if none selected
         if (!next.customer_id && customers.length > 0) {
-          const sortedCustomers = [...customers].sort((a, b) => (a?.id ?? 0) - (b?.id ?? 0));
-          next.customer_id = sortedCustomers[0].id;
+          next.customer_id = getDefaultCustomerId(customers);
         }
-        // For debit, auto-fill total_receive with total
-        if (!receiveTouched) {
-          next.total_receive = next.total ?? "";
-        }
+        // For debit, always sync total_receive with total and reset receiveTouched
+        setReceiveTouched(false);
+        next.total_receive = next.total ?? "";
       }
       return next;
     });
@@ -1067,8 +1068,8 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
     const tmp = { ...form, [name]: v };
     let next = recalcFooter(tmp, name);
     next[name] = v;
-    // For credit sales, total_receive stays at 0; for debit, auto-fill if not touched
-    if (!receiveTouched && form.invoice_type !== "credit") next.total_receive = next.total ?? "";
+    // For debit sales, always keep total_receive synced to total; for credit, keep empty if untouched
+    if (form.invoice_type !== "credit") next.total_receive = next.total ?? "";
     if (!receiveTouched && form.invoice_type === "credit") next.total_receive = "";
     setForm(next);
   };
@@ -1093,8 +1094,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
       if (field === "item_discount_percentage") row.item_discount_percentage = value;
       items[index] = row;
       let updated = recalcFooter({ ...prev, items }, "items");
-      // For credit sales, total_receive stays at 0; for debit, auto-fill if not touched
-      if (!receiveTouched && prev.invoice_type !== "credit") updated.total_receive = updated.total ?? "";
+      if (prev.invoice_type !== "credit") updated.total_receive = updated.total ?? "";
       if (!receiveTouched && prev.invoice_type === "credit") updated.total_receive = "";
       return updated;
     });
@@ -1122,9 +1122,8 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
           },
         ],
       };
-      if (!receiveTouched) {
+      if (prev.invoice_type !== "credit" || !receiveTouched) {
         const afterFooter = recalcFooter(next, "items");
-        // For credit sales, total_receive stays at 0; for debit, auto-fill if not touched
         if (prev.invoice_type !== "credit") {
           afterFooter.total_receive = afterFooter.total ?? "";
         } else {
@@ -1141,8 +1140,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
     if (form.items.length <= 1) return;
     const items = form.items.filter((_, idx) => idx !== i);
     let next = recalcFooter({ ...form, items }, "items");
-    // For credit sales, total_receive stays at 0; for debit, auto-fill if not touched
-    if (!receiveTouched && form.invoice_type !== "credit") next.total_receive = next.total ?? "";
+    if (form.invoice_type !== "credit") next.total_receive = next.total ?? "";
     if (!receiveTouched && form.invoice_type === "credit") next.total_receive = "";
     setForm(next);
   };
@@ -1170,8 +1168,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
         "revert_duplicate_product"
       );
       let next = recalcFooter({ ...prev, items: items2 }, "items");
-      // For credit sales, total_receive stays at 0; for debit, auto-fill if not touched
-      if (!receiveTouched && prev.invoice_type !== "credit") next.total_receive = next.total ?? "";
+      if (prev.invoice_type !== "credit") next.total_receive = next.total ?? "";
       if (!receiveTouched && prev.invoice_type === "credit") next.total_receive = "";
       return next;
     });
@@ -1329,9 +1326,15 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
         ? existingIsUnbatched
         : (!hasAssignedBatches ? true : Boolean(fefoBatch?.is_unbatched));
       const batchAvailable = fefoBatch?.available_units ?? displayAvailable;
-      const effectivePrice =
-        !isCustomPrice && !allocatedIsUnbatched && fefoBatch && Number(fefoBatch.unit_sale_price) > 0
+      const fefoUnitSalePrice =
+        fefoBatch && Number(fefoBatch.unit_sale_price) > 0
           ? Number(fefoBatch.unit_sale_price)
+          : fefoBatch && Number(fefoBatch.pack_sale_price) > 0 && Number(packSize) > 0
+          ? Number((Number(fefoBatch.pack_sale_price) / Number(packSize)).toFixed(2))
+          : 0;
+      const effectivePrice =
+        !isCustomPrice && !allocatedIsUnbatched && fefoUnitSalePrice > 0
+          ? fefoUnitSalePrice
           : price;
       
       items[rowIndex] = recalcItem(
@@ -1355,8 +1358,8 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
         "product_select"
       );
       let next = recalcFooter({ ...prev, items }, "items");
-      // For credit sales, total_receive stays at 0; for debit, auto-fill if not touched
-      if (!receiveTouched && prev.invoice_type !== "credit") next.total_receive = next.total ?? "";
+      // For credit sales, total_receive stays at 0 if untouched; for debit, always sync with total
+      if (prev.invoice_type !== "credit") next.total_receive = next.total ?? "";
       if (!receiveTouched && prev.invoice_type === "credit") next.total_receive = "";
       return next;
     });
@@ -1375,7 +1378,13 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
     if (!row0?.product_id) return;
 
     // Check if unbatched stock is selected
-    if (batchObj?.is_unbatched || batchNum === "" || batchNum === "__unbatched__") {
+    if (
+      batchObj?.is_unbatched ||
+      batchNum === "" ||
+      batchNum === "__unbatched__" ||
+      batchNum === "[Unbatched Stock]" ||
+      batchNum === "[Unassigned Stock]"
+    ) {
       const batches = await fetchBatches(row0.product_id);
       const unbatchedItem = batchObj || (batches || []).find((x) => x.is_unbatched);
       let unbatchedAvailable = unbatchedItem?.available_units;
@@ -1395,14 +1404,31 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
       const batches = await fetchBatches(row0.product_id);
       const b = batchObj || (batches || []).find((x) => String(x.batch_number) === String(batchNum));
       
-      const baseAvailable = Number(b?.available_units ?? 0);
       const batchExpiry = b?.expiry || b?.expiry_date || "";
-      const batchPrice = b?.unit_sale_price;
+      const effectivePackSize = Number(row0.pack_size || b?.pack_size || 1);
+      const batchPrice =
+        b && Number(b.unit_sale_price) > 0
+          ? Number(b.unit_sale_price)
+          : b && Number(b.pack_sale_price) > 0 && effectivePackSize > 0
+          ? Number((Number(b.pack_sale_price) / effectivePackSize).toFixed(2))
+          : null;
 
       if (b?.is_expired) {
         toast.error(`Warning: Batch ${batchNum} is EXPIRED (${batchExpiry}). Supervisor override required.`, { id: "expired-batch-warn" });
       }
+
+      if (b?.available_units != null && Number.isFinite(Number(b.available_units))) {
+        return handleBatchSelectWithCalculatedAvailable(
+          rowIndex,
+          batchNum,
+          Number(b.available_units),
+          batchExpiry,
+          false,
+          batchPrice
+        );
+      }
       
+      const baseAvailable = Number(b?.available_units ?? 0);
       const params = new URLSearchParams({
         product_id: row0.product_id || "",
         batch: batchNum || "",
@@ -1443,8 +1469,8 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
       };
       items[rowIndex] = recalcItem(updated, "batch_select");
       let next = recalcFooter({ ...prev, items }, "items");
-      // For credit sales, total_receive stays at 0; for debit, auto-fill if not touched
-      if (!receiveTouched && prev.invoice_type !== "credit") next.total_receive = next.total ?? "";
+      // For credit sales, total_receive stays at 0 if untouched; for debit, always sync with total
+      if (prev.invoice_type !== "credit") next.total_receive = next.total ?? "";
       if (!receiveTouched && prev.invoice_type === "credit") next.total_receive = "";
       return next;
     });
@@ -1586,9 +1612,12 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
     }
 
     // total_receive & Walk-In Customer unpaid credit (Udhar) validation
+    const totalNum = Math.round(Number(form.total || 0));
+    const recvNum =
+      form.invoice_type !== "credit"
+        ? totalNum
+        : Math.round(Number(form.total_receive || 0));
     {
-      const totalNum = Math.round(Number(form.total || 0));
-      const recvNum = Math.round(Number(form.total_receive || 0));
       if (recvNum < 0) return invoiceErrors.showMessage("Total Receive cannot be negative");
       if (form.invoice_type !== "credit" && recvNum > totalNum) {
         return invoiceErrors.showMessage("Total Receive cannot exceed Total");
@@ -1597,14 +1626,10 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
       const resolvedCustomer = (customersRef.current || customers || []).find(
         (c) => String(c.id) === String(effectiveCustomerId)
       );
-      const cashTenderedUnderpaid =
-        form.cash_given !== "" &&
-        form.cash_given !== undefined &&
-        Number(form.cash_given) < totalNum;
 
       if (
         isWalkInCustomer(resolvedCustomer) &&
-        (form.invoice_type === "credit" || recvNum < totalNum || cashTenderedUnderpaid)
+        (form.invoice_type === "credit" || recvNum < totalNum)
       ) {
         setCustomerSearchOpen(true);
         return invoiceErrors.showMessage(WALK_IN_CREDIT_ERROR);
@@ -1617,6 +1642,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
       customer_id: effectiveCustomerId,
       sale_type: "retail",
       invoice_type: form.invoice_type ?? "debit",
+      total_receive: form.invoice_type !== "credit" ? String(totalNum) : form.total_receive,
       due_date: form.due_date || undefined,
       discount_percentage:
         form.discount_percentage === "-" || form.discount_percentage === "-."
@@ -2633,11 +2659,13 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                     readOnly={form.invoice_type === "debit"}
                     value={form.total_receive ?? ""}
                     onChange={(e) => {
+                      if (form.invoice_type === "debit") return;
                       const v = sanitizeNumberInput(e.target.value, true, false);
                       setReceiveTouched(true);
                       setForm((prev) => ({ ...prev, total_receive: v }));
                     }}
                     onBlur={() => {
+                      if (form.invoice_type === "debit") return;
                       setForm((prev) => ({
                         ...prev,
                         total_receive: String(Math.round(Number(prev.total_receive || 0))),
