@@ -1109,6 +1109,17 @@ export default function PurchaseInvoiceShow() {
                   {remainingAmount.toFixed(2)}
                 </div>
               </div>
+
+              {inv.invoice_type === "credit" && to2(totalPaid - totalAmount) > 0.009 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                    Ledger Credit
+                  </span>
+                  <div className="purchase-readonly-field h-7 min-w-[84px] flex items-center justify-end px-2 rounded-md text-xs font-bold font-mono !text-emerald-600 dark:!text-emerald-400">
+                    +{to2(totalPaid - totalAmount).toFixed(2)}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 ml-auto no-print">

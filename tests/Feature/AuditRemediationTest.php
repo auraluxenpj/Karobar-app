@@ -511,4 +511,209 @@ class AuditRemediationTest extends TestCase
         $this->assertNotNull($apLine);
         $this->assertEquals(1000.0, (float) $apLine['credit']);
     }
+
+    public function test_credit_purchase_invoice_overpayment_updates_supplier_ledger_drawer_account_and_finance(): void
+    {
+        Sanctum::actingAs($this->admin);
+
+        $cashAccount = \App\Models\Account::create([
+            'name' => 'Cash in Hand',
+            'type' => 'cash',
+            'code' => 'CASH',
+            'opening_balance' => 10000,
+            'current_balance' => 10000,
+            'is_active' => true,
+            'is_default' => true,
+        ]);
+
+        $drawerSession = \App\Models\CashDrawerSession::create([
+            'user_id' => $this->admin->id,
+            'opened_at' => now()->subHour(),
+            'status' => 'open',
+            'opening_balance' => 5000,
+            'closing_balance_expected' => 5000,
+        ]);
+
+        // Prior unpaid credit purchase invoice of 2,000 so supplier has an existing payable balance
+        $priorInvoice = PurchaseInvoice::create([
+            'user_id' => $this->admin->id,
+            'supplier_id' => $this->supplier->id,
+            'posted_number' => 'PI-PRIOR-001',
+            'posted_date' => now()->toDateString(),
+            'invoice_number' => 'SUP-PRIOR-001',
+            'invoice_amount' => 2000,
+            'invoice_type' => 'credit',
+            'status' => 'posted',
+            'total_amount' => 2000,
+            'tax_amount' => 0,
+            'total_paid' => 0,
+        ]);
+
+        SupplierLedger::create([
+            'supplier_id' => $this->supplier->id,
+            'purchase_invoice_id' => $priorInvoice->id,
+            'entry_type' => 'invoice',
+            'entry_date' => now()->toDateString(),
+            'posted_number' => 'PI-PRIOR-001',
+            'invoice_number' => 'SUP-PRIOR-001',
+            'invoice_total' => 2000,
+            'total_paid' => 0,
+            'credit_remaining' => 2000,
+            'is_manual' => false,
+        ]);
+
+        $this->assertEquals(2000.0, SupplierLedger::getSupplierNetBalance($this->supplier->id));
+
+        $product = $this->makeProduct([
+            'pack_size' => 10,
+            'quantity' => 50,
+            'pack_purchase_price' => 100,
+            'unit_purchase_price' => 10,
+            'pack_sale_price' => 150,
+            'unit_sale_price' => 15,
+            'avg_price' => 10,
+        ]);
+
+        // Create a Credit Purchase Invoice with total_amount = 1,000 and total_paid = 1,500 (500 overpayment)
+        $storeRes = $this->postJson('/api/purchase-invoices', [
+            'supplier_id' => $this->supplier->id,
+            'posted_date' => now()->toDateString(),
+            'invoice_number' => 'SUP-OVERPAY-001',
+            'invoice_amount' => 1000,
+            'invoice_type' => 'credit',
+            'payment_method' => 'cash',
+            'account_id' => $cashAccount->id,
+            'total_amount' => 1000,
+            'total_paid' => 1500,
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'pack_size' => 10,
+                    'pack_quantity' => 10,
+                    'unit_quantity' => 0,
+                    'quantity' => 100,
+                    'pack_purchase_price' => 100,
+                    'unit_purchase_price' => 10,
+                    'pack_sale_price' => 150,
+                    'unit_sale_price' => 15,
+                    'avg_price' => 10,
+                    'margin' => 33.33,
+                    'sub_total' => 1000,
+                ],
+            ],
+        ]);
+
+        $storeRes->assertStatus(201);
+        $createdId = $storeRes->json('id');
+        $createdInv = PurchaseInvoice::findOrFail($createdId);
+
+        $this->assertEquals(1000.0, (float) $createdInv->total_amount);
+        $this->assertEquals(1500.0, (float) $createdInv->total_paid);
+
+        // Verify SupplierLedger has the invoice row (total_paid capped at 1000) AND the excess payment row (500)
+        $invLedger = SupplierLedger::where('purchase_invoice_id', $createdInv->id)
+            ->where('entry_type', 'invoice')
+            ->first();
+        $this->assertNotNull($invLedger);
+        $this->assertEquals(1000.0, (float) $invLedger->invoice_total);
+        $this->assertEquals(1000.0, (float) $invLedger->total_paid);
+        $this->assertEquals(0.0, (float) $invLedger->credit_remaining);
+
+        $excessLedger = SupplierLedger::where('supplier_id', $this->supplier->id)
+            ->where('payment_ref', 'Inv #' . $createdInv->posted_number)
+            ->where('entry_type', 'payment')
+            ->first();
+        $this->assertNotNull($excessLedger);
+        $this->assertEquals(500.0, (float) $excessLedger->debited_amount);
+
+        // Supplier net balance reduced from 2000 to 1500
+        $this->assertEquals(1500.0, SupplierLedger::getSupplierNetBalance($this->supplier->id));
+
+        // Cash Drawer & Financial Account updated by full 1500
+        $drawerSession->refresh();
+        $cashAccount->refresh();
+        $this->assertEquals(3500.0, (float) $drawerSession->closing_balance_expected);
+        $this->assertEquals(8500.0, (float) $cashAccount->current_balance);
+
+        // Finance General Ledger & Trial Balance stay balanced and reflect the 500 excess reduction in Accounts Payable
+        $gl = app(AccountingService::class)->getGeneralLedger([
+            'from' => now()->startOfMonth()->toDateString(),
+            'to' => now()->endOfMonth()->toDateString(),
+        ]);
+        $this->assertEquals($gl['summary']['total_debit'], $gl['summary']['total_credit']);
+        $piVoucher = collect($gl['entries'])->firstWhere('entry_number', $createdInv->posted_number);
+        $this->assertNotNull($piVoucher);
+        $this->assertEquals(1500.0, (float) $piVoucher['total_debit']);
+        $this->assertEquals(1500.0, (float) $piVoucher['total_credit']);
+
+        $tb = app(AccountingService::class)->getTrialBalance(
+            now()->startOfMonth()->toDateString(),
+            now()->endOfMonth()->toDateString()
+        );
+        $apLine = collect($tb['rows'])->firstWhere('system_key', 'accounts_payable');
+        $this->assertNotNull($apLine);
+        $this->assertEquals(1500.0, (float) $apLine['credit']);
+
+        // Update the Credit Purchase Invoice total_paid from 1500 to 1200 (excess reduced from 500 to 200)
+        $updateRes = $this->putJson("/api/purchase-invoices/{$createdInv->id}", [
+            'posted_number' => $createdInv->posted_number,
+            'supplier_id' => $this->supplier->id,
+            'posted_date' => now()->toDateString(),
+            'invoice_number' => 'SUP-OVERPAY-001',
+            'invoice_amount' => 1000,
+            'invoice_type' => 'credit',
+            'payment_method' => 'cash',
+            'account_id' => $cashAccount->id,
+            'total_amount' => 1000,
+            'total_paid' => 1200,
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'pack_size' => 10,
+                    'pack_quantity' => 10,
+                    'unit_quantity' => 0,
+                    'quantity' => 100,
+                    'pack_purchase_price' => 100,
+                    'unit_purchase_price' => 10,
+                    'pack_sale_price' => 150,
+                    'unit_sale_price' => 15,
+                    'avg_price' => 10,
+                    'margin' => 33.33,
+                    'sub_total' => 1000,
+                ],
+            ],
+        ]);
+        $updateRes->assertStatus(200);
+
+        $excessLedgerAfterUpdate = SupplierLedger::where('supplier_id', $this->supplier->id)
+            ->where('payment_ref', 'Inv #' . $createdInv->posted_number)
+            ->where('entry_type', 'payment')
+            ->first();
+        $this->assertNotNull($excessLedgerAfterUpdate);
+        $this->assertEquals(200.0, (float) $excessLedgerAfterUpdate->debited_amount);
+        $this->assertEquals(1800.0, SupplierLedger::getSupplierNetBalance($this->supplier->id));
+
+        $drawerSession->refresh();
+        $cashAccount->refresh();
+        $this->assertEquals(3800.0, (float) $drawerSession->closing_balance_expected);
+        $this->assertEquals(8800.0, (float) $cashAccount->current_balance);
+
+        // Reverse the Credit Purchase Invoice and verify excess payment row is removed and full 1200 is refunded
+        $reverseRes = $this->postJson("/api/purchase-invoices/{$createdInv->id}/reverse", [
+            'reason' => 'Duplicate entry test reversal',
+        ]);
+        $reverseRes->assertStatus(200);
+
+        $this->assertNull(
+            SupplierLedger::where('payment_ref', 'Inv #' . $createdInv->posted_number)
+                ->where('entry_type', 'payment')
+                ->first()
+        );
+        $this->assertEquals(2000.0, SupplierLedger::getSupplierNetBalance($this->supplier->id));
+
+        $drawerSession->refresh();
+        $cashAccount->refresh();
+        $this->assertEquals(5000.0, (float) $drawerSession->closing_balance_expected);
+        $this->assertEquals(10000.0, (float) $cashAccount->current_balance);
+    }
 }

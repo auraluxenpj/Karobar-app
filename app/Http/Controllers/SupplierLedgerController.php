@@ -293,11 +293,14 @@ class SupplierLedgerController extends Controller
 
         DB::transaction(function () use ($invoices, $allocatedByInvoice) {
             foreach ($invoices as $inv) {
-                $invTotal = (float) ($inv->total_amount ?? 0);
-                $rawPaid  = (float) ($inv->total_paid ?? 0);
-                $allocated = (float) ($allocatedByInvoice[$inv->id] ?? 0);
-                $paidOnInv = max(0.0, min($rawPaid - $allocated, $invTotal));
+                $invTotal = round((float) ($inv->total_amount ?? 0), 2);
+                $rawPaid  = round((float) ($inv->total_paid ?? 0), 2);
+                $allocated = round((float) ($allocatedByInvoice[$inv->id] ?? 0), 2);
+                $directPaid = max(0.0, round($rawPaid - $allocated, 2));
+                $paidOnInv = min($directPaid, $invTotal);
                 $credit = max(0.0, round($invTotal - $paidOnInv, 2));
+                $excessPaid = max(0.0, round($directPaid - max(0.0, $invTotal - $allocated), 2));
+                $entryDate = $this->dateStr($inv->posted_date, now()->toDateString());
 
                 SupplierLedger::updateOrCreate(
                     [
@@ -306,7 +309,7 @@ class SupplierLedgerController extends Controller
                     ],
                     [
                         'entry_type'       => 'invoice',
-                        'entry_date'       => $this->dateStr($inv->posted_date, now()->toDateString()),
+                        'entry_date'       => $entryDate,
                         'description'      => 'Invoice #'.$inv->invoice_number,
                         'posted_number'    => $inv->posted_number,
                         'invoice_number'   => $inv->invoice_number,
@@ -317,6 +320,32 @@ class SupplierLedgerController extends Controller
                         'is_manual'        => false,
                     ]
                 );
+
+                if ($inv->posted_number) {
+                    SupplierLedger::where('supplier_id', $inv->supplier_id)
+                        ->where('payment_ref', 'Inv #' . $inv->posted_number)
+                        ->where('entry_type', 'payment')
+                        ->whereNull('payment_id')
+                        ->delete();
+
+                    if ($excessPaid > 0) {
+                        SupplierLedger::create([
+                            'supplier_id'         => $inv->supplier_id,
+                            'purchase_invoice_id' => null,
+                            'entry_type'          => 'payment',
+                            'entry_date'          => $entryDate,
+                            'description'         => 'Payment made on invoice ' . $inv->posted_number,
+                            'posted_number'       => $inv->posted_number,
+                            'invoice_number'      => $inv->invoice_number,
+                            'invoice_total'       => 0,
+                            'total_paid'          => 0,
+                            'debited_amount'      => $excessPaid,
+                            'payment_ref'         => 'Inv #' . $inv->posted_number,
+                            'credit_remaining'    => 0,
+                            'is_manual'           => false,
+                        ]);
+                    }
+                }
             }
         });
 

@@ -1243,7 +1243,7 @@ const contRect = container.getBoundingClientRect();
       invoiceErrors.showMessage("Total Paid cannot be negative");
       return;
     }
-    if (totalPaid > totalAmount) {
+    if (form.invoice_type !== "credit" && totalPaid > totalAmount) {
       invoiceErrors.showMessage("Total Paid cannot exceed Total Amount");
       return;
     }
@@ -2629,13 +2629,24 @@ const contRect = container.getBoundingClientRect();
               <div className="flex items-center gap-1.5">
                 <label className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 whitespace-nowrap">Remaining</label>
                 <div className={`purchase-readonly-field h-7 min-w-[84px] flex items-center justify-end px-2 rounded-md text-xs font-bold font-mono ${
-                  (form.total_amount || 0) - (form.total_paid || 0) > 0
+                  Math.max(0, to2((form.total_amount || 0) - (form.total_paid || 0))) > 0
                     ? "!text-amber-600 dark:!text-amber-400"
                     : "!text-emerald-600 dark:!text-emerald-400"
                 }`}>
-                  {to2((form.total_amount || 0) - (form.total_paid || 0)).toFixed(2)}
+                  {Math.max(0, to2((form.total_amount || 0) - (form.total_paid || 0))).toFixed(2)}
                 </div>
               </div>
+
+              {form.invoice_type === "credit" && to2((form.total_paid || 0) - (form.total_amount || 0)) > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <label className="text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                    Ledger Credit
+                  </label>
+                  <div className="purchase-readonly-field h-7 min-w-[84px] flex items-center justify-end px-2 rounded-md text-xs font-bold font-mono !text-emerald-600 dark:!text-emerald-400">
+                    +{to2((form.total_paid || 0) - (form.total_amount || 0)).toFixed(2)}
+                  </div>
+                </div>
+              )}
             </div>
 
             <button

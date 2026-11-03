@@ -956,14 +956,16 @@ class AccountingService
                 $tax = round((float) ($s->tax_amount ?? 0), 2);
                 $disc = round((float) ($s->discount_amount ?? 0), 2);
                 $gross = round((float) ($s->gross_amount ?? ($total - $tax + $disc)), 2);
-                $received = ($s->invoice_type ?? 'debit') === 'debit' && (float) ($s->total_receive ?? 0) <= 0
+                $rawReceived = ($s->invoice_type ?? 'debit') === 'debit' && (float) ($s->total_receive ?? 0) <= 0
                     ? $total
-                    : min($total, round((float) ($s->total_receive ?? 0), 2));
+                    : round((float) ($s->total_receive ?? 0), 2);
+                $received = min($total, $rawReceived);
+                $excessRecv = round(max(0.0, $rawReceived - $total), 2);
                 $arPortion = round(max(0.0, $total - $received), 2);
 
                 $lines = [];
-                if ($received > 0) {
-                    $lines[] = ['account_code' => '1010', 'account_name' => 'Cash & Bank Equivalents', 'description' => 'Payment received on sale', 'debit' => $received, 'credit' => 0.0];
+                if ($rawReceived > 0) {
+                    $lines[] = ['account_code' => '1010', 'account_name' => 'Cash & Bank Equivalents', 'description' => 'Payment received on sale', 'debit' => $rawReceived, 'credit' => 0.0];
                 }
                 if ($arPortion > 0) {
                     $lines[] = ['account_code' => '1200', 'account_name' => 'Accounts Receivable', 'description' => $s->customer_name ?: 'Customer Receivable', 'debit' => $arPortion, 'credit' => 0.0];
@@ -974,6 +976,9 @@ class AccountingService
                 $lines[] = ['account_code' => '4100', 'account_name' => 'Gross Sales Revenue', 'description' => ucfirst($s->sale_type ?? 'retail') . ' sale', 'debit' => 0.0, 'credit' => round($total + $disc - $tax, 2)];
                 if ($tax > 0) {
                     $lines[] = ['account_code' => '2200', 'account_name' => 'Output Tax Payable (GST/VAT)', 'description' => "Output tax ({$s->tax_percentage}%)", 'debit' => 0.0, 'credit' => $tax];
+                }
+                if ($excessRecv > 0) {
+                    $lines[] = ['account_code' => '1200', 'account_name' => 'Accounts Receivable', 'description' => ($s->customer_name ?: 'Customer') . ' (Excess payment credited to ledger)', 'debit' => 0.0, 'credit' => $excessRecv];
                 }
 
                 $sumDr = round(collect($lines)->sum('debit'), 2);
@@ -1012,7 +1017,11 @@ class AccountingService
                 $total = round((float) ($p->total_amount ?? 0), 2);
                 $tax = round((float) ($p->tax_amount ?? 0), 2);
                 $invValue = round(max(0.0, $total - $tax), 2);
-                $paid = min($total, round((float) ($p->total_paid ?? 0), 2));
+                $rawPaid = ($p->invoice_type ?? 'debit') === 'debit' && (float) ($p->total_paid ?? 0) <= 0
+                    ? $total
+                    : round((float) ($p->total_paid ?? 0), 2);
+                $paid = min($total, $rawPaid);
+                $excessPaid = round(max(0.0, $rawPaid - $total), 2);
                 $apPortion = round(max(0.0, $total - $paid), 2);
 
                 $lines = [
@@ -1021,13 +1030,17 @@ class AccountingService
                 if ($tax > 0) {
                     $lines[] = ['account_code' => '1400', 'account_name' => 'Input Tax Receivable (GST/VAT)', 'description' => "Input tax ({$p->tax_percentage}%)", 'debit' => $tax, 'credit' => 0.0];
                 }
-                if ($paid > 0) {
-                    $lines[] = ['account_code' => '1010', 'account_name' => 'Cash & Bank Equivalents', 'description' => 'Paid on purchase', 'debit' => 0.0, 'credit' => $paid];
+                if ($excessPaid > 0) {
+                    $lines[] = ['account_code' => '2100', 'account_name' => 'Accounts Payable', 'description' => ($p->supplier_name ?: 'Supplier') . ' (Excess payment debited to ledger)', 'debit' => $excessPaid, 'credit' => 0.0];
+                }
+                if ($rawPaid > 0) {
+                    $lines[] = ['account_code' => '1010', 'account_name' => 'Cash & Bank Equivalents', 'description' => 'Paid on purchase', 'debit' => 0.0, 'credit' => $rawPaid];
                 }
                 if ($apPortion > 0) {
                     $lines[] = ['account_code' => '2100', 'account_name' => 'Accounts Payable', 'description' => $p->supplier_name ?: 'Supplier Payable', 'debit' => 0.0, 'credit' => $apPortion];
                 }
 
+                $voucherTotal = round(collect($lines)->sum('debit'), 2);
                 $entries[] = [
                     'id'               => 'PI-' . $p->id,
                     'raw_id'           => $p->id,
@@ -1038,8 +1051,8 @@ class AccountingService
                     'source_label'     => 'PURCHASE INVOICE',
                     'reference_number' => $p->invoice_number ?: $p->posted_number,
                     'description'      => 'Purchase from ' . ($p->supplier_name ?: 'Supplier'),
-                    'total_debit'      => $total,
-                    'total_credit'     => $total,
+                    'total_debit'      => $voucherTotal,
+                    'total_credit'     => $voucherTotal,
                     'status'           => 'posted',
                     'created_by_name'  => 'Auto-Posted',
                     'lines'            => $lines,

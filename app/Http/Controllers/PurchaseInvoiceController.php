@@ -225,25 +225,50 @@ class PurchaseInvoiceController extends Controller
                 // Create supplier ledger entry ONLY for credit purchases
                 $invoiceType = $data['invoice_type'] ?? 'debit';
                 if ($invoiceType === 'credit') {
+                    $invTotal = round((float) $data['total_amount'], 2);
+                    $totalPaid = round((float) ($data['total_paid'] ?? 0), 2);
+                    $paidOnInv = min($totalPaid, $invTotal);
+                    $excessPaid = round(max(0.0, $totalPaid - $invTotal), 2);
+
                     $ledger = new SupplierLedger();
-                    $ledger->supplier_id       = $data['supplier_id'];
+                    $ledger->supplier_id         = $data['supplier_id'];
                     $ledger->purchase_invoice_id = $invoice->id;
-                    $ledger->entry_type        = 'invoice';
-                    $ledger->is_manual         = false;
-                    $ledger->entry_date        = $data['posted_date'];
+                    $ledger->entry_type          = 'invoice';
+                    $ledger->is_manual           = false;
+                    $ledger->entry_date          = $data['posted_date'];
                     if (\App\Support\SchemaCache::hasColumn('supplier_ledgers', 'due_date')) {
-                        $ledger->due_date      = $dueDate;
+                        $ledger->due_date        = $dueDate;
                     }
-                    $ledger->posted_number     = $nextCode;
-                    $ledger->invoice_number    = $data['invoice_number'];
-                    $ledger->invoice_total     = $data['total_amount'];
-                    $ledger->total_paid        = $data['total_paid'] ?? 0;
-                    $ledger->debited_amount    = 0;
-                    $ledger->credit_remaining  = max((float)$data['total_amount'] - (float)($data['total_paid'] ?? 0), 0);
-                    $ledger->payment_ref       = null;
-                    $ledger->description       = 'Purchase invoice ' . $nextCode;
-                    $ledger->created_by        = optional(Auth::user())->id;
+                    $ledger->posted_number       = $nextCode;
+                    $ledger->invoice_number      = $data['invoice_number'];
+                    $ledger->invoice_total       = $invTotal;
+                    $ledger->total_paid          = $paidOnInv;
+                    $ledger->debited_amount      = 0;
+                    $ledger->credit_remaining    = max($invTotal - $paidOnInv, 0);
+                    $ledger->payment_ref         = null;
+                    $ledger->description         = 'Purchase invoice ' . $nextCode;
+                    $ledger->created_by          = optional(Auth::user())->id;
                     $ledger->save();
+
+                    // If more was paid than the invoice total, record the excess in supplier ledger as a payment
+                    if ($excessPaid > 0) {
+                        $excessEntry = new SupplierLedger();
+                        $excessEntry->supplier_id         = $data['supplier_id'];
+                        $excessEntry->purchase_invoice_id = null;
+                        $excessEntry->entry_type          = 'payment';
+                        $excessEntry->is_manual           = false;
+                        $excessEntry->entry_date          = $data['posted_date'];
+                        $excessEntry->posted_number       = $nextCode;
+                        $excessEntry->invoice_number      = $data['invoice_number'];
+                        $excessEntry->invoice_total       = 0;
+                        $excessEntry->total_paid          = 0;
+                        $excessEntry->debited_amount      = $excessPaid;
+                        $excessEntry->credit_remaining    = 0;
+                        $excessEntry->payment_ref         = 'Inv #' . $nextCode;
+                        $excessEntry->description         = 'Payment made on invoice ' . $nextCode;
+                        $excessEntry->created_by          = optional(Auth::user())->id;
+                        $excessEntry->save();
+                    }
                 }
 
                 if ($order) {
@@ -548,22 +573,34 @@ class PurchaseInvoiceController extends Controller
                 }
                 // If invoice was previously credit but is now debit, delete the ledger entry
                 if ($oldInvoiceType === 'credit' && $newInvoiceType !== 'credit') {
-                    // Remove existing ledger entry for this invoice
+                    // Remove existing ledger entry for this invoice and any excess payment entry
                     SupplierLedger::where('purchase_invoice_id', $purchaseInvoice->id)->delete();
+                    SupplierLedger::where('payment_ref', 'Inv #' . $purchaseInvoice->posted_number)
+                        ->where('entry_type', 'payment')
+                        ->whereNull('payment_id')
+                        ->delete();
                 }
                 // If invoice is now credit, create or update ledger entry
                 elseif ($newInvoiceType === 'credit') {
+                    SupplierLedger::where('payment_ref', 'Inv #' . $purchaseInvoice->posted_number)
+                        ->where('entry_type', 'payment')
+                        ->whereNull('payment_id')
+                        ->delete();
+
                     // Check if a ledger entry already exists for this invoice
                     $existingLedger = SupplierLedger::where('purchase_invoice_id', $purchaseInvoice->id)->first();
-                    $invTotalAmount = (float) $data['total_amount'];
-                    $rawTotalPaid   = (float) ($data['total_paid'] ?? 0);
-                    $directPaidOnInv = max(0.0, min(round($rawTotalPaid - $allocatedOnInvoice, 2), $invTotalAmount));
+                    $invTotalAmount = round((float) $data['total_amount'], 2);
+                    $rawTotalPaid   = round((float) ($data['total_paid'] ?? 0), 2);
+                    $directPaid     = max(0.0, round($rawTotalPaid - $allocatedOnInvoice, 2));
+                    $directPaidOnInv = min($directPaid, $invTotalAmount);
                     $creditRemainingOnInv = max(0.0, round($invTotalAmount - $directPaidOnInv, 2));
+                    $excessPaid     = max(0.0, round($directPaid - max(0.0, $invTotalAmount - $allocatedOnInvoice), 2));
 
                     if ($existingLedger) {
                         $ledgerUpdates = [
                             'supplier_id'        => $data['supplier_id'],
                             'entry_date'         => $data['posted_date'],
+                            'invoice_number'     => $data['invoice_number'],
                             'invoice_total'      => $invTotalAmount,
                             'total_paid'         => $directPaidOnInv,
                             'credit_remaining'   => $creditRemainingOnInv,
@@ -594,6 +631,25 @@ class PurchaseInvoiceController extends Controller
                         $ledger->description         = 'Purchase invoice ' . $data['posted_number'];
                         $ledger->created_by          = optional(Auth::user())->id;
                         $ledger->save();
+                    }
+
+                    if ($excessPaid > 0) {
+                        $excessEntry = new SupplierLedger();
+                        $excessEntry->supplier_id         = $data['supplier_id'];
+                        $excessEntry->purchase_invoice_id = null;
+                        $excessEntry->entry_type          = 'payment';
+                        $excessEntry->is_manual           = false;
+                        $excessEntry->entry_date          = $data['posted_date'];
+                        $excessEntry->posted_number       = $data['posted_number'];
+                        $excessEntry->invoice_number      = $data['invoice_number'];
+                        $excessEntry->invoice_total       = 0;
+                        $excessEntry->total_paid          = 0;
+                        $excessEntry->debited_amount      = $excessPaid;
+                        $excessEntry->credit_remaining    = 0;
+                        $excessEntry->payment_ref         = 'Inv #' . $data['posted_number'];
+                        $excessEntry->description         = 'Payment made on invoice ' . $data['posted_number'];
+                        $excessEntry->created_by          = optional(Auth::user())->id;
+                        $excessEntry->save();
                     }
                 }
 
@@ -741,6 +797,10 @@ class PurchaseInvoiceController extends Controller
 
                     if (\Illuminate\Support\Facades\Schema::hasTable('supplier_ledgers')) {
                         \App\Models\SupplierLedger::where('purchase_invoice_id', $purchaseInvoice->id)->delete();
+                        \App\Models\SupplierLedger::where('payment_ref', 'Inv #' . $purchaseInvoice->posted_number)
+                            ->where('entry_type', 'payment')
+                            ->whereNull('payment_id')
+                            ->delete();
                     }
 
                     // Adjust cash drawer for deleted purchase invoice
@@ -837,6 +897,10 @@ class PurchaseInvoiceController extends Controller
             // Revert supplier ledger entry if credit/invoice entry
             if (\Illuminate\Support\Facades\Schema::hasTable('supplier_ledgers')) {
                 \App\Models\SupplierLedger::where('purchase_invoice_id', $purchaseInvoice->id)->delete();
+                \App\Models\SupplierLedger::where('payment_ref', 'Inv #' . $purchaseInvoice->posted_number)
+                    ->where('entry_type', 'payment')
+                    ->whereNull('payment_id')
+                    ->delete();
             }
 
             $purchaseInvoice->status = 'reversed';
