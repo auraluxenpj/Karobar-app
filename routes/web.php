@@ -99,12 +99,15 @@ Route::get('/print/thermal-preview/{template}', function ($template) {
     
     $sampleInvoice->items = new \Illuminate\Support\Collection($items);
     
+    $dbSetting = \Illuminate\Support\Facades\Schema::hasTable('settings') ? \App\Models\Setting::first() : null;
     $sampleSetting = new \stdClass();
-    $sampleSetting->store_name = 'PHARMACY STORE';
-    $sampleSetting->phone_number = '+92 300 1234567';
-    $sampleSetting->address = '123 Main Street, City';
-    $sampleSetting->logo_url = null;
-    $sampleSetting->note = 'Thank you for your business!';
+    $sampleSetting->store_name = $dbSetting?->store_name ?: 'PHARMACY STORE';
+    $sampleSetting->phone_number = $dbSetting?->phone_number ?: '+92 300 1234567';
+    $sampleSetting->address = $dbSetting?->address ?: '123 Main Street, City';
+    $sampleSetting->logo_url = $dbSetting?->logo_url ?? null;
+    $sampleSetting->note = request()->has('note')
+        ? (string) request()->query('note', '')
+        : ($dbSetting ? (string) ($dbSetting->note ?? '') : 'Thank you for your business!');
     
     return view("printer.sale_invoice_thermal_{$template}", [
         'invoice' => $sampleInvoice,
@@ -190,12 +193,15 @@ Route::get('/print/a4-preview/{template}', function ($template) {
     
     $sampleInvoice->items = new \Illuminate\Support\Collection($items);
     
+    $dbSetting = \Illuminate\Support\Facades\Schema::hasTable('settings') ? \App\Models\Setting::first() : null;
     $sampleSetting = new \stdClass();
-    $sampleSetting->store_name = 'PHARMACY STORE';
-    $sampleSetting->phone_number = '+92 300 1234567';
-    $sampleSetting->address = '123 Main Street, City';
-    $sampleSetting->logo_url = null;
-    $sampleSetting->note = 'Thank you for your business!';
+    $sampleSetting->store_name = $dbSetting?->store_name ?: 'PHARMACY STORE';
+    $sampleSetting->phone_number = $dbSetting?->phone_number ?: '+92 300 1234567';
+    $sampleSetting->address = $dbSetting?->address ?: '123 Main Street, City';
+    $sampleSetting->logo_url = $dbSetting?->logo_url ?? null;
+    $sampleSetting->note = request()->has('note')
+        ? (string) request()->query('note', '')
+        : ($dbSetting ? (string) ($dbSetting->note ?? '') : 'Thank you for your business!');
     
     return view("printer.sale_invoice_a4_{$template}", [
         'invoice' => $sampleInvoice,

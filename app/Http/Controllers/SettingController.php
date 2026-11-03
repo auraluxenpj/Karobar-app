@@ -89,7 +89,11 @@ class SettingController extends Controller
             'phone_number'            => ['nullable','string','max:30'],
             'address'                 => ['nullable','string','max:500'],
             'license_number'          => ['nullable','string','max:100'],
-            'note'                    => ['nullable','string','max:2000'],
+            'note'                    => ['nullable','string','max:5000'],
+            'note_en'                 => ['nullable','string','max:5000'],
+            'note_ur'                 => ['nullable','string','max:5000'],
+            'whatsapp_message_en'     => ['nullable','string','max:5000'],
+            'whatsapp_message_ur'     => ['nullable','string','max:5000'],
             'printer_type'            => ['required', Rule::in(['thermal','a4'])],
             'thermal_template'        => ['nullable', Rule::in(['standard','minimal','detailed','compact','bold','barcode'])],
             'a4_template'             => ['nullable', Rule::in(['standard','minimal','detailed','compact','bold','barcode'])],
@@ -178,6 +182,10 @@ class SettingController extends Controller
             'whatsapp_template_name',
             'whatsapp_template_language',
             'whatsapp_auto_fallback',
+            'note_en',
+            'note_ur',
+            'whatsapp_message_en',
+            'whatsapp_message_ur',
         ];
 
         $cubeFields = [
@@ -319,6 +327,22 @@ class SettingController extends Controller
             }
         }
         
+        if ($request->has('note')) {
+            $setting->note = (string) ($request->input('note') ?? '');
+        }
+        if (Schema::hasColumn('settings', 'note_en') && $request->has('note_en')) {
+            $setting->note_en = (string) ($request->input('note_en') ?? '');
+        }
+        if (Schema::hasColumn('settings', 'note_ur') && $request->has('note_ur')) {
+            $setting->note_ur = (string) ($request->input('note_ur') ?? '');
+        }
+        if (Schema::hasColumn('settings', 'whatsapp_message_en') && $request->has('whatsapp_message_en')) {
+            $setting->whatsapp_message_en = (string) ($request->input('whatsapp_message_en') ?? '');
+        }
+        if (Schema::hasColumn('settings', 'whatsapp_message_ur') && $request->has('whatsapp_message_ur')) {
+            $setting->whatsapp_message_ur = (string) ($request->input('whatsapp_message_ur') ?? '');
+        }
+
         // Ensure navigation_style is always updated (it might not be in validated if null)
         if ($request->has('navigation_style')) {
             $setting->navigation_style = $request->input('navigation_style');

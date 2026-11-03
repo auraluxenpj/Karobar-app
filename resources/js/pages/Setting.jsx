@@ -30,7 +30,12 @@ import GeneralSetting from "@/components/settings/GeneralSetting.jsx";
 import SaleSystemSetting from "@/components/settings/SaleSystemSetting.jsx";
 import ThemeSetting from "@/components/settings/ThemeSetting.jsx";
 import PrinterSetting from "@/components/settings/PrinterSetting.jsx";
-import DocumentSharingSetting from "@/components/settings/DocumentSharingSetting.jsx";
+import DocumentSharingSetting, {
+  DEFAULT_CLOSING_NOTE_EN,
+  DEFAULT_CLOSING_NOTE_UR,
+  DEFAULT_WHATSAPP_MESSAGE_EN,
+  DEFAULT_WHATSAPP_MESSAGE_UR,
+} from "@/components/settings/DocumentSharingSetting.jsx";
 import CubeAiSetting from "@/components/settings/CubeAiSetting.jsx";
 import LicenseSetting from "@/components/settings/LicenseSetting.jsx";
 
@@ -146,6 +151,10 @@ export default function Setting() {
     address: "",
     license_number: "",
     note: "",
+    note_en: DEFAULT_CLOSING_NOTE_EN,
+    note_ur: DEFAULT_CLOSING_NOTE_UR,
+    whatsapp_message_en: DEFAULT_WHATSAPP_MESSAGE_EN,
+    whatsapp_message_ur: DEFAULT_WHATSAPP_MESSAGE_UR,
     printer_type: "thermal",
     thermal_template: "standard",
     a4_template: "standard",
@@ -302,12 +311,37 @@ export default function Setting() {
     try {
       setLoading(true);
       const { data } = await axios.get("/api/settings");
+      const rawNote = data.note ?? "";
+      const hasUrduInSavedNote = /[\u0600-\u06FF]/.test(rawNote);
+      const resolvedNoteEn =
+        data.note_en !== null && data.note_en !== undefined
+          ? data.note_en
+          : !hasUrduInSavedNote && rawNote !== ""
+          ? rawNote
+          : DEFAULT_CLOSING_NOTE_EN;
+      const resolvedNoteUr =
+        data.note_ur !== null && data.note_ur !== undefined
+          ? data.note_ur
+          : hasUrduInSavedNote && rawNote !== ""
+          ? rawNote
+          : DEFAULT_CLOSING_NOTE_UR;
+
       setForm({
         store_name: data.store_name || "",
         phone_number: data.phone_number || "",
         address: data.address || "",
         license_number: data.license_number || "",
-        note: data.note || "",
+        note: rawNote,
+        note_en: resolvedNoteEn,
+        note_ur: resolvedNoteUr,
+        whatsapp_message_en:
+          data.whatsapp_message_en !== null && data.whatsapp_message_en !== undefined
+            ? data.whatsapp_message_en
+            : DEFAULT_WHATSAPP_MESSAGE_EN,
+        whatsapp_message_ur:
+          data.whatsapp_message_ur !== null && data.whatsapp_message_ur !== undefined
+            ? data.whatsapp_message_ur
+            : DEFAULT_WHATSAPP_MESSAGE_UR,
         printer_type: data.printer_type || "thermal",
         thermal_template: data.thermal_template || "standard",
         a4_template: data.a4_template || "standard",
@@ -415,7 +449,11 @@ export default function Setting() {
       fd.append("phone_number", form.phone_number || "");
       fd.append("address", form.address || "");
       fd.append("license_number", form.license_number || "");
-      fd.append("note", form.note || "");
+      fd.append("note", form.note ?? "");
+      fd.append("note_en", form.note_en ?? "");
+      fd.append("note_ur", form.note_ur ?? "");
+      fd.append("whatsapp_message_en", form.whatsapp_message_en ?? "");
+      fd.append("whatsapp_message_ur", form.whatsapp_message_ur ?? "");
       fd.append("printer_type", form.printer_type || "a4");
       fd.append("thermal_template", form.thermal_template || "standard");
       fd.append("a4_template", form.a4_template || "standard");
@@ -474,6 +512,29 @@ export default function Setting() {
       const { data } = await axios.post("/api/settings", fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+
+      setForm((prev) => ({
+        ...prev,
+        note: data?.note ?? prev.note,
+        note_en:
+          data?.note_en !== null && data?.note_en !== undefined
+            ? data.note_en
+            : prev.note_en,
+        note_ur:
+          data?.note_ur !== null && data?.note_ur !== undefined
+            ? data.note_ur
+            : prev.note_ur,
+        whatsapp_message_en:
+          data?.whatsapp_message_en !== null &&
+          data?.whatsapp_message_en !== undefined
+            ? data.whatsapp_message_en
+            : prev.whatsapp_message_en,
+        whatsapp_message_ur:
+          data?.whatsapp_message_ur !== null &&
+          data?.whatsapp_message_ur !== undefined
+            ? data.whatsapp_message_ur
+            : prev.whatsapp_message_ur,
+      }));
 
       if (data?.cube_usage_summary) {
         setCubeUsageSummary(data.cube_usage_summary);
@@ -783,6 +844,8 @@ export default function Setting() {
               form={form}
               setForm={setForm}
               handleChange={handleChange}
+              handleSave={handleSave}
+              saving={saving}
               disableInputs={disableInputs}
               initialSubTab={sharingSubTab}
             />

@@ -1456,65 +1456,105 @@ class DocumentShareService
         }));
 
         $rawNote = trim((string) ($setting?->note ?? ''));
-        $hasUrduNote = \App\Support\UrduPdfTextShaper::containsUrdu($rawNote);
+        $englishNote = $setting?->note_en !== null ? trim((string) $setting->note_en) : $rawNote;
+        $urduNote = $setting?->note_ur !== null ? trim((string) $setting->note_ur) : $rawNote;
 
-        // 1. Proper English Invoice Note (never mixes raw Urdu lines into the English format)
-        $englishNote = (!$hasUrduNote && $rawNote !== '')
-            ? $rawNote
-            : "Refrigerated, loose, used, or cut-strip medicines are non-returnable.\nReturn or exchange is accepted within 7 days along with the original bill.\nThank you for your cooperation.";
+        $itemsEn = $itemsCount > 0 ? "{$itemsCount} (" . number_format($totalUnits) . " units)" : null;
+        $itemsUr = $itemsCount > 0 ? "{$itemsCount} (" . number_format($totalUnits) . " یونٹس)" : null;
+        $totalFormatted = 'Rs. ' . number_format($total, 2);
+        $receivedFormatted = 'Rs. ' . number_format($received, 2);
+        $remainingFormatted = 'Rs. ' . number_format($remaining, 2);
+        $totalDueFormatted = $customerTotalDue !== null ? ('Rs. ' . number_format($customerTotalDue, 2)) : null;
 
-        // 2. Proper Urdu Invoice Note
-        $urduNote = ($hasUrduNote && $rawNote !== '')
-            ? $rawNote
-            : "فریج میڈیسن، کھلی میڈیسن، استعمال شدہ میڈیسن اور کٹی ہوئی میڈیسن ناقابلِ واپسی ہے۔\nواپسی یا تبدیلی 7 دن کے اندر اصل بل کے ہمراہ ہوگی۔\nآپ کے تعاون کا شکریہ۔";
+        // Format A: English Invoice Text (uses custom saved template if configured)
+        $customWaEn = $setting?->whatsapp_message_en ?? null;
+        if ($customWaEn !== null) {
+            $whatsappTextEn = $this->renderWhatsAppInvoiceTemplate($customWaEn, [
+                'store_name'    => $storeName,
+                'store_address' => $storeAddress,
+                'store_phone'   => $storePhone,
+                'invoice_no'    => $docNo,
+                'date'          => $dateStr,
+                'customer_name' => $custName,
+                'items'         => $itemsEn,
+                'items_count'   => (string) $itemsCount,
+                'total_units'   => number_format($totalUnits),
+                'total'         => $totalFormatted,
+                'received'      => $receivedFormatted,
+                'balance_due'   => $remainingFormatted,
+                'total_balance' => $totalDueFormatted,
+                'note'          => $englishNote,
+            ]);
+        } else {
+            $waEnLines = array_values(array_filter([
+                "*{$storeName}*",
+                $storeAddress !== '' ? $storeAddress : null,
+                $storePhone !== '' ? "Tel: {$storePhone}" : null,
+                "────────────────────",
+                "*SALE INVOICE*",
+                "Invoice No: *{$docNo}*",
+                "Date: {$dateStr}",
+                "Customer: {$custName}",
+                $itemsEn !== null ? "Items: {$itemsEn}" : null,
+                "",
+                "*Billing Summary*",
+                "Invoice Total: *{$totalFormatted}*",
+                "Amount Received: {$receivedFormatted}",
+                "Balance Due (This Invoice): {$remainingFormatted}",
+                $totalDueFormatted !== null ? "Total Account Balance Due: *{$totalDueFormatted}*" : null,
+                $englishNote !== '' ? "" : null,
+                $englishNote !== '' ? "*Terms & Return Policy:*" : null,
+                $englishNote !== '' ? $englishNote : null,
+                "",
+                "Please find the official invoice PDF attached for your records.",
+            ], fn ($line) => $line !== null));
+            $whatsappTextEn = implode("\n", $waEnLines);
+        }
 
-        // Format A: Proper English Invoice Text
-        $waEnLines = array_values(array_filter([
-            "*{$storeName}*",
-            $storeAddress !== '' ? $storeAddress : null,
-            $storePhone !== '' ? "Tel: {$storePhone}" : null,
-            "────────────────────",
-            "*SALE INVOICE*",
-            "Invoice No: *{$docNo}*",
-            "Date: {$dateStr}",
-            "Customer: {$custName}",
-            $itemsCount > 0 ? "Items: {$itemsCount} (" . number_format($totalUnits) . " units)" : null,
-            "",
-            "*Billing Summary*",
-            "Invoice Total: *Rs. " . number_format($total, 2) . "*",
-            "Amount Received: Rs. " . number_format($received, 2),
-            "Balance Due (This Invoice): Rs. " . number_format($remaining, 2),
-            $customerTotalDue !== null ? "Total Account Balance Due: *Rs. " . number_format($customerTotalDue, 2) . "*" : null,
-            "",
-            "*Terms & Return Policy:*",
-            $englishNote,
-            "",
-            "Please find the official invoice PDF attached for your records.",
-        ], fn ($line) => $line !== null));
-
-        // Format B: Proper Urdu Invoice Text (اردو فارمیٹ)
-        $waUrLines = array_values(array_filter([
-            "*{$storeName}*",
-            $storeAddress !== '' ? $storeAddress : null,
-            $storePhone !== '' ? "فون نمبر: {$storePhone}" : null,
-            "────────────────────",
-            "*سیل انوائس / بل کی تفصیل*",
-            "بل نمبر: *{$docNo}*",
-            "تاریخ: {$dateStr}",
-            "محترم کسٹمر: {$custName}",
-            $itemsCount > 0 ? "آئٹمز کی تعداد: {$itemsCount} (" . number_format($totalUnits) . " یونٹس)" : null,
-            "",
-            "*بل کا خلاصہ:*",
-            "کل بل: *Rs. " . number_format($total, 2) . "*",
-            "وصول شدہ رقم: Rs. " . number_format($received, 2),
-            "بقایا رقم (موجودہ بل): Rs. " . number_format($remaining, 2),
-            $customerTotalDue !== null ? "کل کھاتہ بقایا: *Rs. " . number_format($customerTotalDue, 2) . "*" : null,
-            "",
-            "*ضروری ہدایات و شرائط:*",
-            $urduNote,
-            "",
-            "مکمل بل پی ڈی ایف (PDF) فائل کی صورت میں منسلک ہے۔",
-        ], fn ($line) => $line !== null));
+        // Format B: Urdu Invoice Text (uses custom saved template if configured)
+        $customWaUr = $setting?->whatsapp_message_ur ?? null;
+        if ($customWaUr !== null) {
+            $whatsappTextUr = $this->renderWhatsAppInvoiceTemplate($customWaUr, [
+                'store_name'    => $storeName,
+                'store_address' => $storeAddress,
+                'store_phone'   => $storePhone,
+                'invoice_no'    => $docNo,
+                'date'          => $dateStr,
+                'customer_name' => $custName,
+                'items'         => $itemsUr,
+                'items_count'   => (string) $itemsCount,
+                'total_units'   => number_format($totalUnits),
+                'total'         => $totalFormatted,
+                'received'      => $receivedFormatted,
+                'balance_due'   => $remainingFormatted,
+                'total_balance' => $totalDueFormatted,
+                'note'          => $urduNote,
+            ]);
+        } else {
+            $waUrLines = array_values(array_filter([
+                "*{$storeName}*",
+                $storeAddress !== '' ? $storeAddress : null,
+                $storePhone !== '' ? "فون نمبر: {$storePhone}" : null,
+                "────────────────────",
+                "*سیل انوائس / بل کی تفصیل*",
+                "بل نمبر: *{$docNo}*",
+                "تاریخ: {$dateStr}",
+                "محترم کسٹمر: {$custName}",
+                $itemsUr !== null ? "آئٹمز کی تعداد: {$itemsUr}" : null,
+                "",
+                "*بل کا خلاصہ:*",
+                "کل بل: *{$totalFormatted}*",
+                "وصول شدہ رقم: {$receivedFormatted}",
+                "بقایا رقم (موجودہ بل): {$remainingFormatted}",
+                $totalDueFormatted !== null ? "کل کھاتہ بقایا: *{$totalDueFormatted}*" : null,
+                $urduNote !== '' ? "" : null,
+                $urduNote !== '' ? "*ضروری ہدایات و شرائط:*" : null,
+                $urduNote !== '' ? $urduNote : null,
+                "",
+                "مکمل بل پی ڈی ایف (PDF) فائل کی صورت میں منسلک ہے۔",
+            ], fn ($line) => $line !== null));
+            $whatsappTextUr = implode("\n", $waUrLines);
+        }
 
         $emailSubjectEn = "Sale Invoice {$docNo} — {$storeName}";
         $emailBodyEn = "Dear {$custName},\n\n"
@@ -1528,8 +1568,7 @@ class DocumentShareService
             . "Balance Due (This Invoice): Rs. " . number_format($remaining, 2) . "\n"
             . ($customerTotalDue !== null ? "Total Account Balance Due: Rs. " . number_format($customerTotalDue, 2) . "\n" : '')
             . "----------------------------------------\n\n"
-            . "TERMS & RETURN POLICY:\n"
-            . "{$englishNote}\n\n"
+            . ($englishNote !== '' ? "TERMS & RETURN POLICY:\n{$englishNote}\n\n" : '')
             . "Sincerely,\n"
             . "{$storeName}"
             . ($storePhone !== '' ? "\nTel: {$storePhone}" : '')
@@ -1548,15 +1587,11 @@ class DocumentShareService
             . "بقایا رقم (موجودہ بل): Rs. " . number_format($remaining, 2) . "\n"
             . ($customerTotalDue !== null ? "کل کھاتہ بقایا: Rs. " . number_format($customerTotalDue, 2) . "\n" : '')
             . "----------------------------------------\n\n"
-            . "ضروری ہدایات و شرائط:\n"
-            . "{$urduNote}\n\n"
+            . ($urduNote !== '' ? "ضروری ہدایات و شرائط:\n{$urduNote}\n\n" : '')
             . "والسلام،\n"
             . "{$storeName}"
             . ($storePhone !== '' ? "\nفون نمبر: {$storePhone}" : '')
             . ($storeAddress !== '' ? "\n{$storeAddress}" : '');
-
-        $whatsappTextEn = implode("\n", $waEnLines);
-        $whatsappTextUr = implode("\n", $waUrLines);
 
         return [
             'title'            => "Sale Invoice {$docNo}",
@@ -1582,6 +1617,113 @@ class DocumentShareService
             'email_body_en'    => $emailBodyEn,
             'email_body_ur'    => $emailBodyUr,
         ];
+    }
+
+    /**
+     * Render a customizable WhatsApp message template, replacing dynamic tags if present
+     * while preserving any free-form text added by the user.
+     */
+    public function renderWhatsAppInvoiceTemplate(string $template, array $vars): string
+    {
+        $raw = str_replace(["\r\n", "\r"], "\n", $template);
+        if (trim($raw) === '') {
+            return '';
+        }
+
+        $noteVal         = trim((string) ($vars['note'] ?? ''));
+        $storeAddressVal = trim((string) ($vars['store_address'] ?? ''));
+        $storePhoneVal   = trim((string) ($vars['store_phone'] ?? ''));
+        $itemsVal        = $vars['items'] ?? null;
+        $totalBalanceVal = $vars['total_balance'] ?? null;
+
+        // If note is empty, remove optional return policy headings followed by {note}
+        if ($noteVal === '') {
+            $raw = preg_replace(
+                '/(?:^|\n)\s*(?:\*Terms\s*&\s*Return\s*Policy:\*|Terms\s*&\s*Return\s*Policy:|\*ضروری\s*ہدایات\s*و\s*شرائط:\*|ضروری\s*ہدایات\s*و\s*شرائط:)\s*\n\s*\{\{?(?:note|closing_note|return_policy)\}?\}/iu',
+                '',
+                $raw
+            ) ?? $raw;
+        }
+
+        $lines = explode("\n", $raw);
+        $filteredLines = [];
+
+        foreach ($lines as $line) {
+            $trimmedLine = trim($line);
+
+            // Omit lines whose sole dynamic value is empty/missing
+            if ($storeAddressVal === '' && preg_match('/^\{\{?(?:store_address|address)\}?\}\s*$/iu', $trimmedLine)) {
+                continue;
+            }
+            if ($storePhoneVal === '' && preg_match('/\{\{?(?:store_phone|phone)\}?\}/iu', $trimmedLine)) {
+                continue;
+            }
+            if (($itemsVal === null || $itemsVal === '') && preg_match('/\{\{?(?:items|items_summary)\}?\}/iu', $trimmedLine)) {
+                continue;
+            }
+            if (($totalBalanceVal === null || $totalBalanceVal === '') && preg_match('/\{\{?(?:total_balance|account_balance|ledger_balance)\}?\}/iu', $trimmedLine)) {
+                continue;
+            }
+            if ($noteVal === '' && preg_match('/^\{\{?(?:note|closing_note|return_policy)\}?\}\s*$/iu', $trimmedLine)) {
+                continue;
+            }
+
+            $filteredLines[] = $line;
+        }
+
+        $joined = implode("\n", $filteredLines);
+
+        $replacements = [
+            '{store_name}'      => (string) ($vars['store_name'] ?? ''),
+            '{{store_name}}'    => (string) ($vars['store_name'] ?? ''),
+            '{store_address}'   => $storeAddressVal,
+            '{address}'         => $storeAddressVal,
+            '{{store_address}}' => $storeAddressVal,
+            '{store_phone}'     => $storePhoneVal,
+            '{phone}'           => $storePhoneVal,
+            '{{store_phone}}'   => $storePhoneVal,
+            '{invoice_no}'      => (string) ($vars['invoice_no'] ?? ''),
+            '{document_no}'     => (string) ($vars['invoice_no'] ?? ''),
+            '{bill_no}'         => (string) ($vars['invoice_no'] ?? ''),
+            '{{invoice_no}}'    => (string) ($vars['invoice_no'] ?? ''),
+            '{date}'            => (string) ($vars['date'] ?? ''),
+            '{invoice_date}'    => (string) ($vars['date'] ?? ''),
+            '{{date}}'          => (string) ($vars['date'] ?? ''),
+            '{customer_name}'   => (string) ($vars['customer_name'] ?? ''),
+            '{customer}'        => (string) ($vars['customer_name'] ?? ''),
+            '{recipient_name}'  => (string) ($vars['customer_name'] ?? ''),
+            '{{customer_name}}' => (string) ($vars['customer_name'] ?? ''),
+            '{items}'           => (string) ($itemsVal ?? ''),
+            '{items_summary}'   => (string) ($itemsVal ?? ''),
+            '{{items}}'         => (string) ($itemsVal ?? ''),
+            '{items_count}'     => (string) ($vars['items_count'] ?? ''),
+            '{{items_count}}'   => (string) ($vars['items_count'] ?? ''),
+            '{total_units}'     => (string) ($vars['total_units'] ?? ''),
+            '{units}'           => (string) ($vars['total_units'] ?? ''),
+            '{{total_units}}'   => (string) ($vars['total_units'] ?? ''),
+            '{total}'           => (string) ($vars['total'] ?? ''),
+            '{invoice_total}'   => (string) ($vars['total'] ?? ''),
+            '{{total}}'         => (string) ($vars['total'] ?? ''),
+            '{received}'        => (string) ($vars['received'] ?? ''),
+            '{amount_received}' => (string) ($vars['received'] ?? ''),
+            '{{received}}'      => (string) ($vars['received'] ?? ''),
+            '{balance_due}'     => (string) ($vars['balance_due'] ?? ''),
+            '{remaining}'       => (string) ($vars['balance_due'] ?? ''),
+            '{{balance_due}}'   => (string) ($vars['balance_due'] ?? ''),
+            '{total_balance}'   => (string) ($totalBalanceVal ?? ''),
+            '{account_balance}' => (string) ($totalBalanceVal ?? ''),
+            '{ledger_balance}'  => (string) ($totalBalanceVal ?? ''),
+            '{{total_balance}}' => (string) ($totalBalanceVal ?? ''),
+            '{note}'            => $noteVal,
+            '{closing_note}'    => $noteVal,
+            '{return_policy}'   => $noteVal,
+            '{{note}}'          => $noteVal,
+        ];
+
+        $rendered = str_ireplace(array_keys($replacements), array_values($replacements), $joined);
+        $rendered = preg_replace("/\n{3,}/", "\n\n", $rendered) ?? $rendered;
+
+        return trim($rendered);
     }
 
     private function resolveCustomerLedger(int $customerId, ?string $from, ?string $to, ?Setting $setting, string $storeName): array

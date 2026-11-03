@@ -788,8 +788,11 @@ export default function ShareDocumentModal({
                 <div className="md:col-span-7">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
                     <div className="flex items-center gap-2">
-                      <label className="text-xs font-semibold uppercase tracking-wider">
-                        Message Format:
+                      <label
+                        htmlFor="share-whatsapp-message"
+                        className="text-xs font-semibold uppercase tracking-wider"
+                      >
+                        WhatsApp Message:
                       </label>
                       <div
                         className={`inline-flex rounded-lg p-0.5 border ${
@@ -824,20 +827,34 @@ export default function ShareDocumentModal({
                         </button>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleCopyWhatsAppMessage}
-                      className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                    >
-                      <ClipboardDocumentCheckIcon className="w-4 h-4" />
-                      Copy Text
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setWhatsappMessage("")}
+                        className="text-xs font-semibold text-gray-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 flex items-center gap-1"
+                        title="Clear message to type your own custom text"
+                      >
+                        <XMarkIcon className="w-3.5 h-3.5" />
+                        Clear
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCopyWhatsAppMessage}
+                        className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                      >
+                        <ClipboardDocumentCheckIcon className="w-4 h-4" />
+                        Copy Text
+                      </button>
+                    </div>
                   </div>
                   <textarea
+                    id="share-whatsapp-message"
+                    name="whatsapp_message"
                     rows={6}
                     dir={messageLang === "ur" ? "rtl" : "ltr"}
                     value={whatsappMessage}
                     onChange={(e) => setWhatsappMessage(e.target.value)}
+                    placeholder="Type any custom WhatsApp message you want to send..."
                     className={`${inputClass} text-xs leading-relaxed ${
                       messageLang === "ur" ? "text-right" : "text-left"
                     }`}

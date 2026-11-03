@@ -85,7 +85,7 @@
         $phone = $setting->phone_number ?? '';
         $address = $setting->address ?? '';
         $license = $setting->license_number ?? '';
-        $note = $setting->note ?? 'Thank you for your business!';
+        $note = trim(($invoice->footer_note ?? '') !== '' ? (string) $invoice->footer_note : (string) ($setting->note ?? ''));
 
         $gross = (float) ($invoice->gross_amount ?? 0);
         if ($gross <= 0 && $invoice->relationLoaded('items')) {

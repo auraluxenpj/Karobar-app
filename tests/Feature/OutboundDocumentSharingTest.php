@@ -166,7 +166,8 @@ class OutboundDocumentSharingTest extends TestCase
         $this->assertStringContainsString('https://wa.me/923007654321?text=', $metaRes->json('whatsapp_url'));
         $this->assertStringContainsString('SI-000105', $metaRes->json('whatsapp_text'));
         $this->assertStringContainsString('SALE INVOICE', $metaRes->json('whatsapp_text_en'));
-        $this->assertStringContainsString('Refrigerated, loose, used', $metaRes->json('whatsapp_text_en'));
+        $this->assertStringContainsString('فریج میڈیسن', $metaRes->json('whatsapp_text_en'));
+        $this->assertStringNotContainsString('Refrigerated, loose, used', $metaRes->json('whatsapp_text_en'));
         $this->assertStringContainsString('سیل انوائس / بل کی تفصیل', $metaRes->json('whatsapp_text_ur'));
         $this->assertStringContainsString('فریج میڈیسن', $metaRes->json('whatsapp_text_ur'));
         $this->assertStringContainsString('سیل انوائس SI-000105', $metaRes->json('email_subject_ur'));
@@ -174,6 +175,39 @@ class OutboundDocumentSharingTest extends TestCase
         $this->assertStringNotContainsString('🧾', $metaRes->json('whatsapp_text'));
         $this->assertStringNotContainsString('http://', $metaRes->json('whatsapp_text'));
         $this->assertStringNotContainsString('https://', $metaRes->json('whatsapp_text'));
+
+        // Verify user can change and save both English and Urdu custom PDF closing notes and custom WhatsApp messages via /api/settings
+        $saveCustomRes = $this->postJson('/api/settings', [
+            'printer_type'        => 'a4',
+            'store_name'          => 'Shifa Pharmacy',
+            'note'                => 'No returns after 3 days without original box.',
+            'note_en'             => 'No returns after 3 days without original box.',
+            'note_ur'             => 'اصل ڈبے کے بغیر 3 دن بعد واپسی نہیں ہوگی۔',
+            'whatsapp_message_en' => "Hello {customer_name}, your invoice {invoice_no} total is {total}. {note}",
+            'whatsapp_message_ur' => "محترم {customer_name}، بل نمبر {invoice_no} کل رقم {total}۔ {note}",
+        ])->assertOk()
+          ->assertJsonPath('note', 'No returns after 3 days without original box.')
+          ->assertJsonPath('note_en', 'No returns after 3 days without original box.')
+          ->assertJsonPath('note_ur', 'اصل ڈبے کے بغیر 3 دن بعد واپسی نہیں ہوگی۔');
+
+        $customMetaRes = $this->getJson("/api/share/metadata?type=sale_invoice&id={$invoice->id}&template=standard");
+        $customMetaRes->assertOk();
+        $this->assertSame(
+            'Hello Tariq Mehmood, your invoice SI-000105 total is Rs. 450.00. No returns after 3 days without original box.',
+            $customMetaRes->json('whatsapp_text_en')
+        );
+        $this->assertSame(
+            'محترم Tariq Mehmood، بل نمبر SI-000105 کل رقم Rs. 450.00۔ اصل ڈبے کے بغیر 3 دن بعد واپسی نہیں ہوگی۔',
+            $customMetaRes->json('whatsapp_text_ur')
+        );
+
+        // Reset custom templates to null so the rest of the test exercises default template formatting
+        Setting::first()->update([
+            'note_en'             => null,
+            'note_ur'             => null,
+            'whatsapp_message_en' => null,
+            'whatsapp_message_ur' => null,
+        ]);
 
         // Verify UrduPdfTextShaper shapes Urdu letters into presentation forms
         $shapedSample = \App\Support\UrduPdfTextShaper::shapeText('آپ کے تعاون کا شکریہ');

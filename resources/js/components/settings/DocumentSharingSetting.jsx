@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   SwatchIcon,
   ChatBubbleLeftRightIcon,
@@ -7,11 +7,78 @@ import {
   CheckCircleIcon,
   DocumentTextIcon,
   SparklesIcon,
+  TrashIcon,
+  ArrowPathIcon,
+  PlusIcon,
+  ArrowDownOnSquareIcon,
 } from "@heroicons/react/24/outline";
 import { GlassCard } from "@/components/Glass.jsx";
 import { useTheme } from "@/context/ThemeContext";
 import WhatsAppSetting from "./WhatsAppSetting.jsx";
 import SmtpSetting from "./SmtpSetting.jsx";
+
+export const DEFAULT_CLOSING_NOTE_EN =
+  "Refrigerated, loose, used, or cut-strip medicines are non-returnable.\nReturn or exchange is accepted within 7 days along with the original bill.\nThank you for your cooperation.";
+
+export const DEFAULT_CLOSING_NOTE_UR =
+  "فریج میڈیسن، کھلی میڈیسن، استعمال شدہ میڈیسن اور کٹی ہوئی میڈیسن ناقابلِ واپسی ہے۔\nواپسی یا تبدیلی 7 دن کے اندر اصل بل کے ہمراہ ہوگی۔\nآپ کے تعاون کا شکریہ۔";
+
+export const DEFAULT_WHATSAPP_MESSAGE_EN = `*{store_name}*
+{store_address}
+Tel: {store_phone}
+────────────────────
+*SALE INVOICE*
+Invoice No: *{invoice_no}*
+Date: {date}
+Customer: {customer_name}
+Items: {items}
+
+*Billing Summary*
+Invoice Total: *{total}*
+Amount Received: {received}
+Balance Due (This Invoice): {balance_due}
+Total Account Balance Due: *{total_balance}*
+
+*Terms & Return Policy:*
+{note}
+
+Please find the official invoice PDF attached for your records.`;
+
+export const DEFAULT_WHATSAPP_MESSAGE_UR = `*{store_name}*
+{store_address}
+فون نمبر: {store_phone}
+────────────────────
+*سیل انوائس / بل کی تفصیل*
+بل نمبر: *{invoice_no}*
+تاریخ: {date}
+محترم کسٹمر: {customer_name}
+آئٹمز کی تعداد: {items}
+
+*بل کا خلاصہ:*
+کل بل: *{total}*
+وصول شدہ رقم: {received}
+بقایا رقم (موجودہ بل): {balance_due}
+کل کھاتہ بقایا: *{total_balance}*
+
+*ضروری ہدایات و شرائط:*
+{note}
+
+مکمل بل پی ڈی ایف (PDF) فائل کی صورت میں منسلک ہے۔`;
+
+const DYNAMIC_MESSAGE_TAGS = [
+  { label: "Store Name", tag: "{store_name}" },
+  { label: "Store Phone", tag: "{store_phone}" },
+  { label: "Store Address", tag: "{store_address}" },
+  { label: "Invoice No", tag: "{invoice_no}" },
+  { label: "Date", tag: "{date}" },
+  { label: "Customer", tag: "{customer_name}" },
+  { label: "Items", tag: "{items}" },
+  { label: "Invoice Total", tag: "{total}" },
+  { label: "Received", tag: "{received}" },
+  { label: "Balance Due", tag: "{balance_due}" },
+  { label: "Ledger Balance", tag: "{total_balance}" },
+  { label: "Closing Note", tag: "{note}" },
+];
 
 const SHARED_PDF_DESIGNS = [
   {
@@ -70,31 +137,122 @@ const SHARED_PDF_DESIGNS = [
   },
 ];
 
+function renderPreviewMessage(template, vars) {
+  const raw = String(template ?? "");
+  if (!raw.trim()) return "";
+
+  const noteVal = (vars.note || "").trim();
+  let text = raw;
+
+  if (!noteVal) {
+    text = text.replace(
+      /(?:^|\n)\s*(?:\*Terms\s*&\s*Return\s*Policy:\*|Terms\s*&\s*Return\s*Policy:|\*ضروری\s*ہدایات\s*و\s*شرائط:\*|ضروری\s*ہدایات\s*و\s*شرائط:)\s*\n\s*\{\{?(?:note|closing_note|return_policy)\}?\}/giu,
+      ""
+    );
+  }
+
+  const lines = text.split("\n").filter((line) => {
+    const trimmed = line.trim();
+    if (!noteVal && /^\{\{?(?:note|closing_note|return_policy)\}?\}\s*$/iu.test(trimmed)) {
+      return false;
+    }
+    return true;
+  });
+
+  const replacements = {
+    "{store_name}": vars.store_name,
+    "{{store_name}}": vars.store_name,
+    "{store_address}": vars.store_address,
+    "{address}": vars.store_address,
+    "{{store_address}}": vars.store_address,
+    "{store_phone}": vars.store_phone,
+    "{phone}": vars.store_phone,
+    "{{store_phone}}": vars.store_phone,
+    "{invoice_no}": vars.invoice_no,
+    "{document_no}": vars.invoice_no,
+    "{bill_no}": vars.invoice_no,
+    "{{invoice_no}}": vars.invoice_no,
+    "{date}": vars.date,
+    "{invoice_date}": vars.date,
+    "{{date}}": vars.date,
+    "{customer_name}": vars.customer_name,
+    "{customer}": vars.customer_name,
+    "{recipient_name}": vars.customer_name,
+    "{{customer_name}}": vars.customer_name,
+    "{items}": vars.items,
+    "{items_summary}": vars.items,
+    "{{items}}": vars.items,
+    "{items_count}": "4",
+    "{total_units}": "18",
+    "{units}": "18",
+    "{total}": vars.total,
+    "{invoice_total}": vars.total,
+    "{{total}}": vars.total,
+    "{received}": vars.received,
+    "{amount_received}": vars.received,
+    "{{received}}": vars.received,
+    "{balance_due}": vars.balance_due,
+    "{remaining}": vars.balance_due,
+    "{{balance_due}}": vars.balance_due,
+    "{total_balance}": vars.total_balance,
+    "{account_balance}": vars.total_balance,
+    "{ledger_balance}": vars.total_balance,
+    "{{total_balance}}": vars.total_balance,
+    "{note}": noteVal,
+    "{closing_note}": noteVal,
+    "{return_policy}": noteVal,
+    "{{note}}": noteVal,
+  };
+
+  let joined = lines.join("\n");
+  Object.entries(replacements).forEach(([key, val]) => {
+    joined = joined.split(key).join(val);
+  });
+
+  return joined.replace(/\n{3,}/g, "\n\n").trim();
+}
+
 export default function DocumentSharingSetting({
   form,
   setForm,
   handleChange,
+  handleSave,
+  saving = false,
   disableInputs = false,
   initialSubTab = "pdf_design",
 }) {
   const { isDark } = useTheme();
   const [subTab, setSubTab] = useState(initialSubTab || "pdf_design");
   const [previewTemplate, setPreviewTemplate] = useState(null);
+  const [activeMessageField, setActiveMessageField] = useState("whatsapp_message_en");
+  const [showLivePreview, setShowLivePreview] = useState(false);
+  const [noteLang, setNoteLang] = useState(() =>
+    /[\u0600-\u06FF]/.test(form.note || "") ? "ur" : "en"
+  );
+  const hasUserSwitchedNoteLang = useRef(false);
+
+  const enTextareaRef = useRef(null);
+  const urTextareaRef = useRef(null);
+
+  useEffect(() => {
+    if (!hasUserSwitchedNoteLang.current && form.note) {
+      setNoteLang(/[\u0600-\u06FF]/.test(form.note) ? "ur" : "en");
+    }
+  }, [form.note]);
 
   const selectedTemplate = form.a4_template || "standard";
   const storeName = form.store_name || "Your Business Name";
   const storeAddress = form.address || "SHOP #3 FAROOQ E AZAM CHOCK";
   const storePhone = form.phone_number || "0300-1234567";
-  const rawNote = (form.note || "").trim();
-  const hasUrduInNote = /[\u0600-\u06FF]/.test(rawNote);
-
-  const defaultEnglishNote =
-    "Refrigerated, loose, used, or cut-strip medicines are non-returnable.\nReturn or exchange is accepted within 7 days along with the original bill.\nThank you for your cooperation.";
-  const defaultUrduNote =
-    "فریج میڈیسن، کھلی میڈیسن، استعمال شدہ میڈیسن اور کٹی ہوئی میڈیسن ناقابلِ واپسی ہے۔\nواپسی یا تبدیلی 7 دن کے اندر اصل بل کے ہمراہ ہوگی۔\nآپ کے تعاون کا شکریہ۔";
-
-  const englishNotePreview = !hasUrduInNote && rawNote ? rawNote : defaultEnglishNote;
-  const urduNotePreview = hasUrduInNote && rawNote ? rawNote : defaultUrduNote;
+  const activeNoteValue =
+    noteLang === "ur"
+      ? form.note_ur !== undefined
+        ? form.note_ur
+        : form.note ?? ""
+      : form.note_en !== undefined
+      ? form.note_en
+      : form.note ?? "";
+  const hasUrduInNote = noteLang === "ur" || /[\u0600-\u06FF]/.test(activeNoteValue);
 
   const todayFormatted = new Date().toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -107,47 +265,118 @@ export default function DocumentSharingSetting({
     setForm((prev) => ({ ...prev, a4_template: templateId }));
   };
 
-  const sampleEnglishInvoiceText = `*${storeName}*
-${storeAddress}
-Tel: ${storePhone}
-────────────────────
-*SALE INVOICE*
-Invoice No: *SI-2026-0001*
-Date: ${todayFormatted}
-Customer: Allied Medical Store
-Items: 4 (18 units)
+  const handleSwitchNoteLang = (lang) => {
+    if (disableInputs) return;
+    hasUserSwitchedNoteLang.current = true;
+    setNoteLang(lang);
+    setForm((prev) => {
+      const nextNote =
+        lang === "ur"
+          ? prev.note_ur !== undefined
+            ? prev.note_ur
+            : prev.note ?? ""
+          : prev.note_en !== undefined
+          ? prev.note_en
+          : prev.note ?? "";
+      return {
+        ...prev,
+        note: nextNote,
+      };
+    });
+  };
 
-*Billing Summary*
-Invoice Total: *Rs. 14,500.00*
-Amount Received: Rs. 10,000.00
-Balance Due (This Invoice): Rs. 4,500.00
-Total Account Balance Due: *Rs. 12,000.00*
+  const handleNoteChange = (e) => {
+    const val = e.target.value;
+    setForm((prev) => ({
+      ...prev,
+      note: val,
+      ...(noteLang === "ur" ? { note_ur: val } : { note_en: val }),
+    }));
+  };
 
-*Terms & Return Policy:*
-${englishNotePreview}
+  const handleClearActiveNote = () => {
+    if (disableInputs) return;
+    setForm((prev) => ({
+      ...prev,
+      note: "",
+      ...(noteLang === "ur" ? { note_ur: "" } : { note_en: "" }),
+    }));
+  };
 
-Please find the official invoice PDF attached for your records.`;
+  const handleResetActiveNoteDefault = () => {
+    if (disableInputs) return;
+    const defText =
+      noteLang === "ur" ? DEFAULT_CLOSING_NOTE_UR : DEFAULT_CLOSING_NOTE_EN;
+    setForm((prev) => ({
+      ...prev,
+      note: defText,
+      ...(noteLang === "ur" ? { note_ur: defText } : { note_en: defText }),
+    }));
+  };
 
-  const sampleUrduInvoiceText = `*${storeName}*
-${storeAddress}
-فون نمبر: ${storePhone}
-────────────────────
-*سیل انوائس / بل کی تفصیل*
-بل نمبر: *SI-2026-0001*
-تاریخ: ${todayFormatted}
-محترم کسٹمر: Allied Medical Store
-آئٹمز کی تعداد: 4 (18 یونٹس)
+  const handleKeyDownSave = (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      if (!disableInputs && typeof handleSave === "function") {
+        handleSave();
+      }
+    }
+  };
 
-*بل کا خلاصہ:*
-کل بل: *Rs. 14,500.00*
-وصول شدہ رقم: Rs. 10,000.00
-بقایا رقم (موجودہ بل): Rs. 4,500.00
-کل کھاتہ بقایا: *Rs. 12,000.00*
+  const handleInsertTag = (tag, targetField = activeMessageField) => {
+    if (disableInputs) return;
+    const field = targetField === "whatsapp_message_ur" ? "whatsapp_message_ur" : "whatsapp_message_en";
+    const ref = field === "whatsapp_message_ur" ? urTextareaRef.current : enTextareaRef.current;
+    const currentVal = String(form[field] ?? "");
 
-*ضروری ہدایات و شرائط:*
-${urduNotePreview}
+    if (ref && typeof ref.selectionStart === "number") {
+      const start = ref.selectionStart;
+      const end = ref.selectionEnd ?? start;
+      const nextVal = currentVal.slice(0, start) + tag + currentVal.slice(end);
+      setForm((prev) => ({ ...prev, [field]: nextVal }));
+      setTimeout(() => {
+        ref.focus();
+        const cursor = start + tag.length;
+        ref.setSelectionRange(cursor, cursor);
+      }, 0);
+    } else {
+      const sep = currentVal && !currentVal.endsWith(" ") && !currentVal.endsWith("\n") ? " " : "";
+      setForm((prev) => ({ ...prev, [field]: currentVal + sep + tag }));
+    }
+  };
 
-مکمل بل پی ڈی ایف (PDF) فائل کی صورت میں منسلک ہے۔`;
+  const previewNoteEn = (form.note_en !== undefined ? form.note_en : form.note || "").trim();
+  const previewNoteUr = (form.note_ur !== undefined ? form.note_ur : form.note || "").trim();
+
+  const previewVarsEn = {
+    store_name: storeName,
+    store_address: storeAddress,
+    store_phone: storePhone,
+    invoice_no: "SI-2026-0001",
+    date: todayFormatted,
+    customer_name: "Allied Medical Store",
+    items: "4 (18 units)",
+    total: "Rs. 14,500.00",
+    received: "Rs. 10,000.00",
+    balance_due: "Rs. 4,500.00",
+    total_balance: "Rs. 12,000.00",
+    note: previewNoteEn,
+  };
+
+  const previewVarsUr = {
+    ...previewVarsEn,
+    items: "4 (18 یونٹس)",
+    note: previewNoteUr,
+  };
+
+  const resolvedEnglishPreview = renderPreviewMessage(
+    form.whatsapp_message_en ?? "",
+    previewVarsEn
+  );
+  const resolvedUrduPreview = renderPreviewMessage(
+    form.whatsapp_message_ur ?? "",
+    previewVarsUr
+  );
 
   const subTabs = [
     {
@@ -377,57 +606,114 @@ ${urduNotePreview}
             </div>
           </GlassCard>
 
-          {/* Professional Message Formatting & Footer Note */}
-          <GlassCard className="p-6 space-y-6">
+          {/* Editable Closing Note & Fully Editable Outbound WhatsApp Messages */}
+          <GlassCard className="p-4 sm:p-6 space-y-6">
+            {/* Section 1: PDF Invoice Closing Note & Return Policy */}
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
-                  <DocumentTextIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <DocumentTextIcon className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" />
                   <div>
-                    <h3 className="text-base font-bold text-gray-900 dark:text-slate-100">
+                    <label
+                      htmlFor="setting-pdf-closing-note"
+                      className="block text-base font-bold text-gray-900 dark:text-slate-100 cursor-pointer"
+                    >
                       PDF Invoice Closing Note &amp; Return Policy
-                    </h3>
+                    </label>
                     <p className="text-xs text-gray-500 dark:text-slate-400">
-                      Printed at the bottom of your A4 PDF invoices (supports connected Urdu script &amp; English) and included in outbound WhatsApp &amp; Email messages.
+                      Customize both your English and Urdu closing notes. Switching between English and Urdu keeps your saved changes for each language and sets the active PDF invoice note.
                     </p>
                   </div>
                 </div>
 
                 {!disableInputs && (
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Language Switcher (Preserves custom English & Urdu notes) */}
+                    <div
+                      className={`inline-flex rounded-lg p-0.5 border ${
+                        isDark
+                          ? "bg-slate-900 border-slate-700"
+                          : "bg-gray-100 border-gray-300"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchNoteLang("en")}
+                        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                          noteLang === "en"
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : isDark
+                            ? "text-slate-300 hover:text-white"
+                            : "text-gray-700 hover:text-gray-900"
+                        }`}
+                      >
+                        English Note
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSwitchNoteLang("ur")}
+                        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                          noteLang === "ur"
+                            ? "bg-emerald-600 text-white shadow-sm"
+                            : isDark
+                            ? "text-slate-300 hover:text-white"
+                            : "text-gray-700 hover:text-gray-900"
+                        }`}
+                      >
+                        Urdu Note (اردو نوٹ)
+                      </button>
+                    </div>
+
                     <button
                       type="button"
-                      onClick={() =>
-                        setForm((prev) => ({ ...prev, note: defaultEnglishNote }))
-                      }
-                      className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100"
+                      onClick={handleClearActiveNote}
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-1"
+                      title="Clear current note"
                     >
-                      Use English Note
+                      <TrashIcon className="w-3.5 h-3.5" />
+                      <span>Clear Note</span>
                     </button>
+
                     <button
                       type="button"
-                      onClick={() =>
-                        setForm((prev) => ({ ...prev, note: defaultUrduNote }))
-                      }
-                      className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100"
+                      onClick={handleResetActiveNoteDefault}
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-1"
+                      title="Restore sample return policy for this language"
                     >
-                      Use Urdu Note (اردو نوٹ)
+                      <ArrowPathIcon className="w-3.5 h-3.5" />
+                      <span>Default Sample</span>
                     </button>
+
+                    {typeof handleSave === "function" && (
+                      <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="px-3 py-1 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 flex items-center gap-1.5 shadow-sm"
+                      >
+                        <ArrowDownOnSquareIcon className="w-3.5 h-3.5" />
+                        <span>{saving ? "Saving…" : "Save Note"}</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
 
               <div>
                 <textarea
+                  id="setting-pdf-closing-note"
                   name="note"
                   rows={4}
                   disabled={disableInputs}
                   dir={hasUrduInNote ? "rtl" : "ltr"}
-                  value={form.note || ""}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, note: e.target.value }))
+                  value={activeNoteValue}
+                  onChange={handleNoteChange}
+                  onKeyDown={handleKeyDownSave}
+                  placeholder={
+                    noteLang === "ur"
+                      ? "اپنا کسٹم پی ڈی ایف انوائس نوٹ یا واپسی کی شرائط یہاں لکھیں..."
+                      : "Write your custom PDF invoice closing note or return policy here (or leave blank for no closing note)..."
                   }
-                  placeholder="Thank you for your business."
                   className={`w-full rounded-xl border p-3 text-sm transition-colors focus:outline-none focus:ring-2 ${
                     hasUrduInNote ? "text-right" : "text-left"
                   } ${
@@ -436,66 +722,283 @@ ${urduNotePreview}
                       : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
                   }`}
                 />
+                <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-400">
+                  Editing:{" "}
+                  <strong className="text-gray-700 dark:text-slate-200">
+                    {noteLang === "ur" ? "Urdu Closing Note (اردو نوٹ)" : "English Closing Note"}
+                  </strong>{" "}
+                  — Switching between English and Urdu keeps both notes saved. Click{" "}
+                  <strong>Save Note</strong> (or press Ctrl/⌘ + Enter) to save.
+                </p>
               </div>
             </div>
 
-            {/* Two Prepared Invoice Text Formats: English & Urdu Side-by-Side */}
-            <div className="pt-4 border-t border-gray-200 dark:border-slate-700">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <span className="text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <SparklesIcon className="w-4 h-4 text-emerald-500" />
-                  <span>Prepared Outbound Invoice Texts (Selectable in Share Modal)</span>
-                </span>
-                <span className="text-[11px] text-gray-500 dark:text-slate-400">
-                  Switch between English &amp; Urdu with 1 click when sharing any invoice
-                </span>
+            {/* Section 2: Fully Editable WhatsApp Outbound Messages */}
+            <div className="pt-5 border-t border-gray-200 dark:border-slate-700 space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <SparklesIcon className="w-4 h-4 text-emerald-500" />
+                    <span>Outbound WhatsApp Message Format (Fully Editable)</span>
+                  </span>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                    Write your own custom WhatsApp message or edit the template below. You can add any information you want (such as payment accounts, delivery numbers, or custom notes), remove lines you don&apos;t need, or click a tag below to insert dynamic invoice details.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowLivePreview((v) => !v)}
+                  className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-1"
+                >
+                  <EyeIcon className="w-3.5 h-3.5" />
+                  <span>{showLivePreview ? "Hide Resolved Preview" : "Show Resolved Preview"}</span>
+                </button>
               </div>
+
+              {/* Quick-Insert Dynamic Tag Chips */}
+              {!disableInputs && (
+                <div
+                  className={`p-3 rounded-xl border ${
+                    isDark
+                      ? "bg-slate-900/60 border-slate-700/80"
+                      : "bg-gray-50/90 border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                    <span className="text-[11px] font-semibold text-gray-600 dark:text-slate-300">
+                      Click to insert dynamic info into{" "}
+                      <strong className="text-blue-600 dark:text-blue-400">
+                        {activeMessageField === "whatsapp_message_ur"
+                          ? "Urdu Message (اردو فارمیٹ)"
+                          : "English Message"}
+                      </strong>
+                      :
+                    </span>
+                    <span className="text-[11px] text-gray-400 dark:text-slate-500">
+                      Optional — or just type plain text
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {DYNAMIC_MESSAGE_TAGS.map((item) => (
+                      <button
+                        key={item.tag}
+                        type="button"
+                        onClick={() => handleInsertTag(item.tag)}
+                        className={`px-2 py-1 rounded-md text-[11px] font-medium border transition-colors flex items-center gap-1 ${
+                          isDark
+                            ? "bg-slate-800 border-slate-700 text-slate-200 hover:border-blue-500 hover:text-blue-300"
+                            : "bg-white border-gray-300 text-gray-700 hover:border-blue-500 hover:text-blue-600"
+                        }`}
+                        title={`Insert ${item.tag}`}
+                      >
+                        <PlusIcon className="w-3 h-3" />
+                        <span>{item.label}</span>
+                        <code className="text-[10px] opacity-70">{item.tag}</code>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Format 1: English Invoice Text */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-600 dark:text-blue-400">
-                      1. Proper English Invoice Format
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold">
-                      LTR • English
-                    </span>
+                {/* Format 1: Editable English WhatsApp Message */}
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label
+                      htmlFor="setting-whatsapp-message-en"
+                      className="text-xs font-bold text-blue-600 dark:text-blue-400 cursor-pointer flex items-center gap-1.5"
+                    >
+                      <span>1. English WhatsApp Message</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold">
+                        Editable • LTR
+                      </span>
+                    </label>
+
+                    {!disableInputs && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({ ...prev, whatsapp_message_en: "" }))
+                          }
+                          className="px-2 py-0.5 rounded text-[11px] font-semibold border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center gap-1"
+                          title="Clear to write your own custom message from scratch"
+                        >
+                          <TrashIcon className="w-3 h-3" />
+                          <span>Clear</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              whatsapp_message_en: DEFAULT_WHATSAPP_MESSAGE_EN,
+                            }))
+                          }
+                          className="px-2 py-0.5 rounded text-[11px] font-semibold border border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 flex items-center gap-1"
+                          title="Restore standard template with dynamic placeholders"
+                        >
+                          <ArrowPathIcon className="w-3 h-3" />
+                          <span>Default Template</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div
+
+                  <textarea
+                    ref={enTextareaRef}
+                    id="setting-whatsapp-message-en"
+                    name="whatsapp_message_en"
+                    rows={12}
+                    disabled={disableInputs}
                     dir="ltr"
-                    className={`rounded-xl border p-4 font-mono text-xs whitespace-pre-wrap leading-relaxed text-left ${
+                    value={form.whatsapp_message_en ?? ""}
+                    onFocus={() => setActiveMessageField("whatsapp_message_en")}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        whatsapp_message_en: e.target.value,
+                      }))
+                    }
+                    onKeyDown={handleKeyDownSave}
+                    placeholder="Write your custom English WhatsApp message here... You can add any info you want or insert dynamic tags above."
+                    className={`w-full rounded-xl border p-3.5 font-mono text-xs leading-relaxed text-left transition-colors focus:outline-none focus:ring-2 ${
                       isDark
-                        ? "bg-slate-900/90 border-slate-700 text-slate-200"
-                        : "bg-gray-50 border-gray-200 text-gray-800"
+                        ? "bg-slate-900 border-slate-700 text-slate-100 focus:border-blue-500 focus:ring-blue-500/20"
+                        : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500/20"
                     }`}
-                  >
-                    {sampleEnglishInvoiceText}
-                  </div>
+                  />
+
+                  {showLivePreview && (
+                    <div
+                      dir="ltr"
+                      className={`rounded-xl border p-3.5 font-mono text-xs whitespace-pre-wrap leading-relaxed text-left ${
+                        isDark
+                          ? "bg-slate-900/70 border-slate-700/80 text-slate-300"
+                          : "bg-gray-50 border-gray-200 text-gray-700"
+                      }`}
+                    >
+                      <div className="text-[10px] font-sans font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 mb-1.5">
+                        Live Preview (English):
+                      </div>
+                      {resolvedEnglishPreview || (
+                        <span className="italic opacity-60">
+                          Empty message — you can type a custom message above or when sharing.
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Format 2: Urdu Invoice Text */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                      2. Proper Urdu Invoice Format (اردو انوائس فارمیٹ)
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-semibold">
-                      RTL • اردو
-                    </span>
+                {/* Format 2: Editable Urdu WhatsApp Message */}
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label
+                      htmlFor="setting-whatsapp-message-ur"
+                      className="text-xs font-bold text-emerald-600 dark:text-emerald-400 cursor-pointer flex items-center gap-1.5"
+                    >
+                      <span>2. Urdu WhatsApp Message (اردو واٹس ایپ میسج)</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 font-semibold">
+                        Editable • RTL
+                      </span>
+                    </label>
+
+                    {!disableInputs && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({ ...prev, whatsapp_message_ur: "" }))
+                          }
+                          className="px-2 py-0.5 rounded text-[11px] font-semibold border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 flex items-center gap-1"
+                          title="Clear to write your own custom Urdu message from scratch"
+                        >
+                          <TrashIcon className="w-3 h-3" />
+                          <span>Clear</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              whatsapp_message_ur: DEFAULT_WHATSAPP_MESSAGE_UR,
+                            }))
+                          }
+                          className="px-2 py-0.5 rounded text-[11px] font-semibold border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-1"
+                          title="Restore standard Urdu template with dynamic placeholders"
+                        >
+                          <ArrowPathIcon className="w-3 h-3" />
+                          <span>Default Template</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div
+
+                  <textarea
+                    ref={urTextareaRef}
+                    id="setting-whatsapp-message-ur"
+                    name="whatsapp_message_ur"
+                    rows={12}
+                    disabled={disableInputs}
                     dir="rtl"
-                    className={`rounded-xl border p-4 text-xs whitespace-pre-wrap leading-relaxed text-right ${
+                    value={form.whatsapp_message_ur ?? ""}
+                    onFocus={() => setActiveMessageField("whatsapp_message_ur")}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        whatsapp_message_ur: e.target.value,
+                      }))
+                    }
+                    onKeyDown={handleKeyDownSave}
+                    placeholder="اپنا کسٹم واٹس ایپ میسج یہاں لکھیں... آپ اپنی مرضی کی کوئی بھی معلومات شامل کر سکتے ہیں۔"
+                    className={`w-full rounded-xl border p-3.5 text-xs leading-relaxed text-right transition-colors focus:outline-none focus:ring-2 ${
                       isDark
-                        ? "bg-slate-900/90 border-slate-700 text-slate-200"
-                        : "bg-gray-50 border-gray-200 text-gray-800"
+                        ? "bg-slate-900 border-slate-700 text-slate-100 focus:border-emerald-500 focus:ring-emerald-500/20"
+                        : "bg-white border-gray-300 text-gray-900 focus:border-emerald-500 focus:ring-emerald-500/20"
                     }`}
-                  >
-                    {sampleUrduInvoiceText}
-                  </div>
+                  />
+
+                  {showLivePreview && (
+                    <div
+                      dir="rtl"
+                      className={`rounded-xl border p-3.5 text-xs whitespace-pre-wrap leading-relaxed text-right ${
+                        isDark
+                          ? "bg-slate-900/70 border-slate-700/80 text-slate-300"
+                          : "bg-gray-50 border-gray-200 text-gray-700"
+                      }`}
+                    >
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1.5">
+                        لائیو پریویو (اردو):
+                      </div>
+                      {resolvedUrduPreview || (
+                        <span className="italic opacity-60">
+                          خالی میسج — آپ اوپر یا شیئر کرتے وقت اپنی مرضی کا میسج لکھ سکتے ہیں۔
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {!disableInputs && typeof handleSave === "function" && (
+                <div className="pt-3 flex items-center justify-end gap-3 border-t border-gray-100 dark:border-slate-800">
+                  <span className="text-xs text-gray-500 dark:text-slate-400">
+                    Saves your PDF design, closing note, and custom WhatsApp message formats.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 flex items-center gap-1.5 shadow-sm"
+                  >
+                    <ArrowDownOnSquareIcon className="w-4 h-4" />
+                    <span>
+                      {saving ? "Saving…" : "Save Closing Note & WhatsApp Message"}
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
           </GlassCard>
         </div>
@@ -569,7 +1072,9 @@ ${urduNotePreview}
             </div>
             <div className="flex-1 bg-gray-100 dark:bg-slate-900 p-2 sm:p-4 min-h-0">
               <iframe
-                src={`/print/a4-preview/${previewTemplate}`}
+                src={`/print/a4-preview/${previewTemplate}?note=${encodeURIComponent(
+                  form.note ?? ""
+                )}`}
                 title="A4 Template Preview"
                 className="w-full h-full rounded-xl bg-white border border-gray-200 dark:border-slate-700"
               />
