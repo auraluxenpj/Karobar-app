@@ -26,11 +26,51 @@ class AccountService
     ];
 
     /**
+     * Check whether the given account (or fallback payment method when account is null)
+     * represents the primary Cash in Hand (Drawer) account.
+     */
+    public function isDefaultCashDrawerAccount(?Account $account, ?string $fallbackMethod = null): bool
+    {
+        if ($account) {
+            return $account->type === 'cash' && (bool) $account->is_default;
+        }
+
+        return ($fallbackMethod ?? 'cash') === 'cash';
+    }
+
+    /**
+     * Check whether a document (invoice/return) was created before the currently active
+     * cash drawer shift and has no transaction in the active shift.
+     */
+    public function isPreShiftDocumentForOpenDrawer($model, string $referenceType, ?User $user = null): bool
+    {
+        if (!SchemaCache::hasTable('cash_drawer_sessions') || !SchemaCache::hasTable('cash_drawer_transactions')) {
+            return false;
+        }
+
+        $drawerService = app(CashDrawerService::class);
+        $session = $drawerService->getCurrentSession($user, false);
+        if (!$session || $session->status !== 'open') {
+            return false;
+        }
+
+        $hasSameShiftTxn = \App\Models\CashDrawerTransaction::where('session_id', $session->id)
+            ->where('reference_type', $referenceType)
+            ->where('reference_id', $model->id)
+            ->exists();
+
+        if ($hasSameShiftTxn) {
+            return false;
+        }
+
+        $createdAt = $model->created_at ? Carbon::parse($model->created_at) : null;
+        $openedAt = $session->opened_at ? Carbon::parse($session->opened_at) : null;
+
+        return (bool) ($createdAt && $openedAt && $createdAt->lt($openedAt));
+    }
+
+    /**
      * Ensure the default Cash in Hand (Drawer) account exists and return it.
-     * Note: Balance mutations are strictly driven by append-only AccountTransactions
-     * (including drawer opening float additions, manual till cash-in/out, operational
-     * vouchers, and shift-close shortage/overage variances) so historical closed-shift
-     * and off-shift cash reserves are never overwritten.
      */
     public function syncCashDrawerBalance(?\App\Models\CashDrawerSession $session = null): ?Account
     {
@@ -55,9 +95,78 @@ class AccountService
                 'is_default'      => true,
                 'notes'           => 'Primary cash counter / drawer balance',
             ]);
+        } elseif ((float) ($cashAccount->opening_balance ?? 0) != 0.0) {
+            // Ensure Cash in Hand (Drawer) does not retain a separate locked opening_balance reserve
+            // that conflicts with Cash Drawer shift opening/closing balances.
+            $cashAccount->opening_balance = 0;
+            $cashAccount->saveQuietly();
         }
 
         return $cashAccount;
+    }
+
+    /**
+     * Reconcile the default Cash in Hand (Drawer) account with all currently open
+     * CashDrawerSessions so that whenever a drawer shift is open, Cash in Hand (Drawer)
+     * and the active Cash Drawer expected balance are 100% identical.
+     */
+    public function reconcileWithOpenCashDrawers(?User $user = null): ?Account
+    {
+        $cashAccount = $this->syncCashDrawerBalance();
+        if (!$cashAccount || !SchemaCache::hasTable('cash_drawer_sessions') || !SchemaCache::hasTable('cash_drawer_transactions')) {
+            return $cashAccount;
+        }
+
+        return DB::transaction(function () use ($cashAccount, $user) {
+            $openSessions = \App\Models\CashDrawerSession::where('status', 'open')
+                ->lockForUpdate()
+                ->get();
+
+            if ($openSessions->isEmpty()) {
+                return $cashAccount->fresh();
+            }
+
+            $drawerService = app(CashDrawerService::class);
+            $totalOpenExpected = round((float) $openSessions->sum(function (\App\Models\CashDrawerSession $sess) use ($drawerService) {
+                return $drawerService->recalculateExpectedBalance($sess);
+            }), 2);
+
+            $lockedAccount = Account::where('id', $cashAccount->id)->lockForUpdate()->first();
+            if (!$lockedAccount) {
+                return $cashAccount;
+            }
+
+            if ((float) ($lockedAccount->opening_balance ?? 0) != 0.0) {
+                $lockedAccount->opening_balance = 0;
+                $lockedAccount->saveQuietly();
+            }
+
+            $delta = round($totalOpenExpected - (float) $lockedAccount->current_balance, 2);
+            $primarySessionId = (int) $openSessions->first()->id;
+            $actor = $user ?? auth()->user();
+
+            if ($delta > 0.009) {
+                $this->deposit(
+                    $lockedAccount,
+                    $delta,
+                    'cash_drawer_reconcile',
+                    $primarySessionId,
+                    "Auto-reconciled Cash in Hand with active Cash Drawer (Shift #{$primarySessionId})",
+                    $actor
+                );
+            } elseif ($delta < -0.009) {
+                $this->withdraw(
+                    $lockedAccount,
+                    abs($delta),
+                    'cash_drawer_reconcile',
+                    $primarySessionId,
+                    "Auto-reconciled Cash in Hand with active Cash Drawer (Shift #{$primarySessionId})",
+                    $actor
+                );
+            }
+
+            return $lockedAccount->fresh();
+        });
     }
 
     /**
@@ -367,13 +476,14 @@ class AccountService
         ?int $newAccountId,
         string $newMethod,
         float $newReceived,
-        ?User $user = null
+        ?User $user = null,
+        ?bool $updateDrawerIfPreShift = null
     ): void {
         if (!Schema::hasTable('accounts')) {
             return;
         }
 
-        DB::transaction(function () use ($invoice, $oldAccountId, $oldMethod, $oldReceived, $newAccountId, $newMethod, $newReceived, $user) {
+        DB::transaction(function () use ($invoice, $oldAccountId, $oldMethod, $oldReceived, $newAccountId, $newMethod, $newReceived, $user, $updateDrawerIfPreShift) {
             $oldAcc = $this->resolveAccount($oldAccountId, $oldMethod);
             $newAcc = $this->resolveAccount($newAccountId, $newMethod);
 
@@ -381,7 +491,13 @@ class AccountService
                 return;
             }
 
+            $skipDrawerCash = ($updateDrawerIfPreShift === false)
+                && $this->isPreShiftDocumentForOpenDrawer($invoice, 'sale_invoice', $user);
+
             if ($oldAcc->id === $newAcc->id) {
+                if ($skipDrawerCash && $this->isDefaultCashDrawerAccount($newAcc)) {
+                    return;
+                }
                 $delta = round($newReceived - $oldReceived, 2);
                 if (abs($delta) > 0.001) {
                     if ($delta > 0) {
@@ -392,11 +508,11 @@ class AccountService
                 }
             } else {
                 // Revert from old account
-                if ($oldReceived > 0) {
+                if ($oldReceived > 0 && !($skipDrawerCash && $this->isDefaultCashDrawerAccount($oldAcc))) {
                     $this->withdraw($oldAcc, $oldReceived, 'sale_invoice_update', $invoice->id, "Sale Invoice #{$invoice->posted_number} changed account from {$oldAcc->name}", $user);
                 }
                 // Deposit into new account
-                if ($newReceived > 0) {
+                if ($newReceived > 0 && !($skipDrawerCash && $this->isDefaultCashDrawerAccount($newAcc))) {
                     $this->deposit($newAcc, $newReceived, 'sale_invoice_update', $invoice->id, "Sale Invoice #{$invoice->posted_number} changed account to {$newAcc->name}", $user);
                 }
             }
@@ -419,13 +535,14 @@ class AccountService
         ?int $newAccountId,
         string $newMethod,
         float $newPaid,
-        ?User $user = null
+        ?User $user = null,
+        ?bool $updateDrawerIfPreShift = null
     ): void {
         if (!Schema::hasTable('accounts')) {
             return;
         }
 
-        DB::transaction(function () use ($invoice, $oldAccountId, $oldMethod, $oldPaid, $newAccountId, $newMethod, $newPaid, $user) {
+        DB::transaction(function () use ($invoice, $oldAccountId, $oldMethod, $oldPaid, $newAccountId, $newMethod, $newPaid, $user, $updateDrawerIfPreShift) {
             $oldAcc = $this->resolveAccount($oldAccountId, $oldMethod);
             $newAcc = $this->resolveAccount($newAccountId, $newMethod);
 
@@ -433,7 +550,13 @@ class AccountService
                 return;
             }
 
+            $skipDrawerCash = ($updateDrawerIfPreShift === false)
+                && $this->isPreShiftDocumentForOpenDrawer($invoice, 'purchase_invoice', $user);
+
             if ($oldAcc->id === $newAcc->id) {
+                if ($skipDrawerCash && $this->isDefaultCashDrawerAccount($newAcc)) {
+                    return;
+                }
                 $delta = round($newPaid - $oldPaid, 2);
                 if (abs($delta) > 0.001) {
                     if ($delta > 0) {
@@ -446,11 +569,11 @@ class AccountService
                 }
             } else {
                 // Deposit back into old account
-                if ($oldPaid > 0) {
+                if ($oldPaid > 0 && !($skipDrawerCash && $this->isDefaultCashDrawerAccount($oldAcc))) {
                     $this->deposit($oldAcc, $oldPaid, 'purchase_invoice_update', $invoice->id, "Purchase Invoice #{$invoice->posted_number} payment reverted from {$oldAcc->name}", $user);
                 }
                 // Withdraw from new account
-                if ($newPaid > 0) {
+                if ($newPaid > 0 && !($skipDrawerCash && $this->isDefaultCashDrawerAccount($newAcc))) {
                     $this->withdraw($newAcc, $newPaid, 'purchase_invoice_update', $invoice->id, "Purchase Invoice #{$invoice->posted_number} payment charged to {$newAcc->name}", $user);
                 }
             }
@@ -608,7 +731,7 @@ class AccountService
      */
     public function getSummary(): array
     {
-        $this->syncCashDrawerBalance();
+        $this->reconcileWithOpenCashDrawers();
 
         $accounts = Account::orderBy('type')->orderBy('name')->get();
         $totalBalance = round((float)$accounts->where('is_active', true)->sum('current_balance'), 2);

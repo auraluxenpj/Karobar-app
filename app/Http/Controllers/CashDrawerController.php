@@ -49,33 +49,45 @@ class CashDrawerController extends Controller
         ]);
         $session = $this->cashDrawerService->getCurrentSession($request->user());
         $summaryOnly = $request->boolean('summary_only');
+        $accountService = app(\App\Services\AccountService::class);
 
         if (!$session) {
+            $cashAcc = $accountService->syncCashDrawerBalance();
+            $otherOpenExpected = (float) \App\Models\CashDrawerSession::where('status', 'open')->sum('closing_balance_expected');
+            $availableCashInHand = $cashAcc
+                ? max(0.0, round((float) $cashAcc->current_balance - $otherOpenExpected, 2))
+                : null;
+
             if ($summaryOnly) {
                 return response()->json([
-                    'is_open'             => false,
-                    'session'             => null,
-                    'summary'             => null,
-                    'last_closed_session' => null,
-                    'last_closed_summary' => null,
+                    'is_open'              => false,
+                    'session'              => null,
+                    'summary'              => null,
+                    'last_closed_session'  => null,
+                    'last_closed_summary'  => null,
+                    'cash_in_hand_balance' => $availableCashInHand,
                 ]);
             }
 
             $lastClosed = $this->cashDrawerService->getLastClosedSession($request->user());
             return response()->json([
-                'is_open'             => false,
-                'session'             => null,
-                'summary'             => null,
-                'last_closed_session' => $lastClosed,
-                'last_closed_summary' => $lastClosed ? $this->cashDrawerService->getSessionSummary($lastClosed) : null,
+                'is_open'              => false,
+                'session'              => null,
+                'summary'              => null,
+                'last_closed_session'  => $lastClosed,
+                'last_closed_summary'  => $lastClosed ? $this->cashDrawerService->getSessionSummary($lastClosed) : null,
+                'cash_in_hand_balance' => $availableCashInHand,
             ]);
         }
 
+        $cashAcc = $accountService->reconcileWithOpenCashDrawers($request->user());
+
         if ($summaryOnly) {
             return response()->json([
-                'is_open' => true,
-                'session' => null,
-                'summary' => $this->cashDrawerService->getSessionSummary($session),
+                'is_open'              => true,
+                'session'              => null,
+                'summary'              => $this->cashDrawerService->getSessionSummary($session),
+                'cash_in_hand_balance' => $cashAcc ? (float) $cashAcc->current_balance : null,
             ]);
         }
 
@@ -89,9 +101,10 @@ class CashDrawerController extends Controller
         $this->cashDrawerService->enrichTransactions($session->transactions);
 
         return response()->json([
-            'is_open' => true,
-            'session' => $session,
-            'summary' => $this->cashDrawerService->getSessionSummary($session),
+            'is_open'              => true,
+            'session'              => $session,
+            'summary'              => $this->cashDrawerService->getSessionSummary($session),
+            'cash_in_hand_balance' => $cashAcc ? (float) $cashAcc->current_balance : null,
         ]);
     }
 

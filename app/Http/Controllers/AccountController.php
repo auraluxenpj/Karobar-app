@@ -183,6 +183,11 @@ class AccountController extends Controller
         ]);
 
         $opening = max(round((float)($validated['opening_balance'] ?? 0), 2), 0);
+        $isDefault = !empty($validated['is_default']);
+        if ($validated['type'] === 'cash' && Account::where('type', 'cash')->where('is_default', true)->exists()) {
+            // Only the primary Cash in Hand (Drawer) account may hold is_default = true for type='cash'
+            $isDefault = false;
+        }
 
         $account = Account::create([
             'name'            => $validated['name'],
@@ -195,7 +200,7 @@ class AccountController extends Controller
             'opening_balance' => $opening,
             'current_balance' => $opening,
             'is_active'       => true,
-            'is_default'      => !empty($validated['is_default']),
+            'is_default'      => $isDefault,
             'notes'           => $validated['notes'] ?? null,
         ]);
 
@@ -240,16 +245,22 @@ class AccountController extends Controller
             'notes'          => 'nullable|string|max:500',
         ]);
 
+        $isPrimaryCashDrawer = $account->code === 'cash_drawer' || ($account->type === 'cash' && $account->is_default);
+        $targetType = $isPrimaryCashDrawer ? 'cash' : $validated['type'];
+        $targetIsDefault = $isPrimaryCashDrawer
+            ? true
+            : ($targetType === 'cash' ? false : (array_key_exists('is_default', $validated) ? (bool)$validated['is_default'] : $account->is_default));
+
         $account->update([
             'name'           => $validated['name'],
-            'type'           => $validated['type'],
-            'code'           => array_key_exists('code', $validated) ? $validated['code'] : $account->code,
+            'type'           => $targetType,
+            'code'           => $isPrimaryCashDrawer ? 'cash_drawer' : (array_key_exists('code', $validated) ? $validated['code'] : $account->code),
             'icon'           => array_key_exists('icon', $validated) ? $validated['icon'] : $account->icon,
             'color'          => array_key_exists('color', $validated) ? $validated['color'] : $account->color,
             'bank_name'      => $validated['bank_name'] ?? null,
             'account_number' => $validated['account_number'] ?? null,
-            'is_active'      => array_key_exists('is_active', $validated) ? (bool)$validated['is_active'] : $account->is_active,
-            'is_default'     => array_key_exists('is_default', $validated) ? (bool)$validated['is_default'] : $account->is_default,
+            'is_active'      => $isPrimaryCashDrawer ? true : (array_key_exists('is_active', $validated) ? (bool)$validated['is_active'] : $account->is_active),
+            'is_default'     => $targetIsDefault,
             'notes'          => $validated['notes'] ?? null,
         ]);
 
@@ -300,6 +311,9 @@ class AccountController extends Controller
     {
         $this->authorizeAccountAction('account.view');
         $account = Account::findOrFail($id);
+        if ($this->accountService->isDefaultCashDrawerAccount($account)) {
+            $account = $this->accountService->reconcileWithOpenCashDrawers($request->user()) ?? $account->fresh();
+        }
 
         $query = AccountTransaction::with('user:id,name')
             ->where('account_id', $account->id)

@@ -142,6 +142,7 @@ class ReturnSettlementService
 
             $payMethod = $saleReturn->payment_method ?: 'cash';
             $resolvedAccountId = $saleReturn->account_id ? (int) $saleReturn->account_id : null;
+            $account = null;
 
             if ($amount > 0) {
                 $account = $this->accountService->resolveAccount($resolvedAccountId, $payMethod);
@@ -167,7 +168,7 @@ class ReturnSettlementService
                 'credited_amount' => 0,
             ]);
 
-            if ($payMethod === 'cash' && $amount > 0) {
+            if ($amount > 0 && $this->accountService->isDefaultCashDrawerAccount($account, $payMethod)) {
                 $this->cashDrawerService->handleSaleReturnCreation($saleReturn, $user);
             }
         });
@@ -191,6 +192,9 @@ class ReturnSettlementService
             $newPayMethod = $saleReturn->payment_method ?: 'cash';
             $newTotal = round((float) ($saleReturn->total ?? 0), 2);
 
+            $skipDrawerCash = ($updateDrawerIfPreShift === false)
+                && $this->accountService->isPreShiftDocumentForOpenDrawer($saleReturn, 'sale_return', $user);
+
             // 1. Sync Financial Account transaction
             $existingAccTxn = Schema::hasTable('account_transactions')
                 ? AccountTransaction::where('reference_type', 'sale_return')
@@ -198,6 +202,11 @@ class ReturnSettlementService
                     ->latest('id')
                     ->first()
                 : null;
+
+            $oldAccModel = $existingAccTxn
+                ? Account::find($existingAccTxn->account_id)
+                : ($oldMode === 'cash_refund' ? $this->accountService->resolveAccount(!empty($oldSnapshot['account_id']) ? (int) $oldSnapshot['account_id'] : null, $oldPayMethod) : null);
+            $targetAccount = null;
 
             if ($newMode === 'cash_refund' && $newTotal > 0) {
                 $explicitAccountId = ($newPayMethod !== $oldPayMethod && (int) ($saleReturn->account_id ?? 0) === (int) ($oldSnapshot['account_id'] ?? 0))
@@ -207,7 +216,7 @@ class ReturnSettlementService
                     $explicitAccountId,
                     $newPayMethod
                 );
-                $resolvedAccountId = $explicitAccountId;
+                $resolvedAccountId = $targetAccount ? $targetAccount->id : $explicitAccountId;
 
                 $dateStr = $saleReturn->date instanceof \Carbon\Carbon
                     ? $saleReturn->date->toDateString()
@@ -215,31 +224,39 @@ class ReturnSettlementService
 
                 if ($existingAccTxn) {
                     $oldAcc = Account::lockForUpdate()->find($existingAccTxn->account_id);
-                    if ($oldAcc) {
-                        $oldAcc->current_balance = round((float) $oldAcc->current_balance + (float) $existingAccTxn->amount, 2);
-                        $oldAcc->save();
-                    }
+                    $isSameDefaultDrawer = $oldAcc && $targetAccount
+                        && (int) $oldAcc->id === (int) $targetAccount->id
+                        && $this->accountService->isDefaultCashDrawerAccount($targetAccount);
 
-                    if ($targetAccount) {
-                        $lockedTarget = Account::lockForUpdate()->find($targetAccount->id);
-                        if ($lockedTarget) {
-                            $lockedTarget->current_balance = round((float) $lockedTarget->current_balance - $newTotal, 2);
-                            $lockedTarget->save();
-
-                            $existingAccTxn->account_id = $lockedTarget->id;
-                            $existingAccTxn->amount = $newTotal;
-                            $existingAccTxn->balance_after = $lockedTarget->current_balance;
-                            $existingAccTxn->transaction_date = $dateStr;
-                            $existingAccTxn->description = "Customer refund for sale return #{$saleReturn->posted_number}";
-                            $existingAccTxn->save();
-
-                            $resolvedAccountId = $lockedTarget->id;
+                    if (!($skipDrawerCash && $isSameDefaultDrawer)) {
+                        if ($oldAcc && !($skipDrawerCash && $this->accountService->isDefaultCashDrawerAccount($oldAcc))) {
+                            $oldAcc->current_balance = round((float) $oldAcc->current_balance + (float) $existingAccTxn->amount, 2);
+                            $oldAcc->save();
                         }
-                    } else {
-                        $existingAccTxn->delete();
-                        $resolvedAccountId = null;
+
+                        if ($targetAccount) {
+                            $lockedTarget = Account::lockForUpdate()->find($targetAccount->id);
+                            if ($lockedTarget) {
+                                if (!($skipDrawerCash && $this->accountService->isDefaultCashDrawerAccount($lockedTarget))) {
+                                    $lockedTarget->current_balance = round((float) $lockedTarget->current_balance - $newTotal, 2);
+                                    $lockedTarget->save();
+                                }
+
+                                $existingAccTxn->account_id = $lockedTarget->id;
+                                $existingAccTxn->amount = $newTotal;
+                                $existingAccTxn->balance_after = $lockedTarget->current_balance;
+                                $existingAccTxn->transaction_date = $dateStr;
+                                $existingAccTxn->description = "Customer refund for sale return #{$saleReturn->posted_number}";
+                                $existingAccTxn->save();
+
+                                $resolvedAccountId = $lockedTarget->id;
+                            }
+                        } else {
+                            $existingAccTxn->delete();
+                            $resolvedAccountId = null;
+                        }
                     }
-                } elseif ($targetAccount) {
+                } elseif ($targetAccount && !($skipDrawerCash && $this->accountService->isDefaultCashDrawerAccount($targetAccount))) {
                     $resolvedAccountId = $targetAccount->id;
                     $this->accountService->withdraw(
                         $targetAccount,
@@ -263,7 +280,7 @@ class ReturnSettlementService
                 // Switched to credit_note / invoice_offset or 0 total: unwind any previous account withdrawal
                 if ($existingAccTxn) {
                     $oldAcc = Account::lockForUpdate()->find($existingAccTxn->account_id);
-                    if ($oldAcc) {
+                    if ($oldAcc && !($skipDrawerCash && $this->accountService->isDefaultCashDrawerAccount($oldAcc))) {
                         $oldAcc->current_balance = round((float) $oldAcc->current_balance + (float) $existingAccTxn->amount, 2);
                         $oldAcc->save();
                     }
@@ -285,8 +302,10 @@ class ReturnSettlementService
             }
 
             // 2. Sync Cash Drawer based on effective physical cash impact before vs after
-            $oldCash = ($oldMode === 'cash_refund' && $oldPayMethod === 'cash') ? $oldTotal : 0.0;
-            $newCash = ($newMode === 'cash_refund' && $newPayMethod === 'cash') ? $newTotal : 0.0;
+            $oldIsDrawerCash = ($oldMode === 'cash_refund') && $this->accountService->isDefaultCashDrawerAccount($oldAccModel, $oldPayMethod);
+            $newIsDrawerCash = ($newMode === 'cash_refund') && $this->accountService->isDefaultCashDrawerAccount($targetAccount, $newPayMethod);
+            $oldCash = $oldIsDrawerCash ? $oldTotal : 0.0;
+            $newCash = $newIsDrawerCash ? $newTotal : 0.0;
 
             if ($oldCash > 0 || $newCash > 0) {
                 $this->cashDrawerService->syncSaleReturnUpdate(
@@ -380,6 +399,7 @@ class ReturnSettlementService
 
             $payMethod = $purchaseReturn->payment_method ?: 'cash';
             $resolvedAccountId = $purchaseReturn->account_id ? (int) $purchaseReturn->account_id : null;
+            $account = null;
 
             if ($amount > 0) {
                 $account = $this->accountService->resolveAccount($resolvedAccountId, $payMethod);
@@ -405,7 +425,7 @@ class ReturnSettlementService
                 'credited_amount' => 0,
             ]);
 
-            if ($payMethod === 'cash' && $amount > 0) {
+            if ($amount > 0 && $this->accountService->isDefaultCashDrawerAccount($account, $payMethod)) {
                 $this->cashDrawerService->handlePurchaseReturnCreation($purchaseReturn, $user);
             }
         });
@@ -429,6 +449,9 @@ class ReturnSettlementService
             $newPayMethod = $purchaseReturn->payment_method ?: 'cash';
             $newTotal = round((float) ($purchaseReturn->total ?? 0), 2);
 
+            $skipDrawerCash = ($updateDrawerIfPreShift === false)
+                && $this->accountService->isPreShiftDocumentForOpenDrawer($purchaseReturn, 'purchase_return', $user);
+
             // 1. Sync Financial Account transaction
             $existingAccTxn = Schema::hasTable('account_transactions')
                 ? AccountTransaction::where('reference_type', 'purchase_return')
@@ -436,6 +459,11 @@ class ReturnSettlementService
                     ->latest('id')
                     ->first()
                 : null;
+
+            $oldAccModel = $existingAccTxn
+                ? Account::find($existingAccTxn->account_id)
+                : ($oldMode === 'cash_refund' ? $this->accountService->resolveAccount(!empty($oldSnapshot['account_id']) ? (int) $oldSnapshot['account_id'] : null, $oldPayMethod) : null);
+            $targetAccount = null;
 
             if ($newMode === 'cash_refund' && $newTotal > 0) {
                 $explicitAccountId = ($newPayMethod !== $oldPayMethod && (int) ($purchaseReturn->account_id ?? 0) === (int) ($oldSnapshot['account_id'] ?? 0))
@@ -445,7 +473,7 @@ class ReturnSettlementService
                     $explicitAccountId,
                     $newPayMethod
                 );
-                $resolvedAccountId = $explicitAccountId;
+                $resolvedAccountId = $targetAccount ? $targetAccount->id : $explicitAccountId;
 
                 $dateStr = $purchaseReturn->date instanceof \Carbon\Carbon
                     ? $purchaseReturn->date->toDateString()
@@ -453,31 +481,39 @@ class ReturnSettlementService
 
                 if ($existingAccTxn) {
                     $oldAcc = Account::lockForUpdate()->find($existingAccTxn->account_id);
-                    if ($oldAcc) {
-                        $oldAcc->current_balance = round((float) $oldAcc->current_balance - (float) $existingAccTxn->amount, 2);
-                        $oldAcc->save();
-                    }
+                    $isSameDefaultDrawer = $oldAcc && $targetAccount
+                        && (int) $oldAcc->id === (int) $targetAccount->id
+                        && $this->accountService->isDefaultCashDrawerAccount($targetAccount);
 
-                    if ($targetAccount) {
-                        $lockedTarget = Account::lockForUpdate()->find($targetAccount->id);
-                        if ($lockedTarget) {
-                            $lockedTarget->current_balance = round((float) $lockedTarget->current_balance + $newTotal, 2);
-                            $lockedTarget->save();
-
-                            $existingAccTxn->account_id = $lockedTarget->id;
-                            $existingAccTxn->amount = $newTotal;
-                            $existingAccTxn->balance_after = $lockedTarget->current_balance;
-                            $existingAccTxn->transaction_date = $dateStr;
-                            $existingAccTxn->description = "Supplier refund for purchase return #{$purchaseReturn->posted_number}";
-                            $existingAccTxn->save();
-
-                            $resolvedAccountId = $lockedTarget->id;
+                    if (!($skipDrawerCash && $isSameDefaultDrawer)) {
+                        if ($oldAcc && !($skipDrawerCash && $this->accountService->isDefaultCashDrawerAccount($oldAcc))) {
+                            $oldAcc->current_balance = round((float) $oldAcc->current_balance - (float) $existingAccTxn->amount, 2);
+                            $oldAcc->save();
                         }
-                    } else {
-                        $existingAccTxn->delete();
-                        $resolvedAccountId = null;
+
+                        if ($targetAccount) {
+                            $lockedTarget = Account::lockForUpdate()->find($targetAccount->id);
+                            if ($lockedTarget) {
+                                if (!($skipDrawerCash && $this->accountService->isDefaultCashDrawerAccount($lockedTarget))) {
+                                    $lockedTarget->current_balance = round((float) $lockedTarget->current_balance + $newTotal, 2);
+                                    $lockedTarget->save();
+                                }
+
+                                $existingAccTxn->account_id = $lockedTarget->id;
+                                $existingAccTxn->amount = $newTotal;
+                                $existingAccTxn->balance_after = $lockedTarget->current_balance;
+                                $existingAccTxn->transaction_date = $dateStr;
+                                $existingAccTxn->description = "Supplier refund for purchase return #{$purchaseReturn->posted_number}";
+                                $existingAccTxn->save();
+
+                                $resolvedAccountId = $lockedTarget->id;
+                            }
+                        } else {
+                            $existingAccTxn->delete();
+                            $resolvedAccountId = null;
+                        }
                     }
-                } elseif ($targetAccount) {
+                } elseif ($targetAccount && !($skipDrawerCash && $this->accountService->isDefaultCashDrawerAccount($targetAccount))) {
                     $resolvedAccountId = $targetAccount->id;
                     $this->accountService->deposit(
                         $targetAccount,
@@ -501,7 +537,7 @@ class ReturnSettlementService
                 // Switched to credit_note / invoice_offset or 0 total: unwind any previous account deposit
                 if ($existingAccTxn) {
                     $oldAcc = Account::lockForUpdate()->find($existingAccTxn->account_id);
-                    if ($oldAcc) {
+                    if ($oldAcc && !($skipDrawerCash && $this->accountService->isDefaultCashDrawerAccount($oldAcc))) {
                         $oldAcc->current_balance = round((float) $oldAcc->current_balance - (float) $existingAccTxn->amount, 2);
                         $oldAcc->save();
                     }
@@ -523,8 +559,10 @@ class ReturnSettlementService
             }
 
             // 2. Sync Cash Drawer based on effective physical cash impact before vs after
-            $oldCash = ($oldMode === 'cash_refund' && $oldPayMethod === 'cash') ? $oldTotal : 0.0;
-            $newCash = ($newMode === 'cash_refund' && $newPayMethod === 'cash') ? $newTotal : 0.0;
+            $oldIsDrawerCash = ($oldMode === 'cash_refund') && $this->accountService->isDefaultCashDrawerAccount($oldAccModel, $oldPayMethod);
+            $newIsDrawerCash = ($newMode === 'cash_refund') && $this->accountService->isDefaultCashDrawerAccount($targetAccount, $newPayMethod);
+            $oldCash = $oldIsDrawerCash ? $oldTotal : 0.0;
+            $newCash = $newIsDrawerCash ? $newTotal : 0.0;
 
             if ($oldCash > 0 || $newCash > 0) {
                 $this->cashDrawerService->syncPurchaseReturnUpdate(

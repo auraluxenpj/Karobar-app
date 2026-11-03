@@ -674,7 +674,7 @@ class SaleInvoiceController extends Controller
                         );
                     }
 
-                    if (($legAccount && $legAccount->type === 'cash') || $legMethod === 'cash') {
+                    if (app(\App\Services\AccountService::class)->isDefaultCashDrawerAccount($legAccount, $legMethod)) {
                         app(\App\Services\CashDrawerService::class)->recordTransaction(
                             null,
                             'cash_sale',
@@ -712,7 +712,7 @@ class SaleInvoiceController extends Controller
                         );
                     }
 
-                    if (($account && $account->type === 'cash') || $payMethod === 'cash') {
+                    if (app(\App\Services\AccountService::class)->isDefaultCashDrawerAccount($account, $payMethod)) {
                         app(\App\Services\CashDrawerService::class)->recordTransaction(
                             null,
                             'cash_sale',
@@ -1037,13 +1037,22 @@ class SaleInvoiceController extends Controller
             }
 
             // Sync with active cash drawer if applicable (using direct tender only, excluding allocations)
+            $accountService = app(\App\Services\AccountService::class);
             $newPayMethod = $invoice->payment_method ?? 'cash';
+            $newAccountId = array_key_exists('account_id', $data) ? $data['account_id'] : $invoice->account_id;
+            if ($newPayMethod !== $oldPayMethod && (int) ($newAccountId ?? 0) === (int) ($oldAccountId ?? 0) && !array_key_exists('account_id', $data)) {
+                $newAccountId = null;
+            }
+            $oldResolvedAcc = $accountService->resolveAccount($oldAccountId, $oldPayMethod);
+            $newResolvedAcc = $accountService->resolveAccount($newAccountId, $newPayMethod);
+
             $newRawReceived = (float) ($invoice->total_receive ?? 0);
             if ($newInvoiceType === 'debit' && $newRawReceived <= 0) {
                 $newRawReceived = (float) $invoice->total;
             }
             $newDirectReceived = max(0.0, round($newRawReceived - $allocatedOnInvoice, 2));
-            $newCash = ($newPayMethod === 'cash') ? $newDirectReceived : 0.0;
+            $oldCash = $accountService->isDefaultCashDrawerAccount($oldResolvedAcc, $oldPayMethod) ? $oldDirectReceived : 0.0;
+            $newCash = $accountService->isDefaultCashDrawerAccount($newResolvedAcc, $newPayMethod) ? $newDirectReceived : 0.0;
             $updateDrawerFlag = null;
             if (array_key_exists('update_drawer', $data) && $data['update_drawer'] !== null) {
                 $updateDrawerFlag = (bool)$data['update_drawer'];
@@ -1060,8 +1069,7 @@ class SaleInvoiceController extends Controller
             );
 
             // Sync with financial accounts
-            $newAccountId = array_key_exists('account_id', $data) ? $data['account_id'] : $invoice->account_id;
-            app(\App\Services\AccountService::class)->syncSaleInvoiceUpdate(
+            $accountService->syncSaleInvoiceUpdate(
                 $invoice,
                 $oldAccountId,
                 $oldPayMethod,
@@ -1069,7 +1077,8 @@ class SaleInvoiceController extends Controller
                 $newAccountId,
                 $newPayMethod,
                 $newDirectReceived,
-                $request->user()
+                $request->user(),
+                $updateDrawerFlag
             );
 
             $auditService->recordUpdate($invoice->fresh(['items.product', 'customer']), $beforeSnapshot, $request->user(), $data['reason'] ?? 'Sale invoice updated');

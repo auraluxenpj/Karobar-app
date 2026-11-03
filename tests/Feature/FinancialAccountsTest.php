@@ -1445,4 +1445,193 @@ class FinancialAccountsTest extends TestCase
         $this->assertEquals(3000.0, (float) $drawerSession->fresh()->closing_balance_expected);
         $this->assertEquals(3000.0, (float) $cashAcc->fresh()->current_balance);
     }
+
+    public function test_cash_in_hand_and_cash_drawer_remain_strictly_synchronized_across_all_operations(): void
+    {
+        if (file_exists(database_path('migrations/2026_10_23_000010_create_expenses_and_categories_tables.php'))) {
+            try {
+                (require database_path('migrations/2026_10_23_000010_create_expenses_and_categories_tables.php'))->up();
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $manager = User::forceCreate([
+            'name'     => 'Store Manager',
+            'email'    => 'storemgr@example.com',
+            'password' => bcrypt('secret123'),
+        ]);
+        $staff = User::forceCreate([
+            'name'     => 'Counter Staff',
+            'email'    => 'counterstaff@example.com',
+            'password' => bcrypt('secret123'),
+        ]);
+
+        $this->actingAs($manager);
+
+        $cashAcc = Account::where('type', 'cash')->where('is_default', true)->firstOrFail();
+        // Simulate legacy non-zero opening_balance (4841.67) on Cash in Hand (Drawer)
+        $cashAcc->update([
+            'opening_balance' => 4841.67,
+            'current_balance' => 4841.67,
+        ]);
+
+        $customer = Customer::create(['name' => 'Sync Customer']);
+        $supplier = Supplier::create(['name' => 'Sync Supplier']);
+        \Illuminate\Support\Facades\DB::table('categories')->insertOrIgnore(['id' => 1, 'name' => 'General Cat']);
+        \Illuminate\Support\Facades\DB::table('brands')->insertOrIgnore(['id' => 1, 'name' => 'General Brand']);
+
+        $product = Product::create([
+            'category_id'         => 1,
+            'brand_id'            => 1,
+            'name'                => 'Panadol Extra',
+            'product_code'        => 'PAN-EXT',
+            'barcode'             => 'BC-PAN-EXT',
+            'pack_size'           => 10,
+            'quantity'            => 500,
+            'unit_purchase_price' => 10,
+            'unit_sale_price'     => 20,
+        ]);
+
+        // 1. Open Shift #1 with Rs. 7,000 -> Cash in Hand must become 7,000 (not 4841.67 + 7000!)
+        $open1 = $this->postJson('/api/cash-drawer/open', [
+            'opening_balance' => 7000,
+            'notes'           => 'Shift 1 open',
+        ])->assertStatus(201);
+        $session1Id = $open1->json('session.id');
+
+        $this->assertEquals(7000.0, (float) $cashAcc->fresh()->current_balance);
+        $this->assertEquals(0.0, (float) $cashAcc->fresh()->opening_balance);
+        $this->assertEquals(7000.0, (float) \App\Models\CashDrawerSession::findOrFail($session1Id)->closing_balance_expected);
+
+        // 2. Staff user (who did NOT open their own drawer) records a Rs. 600 cash sale and a Rs. 250 cash expense
+        $this->actingAs($staff);
+        $saleRes = $this->postJson('/api/sale-invoices', [
+            'customer_id'    => $customer->id,
+            'sale_type'      => 'retail',
+            'invoice_type'   => 'debit',
+            'date'           => now()->toDateString(),
+            'payment_method' => 'cash',
+            'gross_amount'   => 600,
+            'total'          => 600,
+            'total_receive'  => 600,
+            'items'          => [
+                [
+                    'product_id' => $product->id,
+                    'quantity'   => 30,
+                    'price'      => 20,
+                    'sub_total'  => 600,
+                ],
+            ],
+        ])->assertStatus(201);
+        $saleId = $saleRes->json('id');
+        $salePosted = $saleRes->json('posted_number');
+
+        $expCat = \App\Models\ExpenseCategory::firstOrCreate(['name' => 'Utilities']);
+        $expense = app(\App\Services\ExpenseService::class)->createExpense([
+            'expense_category_id' => $expCat->id,
+            'amount'              => 250,
+            'date'                => now()->toDateString(),
+            'payment_method'      => 'cash',
+            'description'         => 'Electricity bill token',
+        ], $staff);
+
+        // Both Cash Drawer and Cash in Hand must be 7000 + 600 - 250 = 7350
+        $this->assertEquals(7350.0, (float) \App\Models\CashDrawerSession::findOrFail($session1Id)->closing_balance_expected);
+        $this->assertEquals(7350.0, (float) $cashAcc->fresh()->current_balance);
+
+        // 3. Manager closes Shift #1 with Rs. 5,000 actual count -> both become 5,000
+        $this->actingAs($manager);
+        $this->postJson('/api/cash-drawer/close', [
+            'closing_balance_actual' => 5000,
+            'notes'                  => 'End of Shift 1',
+        ])->assertOk();
+        $this->assertEquals(5000.0, (float) $cashAcc->fresh()->current_balance);
+
+        // 4. While drawer is CLOSED, transfer Rs. 1,000 from Bank into Cash in Hand -> Cash in Hand is now 6,000
+        $bankAcc = Account::firstOrCreate(
+            ['type' => 'bank', 'name' => 'HBL Business'],
+            ['opening_balance' => 10000, 'current_balance' => 10000, 'is_active' => true, 'is_default' => false]
+        );
+        app(\App\Services\AccountService::class)->transfer($bankAcc, $cashAcc->fresh(), 1000, 'Off-shift float top-up', $manager);
+        $this->assertEquals(6000.0, (float) $cashAcc->fresh()->current_balance);
+
+        // GET /api/cash-drawer/current when closed reports cash_in_hand_balance = 6,000
+        $closedCurrent = $this->getJson('/api/cash-drawer/current')->assertOk();
+        $this->assertEquals(6000.0, (float) $closedCurrent->json('cash_in_hand_balance'));
+
+        // Backdate the Shift #1 sale invoice & expense so they are pre-shift relative to Shift #2
+        SaleInvoice::where('id', $saleId)->update(['created_at' => now()->subHours(2)]);
+        \App\Models\Expense::where('id', $expense->id)->update(['created_at' => now()->subHours(2)]);
+
+        // 5. Open Shift #2 with Rs. 4,000 (e.g. manager kept 2,000 out of the 6,000) -> both Drawer and Cash in Hand become 4,000!
+        $open2 = $this->postJson('/api/cash-drawer/open', [
+            'opening_balance' => 4000,
+            'notes'           => 'Shift 2 open',
+        ])->assertStatus(201);
+        $session2Id = $open2->json('session.id');
+
+        $this->assertEquals(4000.0, (float) \App\Models\CashDrawerSession::findOrFail($session2Id)->closing_balance_expected);
+        $this->assertEquals(4000.0, (float) $cashAcc->fresh()->current_balance);
+
+        // 6. Edit pre-shift sale invoice from 600 to 800 WITH update_drawer = false ("Save Without Updating Drawer")
+        // -> Neither Drawer nor Cash in Hand should change (both stay 4,000)
+        $this->putJson("/api/sale-invoices/{$saleId}", [
+            'customer_id'    => $customer->id,
+            'sale_type'      => 'retail',
+            'invoice_type'   => 'debit',
+            'posted_number'  => $salePosted,
+            'date'           => now()->toDateString(),
+            'payment_method' => 'cash',
+            'gross_amount'   => 800,
+            'total'          => 800,
+            'total_receive'  => 800,
+            'update_drawer'  => false,
+            'items'          => [
+                [
+                    'product_id' => $product->id,
+                    'quantity'   => 40,
+                    'price'      => 20,
+                    'sub_total'  => 800,
+                ],
+            ],
+        ])->assertOk();
+
+        $this->assertEquals(4000.0, (float) \App\Models\CashDrawerSession::findOrFail($session2Id)->closing_balance_expected);
+        $this->assertEquals(4000.0, (float) $cashAcc->fresh()->current_balance);
+
+        // 7. Edit pre-shift sale invoice from 800 to 1,000 without update_drawer flag (default)
+        // -> Both Drawer and Cash in Hand increase by +200 to 4,200
+        $this->putJson("/api/sale-invoices/{$saleId}", [
+            'customer_id'    => $customer->id,
+            'sale_type'      => 'retail',
+            'invoice_type'   => 'debit',
+            'posted_number'  => $salePosted,
+            'date'           => now()->toDateString(),
+            'payment_method' => 'cash',
+            'gross_amount'   => 1000,
+            'total'          => 1000,
+            'total_receive'  => 1000,
+            'items'          => [
+                [
+                    'product_id' => $product->id,
+                    'quantity'   => 50,
+                    'price'      => 20,
+                    'sub_total'  => 1000,
+                ],
+            ],
+        ])->assertOk();
+
+        $this->assertEquals(4200.0, (float) \App\Models\CashDrawerSession::findOrFail($session2Id)->closing_balance_expected);
+        $this->assertEquals(4200.0, (float) $cashAcc->fresh()->current_balance);
+
+        // 8. Edit pre-shift expense from 250 to 350 (+100 extra cash paid out)
+        // -> Both Drawer and Cash in Hand decrease by 100 (from 4,200 to 4,100)
+        app(\App\Services\ExpenseService::class)->updateExpense($expense->fresh(), [
+            'amount'         => 350,
+            'payment_method' => 'cash',
+        ], $manager);
+
+        $this->assertEquals(4100.0, (float) \App\Models\CashDrawerSession::findOrFail($session2Id)->closing_balance_expected);
+        $this->assertEquals(4100.0, (float) $cashAcc->fresh()->current_balance);
+    }
 }

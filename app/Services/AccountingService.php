@@ -197,6 +197,18 @@ class AccountingService
                             $user
                         );
                     }
+
+                    if ($this->accountService->isDefaultCashDrawerAccount($treasuryAcc)) {
+                        app(CashDrawerService::class)->recordTransaction(
+                            null,
+                            $netCashDelta > 0 ? 'cash_in' : 'cash_out',
+                            abs($netCashDelta),
+                            'journal_entry',
+                            $entry->id,
+                            "JV {$entry->entry_number}: {$entry->description}",
+                            $user
+                        );
+                    }
                 }
             }
 
@@ -254,6 +266,18 @@ class AccountingService
                                 $user
                             );
                         }
+
+                        if ($this->accountService->isDefaultCashDrawerAccount($treasuryAcc)) {
+                            app(CashDrawerService::class)->recordTransaction(
+                                null,
+                                $netCashDelta > 0 ? 'cash_out' : 'cash_in',
+                                abs($netCashDelta),
+                                'journal_entry_reversal',
+                                $entry->id,
+                                "Reversal of JV {$entry->entry_number}: {$reason}",
+                                $user
+                            );
+                        }
                     }
                 }
             }
@@ -278,7 +302,7 @@ class AccountingService
         $to = Carbon::parse($toDate)->toDateString();
 
         // 1. Treasury Cash & Bank Balances
-        $this->accountService->syncCashDrawerBalance();
+        $this->accountService->reconcileWithOpenCashDrawers();
         $treasuryAccounts = Schema::hasTable('accounts')
             ? Account::where('is_active', true)->orderBy('type')->orderBy('name')->get()
             : collect();
@@ -862,7 +886,7 @@ class AccountingService
         $netFinancingCashFlow = round($capitalInjected - $ownerDrawings, 2);
         $netCashChange = round($netOperatingCashFlow + $netInvestingCashFlow + $netFinancingCashFlow, 2);
 
-        $this->accountService->syncCashDrawerBalance();
+        $this->accountService->reconcileWithOpenCashDrawers();
         $closingCashAndBank = Schema::hasTable('accounts')
             ? round((float) Account::where('is_active', true)->sum('current_balance'), 2)
             : 0.0;

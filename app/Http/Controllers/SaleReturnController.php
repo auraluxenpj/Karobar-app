@@ -363,10 +363,17 @@ class SaleReturnController extends Controller
                 $saleReturn->account_id = $data['account_id'];
             }
 
+            $updateDrawerFlag = null;
+            if ($request->has('update_drawer') && $request->input('update_drawer') !== null) {
+                $updateDrawerFlag = $request->boolean('update_drawer');
+            } elseif ($request->has('update_drawer_if_pre_shift') && $request->input('update_drawer_if_pre_shift') !== null) {
+                $updateDrawerFlag = $request->boolean('update_drawer_if_pre_shift');
+            }
+
             $settlementService->syncSaleReturnSettlementUpdate(
                 $saleReturn,
                 $oldSnapshot,
-                $request->has('update_drawer_if_pre_shift') ? $request->boolean('update_drawer_if_pre_shift') : null,
+                $updateDrawerFlag,
                 Auth::user()
             );
 

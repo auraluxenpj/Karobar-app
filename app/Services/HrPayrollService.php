@@ -392,8 +392,8 @@ class HrPayrollService
                 }
             }
 
-            if ($paymentMethod === 'cash') {
-                $drawerSession = $this->cashDrawerService->getCurrentSession($user);
+            if ($this->accountService->isDefaultCashDrawerAccount($account, $paymentMethod)) {
+                $drawerSession = $this->cashDrawerService->getCurrentSession($user, false);
                 if ($drawerSession) {
                     $this->cashDrawerService->recordTransaction(
                         $drawerSession,

@@ -2230,7 +2230,7 @@ export default function CashDrawerPage() {
           btnPrimary={btnPrimary}
           btnSecondary={btnSecondary}
           formatCurrency={formatCurrency}
-          suggestedFloat={lastClosedSession?.closing_balance_actual ?? null}
+          suggestedFloat={currentData?.cash_in_hand_balance ?? lastClosedSession?.closing_balance_actual ?? null}
           onClose={() => setShowOpenModal(false)}
           onSuccess={handleActionSuccess}
         />

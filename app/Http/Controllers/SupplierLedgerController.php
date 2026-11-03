@@ -477,7 +477,7 @@ class SupplierLedgerController extends Controller
                 );
             }
 
-            if (($account && $account->type === 'cash') || $payMethod === 'cash') {
+            if (app(\App\Services\AccountService::class)->isDefaultCashDrawerAccount($account, $payMethod)) {
                 app(\App\Services\CashDrawerService::class)->recordTransaction(
                     null,
                     'supplier_payment',

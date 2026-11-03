@@ -106,7 +106,11 @@ class CashDrawerService
             $opening = max(round($openingBalance, 2), 0);
 
             $otherOpenExpected = (float) CashDrawerSession::where('status', 'open')
-                ->sum('closing_balance_expected');
+                ->lockForUpdate()
+                ->get()
+                ->sum(function (CashDrawerSession $openSess) {
+                    return $this->recalculateExpectedBalance($openSess);
+                });
 
             $session = CashDrawerSession::create([
                 'user_id'                  => $user->id,
@@ -123,20 +127,25 @@ class CashDrawerService
                 $accountService = app(AccountService::class);
                 $cashAccount = $accountService->syncCashDrawerBalance($session);
                 if ($cashAccount) {
-                    $safeOpeningReserve = max((float) ($cashAccount->opening_balance ?? 0), 0.0);
-                    $availableCarryover = max(
-                        0.0,
-                        round((float) $cashAccount->current_balance - $safeOpeningReserve - $otherOpenExpected, 2)
-                    );
-                    $floatToDeposit = max(0.0, round($opening - $availableCarryover, 2));
+                    $targetBalance = round($otherOpenExpected + $opening, 2);
+                    $delta = round($targetBalance - (float) $cashAccount->current_balance, 2);
 
-                    if ($floatToDeposit > 0.001) {
+                    if ($delta > 0.001) {
                         $accountService->deposit(
                             $cashAccount,
-                            $floatToDeposit,
+                            $delta,
                             'cash_drawer_open',
                             $session->id,
                             "Cash drawer opening float (Session #{$session->id})",
+                            $user
+                        );
+                    } elseif ($delta < -0.001) {
+                        $accountService->withdraw(
+                            $cashAccount,
+                            abs($delta),
+                            'cash_drawer_open',
+                            $session->id,
+                            "Cash drawer opening balance reconciliation (Session #{$session->id})",
                             $user
                         );
                     }
@@ -164,7 +173,7 @@ class CashDrawerService
         }
 
         if (!$session) {
-            $session = $this->getCurrentSession($user);
+            $session = $this->getCurrentSession($user, false);
         }
 
         if (!$session || $session->status !== 'open') {
@@ -272,6 +281,14 @@ class CashDrawerService
             $actual = round($actualCount, 2);
             $difference = round($actual - $expected, 2);
 
+            $otherOpenExpected = (float) CashDrawerSession::where('status', 'open')
+                ->where('id', '!=', $lockedSession->id)
+                ->lockForUpdate()
+                ->get()
+                ->sum(function (CashDrawerSession $openSess) {
+                    return $this->recalculateExpectedBalance($openSess);
+                });
+
             $combinedNotes = trim(($lockedSession->notes ? $lockedSession->notes . "\n" : '') . ($notes ?? ''));
 
             $lockedSession->update([
@@ -283,27 +300,29 @@ class CashDrawerService
                 'notes'                    => $combinedNotes ?: null,
             ]);
 
-            if (abs($difference) > 0.001 && Schema::hasTable('accounts')) {
+            if (Schema::hasTable('accounts')) {
                 $accountService = app(AccountService::class);
                 $cashAccount = $accountService->syncCashDrawerBalance($lockedSession);
                 if ($cashAccount) {
+                    $targetBalance = round($otherOpenExpected + $actual, 2);
+                    $accountDelta = round($targetBalance - (float) $cashAccount->current_balance, 2);
                     $actor = auth()->user() ?? $lockedSession->user;
-                    if ($difference > 0) {
+                    if ($accountDelta > 0.001) {
                         $accountService->deposit(
                             $cashAccount,
-                            $difference,
+                            $accountDelta,
                             'cash_drawer_variance',
                             $lockedSession->id,
-                            "Cash drawer close overage (Session #{$lockedSession->id})",
+                            "Cash drawer close overage / reconciliation (Session #{$lockedSession->id})",
                             $actor
                         );
-                    } else {
+                    } elseif ($accountDelta < -0.001) {
                         $accountService->withdraw(
                             $cashAccount,
-                            abs($difference),
+                            abs($accountDelta),
                             'cash_drawer_variance',
                             $lockedSession->id,
-                            "Cash drawer close shortage (Session #{$lockedSession->id})",
+                            "Cash drawer close shortage / reconciliation (Session #{$lockedSession->id})",
                             $actor
                         );
                     }
@@ -536,7 +555,7 @@ class CashDrawerService
             return null;
         }
 
-        $session = $this->getCurrentSession($user);
+        $session = $this->getCurrentSession($user, false);
         if (!$session || $session->status !== 'open') {
             return null;
         }
@@ -559,8 +578,8 @@ class CashDrawerService
                 && !$existingTxn;
 
             if ($isPreShift) {
-                // Pre-shift invoice: only adjust if user confirmed drawer update
-                if ($updateDrawerIfPreShift !== true) {
+                // Pre-shift invoice: skip only if user explicitly declined drawer update
+                if ($updateDrawerIfPreShift === false) {
                     return null;
                 }
 
@@ -639,7 +658,7 @@ class CashDrawerService
 
         // Check if AccountTransactions exist for this invoice (e.g., split payments across cash & non-cash accounts)
         if (Schema::hasTable('account_transactions') && Schema::hasTable('accounts')) {
-            $acctTxns = \App\Models\AccountTransaction::with('account:id,type')
+            $acctTxns = \App\Models\AccountTransaction::with('account:id,type,is_default')
                 ->whereIn('reference_type', ['sale_invoice', 'sale_invoice_update'])
                 ->where('reference_id', $invoice->id)
                 ->get();
@@ -647,7 +666,7 @@ class CashDrawerService
             if ($acctTxns->isNotEmpty()) {
                 $cashNet = 0.0;
                 foreach ($acctTxns as $t) {
-                    if (($t->account?->type ?? '') === 'cash') {
+                    if (($t->account?->type ?? '') === 'cash' && (bool) ($t->account?->is_default ?? false)) {
                         $delta = in_array($t->type, ['deposit', 'transfer_in', 'opening_balance'], true)
                             ? (float) $t->amount
                             : -(float) $t->amount;
@@ -674,7 +693,7 @@ class CashDrawerService
             return null;
         }
 
-        $session = $this->getCurrentSession($user);
+        $session = $this->getCurrentSession($user, false);
         if (!$session || $session->status !== 'open' || $mode === 'credit') {
             return null;
         }
@@ -732,7 +751,7 @@ class CashDrawerService
             return null;
         }
 
-        $session = $this->getCurrentSession($user);
+        $session = $this->getCurrentSession($user, false);
         if (!$session || $session->status !== 'open') {
             return null;
         }
@@ -775,7 +794,7 @@ class CashDrawerService
             return null;
         }
 
-        $session = $this->getCurrentSession($user);
+        $session = $this->getCurrentSession($user, false);
         if (!$session || $session->status !== 'open') {
             return null;
         }
@@ -796,7 +815,7 @@ class CashDrawerService
                 && !$existingTxn;
 
             if ($isPreShift) {
-                if ($updateDrawerIfPreShift !== true) {
+                if ($updateDrawerIfPreShift === false) {
                     return null;
                 }
 
@@ -859,6 +878,46 @@ class CashDrawerService
     }
 
     /**
+     * Resolve the actual direct cash portion paid on a purchase invoice from Cash in Hand (Drawer).
+     */
+    protected function resolveDirectCashForPurchaseInvoice(\App\Models\PurchaseInvoice $invoice): float
+    {
+        $invTotal = (float) ($invoice->total_amount ?? 0);
+        $rawPaid = (float) ($invoice->total_paid ?? 0);
+        if (($invoice->invoice_type ?? 'debit') === 'debit' && $rawPaid <= 0) {
+            $rawPaid = $invTotal;
+        }
+        $rawPaid = round($rawPaid, 2);
+
+        if ($rawPaid <= 0) {
+            return 0.0;
+        }
+
+        if (Schema::hasTable('account_transactions') && Schema::hasTable('accounts')) {
+            $acctTxns = \App\Models\AccountTransaction::with('account:id,type,is_default')
+                ->whereIn('reference_type', ['purchase_invoice', 'purchase_invoice_update'])
+                ->where('reference_id', $invoice->id)
+                ->get();
+
+            if ($acctTxns->isNotEmpty()) {
+                $cashNet = 0.0;
+                foreach ($acctTxns as $t) {
+                    if (($t->account?->type ?? '') === 'cash' && (bool) ($t->account?->is_default ?? false)) {
+                        $delta = in_array($t->type, ['withdrawal', 'transfer_out'], true)
+                            ? (float) $t->amount
+                            : -(float) $t->amount;
+                        $cashNet = round($cashNet + $delta, 2);
+                    }
+                }
+                return max(0.0, min($cashNet, $rawPaid));
+            }
+        }
+
+        $payMethod = $invoice->payment_method ?? 'cash';
+        return $payMethod === 'cash' ? $rawPaid : 0.0;
+    }
+
+    /**
      * Handle cash drawer effect when a purchase invoice is deleted.
      */
     public function handlePurchaseInvoiceDeletion(
@@ -869,23 +928,12 @@ class CashDrawerService
             return null;
         }
 
-        $session = $this->getCurrentSession($user);
+        $session = $this->getCurrentSession($user, false);
         if (!$session || $session->status !== 'open') {
             return null;
         }
 
-        $payMethod = $invoice->payment_method ?? 'cash';
-        if ($payMethod !== 'cash') {
-            return null;
-        }
-
-        $invTotal = (float)($invoice->total_amount ?? 0);
-        $cashPaid = (float)($invoice->total_paid ?? 0);
-        if (($invoice->invoice_type ?? 'debit') === 'debit' && $cashPaid <= 0) {
-            $cashPaid = $invTotal;
-        }
-        $cashPaid = round($cashPaid, 2);
-
+        $cashPaid = $this->resolveDirectCashForPurchaseInvoice($invoice);
         if ($cashPaid <= 0) {
             return null;
         }
@@ -933,23 +981,12 @@ class CashDrawerService
             return null;
         }
 
-        $session = $this->getCurrentSession($user);
+        $session = $this->getCurrentSession($user, false);
         if (!$session || $session->status !== 'open') {
             return null;
         }
 
-        $payMethod = $invoice->payment_method ?? 'cash';
-        if ($payMethod !== 'cash') {
-            return null;
-        }
-
-        $invTotal = (float)($invoice->total_amount ?? 0);
-        $cashPaid = (float)($invoice->total_paid ?? 0);
-        if (($invoice->invoice_type ?? 'debit') === 'debit' && $cashPaid <= 0) {
-            $cashPaid = $invTotal;
-        }
-        $cashPaid = round($cashPaid, 2);
-
+        $cashPaid = $this->resolveDirectCashForPurchaseInvoice($invoice);
         if ($cashPaid <= 0) {
             return null;
         }
@@ -985,7 +1022,7 @@ class CashDrawerService
             return null;
         }
 
-        $session = $this->getCurrentSession($user);
+        $session = $this->getCurrentSession($user, false);
         if (!$session) {
             return null;
         }
@@ -1011,7 +1048,7 @@ class CashDrawerService
         ?bool $updateDrawerIfPreShift = null,
         ?User $user = null
     ): ?CashDrawerTransaction {
-        $session = $this->getCurrentSession($user);
+        $session = $this->getCurrentSession($user, false);
         if (!$session) {
             return null;
         }
@@ -1100,7 +1137,7 @@ class CashDrawerService
             return null;
         }
 
-        $session = $this->getCurrentSession($user);
+        $session = $this->getCurrentSession($user, false);
         if (!$session) {
             return null;
         }
@@ -1144,7 +1181,7 @@ class CashDrawerService
             return null;
         }
 
-        $session = $this->getCurrentSession($user);
+        $session = $this->getCurrentSession($user, false);
         if (!$session) {
             return null;
         }
@@ -1170,7 +1207,7 @@ class CashDrawerService
         ?bool $updateDrawerIfPreShift = null,
         ?User $user = null
     ): ?CashDrawerTransaction {
-        $session = $this->getCurrentSession($user);
+        $session = $this->getCurrentSession($user, false);
         if (!$session) {
             return null;
         }
@@ -1259,7 +1296,7 @@ class CashDrawerService
             return null;
         }
 
-        $session = $this->getCurrentSession($user);
+        $session = $this->getCurrentSession($user, false);
         if (!$session) {
             return null;
         }
@@ -1326,7 +1363,7 @@ class CashDrawerService
 
             // 2. Otherwise, if the current user (or store) has an active open session,
             // record a compensating cash_out (for customer payment reversal) or cash_in (for supplier payment reversal)
-            $session = $this->getCurrentSession($user);
+            $session = $this->getCurrentSession($user, false);
             if (!$session) {
                 return null;
             }

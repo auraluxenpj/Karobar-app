@@ -222,8 +222,8 @@ class PaymentService
                 }
             }
 
-            // Record cash drawer transaction if payment method is cash
-            if ((($account && $account->type === 'cash') || $payment->payment_method === 'cash') && !$isCheque) {
+            // Record cash drawer transaction if payment hits the default Cash in Hand (Drawer) account
+            if (app(AccountService::class)->isDefaultCashDrawerAccount($account, $payment->payment_method) && !$isCheque) {
                 app(CashDrawerService::class)->recordTransaction(
                     null,
                     'customer_payment',
@@ -410,8 +410,8 @@ class PaymentService
                 }
             }
 
-            // Record cash drawer transaction if payment method is cash
-            if ((($account && $account->type === 'cash') || $payment->payment_method === 'cash') && !$isCheque) {
+            // Record cash drawer transaction if payment hits the default Cash in Hand (Drawer) account
+            if (app(AccountService::class)->isDefaultCashDrawerAccount($account, $payment->payment_method) && !$isCheque) {
                 app(CashDrawerService::class)->recordTransaction(
                     null,
                     'supplier_payment',
@@ -517,8 +517,8 @@ class PaymentService
                     }
                 }
 
-                // Reverse cash drawer transaction if payment method is cash
-                if (($account && $account->type === 'cash') || $payment->payment_method === 'cash') {
+                // Reverse cash drawer transaction if payment hit the default Cash in Hand (Drawer) account
+                if (app(AccountService::class)->isDefaultCashDrawerAccount($account, $payment->payment_method)) {
                     app(CashDrawerService::class)->handlePaymentReversal(
                         $payment,
                         $reason,

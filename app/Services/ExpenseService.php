@@ -52,9 +52,9 @@ class ExpenseService
             }
 
             $drawerSession = null;
-            if ($paymentMethod === 'cash') {
-                // If cashier has an active open session, link to it
-                $drawerSession = $this->cashDrawerService->getCurrentSession($user);
+            if ($this->accountService->isDefaultCashDrawerAccount($account, $paymentMethod)) {
+                // If cashier or store has an active open session, link to it
+                $drawerSession = $this->cashDrawerService->getCurrentSession($user, false);
             }
 
             $isRecurring = !empty($data['is_recurring']) && filter_var($data['is_recurring'], FILTER_VALIDATE_BOOLEAN);
@@ -87,7 +87,7 @@ class ExpenseService
                     $user
                 );
             }
-            if ($paymentMethod === 'cash' && $drawerSession) {
+            if ($drawerSession && $this->accountService->isDefaultCashDrawerAccount($account, $paymentMethod)) {
                 $this->cashDrawerService->recordTransaction(
                     $drawerSession,
                     'cash_out',
@@ -127,9 +127,7 @@ class ExpenseService
                 : $expense->category;
 
             $newAccount = null;
-            if ($newMethod === 'cash') {
-                $newAccount = $this->accountService->getDefaultAccount('cash');
-            } elseif ($newAccountId) {
+            if ($newAccountId && ($newMethod === $oldMethod || array_key_exists('account_id', $data))) {
                 $newAccount = Account::find($newAccountId);
             }
             if (!$newAccount) {
@@ -148,30 +146,24 @@ class ExpenseService
                     $user
                 );
             }
-            // 2. Resolve new drawer session if cash
-            $newSession = null;
-            if ($newMethod === 'cash') {
-                $newSession = $this->cashDrawerService->getCurrentSession($user);
-            }
 
-            $existingDrawerTx = null;
-            if ($oldMethod === 'cash' && $oldSessionId) {
-                $oldTx = CashDrawerTransaction::where('session_id', $oldSessionId)
-                    ->where('reference_type', Expense::class)
-                    ->where('reference_id', $expense->id)
-                    ->first();
-                if ($oldTx) {
-                    $session = CashDrawerSession::find($oldSessionId);
-                    if ($newMethod === 'cash' && $newSession && (int) $oldSessionId === (int) $newSession->id && $session && $session->status === 'open') {
-                        // Preserve original chronological position in the drawer log
-                        $existingDrawerTx = $oldTx;
-                    } else {
-                        $oldTx->delete();
-                        if ($session && $session->status === 'open') {
-                            $this->cashDrawerService->recalculateExpectedBalance($session);
-                            $this->accountService->syncCashDrawerBalance($session);
-                        }
-                    }
+            $oldIsDrawerCash = $this->accountService->isDefaultCashDrawerAccount($oldAcc, $oldMethod);
+            $newIsDrawerCash = $this->accountService->isDefaultCashDrawerAccount($newAccount, $newMethod);
+
+            // 2. Resolve active drawer session
+            $activeSession = $this->cashDrawerService->getCurrentSession($user, false);
+            $newSession = $newIsDrawerCash ? $activeSession : null;
+
+            $oldOpenSession = null;
+            $oldOpenTx = null;
+            if ($oldIsDrawerCash && $oldSessionId) {
+                $candidateSession = CashDrawerSession::find($oldSessionId);
+                if ($candidateSession && $candidateSession->status === 'open') {
+                    $oldOpenSession = $candidateSession;
+                    $oldOpenTx = CashDrawerTransaction::where('session_id', $oldSessionId)
+                        ->where('reference_type', Expense::class)
+                        ->where('reference_id', $expense->id)
+                        ->first();
                 }
             }
 
@@ -186,7 +178,7 @@ class ExpenseService
             $expense->update([
                 'expense_category_id'    => $category->id,
                 'account_id'             => $newAccount?->id,
-                'cash_drawer_session_id' => $newSession?->id,
+                'cash_drawer_session_id' => $newIsDrawerCash ? ($oldOpenSession?->id ?? $newSession?->id ?? $oldSessionId) : null,
                 'amount'                 => $newAmount,
                 'date'                   => $data['date'] ?? $expense->date,
                 'payment_method'         => $newMethod,
@@ -209,26 +201,47 @@ class ExpenseService
                     $user
                 );
             }
-            if ($newMethod === 'cash' && $newSession) {
-                $drawerNote = "Expense: {$category->name}" . ($expense->payee ? " ({$expense->payee})" : "");
-                if ($existingDrawerTx) {
-                    $existingDrawerTx->update([
+
+            $drawerNote = "Expense: {$category->name}" . ($expense->payee ? " ({$expense->payee})" : "");
+            if ($oldOpenSession && $oldOpenTx) {
+                // Expense was recorded in an open session
+                if ($newIsDrawerCash) {
+                    $oldOpenTx->update([
                         'amount' => $newAmount,
                         'notes'  => $drawerNote,
                     ]);
-                    $this->cashDrawerService->recalculateExpectedBalance($newSession);
+                    $this->cashDrawerService->recalculateExpectedBalance($oldOpenSession);
                 } else {
+                    $oldOpenTx->delete();
+                    $this->cashDrawerService->recalculateExpectedBalance($oldOpenSession);
+                }
+            } elseif ($activeSession) {
+                // Expense was from a closed session or off-shift; apply only the net drawer cash delta to the active open session
+                $oldDrawerCash = $oldIsDrawerCash ? $oldAmount : 0.0;
+                $newDrawerCash = $newIsDrawerCash ? $newAmount : 0.0;
+                $cashDelta = round($newDrawerCash - $oldDrawerCash, 2);
+
+                if ($cashDelta > 0.001) {
                     $this->cashDrawerService->recordTransaction(
-                        $newSession,
+                        $activeSession,
                         'cash_out',
-                        $newAmount,
+                        $cashDelta,
                         Expense::class,
                         $expense->id,
-                        $drawerNote,
+                        "{$drawerNote} (adjustment +{$cashDelta})",
+                        $user
+                    );
+                } elseif ($cashDelta < -0.001) {
+                    $this->cashDrawerService->recordTransaction(
+                        $activeSession,
+                        'cash_in',
+                        abs($cashDelta),
+                        Expense::class,
+                        $expense->id,
+                        "{$drawerNote} (reduction reimbursement " . abs($cashDelta) . ")",
                         $user
                     );
                 }
-                $this->accountService->syncCashDrawerBalance($newSession);
             }
 
             return $expense->load(['category', 'account', 'user', 'drawerSession']);
@@ -255,32 +268,35 @@ class ExpenseService
             }
 
             // Restore drawer balance if applicable
-            if ($expense->payment_method === 'cash' && $expense->cash_drawer_session_id) {
-                $tx = CashDrawerTransaction::where('session_id', $expense->cash_drawer_session_id)
-                    ->where('reference_type', Expense::class)
-                    ->where('reference_id', $expense->id)
-                    ->first();
-                if ($tx) {
+            if ($this->accountService->isDefaultCashDrawerAccount($acc, $expense->payment_method)) {
+                $handledInOpenOriginalSession = false;
+                if ($expense->cash_drawer_session_id) {
                     $session = CashDrawerSession::find($expense->cash_drawer_session_id);
-                    $tx->delete();
                     if ($session && $session->status === 'open') {
-                        $this->cashDrawerService->recalculateExpectedBalance($session);
-                        $this->accountService->syncCashDrawerBalance($session);
-                    } else {
-                        // Prior shift was already closed; record cash in reimbursement to active drawer if open
-                        $activeSession = $this->cashDrawerService->getCurrentSession($user);
-                        if ($activeSession) {
-                            $this->cashDrawerService->recordTransaction(
-                                $activeSession,
-                                'cash_in',
-                                (float) $expense->amount,
-                                Expense::class,
-                                $expense->id,
-                                "Expense Reversal: {$expense->expense_number} reimbursement",
-                                $user
-                            );
-                            $this->accountService->syncCashDrawerBalance($activeSession);
+                        $tx = CashDrawerTransaction::where('session_id', $session->id)
+                            ->where('reference_type', Expense::class)
+                            ->where('reference_id', $expense->id)
+                            ->first();
+                        if ($tx) {
+                            $tx->delete();
+                            $this->cashDrawerService->recalculateExpectedBalance($session);
+                            $handledInOpenOriginalSession = true;
                         }
+                    }
+                }
+
+                if (!$handledInOpenOriginalSession) {
+                    $activeSession = $this->cashDrawerService->getCurrentSession($user, false);
+                    if ($activeSession) {
+                        $this->cashDrawerService->recordTransaction(
+                            $activeSession,
+                            'cash_in',
+                            (float) $expense->amount,
+                            Expense::class,
+                            $expense->id,
+                            "Expense Reversal: {$expense->expense_number} reimbursement",
+                            $user
+                        );
                     }
                 }
             }

@@ -130,6 +130,12 @@ export default function CashDrawerModal({ isOpen, onClose, onSessionUpdated }) {
       setSessionData(res.data);
       if (res.data?.is_open && res.data?.summary) {
         setActualClosingBalance(String(res.data.summary.expected_balance || 0));
+      } else if (!res.data?.is_open) {
+        const suggested =
+          res.data?.cash_in_hand_balance ??
+          res.data?.last_closed_session?.closing_balance_actual ??
+          0;
+        setOpeningBalance(String(Math.max(0, Number(suggested) || 0)));
       }
     } catch (err) {
       setErrorMsg(err.response?.data?.message || "Failed to load cash drawer status.");
