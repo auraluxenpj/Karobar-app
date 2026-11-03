@@ -26,6 +26,7 @@
   <table class="header-table">
     <tr>
       <td style="width: 58%;">
+        @include('pdf.partials.store_logo')
         <div class="store-name">{{ $storeName }}</div>
         <div class="store-meta">
           Scope: <strong>{{ strtoupper($session->scope_type ?? 'FULL') }}</strong>

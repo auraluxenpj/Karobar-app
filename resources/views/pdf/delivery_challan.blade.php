@@ -83,6 +83,7 @@
     <table class="header-table">
         <tr>
             <td style="width: 60%; vertical-align: top;">
+                @include('pdf.partials.store_logo')
                 <div class="store-name">{{ $storeName }}</div>
                 @if($address)<div class="store-meta">{{ $address }}</div>@endif
                 @if($phone)<div class="store-meta">Phone: {{ $phone }}</div>@endif

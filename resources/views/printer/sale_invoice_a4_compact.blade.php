@@ -78,6 +78,9 @@
 <div class="page">
   <div class="header">
     <div class="store">
+      @if($logo)
+        <div style="margin-bottom:4px;"><img src="{{ $logo }}" alt="Logo" style="max-height:36px; max-width:120px; object-fit:contain;" /></div>
+      @endif
       <h2>{{ $store }}</h2>
       <div class="meta">
         @if($lic) {{ $lic }} | @endif

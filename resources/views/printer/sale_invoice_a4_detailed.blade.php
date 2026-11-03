@@ -91,6 +91,9 @@
 <div class="page">
   <div class="header">
     <div class="store-info">
+      @if($logo)
+        <div style="margin-bottom:6px;"><img src="{{ $logo }}" alt="Logo" style="max-height:52px; max-width:160px; object-fit:contain;" /></div>
+      @endif
       <h1>{{ $store }}</h1>
       <div class="details">
         @if($lic) <div>License: {{ $lic }}</div> @endif

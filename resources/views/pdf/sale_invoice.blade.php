@@ -74,13 +74,15 @@
             text-align: center;
         }
     </style>
-    @include('pdf.partials.design_theme', ['pdfDesign' => $pdfDesign ?? ($setting->a4_template ?? 'standard')])
+    @include('pdf.partials.design_theme', ['pdfDesign' => $pdfDesign ?? null, 'paperSize' => $paperSize ?? null])
 </head>
 <body>
     @php
+        $isThermal = ($paperSize ?? ($setting->share_paper_size ?? 'a4')) === 'thermal';
+        $defaultDesign = $isThermal ? ($setting->thermal_template ?? 'standard') : ($setting->a4_template ?? 'standard');
         $activeDesign = in_array($pdfDesign ?? null, ['standard', 'minimal', 'detailed', 'compact', 'bold', 'barcode'], true)
             ? $pdfDesign
-            : ($setting->a4_template ?? 'standard');
+            : $defaultDesign;
         $storeName = $setting->store_name ?? 'Business Store';
         $phone = $setting->phone_number ?? '';
         $address = $setting->address ?? '';
@@ -107,6 +109,7 @@
     <table class="header-table">
         <tr>
             <td style="width: 60%; vertical-align: top;">
+                @include('pdf.partials.store_logo')
                 <div class="store-name">{{ $storeName }}</div>
                 @if($address)<div class="store-meta">{{ $address }}</div>@endif
                 @if($phone)<div class="store-meta">Phone: {{ $phone }}</div>@endif
@@ -155,63 +158,122 @@
         </table>
     </div>
 
-    <table class="items-table">
-        <thead>
-            <tr>
-                <th style="width: 28px;" class="text-center">#</th>
-                @if(in_array($activeDesign, ['barcode', 'detailed'], true))
-                    <th style="width: 75px;">Code / SKU</th>
-                @endif
-                <th>Product Description</th>
-                @if($activeDesign !== 'minimal')
-                    <th style="width: 65px;" class="text-center">Batch</th>
-                    <th style="width: 65px;" class="text-center">Expiry</th>
-                @endif
-                <th style="width: 55px;" class="text-right">Qty</th>
-                <th style="width: 75px;" class="text-right">Unit Price</th>
-                <th style="width: 65px;" class="text-right">Disc</th>
-                <th style="width: 85px;" class="text-right">Sub Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($invoice->items as $idx => $item)
-                @php
-                    $ps = max(1, (int) ($item->pack_size ?? $item->product?->pack_size ?? 1));
-                    $qty = (float) ($item->quantity ?? 0);
-                    if ($qty <= 0) {
-                        $qty = ((float) ($item->unit_quantity ?? 0) > 0)
-                            ? (float) $item->unit_quantity
-                            : ((float) ($item->pack_quantity ?? 0) * $ps);
-                    }
-                    $qtyFormatted = fmod($qty, 1.0) == 0.0
-                        ? number_format($qty, 0)
-                        : rtrim(rtrim(number_format($qty, 2), '0'), '.');
-                    $unitPrice = (float) ($item->price ?? $item->unit_price ?? 0);
-                    $discPct = (float) ($item->item_discount_percentage ?? 0);
-                    $discAmt = (float) ($item->item_discount_amount ?? (($qty * $unitPrice * $discPct) / 100));
-                @endphp
+    @if($isThermal)
+        <table class="items-table">
+            <thead>
                 <tr>
-                    <td class="text-center">{{ $idx + 1 }}</td>
+                    <th style="width: 46%;">Item</th>
+                    <th style="width: 14%;" class="text-right">Qty</th>
+                    <th style="width: 19%;" class="text-right">Rate</th>
+                    <th style="width: 21%;" class="text-right">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($invoice->items as $idx => $item)
+                    @php
+                        $ps = max(1, (int) ($item->pack_size ?? $item->product?->pack_size ?? 1));
+                        $qty = (float) ($item->quantity ?? 0);
+                        if ($qty <= 0) {
+                            $qty = ((float) ($item->unit_quantity ?? 0) > 0)
+                                ? (float) $item->unit_quantity
+                                : ((float) ($item->pack_quantity ?? 0) * $ps);
+                        }
+                        $qtyFormatted = fmod($qty, 1.0) == 0.0
+                            ? number_format($qty, 0)
+                            : rtrim(rtrim(number_format($qty, 2), '0'), '.');
+                        $unitPrice = (float) ($item->price ?? $item->unit_price ?? 0);
+                        $discPct = (float) ($item->item_discount_percentage ?? 0);
+                        $discAmt = (float) ($item->item_discount_amount ?? (($qty * $unitPrice * $discPct) / 100));
+                        $sku = $item->product->barcode ?? $item->product->product_code ?? null;
+                    @endphp
+                    <tr>
+                        <td>
+                            <strong>{{ $item->product->name ?? 'Item' }}</strong>
+                            @if(in_array($activeDesign, ['barcode', 'detailed'], true) && $sku)
+                                <div style="font-size: 6.8px; color: #475569;">SKU: {{ $sku }}</div>
+                            @endif
+                            @if($activeDesign !== 'minimal' && (!empty($item->batch_number) || !empty($item->expiry)))
+                                <div style="font-size: 6.8px; color: #64748b;">
+                                    @if(!empty($item->batch_number))B:{{ $item->batch_number }}@endif
+                                    @if(!empty($item->expiry)) Exp:{{ \Carbon\Carbon::parse($item->expiry)->format('M Y') }}@endif
+                                </div>
+                            @endif
+                            @if($discPct > 0 || $discAmt > 0)
+                                <div style="font-size: 6.8px; color: #64748b;">
+                                    Disc: {{ $discPct > 0 ? rtrim(rtrim(number_format($discPct, 2), '0'), '.') . '%' : number_format($discAmt, 2) }}
+                                </div>
+                            @endif
+                        </td>
+                        <td class="text-right">{{ $qtyFormatted }}</td>
+                        <td class="text-right">{{ number_format($unitPrice, 2) }}</td>
+                        <td class="text-right"><strong>{{ number_format((float)($item->sub_total ?? 0), 2) }}</strong></td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="4" class="text-center">No line items recorded.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    @else
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 28px;" class="text-center">#</th>
                     @if(in_array($activeDesign, ['barcode', 'detailed'], true))
-                        <td>{{ $item->product->barcode ?? $item->product->product_code ?? '-' }}</td>
+                        <th style="width: 75px;">Code / SKU</th>
                     @endif
-                    <td><strong>{{ $item->product->name ?? 'Item' }}</strong></td>
+                    <th>Product Description</th>
                     @if($activeDesign !== 'minimal')
-                        <td class="text-center">{{ $item->batch_number ?: '-' }}</td>
-                        <td class="text-center">{{ $item->expiry ? \Carbon\Carbon::parse($item->expiry)->format('M Y') : '-' }}</td>
+                        <th style="width: 65px;" class="text-center">Batch</th>
+                        <th style="width: 65px;" class="text-center">Expiry</th>
                     @endif
-                    <td class="text-right">{{ $qtyFormatted }}</td>
-                    <td class="text-right">{{ number_format($unitPrice, 2) }}</td>
-                    <td class="text-right">{{ $discPct > 0 ? rtrim(rtrim(number_format($discPct, 2), '0'), '.') . '%' : number_format($discAmt, 2) }}</td>
-                    <td class="text-right"><strong>{{ number_format((float)($item->sub_total ?? 0), 2) }}</strong></td>
+                    <th style="width: 55px;" class="text-right">Qty</th>
+                    <th style="width: 75px;" class="text-right">Unit Price</th>
+                    <th style="width: 65px;" class="text-right">Disc</th>
+                    <th style="width: 85px;" class="text-right">Sub Total</th>
                 </tr>
-            @empty
-                <tr>
-                    <td colspan="{{ in_array($activeDesign, ['barcode', 'detailed'], true) ? 9 : ($activeDesign === 'minimal' ? 6 : 8) }}" class="text-center">No line items recorded.</td>
-                </tr>
-            @endforelse
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @forelse($invoice->items as $idx => $item)
+                    @php
+                        $ps = max(1, (int) ($item->pack_size ?? $item->product?->pack_size ?? 1));
+                        $qty = (float) ($item->quantity ?? 0);
+                        if ($qty <= 0) {
+                            $qty = ((float) ($item->unit_quantity ?? 0) > 0)
+                                ? (float) $item->unit_quantity
+                                : ((float) ($item->pack_quantity ?? 0) * $ps);
+                        }
+                        $qtyFormatted = fmod($qty, 1.0) == 0.0
+                            ? number_format($qty, 0)
+                            : rtrim(rtrim(number_format($qty, 2), '0'), '.');
+                        $unitPrice = (float) ($item->price ?? $item->unit_price ?? 0);
+                        $discPct = (float) ($item->item_discount_percentage ?? 0);
+                        $discAmt = (float) ($item->item_discount_amount ?? (($qty * $unitPrice * $discPct) / 100));
+                    @endphp
+                    <tr>
+                        <td class="text-center">{{ $idx + 1 }}</td>
+                        @if(in_array($activeDesign, ['barcode', 'detailed'], true))
+                            <td>{{ $item->product->barcode ?? $item->product->product_code ?? '-' }}</td>
+                        @endif
+                        <td><strong>{{ $item->product->name ?? 'Item' }}</strong></td>
+                        @if($activeDesign !== 'minimal')
+                            <td class="text-center">{{ $item->batch_number ?: '-' }}</td>
+                            <td class="text-center">{{ $item->expiry ? \Carbon\Carbon::parse($item->expiry)->format('M Y') : '-' }}</td>
+                        @endif
+                        <td class="text-right">{{ $qtyFormatted }}</td>
+                        <td class="text-right">{{ number_format($unitPrice, 2) }}</td>
+                        <td class="text-right">{{ $discPct > 0 ? rtrim(rtrim(number_format($discPct, 2), '0'), '.') . '%' : number_format($discAmt, 2) }}</td>
+                        <td class="text-right"><strong>{{ number_format((float)($item->sub_total ?? 0), 2) }}</strong></td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="{{ in_array($activeDesign, ['barcode', 'detailed'], true) ? 9 : ($activeDesign === 'minimal' ? 6 : 8) }}" class="text-center">No line items recorded.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    @endif
 
     <table class="totals-table">
         <tr>

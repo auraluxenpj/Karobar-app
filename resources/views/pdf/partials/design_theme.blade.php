@@ -1,10 +1,26 @@
 @php
+    $activeSize = in_array($paperSize ?? null, ['a4', 'thermal'], true)
+        ? $paperSize
+        : (in_array($setting->share_paper_size ?? null, ['a4', 'thermal'], true) ? $setting->share_paper_size : 'a4');
+    $defaultDesign = $activeSize === 'thermal'
+        ? ($setting->thermal_template ?? 'standard')
+        : ($setting->a4_template ?? 'standard');
     $activeDesign = in_array($pdfDesign ?? null, ['standard', 'minimal', 'detailed', 'compact', 'bold', 'barcode'], true)
         ? $pdfDesign
-        : ($setting->a4_template ?? 'standard');
+        : (in_array($defaultDesign, ['standard', 'minimal', 'detailed', 'compact', 'bold', 'barcode'], true) ? $defaultDesign : 'standard');
     $urduFonts = \App\Support\UrduPdfTextShaper::resolveUrduFontUrls();
 @endphp
 <style>
+    .store-logo-wrap {
+        margin-bottom: 6px;
+    }
+    .store-logo {
+        max-height: 48px;
+        max-width: 150px;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+    }
     @if(!empty($urduFonts['regular']))
         @font-face {
             font-family: 'UrduFont';
@@ -135,6 +151,10 @@
             line-height: 1.25 !important;
             color: #0f172a;
         }
+        .store-logo {
+            max-height: 36px !important;
+            max-width: 120px !important;
+        }
         .header-table {
             border-bottom: 1.5px solid #334155 !important;
             padding-bottom: 6px !important;
@@ -211,6 +231,11 @@
         .header-table .store-meta {
             color: #d1fae5 !important;
         }
+        .header-table .store-logo {
+            background: #ffffff;
+            padding: 3px 6px;
+            border-radius: 4px;
+        }
         .doc-badge {
             background: #10b981 !important;
             color: #064e3b !important;
@@ -284,5 +309,112 @@
             margin-top: 4px;
         }
     @endif
-</style>
 
+    @if($activeSize === 'thermal')
+        @page { margin: 2.5mm 2.5mm !important; }
+        body {
+            font-size: 6.5px !important;
+            line-height: 1.15 !important;
+        }
+        .store-logo-wrap {
+            text-align: center !important;
+            margin-bottom: 2px !important;
+        }
+        .store-logo {
+            max-height: 22px !important;
+            max-width: 75px !important;
+        }
+        .header-table {
+            padding-bottom: 3px !important;
+            margin-bottom: 3.5px !important;
+            border-bottom-style: dashed !important;
+        }
+        .header-table tr, .header-table td {
+            display: block !important;
+            width: 100% !important;
+            text-align: center !important;
+            padding: 0.5px 0 !important;
+        }
+        .store-name {
+            font-size: 9.5px !important;
+            text-align: center !important;
+            margin-bottom: 1px !important;
+        }
+        .store-meta {
+            font-size: 6px !important;
+            text-align: center !important;
+            line-height: 1.15 !important;
+        }
+        .doc-badge {
+            font-size: 6.5px !important;
+            padding: 1px 5px !important;
+            margin-top: 2px !important;
+            display: inline-block !important;
+        }
+        .barcode-strip {
+            font-size: 6px !important;
+            letter-spacing: 0.6px !important;
+            padding: 1px 4px !important;
+        }
+        .meta-box, .info-box, .summary-grid {
+            padding: 2.5px 3.5px !important;
+            margin-bottom: 3.5px !important;
+        }
+        .meta-box tr, .meta-box td, .info-box tr, .info-box td {
+            display: block !important;
+            width: 100% !important;
+            text-align: left !important;
+            padding: 0.5px 0 !important;
+        }
+        .meta-label, .kpi-label {
+            font-size: 5.8px !important;
+            margin-bottom: 0.5px !important;
+        }
+        .meta-value, .kpi-value {
+            font-size: 6.8px !important;
+        }
+        .items-table, .alloc-table, .ledger-table, .tx-table {
+            width: 100% !important;
+            table-layout: fixed !important;
+        }
+        .items-table th, .alloc-table th, .ledger-table th, .tx-table th {
+            font-size: 5.8px !important;
+            padding: 1.5px 1.5px !important;
+            word-wrap: break-word !important;
+        }
+        .items-table td, .alloc-table td, .ledger-table td, .tx-table td {
+            font-size: 6px !important;
+            padding: 1.5px 1.5px !important;
+            word-wrap: break-word !important;
+        }
+        .totals-wrap tr, .totals-wrap td {
+            display: block !important;
+            width: 100% !important;
+            padding: 0 !important;
+        }
+        .totals-table, .totals-box {
+            width: 100% !important;
+            margin-top: 3px !important;
+            margin-left: 0 !important;
+        }
+        .totals-table td, .totals-box td {
+            font-size: 6.2px !important;
+            padding: 1.5px 2px !important;
+        }
+        .totals-table .grand-row td, .totals-box .grand-row td {
+            font-size: 7.2px !important;
+            padding: 2px 2.5px !important;
+        }
+        .sig-row {
+            margin-top: 6px !important;
+        }
+        .sig-line {
+            font-size: 5.8px !important;
+        }
+        .footer-note {
+            margin-top: 4px !important;
+            padding-top: 2.5px !important;
+            font-size: 5.6px !important;
+        }
+    @endif
+</style>

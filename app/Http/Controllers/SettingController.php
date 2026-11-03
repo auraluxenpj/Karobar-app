@@ -24,6 +24,8 @@ class SettingController extends Controller
             'printer_type' => 'thermal',
             'thermal_template' => 'standard',
             'a4_template' => 'standard',
+            'share_paper_size' => 'a4',
+            'share_show_logo' => true,
             'navigation_style' => 'sidebar',
             'sale_system' => 'retail_wholesale',
             'shop_type' => 'pharmacy',
@@ -97,6 +99,9 @@ class SettingController extends Controller
             'printer_type'            => ['required', Rule::in(['thermal','a4'])],
             'thermal_template'        => ['nullable', Rule::in(['standard','minimal','detailed','compact','bold','barcode'])],
             'a4_template'             => ['nullable', Rule::in(['standard','minimal','detailed','compact','bold','barcode'])],
+            'share_paper_size'        => ['nullable', Rule::in(['thermal','a4'])],
+            'share_show_logo'         => ['nullable', 'boolean'],
+            'remove_logo'             => ['nullable', 'boolean'],
             'navigation_style'        => ['nullable', Rule::in(['sidebar','topbar'])],
             'sale_system'             => ['nullable', Rule::in(['retail', 'retail_wholesale'])],
             'shop_type'               => ['nullable', Rule::in(['pharmacy', 'general_store'])],
@@ -149,7 +154,7 @@ class SettingController extends Controller
 
         $submittedSecrets = [];
 
-        // Handle logo upload (optional)
+        // Handle logo upload or removal (optional)
         if ($request->hasFile('logo')) {
             $newPath = $request->file('logo')->store('logos', 'public');
             // delete old file if exists
@@ -157,6 +162,11 @@ class SettingController extends Controller
                 Storage::disk('public')->delete($setting->logo_path);
             }
             $setting->logo_path = $newPath;
+        } elseif ($request->boolean('remove_logo')) {
+            if ($setting->logo_path) {
+                Storage::disk('public')->delete($setting->logo_path);
+            }
+            $setting->logo_path = null;
         }
 
         $smtpFields = [
@@ -201,7 +211,16 @@ class SettingController extends Controller
         ];
 
         // Fill non-SMTP / non-WhatsApp / non-Cube fields first
-        $setting->fill(collect($validated)->except(array_merge(['logo'], $smtpFields, $whatsappFields, $cubeFields))->toArray());
+        $setting->fill(collect($validated)->except(array_merge(['logo', 'remove_logo', 'share_paper_size', 'share_show_logo'], $smtpFields, $whatsappFields, $cubeFields))->toArray());
+
+        if (Schema::hasColumn('settings', 'share_paper_size') && $request->has('share_paper_size')) {
+            $setting->share_paper_size = in_array($request->input('share_paper_size'), ['thermal', 'a4'], true)
+                ? $request->input('share_paper_size')
+                : 'a4';
+        }
+        if (Schema::hasColumn('settings', 'share_show_logo') && $request->has('share_show_logo')) {
+            $setting->share_show_logo = $request->boolean('share_show_logo');
+        }
 
         // Fill SMTP fields safely if columns exist on the settings table
         if (Schema::hasColumn('settings', 'smtp_host')) {

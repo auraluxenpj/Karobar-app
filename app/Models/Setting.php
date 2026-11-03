@@ -22,7 +22,9 @@ class Setting extends Model
         'printer_type',
         'thermal_template',
         'a4_template',
+        'share_paper_size',
         'logo_path',
+        'share_show_logo',
         'navigation_style',
         'sale_system',
         'shop_type',
@@ -62,6 +64,7 @@ class Setting extends Model
     ];
 
     protected $casts = [
+        'share_show_logo'         => 'boolean',
         'smtp_enabled'            => 'boolean',
         'smtp_port'               => 'integer',
         'whatsapp_enabled'        => 'boolean',
@@ -85,6 +88,63 @@ class Setting extends Model
     public function getLogoUrlAttribute(): ?string
     {
         return $this->logo_path ? Storage::url($this->logo_path) : null;
+    }
+
+    /**
+     * Resolve the store logo as a base64 data URI suitable for DomPDF and inline HTML previews.
+     */
+    public function resolveLogoDataUri(): ?string
+    {
+        $logoPath = trim((string) ($this->logo_path ?? ''));
+        if ($logoPath === '') {
+            return null;
+        }
+
+        if (str_starts_with($logoPath, 'data:image/')) {
+            return $logoPath;
+        }
+
+        try {
+            if (Storage::disk('public')->exists($logoPath)) {
+                $contents = Storage::disk('public')->get($logoPath);
+                if ($contents !== null && $contents !== '') {
+                    $mime = Storage::disk('public')->mimeType($logoPath) ?: $this->guessImageMimeType($logoPath);
+                    return 'data:' . $mime . ';base64,' . base64_encode($contents);
+                }
+            }
+        } catch (\Throwable) {
+            // Fall through to filesystem check
+        }
+
+        $candidates = [
+            storage_path('app/public/' . ltrim($logoPath, '/')),
+            public_path('storage/' . ltrim($logoPath, '/')),
+            public_path(ltrim($logoPath, '/')),
+        ];
+
+        foreach ($candidates as $filePath) {
+            if (is_file($filePath) && is_readable($filePath)) {
+                $contents = @file_get_contents($filePath);
+                if ($contents !== false && $contents !== '') {
+                    $mime = $this->guessImageMimeType($filePath);
+                    return 'data:' . $mime . ';base64,' . base64_encode($contents);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    protected function guessImageMimeType(string $path): string
+    {
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        return match ($ext) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'webp'        => 'image/webp',
+            'gif'         => 'image/gif',
+            'svg'         => 'image/svg+xml',
+            default       => 'image/png',
+        };
     }
 
     /**

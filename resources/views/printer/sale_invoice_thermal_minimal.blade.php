@@ -1,6 +1,7 @@
 @php
     use Illuminate\Support\Facades\DB;
 
+    $logo   = $setting->logo_url ?? null;
     $store  = $setting->store_name ?? 'Store Name';
     $phone  = $setting->phone_number ?? '';
     $user   = optional($invoice->user)->name ?? '';
@@ -77,6 +78,9 @@
   <button onclick="window.print()">Print</button>
 </div>
 <div class="receipt">
+  @if($logo)
+    <div class="center" style="margin-bottom:3px;"><img src="{{ $logo }}" alt="Logo" style="max-height:36px; max-width:45mm; object-fit:contain;" /></div>
+  @endif
   <div class="center" style="font-size:16px; font-weight:bold;">{{ $store }}</div>
   @if($phone)<div class="center">{{ $phone }}</div>@endif
   <div class="hr"></div>

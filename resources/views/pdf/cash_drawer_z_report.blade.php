@@ -27,6 +27,7 @@
   <table class="header-table">
     <tr>
       <td style="width: 60%;">
+        @include('pdf.partials.store_logo')
         <div class="store-name">{{ $storeName }}</div>
         <div class="store-meta">Cashier: <strong>{{ $session->user->name ?? 'N/A' }}</strong></div>
       </td>

@@ -47,10 +47,39 @@ class DocumentShareService
         'barcode',
     ];
 
+    public const SUPPORTED_PAPER_SIZES = [
+        'a4',
+        'thermal',
+    ];
+
+    /**
+     * Resolve the active paper size ('a4' or 'thermal') for shared documents.
+     */
+    public function resolvePaperSize(?string $requested = null, ?Setting $setting = null): string
+    {
+        $candidate = strtolower(trim((string) $requested));
+        if (in_array($candidate, self::SUPPORTED_PAPER_SIZES, true)) {
+            return $candidate;
+        }
+
+        if ($setting === null) {
+            try {
+                if (Schema::hasTable('settings')) {
+                    $setting = Setting::first();
+                }
+            } catch (\Throwable) {
+                $setting = null;
+            }
+        }
+
+        $saved = strtolower(trim((string) ($setting?->share_paper_size ?? 'a4')));
+        return in_array($saved, self::SUPPORTED_PAPER_SIZES, true) ? $saved : 'a4';
+    }
+
     /**
      * Resolve the active PDF design template ('standard', 'minimal', 'detailed', 'compact', 'bold', 'barcode').
      */
-    public function resolvePdfDesign(?string $requested = null, ?Setting $setting = null): string
+    public function resolvePdfDesign(?string $requested = null, ?Setting $setting = null, ?string $paperSize = null): string
     {
         $candidate = strtolower(trim((string) $requested));
         if (in_array($candidate, self::SUPPORTED_PDF_DESIGNS, true)) {
@@ -67,8 +96,35 @@ class DocumentShareService
             }
         }
 
-        $saved = strtolower(trim((string) ($setting?->a4_template ?? 'standard')));
+        $resolvedSize = $paperSize ?: $this->resolvePaperSize(null, $setting);
+        $rawTemplate = $resolvedSize === 'thermal'
+            ? ($setting?->thermal_template ?? 'standard')
+            : ($setting?->a4_template ?? 'standard');
+
+        $saved = strtolower(trim((string) $rawTemplate));
         return in_array($saved, self::SUPPORTED_PDF_DESIGNS, true) ? $saved : 'standard';
+    }
+
+    /**
+     * Resolve whether the store logo should be displayed on shared PDF documents.
+     */
+    public function resolveShowLogo(mixed $requested = null, ?Setting $setting = null): bool
+    {
+        if ($requested !== null && $requested !== '') {
+            return filter_var($requested, FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if ($setting === null) {
+            try {
+                if (Schema::hasTable('settings')) {
+                    $setting = Setting::first();
+                }
+            } catch (\Throwable) {
+                $setting = null;
+            }
+        }
+
+        return (bool) ($setting?->share_show_logo ?? true);
     }
 
     /**
@@ -130,6 +186,7 @@ class DocumentShareService
             'supplier_id' => $params['supplier_id'] ?? null,
             'from'        => $params['from'] ?? null,
             'to'          => $params['to'] ?? null,
+            'size'        => $params['size'] ?? null,
             'template'    => $params['template'] ?? null,
         ], fn ($v) => $v !== null && $v !== '');
 
@@ -205,7 +262,12 @@ class DocumentShareService
     {
         $apiConfigured = $this->isWhatsAppApiConfigured();
         $context = $this->resolveDocumentContext($type, $params);
-        $selectedDesign = $this->resolvePdfDesign($params['template'] ?? null, $context['view_data']['setting'] ?? null);
+        $setting = $context['view_data']['setting'] ?? null;
+        $paperSize = $this->resolvePaperSize($params['size'] ?? null, $setting);
+        $selectedDesign = $this->resolvePdfDesign($params['template'] ?? null, $setting, $paperSize);
+        $showLogo = $this->resolveShowLogo($params['show_logo'] ?? null, $setting);
+        $logoDataUri = $showLogo ? $setting?->resolveLogoDataUri() : null;
+        $params['size'] = $paperSize;
         $params['template'] = $selectedDesign;
         $signedPdfUrl = $this->buildSignedPdfUrl($type, $params);
         $normalizedPhone = $this->normalizePhone($context['recipient_phone']);
@@ -232,22 +294,32 @@ class DocumentShareService
             'supplier_id' => $params['supplier_id'] ?? null,
             'from'        => $params['from'] ?? null,
             'to'          => $params['to'] ?? null,
+            'size'        => $paperSize,
             'template'    => $selectedDesign,
         ], fn ($v) => $v !== null && $v !== ''));
+
+        $availableTemplates = [
+            ['id' => 'standard', 'name' => 'Standard Corporate', 'desc' => 'Classic navy header with structured borders'],
+            ['id' => 'minimal',  'name' => 'Minimal Clean',      'desc' => 'Light borders and airy ink-saving layout'],
+            ['id' => 'detailed', 'name' => 'Executive Detailed', 'desc' => 'Royal blue theme with product codes & full breakdown'],
+            ['id' => 'compact',  'name' => 'Compact High-Density', 'desc' => 'Condensed spacing to fit maximum items per page'],
+            ['id' => 'bold',     'name' => 'Bold Modern',        'desc' => 'High-contrast emerald header banner'],
+            ['id' => 'barcode',  'name' => 'Barcode & SKU',      'desc' => 'Includes SKU/barcode column and reference strip'],
+        ];
+        $templateLabel = collect($availableTemplates)->firstWhere('id', $selectedDesign)['name'] ?? ucfirst($selectedDesign);
 
         return [
             'type'                          => $type,
             'document_title'                => $context['title'],
             'filename'                      => $context['filename'],
+            'paper_size'                    => $paperSize,
+            'paper_size_label'              => $paperSize === 'thermal' ? 'Thermal (58mm × 80mm)' : 'A4 Size',
             'pdf_template'                  => $selectedDesign,
-            'available_pdf_templates'       => [
-                ['id' => 'standard', 'name' => 'Standard Corporate', 'desc' => 'Classic navy header with structured borders'],
-                ['id' => 'minimal',  'name' => 'Minimal Clean',      'desc' => 'Light borders and airy ink-saving layout'],
-                ['id' => 'detailed', 'name' => 'Executive Detailed', 'desc' => 'Royal blue theme with product codes & full breakdown'],
-                ['id' => 'compact',  'name' => 'Compact High-Density', 'desc' => 'Condensed spacing to fit maximum items per page'],
-                ['id' => 'bold',     'name' => 'Bold Modern',        'desc' => 'High-contrast emerald header banner'],
-                ['id' => 'barcode',  'name' => 'Barcode & SKU',      'desc' => 'Includes SKU/barcode column and reference strip'],
-            ],
+            'pdf_template_label'            => $templateLabel,
+            'show_logo'                     => $showLogo,
+            'has_logo'                      => $logoDataUri !== null,
+            'logo_url'                      => $setting?->logo_url,
+            'available_pdf_templates'       => $availableTemplates,
             'party_type'                    => $context['party_type'],
             'party_id'                      => $context['party_id'],
             'recipient_name'                => $context['recipient_name'],
@@ -1362,9 +1434,19 @@ class DocumentShareService
     public function generatePdf(string $type, array $params): array
     {
         $context = $this->resolveDocumentContext($type, $params);
-        $selectedDesign = $this->resolvePdfDesign($params['template'] ?? null, $context['view_data']['setting'] ?? null);
+        $setting = $context['view_data']['setting'] ?? null;
+        $paperSize = $this->resolvePaperSize($params['size'] ?? null, $setting);
+        $selectedDesign = $this->resolvePdfDesign($params['template'] ?? null, $setting, $paperSize);
+        $showLogo = $this->resolveShowLogo($params['show_logo'] ?? null, $setting);
+        $logoDataUri = $showLogo ? $setting?->resolveLogoDataUri() : null;
+
         $context['view_data']['pdfDesign'] = $selectedDesign;
+        $context['view_data']['paperSize'] = $paperSize;
+        $context['view_data']['showLogo'] = $showLogo;
+        $context['view_data']['logoDataUri'] = $logoDataUri;
         $context['pdf_template'] = $selectedDesign;
+        $context['paper_size'] = $paperSize;
+        $context['show_logo'] = $showLogo;
 
         // Ensure storage/fonts exists for DomPDF .ufm metrics caching
         \App\Support\UrduPdfTextShaper::resolveUrduFontUrls();
@@ -1373,13 +1455,21 @@ class DocumentShareService
         $shapedHtml = \App\Support\UrduPdfTextShaper::shapeHtml($rawHtml);
 
         $pdf = Pdf::loadHTML($shapedHtml)
-            ->setPaper('a4', 'portrait')
             ->setOption('isFontSubsettingEnabled', true);
+
+        if ($paperSize === 'thermal') {
+            // 58mm width (164.41pt) x 80mm height (226.77pt)
+            $pdf->setPaper([0, 0, 164.41, 226.77], 'portrait');
+        } else {
+            $pdf->setPaper('a4', 'portrait');
+        }
 
         return [
             'pdf'          => $pdf,
             'filename'     => $context['filename'],
+            'paper_size'   => $paperSize,
             'pdf_template' => $selectedDesign,
+            'show_logo'    => $showLogo,
             'context'      => $context,
         ];
     }

@@ -11,6 +11,8 @@ import {
   ArrowPathIcon,
   PlusIcon,
   ArrowDownOnSquareIcon,
+  PhotoIcon,
+  PrinterIcon,
 } from "@heroicons/react/24/outline";
 import { GlassCard } from "@/components/Glass.jsx";
 import { useTheme } from "@/context/ThemeContext";
@@ -220,12 +222,16 @@ export default function DocumentSharingSetting({
   saving = false,
   disableInputs = false,
   initialSubTab = "pdf_design",
+  files = [],
+  setFiles,
 }) {
   const { isDark } = useTheme();
   const [subTab, setSubTab] = useState(initialSubTab || "pdf_design");
   const [previewTemplate, setPreviewTemplate] = useState(null);
   const [activeMessageField, setActiveMessageField] = useState("whatsapp_message_en");
   const [showLivePreview, setShowLivePreview] = useState(false);
+  const [localLogoPreview, setLocalLogoPreview] = useState(null);
+  const logoInputRef = useRef(null);
   const [noteLang, setNoteLang] = useState(() =>
     /[\u0600-\u06FF]/.test(form.note || "") ? "ur" : "en"
   );
@@ -235,12 +241,35 @@ export default function DocumentSharingSetting({
   const urTextareaRef = useRef(null);
 
   useEffect(() => {
+    if (files && files.length > 0 && files[0].file instanceof File) {
+      const objUrl = URL.createObjectURL(files[0].file);
+      setLocalLogoPreview(objUrl);
+      return () => URL.revokeObjectURL(objUrl);
+    }
+    setLocalLogoPreview(null);
+  }, [files]);
+
+  useEffect(() => {
     if (!hasUserSwitchedNoteLang.current && form.note) {
       setNoteLang(/[\u0600-\u06FF]/.test(form.note) ? "ur" : "en");
     }
   }, [form.note]);
 
-  const selectedTemplate = form.a4_template || "standard";
+  const activePaperSize = form.share_paper_size === "thermal" ? "thermal" : "a4";
+  const selectedTemplate =
+    activePaperSize === "thermal"
+      ? form.thermal_template || "standard"
+      : form.a4_template || "standard";
+  const showLogo = form.share_show_logo !== false;
+  const effectiveLogoUrl =
+    localLogoPreview ||
+    (!form.remove_logo &&
+      (form.logo_url ||
+        (files && files.length > 0 && typeof files[0].source === "string"
+          ? files[0].source
+          : null))) ||
+    null;
+
   const storeName = form.store_name || "Your Business Name";
   const storeAddress = form.address || "SHOP #3 FAROOQ E AZAM CHOCK";
   const storePhone = form.phone_number || "0300-1234567";
@@ -260,9 +289,53 @@ export default function DocumentSharingSetting({
     year: "numeric",
   });
 
+  const handleSelectPaperSize = (size) => {
+    if (disableInputs) return;
+    setForm((prev) => ({
+      ...prev,
+      share_paper_size: size === "thermal" ? "thermal" : "a4",
+    }));
+  };
+
   const handleSelectDesign = (templateId) => {
     if (disableInputs) return;
-    setForm((prev) => ({ ...prev, a4_template: templateId }));
+    setForm((prev) =>
+      (prev.share_paper_size || "a4") === "thermal"
+        ? { ...prev, thermal_template: templateId }
+        : { ...prev, a4_template: templateId }
+    );
+  };
+
+  const handleToggleShowLogo = (checked) => {
+    if (disableInputs) return;
+    setForm((prev) => ({ ...prev, share_show_logo: Boolean(checked) }));
+  };
+
+  const handleLogoFileSelect = (e) => {
+    if (disableInputs) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (typeof setFiles === "function") {
+      setFiles([{ file }]);
+    }
+    setForm((prev) => ({
+      ...prev,
+      remove_logo: false,
+      share_show_logo: true,
+    }));
+    e.target.value = "";
+  };
+
+  const handleRemoveLogo = () => {
+    if (disableInputs) return;
+    if (typeof setFiles === "function") {
+      setFiles([]);
+    }
+    setForm((prev) => ({
+      ...prev,
+      logo_url: null,
+      remove_logo: true,
+    }));
   };
 
   const handleSwitchNoteLang = (lang) => {
@@ -382,9 +455,11 @@ export default function DocumentSharingSetting({
     {
       id: "pdf_design",
       label: "PDF Design & Message Format",
-      desc: "Select shared PDF layout & closing note",
+      desc: "Select shared PDF size, layout, logo & closing note",
       icon: SwatchIcon,
-      badge: SHARED_PDF_DESIGNS.find((d) => d.id === selectedTemplate)?.name || "Standard",
+      badge: `${activePaperSize === "thermal" ? "Thermal (58mm × 80mm)" : "A4"} • ${
+        SHARED_PDF_DESIGNS.find((d) => d.id === selectedTemplate)?.name || "Standard"
+      }`,
     },
     {
       id: "whatsapp",
@@ -484,125 +559,406 @@ export default function DocumentSharingSetting({
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">
-                    Shared PDF Document Design
+                    Shared PDF Document Size, Logo &amp; Template
                   </h2>
                   <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 max-w-2xl">
-                    Select the default A4 PDF design used when generating and sharing Sale Invoices, Purchase Orders, Quotations, Ledgers, and Payment Vouchers via WhatsApp or Email. You can also switch designs on the fly inside the Share window.
+                    Choose whether shared PDF documents use <strong>A4 Full Page</strong> or <strong>Thermal Receipt</strong> size, optionally include your store logo, and select your default template. All shared documents (WhatsApp, Email, and PDF download) will automatically use your selected size and template.
                   </p>
                 </div>
               </div>
+              {!disableInputs && typeof handleSave === "function" && (
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 flex items-center gap-1.5 shadow-sm shrink-0 self-start sm:self-center"
+                >
+                  <ArrowDownOnSquareIcon className="w-4 h-4" />
+                  <span>{saving ? "Saving…" : "Save Design Settings"}</span>
+                </button>
+              )}
             </div>
 
-            {/* 6 Visual PDF Design Cards */}
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {SHARED_PDF_DESIGNS.map((tpl) => {
-                const isSelected = selectedTemplate === tpl.id;
-                return (
-                  <div
-                    key={tpl.id}
-                    onClick={() => handleSelectDesign(tpl.id)}
-                    className={`group cursor-pointer rounded-xl border-2 p-4 transition-all flex flex-col justify-between ${
-                      isSelected
-                        ? "border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 shadow-sm"
-                        : isDark
-                        ? "border-slate-700 bg-slate-800/50 hover:border-slate-500"
-                        : "border-gray-200 bg-white hover:border-gray-300"
-                    }`}
-                  >
-                    <div>
-                      {/* Mini Visual Schematic of the PDF Template */}
-                      <div className="rounded-lg border border-gray-200 dark:border-slate-700 bg-white p-3 mb-3 shadow-inner">
-                        <div
-                          className="rounded px-2.5 py-1.5 flex items-center justify-between mb-2"
-                          style={{
-                            backgroundColor: tpl.headerBg,
-                            color: tpl.headerText,
-                            border:
-                              tpl.id === "minimal"
-                                ? "1px solid #cbd5e1"
-                                : `1px solid ${tpl.accent}`,
-                          }}
-                        >
-                          <div className="font-bold text-[10px] truncate">
-                            {storeName}
-                          </div>
-                          <div
-                            className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded"
-                            style={{
-                              backgroundColor:
-                                tpl.id === "minimal" ? "#f1f5f9" : "rgba(255,255,255,0.18)",
-                              color: tpl.id === "minimal" ? "#0f172a" : "#ffffff",
-                            }}
-                          >
-                            INVOICE
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <div
-                            className="h-2 rounded-sm"
-                            style={{ backgroundColor: tpl.accent, opacity: 0.85 }}
-                          />
-                          <div className="h-1.5 bg-gray-200 rounded-sm" />
-                          <div className="h-1.5 bg-gray-100 rounded-sm" />
-                          <div className="flex justify-end pt-1">
-                            <div
-                              className="h-2.5 w-16 rounded-sm"
-                              style={{ backgroundColor: tpl.accent }}
-                            />
-                          </div>
-                        </div>
-                      </div>
+            {/* 1. Store Logo Inclusion & Upload Control */}
+            <div
+              className={`mt-5 rounded-xl border p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                isDark
+                  ? "bg-slate-900/60 border-slate-700/80"
+                  : "bg-slate-50/80 border-gray-200"
+              }`}
+            >
+              <div className="flex items-start gap-3.5">
+                <div
+                  className={`w-14 h-14 rounded-xl border flex items-center justify-center overflow-hidden shrink-0 ${
+                    isDark
+                      ? "bg-slate-800 border-slate-700"
+                      : "bg-white border-gray-200"
+                  }`}
+                >
+                  {effectiveLogoUrl ? (
+                    <img
+                      src={effectiveLogoUrl}
+                      alt="Store Logo"
+                      className="max-w-full max-h-full object-contain p-1"
+                    />
+                  ) : (
+                    <PhotoIcon className="w-6 h-6 text-gray-400 dark:text-slate-500" />
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <label
+                      htmlFor="setting-share-show-logo"
+                      className="text-sm font-bold text-gray-900 dark:text-slate-100 cursor-pointer"
+                    >
+                      Include Store Logo on Shared Documents
+                    </label>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                        showLogo && effectiveLogoUrl
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                          : showLogo && !effectiveLogoUrl
+                          ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                          : isDark
+                          ? "bg-slate-700 text-slate-300"
+                          : "bg-gray-200 text-gray-700"
+                      }`}
+                    >
+                      {showLogo
+                        ? effectiveLogoUrl
+                          ? "Logo Active"
+                          : "Enabled (Upload Logo)"
+                        : "Logo Hidden"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-slate-400">
+                    When enabled, your store logo is automatically placed in the header of shared PDF documents in both A4 and Thermal sizes.
+                  </p>
+                </div>
+              </div>
 
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="font-bold text-sm text-gray-900 dark:text-slate-100 flex items-center gap-1.5">
-                          <span>{tpl.name}</span>
-                          {isSelected && (
-                            <CheckCircleIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                          )}
-                        </div>
-                        <span
-                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                            isSelected
-                              ? "bg-blue-600 text-white"
-                              : isDark
-                              ? "bg-slate-700 text-slate-300"
-                              : "bg-gray-100 text-gray-600"
-                          }`}
-                        >
-                          {tpl.badge}
-                        </span>
-                      </div>
-
-                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-1.5 leading-relaxed">
-                        {tpl.desc}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-700/70 flex items-center justify-between">
-                      <span
-                        className={`text-xs font-semibold ${
-                          isSelected
-                            ? "text-blue-600 dark:text-blue-400"
-                            : "text-gray-500 dark:text-slate-400"
-                        }`}
-                      >
-                        {isSelected ? "Selected Default Design" : "Click to Select"}
-                      </span>
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  onChange={handleLogoFileSelect}
+                  className="hidden"
+                />
+                {!disableInputs && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => logoInputRef.current?.click()}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                        isDark
+                          ? "bg-slate-800 border-slate-600 text-slate-200 hover:bg-slate-700"
+                          : "bg-white border-gray-300 text-gray-700 hover:bg-gray-100"
+                      }`}
+                    >
+                      <PhotoIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span>{effectiveLogoUrl ? "Change Logo" : "Upload Logo"}</span>
+                    </button>
+                    {effectiveLogoUrl && (
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPreviewTemplate(tpl.id);
-                        }}
-                        className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                        onClick={handleRemoveLogo}
+                        className="px-2.5 py-1.5 rounded-lg border border-red-200 dark:border-red-900/50 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 flex items-center gap-1"
                       >
-                        <EyeIcon className="w-3.5 h-3.5" />
-                        <span>Preview</span>
+                        <TrashIcon className="w-3.5 h-3.5" />
+                        <span>Remove</span>
                       </button>
+                    )}
+                  </>
+                )}
+
+                <label
+                  htmlFor="setting-share-show-logo"
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border cursor-pointer select-none text-xs font-semibold ${
+                    showLogo
+                      ? "border-blue-500/50 bg-blue-50/70 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-500/40"
+                      : isDark
+                      ? "border-slate-700 bg-slate-800 text-slate-300"
+                      : "border-gray-300 bg-white text-gray-700"
+                  }`}
+                >
+                  <input
+                    id="setting-share-show-logo"
+                    type="checkbox"
+                    checked={showLogo}
+                    disabled={disableInputs}
+                    onChange={(e) => handleToggleShowLogo(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>{showLogo ? "Show Logo on PDF" : "Hide Logo"}</span>
+                </label>
+              </div>
+            </div>
+
+            {/* 2. Document Sharing Size Selector (A4 Size vs Thermal Size 58mm × 80mm) */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-slate-300">
+                  1. Select Shared Document Size
+                </span>
+                <span className="text-xs text-gray-500 dark:text-slate-400">
+                  Active:{" "}
+                  <strong className="text-gray-900 dark:text-slate-100">
+                    {activePaperSize === "thermal"
+                      ? "Thermal Size (58mm × 80mm)"
+                      : "A4 Size (Full Page)"}
+                  </strong>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {[
+                  {
+                    id: "a4",
+                    title: "A4 Size (Full Page Document)",
+                    subtitle:
+                      "Standard 210mm × 297mm portrait layout for corporate invoices, purchase orders & ledgers.",
+                    badge: `Template: ${
+                      SHARED_PDF_DESIGNS.find(
+                        (d) => d.id === (form.a4_template || "standard")
+                      )?.name || "Standard"
+                    }`,
+                  },
+                  {
+                    id: "thermal",
+                    title: "Thermal Size (58mm × 80mm)",
+                    subtitle:
+                      "Compact 58mm × 80mm thermal receipt layout ideal for fast mobile viewing on WhatsApp & retail counters.",
+                    badge: `Template: ${
+                      SHARED_PDF_DESIGNS.find(
+                        (d) => d.id === (form.thermal_template || "standard")
+                      )?.name || "Standard"
+                    }`,
+                  },
+                ].map((sizeOpt) => {
+                  const isSizeSelected = activePaperSize === sizeOpt.id;
+                  const radioId = `share-paper-size-${sizeOpt.id}`;
+                  return (
+                    <label
+                      key={sizeOpt.id}
+                      htmlFor={radioId}
+                      className={`cursor-pointer rounded-xl border-2 p-4 transition-all flex items-start gap-3.5 ${
+                        isSizeSelected
+                          ? "border-blue-600 bg-blue-50/40 dark:bg-blue-950/25 shadow-sm"
+                          : isDark
+                          ? "border-slate-700 bg-slate-800/40 hover:border-slate-500"
+                          : "border-gray-200 bg-white hover:border-gray-300"
+                      }`}
+                    >
+                      <input
+                        id={radioId}
+                        type="radio"
+                        name="share_paper_size"
+                        value={sizeOpt.id}
+                        checked={isSizeSelected}
+                        disabled={disableInputs}
+                        onChange={() => handleSelectPaperSize(sizeOpt.id)}
+                        className="mt-1 h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="text-sm font-bold text-gray-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <PrinterIcon className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                            <span>{sizeOpt.title}</span>
+                          </span>
+                          <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                              isSizeSelected
+                                ? "bg-blue-600 text-white"
+                                : isDark
+                                ? "bg-slate-700 text-slate-300"
+                                : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {sizeOpt.badge}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 leading-relaxed">
+                          {sizeOpt.subtitle}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 3. 6 Visual PDF Design Cards for the Selected Size */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-600 dark:text-slate-300">
+                  2. Select{" "}
+                  {activePaperSize === "thermal" ? "Thermal Receipt" : "A4 Page"}{" "}
+                  Template Design
+                </span>
+                <span className="text-xs text-gray-500 dark:text-slate-400">
+                  Selected:{" "}
+                  <strong className="text-blue-600 dark:text-blue-400">
+                    {SHARED_PDF_DESIGNS.find((d) => d.id === selectedTemplate)?.name}
+                  </strong>
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {SHARED_PDF_DESIGNS.map((tpl) => {
+                  const isSelected = selectedTemplate === tpl.id;
+                  return (
+                    <div
+                      key={tpl.id}
+                      onClick={() => handleSelectDesign(tpl.id)}
+                      className={`group cursor-pointer rounded-xl border-2 p-4 transition-all flex flex-col justify-between ${
+                        isSelected
+                          ? "border-blue-600 bg-blue-50/40 dark:bg-blue-950/20 shadow-sm"
+                          : isDark
+                          ? "border-slate-700 bg-slate-800/50 hover:border-slate-500"
+                          : "border-gray-200 bg-white hover:border-gray-300"
+                      }`}
+                    >
+                      <div>
+                        {/* Mini Visual Schematic of the PDF Template (adapts to A4 vs Thermal & Logo) */}
+                        <div className="rounded-lg border border-gray-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 p-2.5 mb-3 shadow-inner flex justify-center">
+                          <div
+                            className={`rounded border border-gray-200 bg-white p-2.5 shadow-sm transition-all ${
+                              activePaperSize === "thermal"
+                                ? "w-44 border-dashed"
+                                : "w-full"
+                            }`}
+                          >
+                            <div
+                              className={`rounded px-2 py-1.5 flex ${
+                                activePaperSize === "thermal"
+                                  ? "flex-col items-center text-center gap-0.5"
+                                  : "items-center justify-between"
+                              } mb-2`}
+                              style={{
+                                backgroundColor: tpl.headerBg,
+                                color: tpl.headerText,
+                                border:
+                                  tpl.id === "minimal"
+                                    ? "1px solid #cbd5e1"
+                                    : `1px solid ${tpl.accent}`,
+                              }}
+                            >
+                              <div className="flex items-center gap-1.5 min-w-0 max-w-full">
+                                {showLogo && (
+                                  <span
+                                    className="w-3.5 h-3.5 rounded-sm shrink-0 flex items-center justify-center overflow-hidden"
+                                    style={{
+                                      backgroundColor:
+                                        tpl.id === "minimal"
+                                          ? "#e2e8f0"
+                                          : "rgba(255,255,255,0.9)",
+                                    }}
+                                  >
+                                    {effectiveLogoUrl ? (
+                                      <img
+                                        src={effectiveLogoUrl}
+                                        alt=""
+                                        className="w-full h-full object-contain"
+                                      />
+                                    ) : (
+                                      <span
+                                        className="w-2 h-2 rounded-full"
+                                        style={{ backgroundColor: tpl.accent }}
+                                      />
+                                    )}
+                                  </span>
+                                )}
+                                <span className="font-bold text-[10px] truncate">
+                                  {storeName}
+                                </span>
+                              </div>
+                              <div
+                                className="text-[7.5px] font-bold uppercase px-1.5 py-0.5 rounded shrink-0"
+                                style={{
+                                  backgroundColor:
+                                    tpl.id === "minimal"
+                                      ? "#f1f5f9"
+                                      : "rgba(255,255,255,0.18)",
+                                  color:
+                                    tpl.id === "minimal" ? "#0f172a" : "#ffffff",
+                                }}
+                              >
+                                {activePaperSize === "thermal" ? "RECEIPT" : "INVOICE"}
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <div
+                                className="h-2 rounded-sm"
+                                style={{ backgroundColor: tpl.accent, opacity: 0.85 }}
+                              />
+                              <div className="h-1.5 bg-gray-200 rounded-sm" />
+                              <div className="h-1.5 bg-gray-100 rounded-sm" />
+                              <div className="flex justify-end pt-1">
+                                <div
+                                  className="h-2.5 w-16 rounded-sm"
+                                  style={{ backgroundColor: tpl.accent }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="font-bold text-sm text-gray-900 dark:text-slate-100 flex items-center gap-1.5">
+                            <span>{tpl.name}</span>
+                            {isSelected && (
+                              <CheckCircleIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            )}
+                          </div>
+                          <span
+                            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                              isSelected
+                                ? "bg-blue-600 text-white"
+                                : isDark
+                                ? "bg-slate-700 text-slate-300"
+                                : "bg-gray-100 text-gray-600"
+                            }`}
+                          >
+                            {tpl.badge}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1.5 leading-relaxed">
+                          {tpl.desc}
+                        </p>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-700/70 flex items-center justify-between">
+                        <span
+                          className={`text-xs font-semibold ${
+                            isSelected
+                              ? "text-blue-600 dark:text-blue-400"
+                              : "text-gray-500 dark:text-slate-400"
+                          }`}
+                        >
+                          {isSelected
+                            ? `Active ${
+                                activePaperSize === "thermal" ? "Thermal" : "A4"
+                              } Template`
+                            : "Click to Select"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewTemplate(tpl.id);
+                          }}
+                          className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                        >
+                          <EyeIcon className="w-3.5 h-3.5" />
+                          <span>Preview</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </GlassCard>
 
@@ -1042,10 +1398,11 @@ export default function DocumentSharingSetting({
               <div className="min-w-0">
                 <h3 className="text-sm sm:text-base font-bold truncate">
                   Template Preview —{" "}
-                  {SHARED_PDF_DESIGNS.find((d) => d.id === previewTemplate)?.name}
+                  {SHARED_PDF_DESIGNS.find((d) => d.id === previewTemplate)?.name} (
+                  {activePaperSize === "thermal" ? "Thermal Size 58mm × 80mm" : "A4 Size"})
                 </h3>
                 <p className="text-xs text-gray-500 dark:text-slate-400">
-                  Live A4 invoice layout preview
+                  Exact shared PDF layout preview ({showLogo ? "Store Logo Enabled" : "Store Logo Hidden"})
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -1072,10 +1429,10 @@ export default function DocumentSharingSetting({
             </div>
             <div className="flex-1 bg-gray-100 dark:bg-slate-900 p-2 sm:p-4 min-h-0">
               <iframe
-                src={`/print/a4-preview/${previewTemplate}?note=${encodeURIComponent(
-                  form.note ?? ""
-                )}`}
-                title="A4 Template Preview"
+                src={`/print/share-preview/${activePaperSize}/${previewTemplate}?show_logo=${
+                  showLogo ? 1 : 0
+                }&note=${encodeURIComponent(form.note ?? "")}`}
+                title="Shared PDF Template Preview"
                 className="w-full h-full rounded-xl bg-white border border-gray-200 dark:border-slate-700"
               />
             </div>

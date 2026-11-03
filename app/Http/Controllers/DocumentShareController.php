@@ -121,7 +121,9 @@ class DocumentShareController extends Controller
             'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
             'from'        => ['nullable', 'date'],
             'to'          => ['nullable', 'date'],
+            'size'        => ['nullable', 'string', Rule::in(DocumentShareService::SUPPORTED_PAPER_SIZES)],
             'template'    => ['nullable', 'string', Rule::in(DocumentShareService::SUPPORTED_PDF_DESIGNS)],
+            'show_logo'   => ['nullable', 'boolean'],
         ]);
 
         $this->authorizeDocumentAccess($validated['type'], $validated);
@@ -143,7 +145,9 @@ class DocumentShareController extends Controller
             'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
             'from'        => ['nullable', 'date'],
             'to'          => ['nullable', 'date'],
+            'size'        => ['nullable', 'string', Rule::in(DocumentShareService::SUPPORTED_PAPER_SIZES)],
             'template'    => ['nullable', 'string', Rule::in(DocumentShareService::SUPPORTED_PDF_DESIGNS)],
+            'show_logo'   => ['nullable', 'boolean'],
             'download'    => ['nullable', 'boolean'],
         ]);
 
@@ -170,7 +174,9 @@ class DocumentShareController extends Controller
             'supplier_id' => ['nullable', 'integer', 'exists:suppliers,id'],
             'from'        => ['nullable', 'date'],
             'to'          => ['nullable', 'date'],
+            'size'        => ['nullable', 'string', Rule::in(DocumentShareService::SUPPORTED_PAPER_SIZES)],
             'template'    => ['nullable', 'string', Rule::in(DocumentShareService::SUPPORTED_PDF_DESIGNS)],
+            'show_logo'   => ['nullable', 'boolean'],
             'email'       => ['required', 'email', 'max:150'],
             'subject'     => ['required', 'string', 'max:255'],
             'message'     => ['required', 'string', 'max:5000'],
@@ -256,7 +262,9 @@ class DocumentShareController extends Controller
             'supplier_id'   => ['nullable', 'integer', 'exists:suppliers,id'],
             'from'          => ['nullable', 'date'],
             'to'            => ['nullable', 'date'],
+            'size'          => ['nullable', 'string', Rule::in(DocumentShareService::SUPPORTED_PAPER_SIZES)],
             'template'      => ['nullable', 'string', Rule::in(DocumentShareService::SUPPORTED_PDF_DESIGNS)],
+            'show_logo'     => ['nullable', 'boolean'],
             'phone'         => ['nullable', 'string', 'max:50'],
             'message'       => ['required', 'string', 'max:5000'],
             'save_phone'    => ['nullable', 'boolean'],
@@ -332,6 +340,7 @@ class DocumentShareController extends Controller
             'supplier_id' => $request->query('supplier_id'),
             'from'        => $request->query('from'),
             'to'          => $request->query('to'),
+            'size'        => $request->query('size'),
             'template'    => $request->query('template'),
         ];
 

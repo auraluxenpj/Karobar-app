@@ -158,6 +158,10 @@ export default function Setting() {
     printer_type: "thermal",
     thermal_template: "standard",
     a4_template: "standard",
+    share_paper_size: "a4",
+    share_show_logo: true,
+    logo_url: null,
+    remove_logo: false,
     navigation_style: "sidebar",
     sale_system: "retail_wholesale",
     shop_type: "pharmacy",
@@ -345,6 +349,13 @@ export default function Setting() {
         printer_type: data.printer_type || "thermal",
         thermal_template: data.thermal_template || "standard",
         a4_template: data.a4_template || "standard",
+        share_paper_size: data.share_paper_size || "a4",
+        share_show_logo:
+          data.share_show_logo !== undefined && data.share_show_logo !== null
+            ? Boolean(data.share_show_logo)
+            : true,
+        logo_url: data.logo_url || null,
+        remove_logo: false,
         navigation_style: data.navigation_style || "sidebar",
         sale_system: data.sale_system || "retail_wholesale",
         shop_type: data.shop_type || "pharmacy",
@@ -457,6 +468,8 @@ export default function Setting() {
       fd.append("printer_type", form.printer_type || "a4");
       fd.append("thermal_template", form.thermal_template || "standard");
       fd.append("a4_template", form.a4_template || "standard");
+      fd.append("share_paper_size", form.share_paper_size || "a4");
+      fd.append("share_show_logo", form.share_show_logo !== false ? "1" : "0");
       fd.append("navigation_style", form.navigation_style || "sidebar");
       fd.append("sale_system", form.sale_system || "retail_wholesale");
       fd.append("shop_type", form.shop_type || "pharmacy");
@@ -507,6 +520,8 @@ export default function Setting() {
 
       if (files.length > 0 && files[0].file) {
         fd.append("logo", files[0].file);
+      } else if (form.remove_logo) {
+        fd.append("remove_logo", "1");
       }
 
       const { data } = await axios.post("/api/settings", fd, {
@@ -515,6 +530,13 @@ export default function Setting() {
 
       setForm((prev) => ({
         ...prev,
+        share_paper_size: data?.share_paper_size || prev.share_paper_size || "a4",
+        share_show_logo:
+          data?.share_show_logo !== undefined && data?.share_show_logo !== null
+            ? Boolean(data.share_show_logo)
+            : prev.share_show_logo,
+        logo_url: data?.logo_url || null,
+        remove_logo: false,
         note: data?.note ?? prev.note,
         note_en:
           data?.note_en !== null && data?.note_en !== undefined
@@ -848,6 +870,8 @@ export default function Setting() {
               saving={saving}
               disableInputs={disableInputs}
               initialSubTab={sharingSubTab}
+              files={files}
+              setFiles={setFiles}
             />
           )}
 

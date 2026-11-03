@@ -106,6 +106,7 @@ export default function ShareDocumentModal({
   const [buildingPdf, setBuildingPdf] = useState(false);
   const [meta, setMeta] = useState(null);
   const [selectedDesign, setSelectedDesign] = useState("standard");
+  const [selectedPaperSize, setSelectedPaperSize] = useState("a4");
 
   // Built PDF file state
   const [pdfFile, setPdfFile] = useState(null);
@@ -136,11 +137,12 @@ export default function ShareDocumentModal({
   const [saveEmailToProfile, setSaveEmailToProfile] = useState(true);
   const [sendingEmail, setSendingEmail] = useState(false);
 
-  const buildRequestParams = (overrideTemplate = null) => ({
+  const buildRequestParams = (overrideTemplate = null, overrideSize = null) => ({
     type: documentType,
     ...(documentId ? { id: documentId } : {}),
     ...queryParams,
-    template: overrideTemplate || selectedDesign || "standard",
+    size: overrideSize || selectedPaperSize || meta?.paper_size || "a4",
+    template: overrideTemplate || selectedDesign || meta?.pdf_template || "standard",
   });
 
   useEffect(() => {
@@ -210,9 +212,11 @@ export default function ShareDocumentModal({
       const metaRes = await axios.get("/api/share/metadata", { params: baseParams });
       const data = metaRes.data;
       const defaultDesign = data.pdf_template || "standard";
+      const defaultPaperSize = data.paper_size || "a4";
 
       setMeta(data);
       setSelectedDesign(defaultDesign);
+      setSelectedPaperSize(defaultPaperSize);
       setMessageLang("en");
       setPhoneInput(data.recipient_phone || data.normalized_phone || "");
       setWhatsappMessage(data.whatsapp_text_en || data.whatsapp_text || "");
@@ -221,7 +225,7 @@ export default function ShareDocumentModal({
       setEmailBody(data.email_body_en || data.email_body || "");
 
       const pdfRes = await axios.get("/api/share/pdf", {
-        params: { ...baseParams, template: defaultDesign },
+        params: { ...baseParams, size: defaultPaperSize, template: defaultDesign },
         responseType: "blob",
       });
 
@@ -259,36 +263,6 @@ export default function ShareDocumentModal({
       setWhatsappMessage(meta.whatsapp_text_en || meta.whatsapp_text || "");
       setEmailSubject(meta.email_subject_en || meta.email_subject || "");
       setEmailBody(meta.email_body_en || meta.email_body || "");
-    }
-  };
-
-  /**
-   * Rebuild the PDF file whenever the user switches the PDF Design template in the modal.
-   */
-  const handleSelectDesign = async (designId) => {
-    if (designId === selectedDesign && pdfFile) return;
-    setSelectedDesign(designId);
-    setBuildingPdf(true);
-    try {
-      const params = buildRequestParams(designId);
-      const pdfRes = await axios.get("/api/share/pdf", {
-        params,
-        responseType: "blob",
-      });
-      const filename = meta?.filename || `${documentType}_document.pdf`;
-      const blob = new Blob([pdfRes.data], { type: "application/pdf" });
-      const file = new File([blob], filename, { type: "application/pdf" });
-
-      if (pdfBlobUrl) {
-        window.URL.revokeObjectURL(pdfBlobUrl);
-      }
-      const nextUrl = window.URL.createObjectURL(blob);
-      setPdfFile(file);
-      setPdfBlobUrl(nextUrl);
-    } catch {
-      toast.error("Could not rebuild PDF with the selected design template");
-    } finally {
-      setBuildingPdf(false);
     }
   };
 
@@ -518,9 +492,12 @@ export default function ShareDocumentModal({
   }`;
 
   const pdfSizeKb = pdfFile ? (pdfFile.size / 1024).toFixed(1) : null;
-  const designOptions = meta?.available_pdf_templates?.length
-    ? meta.available_pdf_templates
-    : PDF_DESIGN_OPTIONS;
+  const activeDesignName =
+    meta?.pdf_template_label ||
+    PDF_DESIGN_OPTIONS.find((d) => d.id === selectedDesign)?.name ||
+    "Standard Corporate";
+  const activeSizeLabel =
+    selectedPaperSize === "thermal" ? "Thermal (58mm × 80mm)" : "A4 Size";
 
   return (
     <div
@@ -558,7 +535,7 @@ export default function ShareDocumentModal({
               <p className={`text-xs truncate ${isDark ? "text-slate-400" : "text-gray-500"}`}>
                 {meta?.recipient_name
                   ? `Recipient: ${meta.recipient_name}`
-                  : "Dispatch A4 PDF via WhatsApp or Email"}
+                  : `Dispatch ${activeSizeLabel} PDF via WhatsApp or Email`}
               </p>
             </div>
           </div>
@@ -605,40 +582,37 @@ export default function ShareDocumentModal({
           </div>
         </div>
 
-        {/* Compact Built PDF Status & PDF Design Selector Bar */}
+        {/* Compact Built PDF Status & Active Settings Template Bar */}
         <div
           className={`px-5 py-2.5 border-b flex flex-wrap items-center justify-between gap-2 ${
             isDark ? "bg-slate-900/80 border-slate-700" : "bg-slate-50 border-gray-200"
           }`}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <SwatchIcon className="w-4 h-4 text-blue-500 shrink-0" />
             <span className="text-xs font-semibold text-gray-600 dark:text-slate-300">
-              PDF Design:
+              Configured Template:
             </span>
-            <div className="flex flex-wrap items-center gap-1">
-              {designOptions.map((tpl) => {
-                const isSelected = selectedDesign === tpl.id;
-                return (
-                  <button
-                    key={tpl.id}
-                    type="button"
-                    disabled={buildingPdf}
-                    onClick={() => handleSelectDesign(tpl.id)}
-                    title={tpl.desc || tpl.name}
-                    className={`px-2 py-0.5 rounded-md text-xs font-medium transition-all border ${
-                      isSelected
-                        ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-                        : isDark
-                        ? "bg-slate-800 text-slate-300 border-slate-700 hover:border-slate-500"
-                        : "bg-white text-gray-700 border-gray-300 hover:border-gray-400"
-                    }`}
-                  >
-                    {tpl.name}
-                  </button>
-                );
-              })}
-            </div>
+            <span
+              className={`px-2.5 py-0.5 rounded-md text-xs font-semibold border ${
+                isDark
+                  ? "bg-blue-950/50 text-blue-300 border-blue-700/60"
+                  : "bg-blue-50 text-blue-700 border-blue-200"
+              }`}
+            >
+              {activeSizeLabel} &bull; {activeDesignName}
+            </span>
+            {meta?.show_logo && meta?.has_logo && (
+              <span
+                className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${
+                  isDark
+                    ? "bg-emerald-950/40 text-emerald-300 border-emerald-800/60"
+                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                }`}
+              >
+                Store Logo Included
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-3 text-xs">
@@ -674,18 +648,20 @@ export default function ShareDocumentModal({
                 isDark ? "text-slate-400 hover:text-slate-200" : "text-gray-500 hover:text-gray-800"
               }`}
             >
-              Settings
+              Change in Settings
             </a>
           </div>
         </div>
 
         {/* Optional Inline PDF Viewer */}
         {showInlinePreview && pdfBlobUrl && (
-          <div className="px-5 pt-3">
+          <div className="px-5 pt-3 flex justify-center">
             <iframe
               src={pdfBlobUrl}
               title="PDF Document Preview"
-              className="w-full h-56 rounded-lg border border-gray-300 dark:border-slate-700 bg-white"
+              className={`h-60 rounded-lg border border-gray-300 dark:border-slate-700 bg-white ${
+                selectedPaperSize === "thermal" ? "w-full max-w-sm" : "w-full"
+              }`}
             />
           </div>
         )}
@@ -778,7 +754,7 @@ export default function ShareDocumentModal({
                     </div>
                     <p className={`text-[11px] leading-snug ${isDark ? "text-slate-400" : "text-gray-600"}`}>
                       {meta?.whatsapp_api_configured
-                        ? "Sends the A4 PDF file directly as a WhatsApp attachment."
+                        ? `Sends the ${activeSizeLabel} PDF file directly as a WhatsApp attachment.`
                         : "Downloads the PDF file and opens the recipient WhatsApp chat."}
                     </p>
                   </div>

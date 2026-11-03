@@ -780,4 +780,115 @@ class OutboundDocumentSharingTest extends TestCase
             ->assertJsonPath('provider', 'evolution_api')
             ->assertJsonPath('whatsapp_msg_id', 'evolution.free.003');
     }
+
+    public function test_document_sharing_supports_a4_and_thermal_sizes_selected_template_and_store_logo(): void
+    {
+        Storage::fake('public');
+        Sanctum::actingAs($this->authorizedUser);
+
+        // Create a 1x1 PNG store logo in public storage
+        $tinyPng = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
+        Storage::disk('public')->put('logos/test-logo.png', $tinyPng);
+
+        Setting::first()->update([
+            'logo_path'        => 'logos/test-logo.png',
+            'share_show_logo'  => true,
+            'share_paper_size' => 'thermal',
+            'thermal_template' => 'bold',
+            'a4_template'      => 'detailed',
+        ]);
+
+        $customer = Customer::create([
+            'name'  => 'City Medical Hall',
+            'phone' => '0300-5556677',
+        ]);
+
+        $product = Product::create([
+            'name'                => 'Augmentin 625mg',
+            'product_code'        => 'AUG-625',
+            'barcode'             => '896400112233',
+            'category_id'         => $this->category->id,
+            'brand_id'            => $this->brand->id,
+            'supplier_id'         => $this->defaultSupplier->id,
+            'pack_size'           => 1,
+            'unit_purchase_price' => 250,
+            'unit_sale_price'     => 350,
+            'quantity'            => 50,
+        ]);
+
+        $invoice = SaleInvoice::create([
+            'user_id'       => $this->authorizedUser->id,
+            'customer_id'   => $customer->id,
+            'posted_number' => 'SI-2026-0777',
+            'date'          => '2026-11-04',
+            'invoice_type'  => 'cash',
+            'status'        => 'posted',
+            'gross_amount'  => 700,
+            'total'         => 700,
+            'total_receive' => 700,
+            'remain_this'   => 0,
+        ]);
+
+        SaleInvoiceItem::create([
+            'sale_invoice_id' => $invoice->id,
+            'product_id'      => $product->id,
+            'pack_size'       => 1,
+            'quantity'        => 2,
+            'price'           => 350,
+            'sub_total'       => 700,
+        ]);
+
+        // 1. Metadata resolves Thermal size and thermal_template ('bold') + logo enabled from Settings
+        $metaThermal = $this->getJson("/api/share/metadata?type=sale_invoice&id={$invoice->id}");
+        $metaThermal->assertOk()
+            ->assertJsonPath('paper_size', 'thermal')
+            ->assertJsonPath('pdf_template', 'bold')
+            ->assertJsonPath('show_logo', true)
+            ->assertJsonPath('has_logo', true);
+
+        // 2. Service generates Thermal PDF with store logo data URI
+        $shareService = app(DocumentShareService::class);
+        $thermalPdfResult = $shareService->generatePdf('sale_invoice', ['id' => $invoice->id]);
+        $this->assertSame('thermal', $thermalPdfResult['paper_size']);
+        $this->assertSame('bold', $thermalPdfResult['pdf_template']);
+        $this->assertTrue($thermalPdfResult['show_logo']);
+        $this->assertNotEmpty($thermalPdfResult['context']['view_data']['logoDataUri']);
+        $this->assertStringStartsWith('%PDF', $thermalPdfResult['pdf']->output());
+
+        // 3. Switch Settings to A4 size and hide logo
+        $saveRes = $this->postJson('/api/settings', [
+            'printer_type'     => 'a4',
+            'share_paper_size' => 'a4',
+            'a4_template'      => 'detailed',
+            'thermal_template' => 'bold',
+            'share_show_logo'  => false,
+        ]);
+        $saveRes->assertOk()
+            ->assertJsonPath('share_paper_size', 'a4')
+            ->assertJsonPath('a4_template', 'detailed')
+            ->assertJsonPath('share_show_logo', false);
+
+        // 4. Metadata now resolves A4 size and a4_template ('detailed') with logo disabled
+        $metaA4 = $this->getJson("/api/share/metadata?type=sale_invoice&id={$invoice->id}");
+        $metaA4->assertOk()
+            ->assertJsonPath('paper_size', 'a4')
+            ->assertJsonPath('pdf_template', 'detailed')
+            ->assertJsonPath('show_logo', false)
+            ->assertJsonPath('has_logo', false);
+
+        $a4PdfResult = $shareService->generatePdf('sale_invoice', ['id' => $invoice->id]);
+        $this->assertSame('a4', $a4PdfResult['paper_size']);
+        $this->assertSame('detailed', $a4PdfResult['pdf_template']);
+        $this->assertFalse($a4PdfResult['show_logo']);
+        $this->assertNull($a4PdfResult['context']['view_data']['logoDataUri']);
+
+        // 5. Preview route renders exact template in both A4 and Thermal sizes with logo toggle
+        $previewThermalWithLogo = $this->get('/print/share-preview/thermal/bold?show_logo=1');
+        $previewThermalWithLogo->assertOk();
+        $this->assertStringContainsString('class="store-logo"', $previewThermalWithLogo->getContent());
+
+        $previewA4NoLogo = $this->get('/print/share-preview/a4/detailed?show_logo=0');
+        $previewA4NoLogo->assertOk();
+        $this->assertStringNotContainsString('<img src="data:image/', $previewA4NoLogo->getContent());
+    }
 }
