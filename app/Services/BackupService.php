@@ -3,23 +3,39 @@
 namespace App\Services;
 
 use App\Models\BackupLog;
+use App\Models\BackupSchedule;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Throwable;
 use ZipArchive;
 
 class BackupService
 {
-    protected $backupPath;
-    protected $maxBackups = 10;
-    protected $retentionDays = 30;
+    protected string $backupPath;
+    protected int $maxBackups = 10;
+    protected int $retentionDays = 30;
+
+    /**
+     * Ephemeral runtime tables whose rows should not be dumped or clobbered during SQL statement backups/restores.
+     */
+    protected array $ephemeralTables = [
+        'sessions',
+        'cache',
+        'cache_locks',
+        'jobs',
+        'job_batches',
+    ];
 
     public function __construct()
     {
         $this->backupPath = storage_path('app/backups');
         $this->ensureBackupDirectoryExists();
+        $this->ensureBackupSchema();
     }
 
     /**
@@ -27,8 +43,103 @@ class BackupService
      */
     protected function ensureBackupDirectoryExists(): void
     {
-        if (!File::exists($this->backupPath)) {
-            File::makeDirectory($this->backupPath, 0755, true);
+        try {
+            if (!File::exists($this->backupPath)) {
+                File::makeDirectory($this->backupPath, 0755, true, true);
+            }
+        } catch (Throwable $e) {
+            Log::warning('Could not create default backup directory: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Self-healing schema check: ensures backup_logs and backup_schedules tables and all
+     * newer columns exist even when deployed on a Laravel Herd instance before running
+     * migrations or immediately after restoring an older database snapshot.
+     */
+    public function ensureBackupSchema(): void
+    {
+        try {
+            if (!Schema::hasTable('backup_logs')) {
+                Schema::create('backup_logs', function (Blueprint $table) {
+                    $table->id();
+                    $table->string('filename')->unique();
+                    $table->string('type');
+                    $table->unsignedBigInteger('size')->default(0);
+                    $table->string('path')->default('');
+                    $table->json('metadata')->nullable();
+                    $table->string('created_by')->nullable();
+                    $table->boolean('is_automated')->default(false);
+                    $table->string('storage_destination', 30)->default('local');
+                    $table->string('remote_path')->nullable();
+                    $table->string('remote_file_id')->nullable();
+                    $table->string('remote_status', 30)->default('skipped');
+                    $table->text('remote_error')->nullable();
+                    $table->string('status', 30)->default('pending');
+                    $table->text('error_message')->nullable();
+                    $table->timestamps();
+                    $table->timestamp('expires_at')->nullable();
+                });
+            } else {
+                $missingLogColumns = [];
+                foreach (['is_automated', 'storage_destination', 'remote_path', 'remote_file_id', 'remote_status', 'remote_error'] as $col) {
+                    if (!Schema::hasColumn('backup_logs', $col)) {
+                        $missingLogColumns[] = $col;
+                    }
+                }
+
+                if (!empty($missingLogColumns)) {
+                    Schema::table('backup_logs', function (Blueprint $table) use ($missingLogColumns) {
+                        if (in_array('is_automated', $missingLogColumns, true)) {
+                            $table->boolean('is_automated')->default(false);
+                        }
+                        if (in_array('storage_destination', $missingLogColumns, true)) {
+                            $table->string('storage_destination', 30)->default('local');
+                        }
+                        if (in_array('remote_path', $missingLogColumns, true)) {
+                            $table->string('remote_path')->nullable();
+                        }
+                        if (in_array('remote_file_id', $missingLogColumns, true)) {
+                            $table->string('remote_file_id')->nullable();
+                        }
+                        if (in_array('remote_status', $missingLogColumns, true)) {
+                            $table->string('remote_status', 30)->default('skipped');
+                        }
+                        if (in_array('remote_error', $missingLogColumns, true)) {
+                            $table->text('remote_error')->nullable();
+                        }
+                    });
+                }
+            }
+
+            if (!Schema::hasTable('backup_schedules')) {
+                Schema::create('backup_schedules', function (Blueprint $table) {
+                    $table->id();
+                    $table->boolean('is_automated')->default(false);
+                    $table->string('frequency', 20)->default('daily');
+                    $table->string('time_of_day', 10)->default('02:00');
+                    $table->unsignedTinyInteger('day_of_week')->nullable()->default(0);
+                    $table->unsignedTinyInteger('day_of_month')->nullable()->default(1);
+                    $table->string('backup_type', 20)->default('full');
+                    $table->unsignedInteger('retention_days')->default(30);
+                    $table->unsignedInteger('max_backups_keep')->default(10);
+                    $table->string('custom_backup_path', 500)->nullable();
+                    $table->string('storage_destination', 30)->default('local');
+                    $table->json('destination_config')->nullable();
+                    $table->boolean('notify_on_failure')->default(true);
+                    $table->string('notification_email')->nullable();
+                    $table->timestamp('last_run_at')->nullable();
+                    $table->string('last_run_status', 20)->default('none');
+                    $table->text('last_error_message')->nullable();
+                    $table->timestamps();
+                });
+            } elseif (!Schema::hasColumn('backup_schedules', 'custom_backup_path')) {
+                Schema::table('backup_schedules', function (Blueprint $table) {
+                    $table->string('custom_backup_path', 500)->nullable();
+                });
+            }
+        } catch (Throwable $e) {
+            // Ignore schema inspection/alter errors when DB connection is unavailable
         }
     }
 
@@ -37,7 +148,7 @@ class BackupService
      */
     protected function getBackupFilePath(string $filename, string $type): string
     {
-        $extension = match($type) {
+        $extension = match ($type) {
             'full' => 'zip',
             'settings' => 'json',
             default => 'sql.gz',
@@ -46,16 +157,95 @@ class BackupService
     }
 
     /**
+     * Generate a unique backup filename that will not collide with backup_logs.filename unique constraint.
+     */
+    protected function generateUniqueBackupFilename(string $type, string $prefix = 'backup'): string
+    {
+        $timestamp = now()->format('Y-m-d_His');
+        $base = "{$prefix}_{$type}_{$timestamp}";
+        $filename = $base;
+        $counter = 1;
+
+        try {
+            while (BackupLog::where('filename', $filename)->exists()) {
+                $filename = "{$base}_{$counter}";
+                $counter++;
+            }
+        } catch (Throwable) {
+            // Ignore if table check fails
+        }
+
+        return $filename;
+    }
+
+    /**
+     * Check whether a configured custom backup path belongs to a foreign machine/OS user
+     * that cannot exist on the current host (e.g. a macOS /Users/otheruser path when running on Windows
+     * or on a different macOS user account).
+     */
+    public function isReachableHostPath(?string $path): bool
+    {
+        $trimmed = trim((string) $path);
+        if ($trimmed === '') {
+            return false;
+        }
+
+        $isWindows = strtoupper(substr(PHP_OS, 0, 3)) === 'WIN';
+
+        // Unix absolute path on Windows or Windows drive path on Unix
+        if ($isWindows && str_starts_with($trimmed, '/Users/')) {
+            return false;
+        }
+        if (!$isWindows && preg_match('/^[A-Za-z]:[\\\\\/]/', $trimmed)) {
+            return false;
+        }
+
+        // On macOS, /Users/<username>/... cannot be created if /Users/<username> does not exist
+        if (!$isWindows && preg_match('#^/Users/([^/]+)(/.*)?$#', $trimmed, $m)) {
+            $userRoot = '/Users/' . $m[1];
+            if (!is_dir($userRoot)) {
+                return false;
+            }
+        }
+
+        // On Windows, C:\Users\<username>\... cannot be created if C:\Users\<username> does not exist
+        if ($isWindows && preg_match('#^([A-Za-z]:[\\\\/]Users[\\\\/][^\\\\/]+)([\\\\/].*)?$#i', $trimmed, $m)) {
+            if (!is_dir($m[1])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Create a new backup
      */
     public function createBackup(string $type, ?int $userId = null, bool $isAutomated = false, ?string $customBackupPath = null): BackupLog
     {
-        $timestamp = now()->format('Y-m-d_His');
-        $filename = "backup_{$type}_{$timestamp}";
-        
-        $schedule = \App\Models\BackupSchedule::getSchedule();
-        $destinationPath = $customBackupPath ?? $schedule->custom_backup_path;
-        $destinationType = !empty($destinationPath) ? 'custom_folder' : 'local';
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
+
+        $this->ensureBackupDirectoryExists();
+        $this->ensureBackupSchema();
+
+        $filename = $this->generateUniqueBackupFilename($type);
+
+        $schedule = BackupSchedule::getSchedule();
+        $configuredSchedulePath = ($schedule->storage_destination === 'custom_folder')
+            ? $schedule->custom_backup_path
+            : null;
+
+        $destinationPath = $customBackupPath !== null
+            ? trim($customBackupPath)
+            : trim((string) $configuredSchedulePath);
+
+        if ($destinationPath !== '' && !$this->isReachableHostPath($destinationPath)) {
+            Log::warning("Skipping unreachable custom backup path from another host: {$destinationPath}");
+            $destinationPath = '';
+        }
+
+        $destinationType = $destinationPath !== '' ? 'custom_folder' : 'local';
 
         $backupLog = BackupLog::create([
             'filename' => $filename,
@@ -65,7 +255,7 @@ class BackupService
             'created_by' => $userId,
             'is_automated' => $isAutomated,
             'storage_destination' => $destinationType,
-            'remote_status' => !empty($destinationPath) ? 'pending' : 'skipped',
+            'remote_status' => $destinationPath !== '' ? 'pending' : 'skipped',
             'status' => 'pending',
         ]);
 
@@ -86,22 +276,32 @@ class BackupService
             $backupLog->refresh();
 
             // Copy to user's custom backup folder if configured
-            if (!empty($destinationPath)) {
+            if ($destinationPath !== '') {
                 $this->copyToCustomFolder($backupLog, $destinationPath);
             }
-            
+
             // Clean up old backups based on retention settings
             $this->cleanupOldBackups();
 
             return $backupLog;
 
-        } catch (\Exception $e) {
-            $backupLog->update([
-                'status' => 'failed',
-                'error_message' => $e->getMessage(),
+        } catch (Throwable $e) {
+            Log::error('Backup creation failed: ' . $e->getMessage(), [
+                'type' => $type,
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
-            
-            throw $e;
+
+            try {
+                $backupLog->update([
+                    'status' => 'failed',
+                    'error_message' => $e->getMessage(),
+                ]);
+            } catch (Throwable) {
+            }
+
+            throw new \RuntimeException($e->getMessage(), (int) $e->getCode(), $e);
         }
     }
 
@@ -200,7 +400,7 @@ class BackupService
     }
 
     /**
-     * Quote a string value safely for SQL dump generation using PDO::quote().
+     * Quote a string value safely for MySQL dump generation using PDO::quote().
      */
     protected function quoteSqlValue(string $value): string
     {
@@ -212,15 +412,23 @@ class BackupService
                     return $quoted;
                 }
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             // Fall through to manual escaping
         }
 
         return "'" . str_replace(
             ["\\", "\0", "\n", "\r", "'", '"', "\x1a"],
-            ["\\\\", "\\0", "\\n", "\\r", "\\'", '\\"', "\\Z"],
+            ["\\\\", "\\0", "\\n", "\\r", "''", '\\"', "\\Z"],
             $value
         ) . "'";
+    }
+
+    /**
+     * Quote a string literal according to standard SQL / SQLite rules (single quotes doubled).
+     */
+    protected function quoteStandardSqlString(string $value): string
+    {
+        return "'" . str_replace("'", "''", $value) . "'";
     }
 
     /**
@@ -241,12 +449,12 @@ class BackupService
             }
 
             if (!is_writable($destinationDir)) {
-                throw new \Exception("The destination folder [{$destinationDir}] is not writable. Please check folder permissions.");
+                throw new \RuntimeException("The destination folder [{$destinationDir}] is not writable. Please check folder permissions.");
             }
 
             $localFile = $this->getBackupFilePath($backupLog->filename, $backupLog->type);
             if (!File::exists($localFile)) {
-                throw new \Exception("Source backup file [{$localFile}] not found.");
+                throw new \RuntimeException("Source backup file [{$localFile}] not found.");
             }
 
             $targetFile = rtrim($destinationDir, DIRECTORY_SEPARATOR . '/\\') . DIRECTORY_SEPARATOR . basename($localFile);
@@ -260,12 +468,12 @@ class BackupService
             ]);
 
             // Prune old backups in the custom folder
-            $schedule = \App\Models\BackupSchedule::getSchedule();
+            $schedule = BackupSchedule::getSchedule();
             $maxKeep = $schedule->max_backups_keep ?? $this->maxBackups;
             $retentionDays = $schedule->retention_days ?? $this->retentionDays;
             $this->pruneCustomFolder($destinationDir, $maxKeep, $retentionDays);
 
-        } catch (\Exception $e) {
+        } catch (Throwable $e) {
             Log::error("Copying backup to custom folder failed: " . $e->getMessage());
             $backupLog->update([
                 'storage_destination' => 'custom_folder',
@@ -291,17 +499,109 @@ class BackupService
 
         // Sort files by modified time descending (newest first)
         usort($files, function ($a, $b) {
-            return filemtime($b) <=> filemtime($a);
+            return @filemtime($b) <=> @filemtime($a);
         });
 
         $expiredTimestamp = now()->subDays($retentionDays)->timestamp;
 
         foreach ($files as $index => $filepath) {
-            $mtime = filemtime($filepath);
-            if ($index >= $maxKeep || $mtime < $expiredTimestamp) {
+            $mtime = @filemtime($filepath);
+            if ($index >= $maxKeep || ($mtime !== false && $mtime < $expiredTimestamp)) {
                 @unlink($filepath);
             }
         }
+    }
+
+    /**
+     * Resolve the SQLite database file path across CLI, PHP-FPM, and Laravel Herd environments.
+     */
+    protected function resolveSqliteDatabasePath(): ?string
+    {
+        $config = config('database.connections.sqlite', []);
+        $candidates = array_filter([
+            $config['database'] ?? null,
+             rescue(fn () => DB::connection('sqlite')->getDatabaseName(), null, false),
+            database_path('database.sqlite'),
+        ]);
+
+        foreach ($candidates as $candidate) {
+            if ($candidate === ':memory:') {
+                return ':memory:';
+            }
+            if (is_file($candidate)) {
+                return realpath($candidate) ?: $candidate;
+            }
+            $fromBase = base_path($candidate);
+            if (is_file($fromBase)) {
+                return realpath($fromBase) ?: $fromBase;
+            }
+            $fromDb = database_path($candidate);
+            if (is_file($fromDb)) {
+                return realpath($fromDb) ?: $fromDb;
+            }
+        }
+
+        return $config['database'] ?? null;
+    }
+
+    /**
+     * Read a consistent binary snapshot of a file-backed SQLite database (including any active WAL pages).
+     */
+    protected function readSqliteDatabaseContent(string $dbPath): string
+    {
+        $snapshotPath = $this->backupPath . '/temp_sqlite_snapshot_' . uniqid('', true) . '.sqlite';
+
+        try {
+            if (file_exists($snapshotPath)) {
+                @unlink($snapshotPath);
+            }
+
+            // SQLite 3.27+ VACUUM INTO creates a transactionally consistent, checkpointed single-file copy
+            $escapedSnapshot = str_replace("'", "''", $snapshotPath);
+            DB::connection('sqlite')->statement("VACUUM INTO '{$escapedSnapshot}'");
+
+            if (is_file($snapshotPath) && filesize($snapshotPath) > 0) {
+                $content = file_get_contents($snapshotPath);
+                @unlink($snapshotPath);
+                if ($content !== false && $content !== '') {
+                    return $content;
+                }
+            }
+        } catch (Throwable) {
+            if (file_exists($snapshotPath)) {
+                @unlink($snapshotPath);
+            }
+        }
+
+        // Fallback: checkpoint WAL passively then read file bytes directly
+        try {
+            DB::connection('sqlite')->statement('PRAGMA wal_checkpoint(PASSIVE);');
+        } catch (Throwable) {
+        }
+
+        $content = @file_get_contents($dbPath);
+        if ($content === false || $content === '') {
+            return $this->generateSqlDump();
+        }
+
+        return $content;
+    }
+
+    /**
+     * Resolve active database name for metadata and SQL dump headers.
+     */
+    protected function resolveDatabaseName(): string
+    {
+        $driver = config('database.default', 'sqlite');
+        try {
+            $name = DB::connection()->getDatabaseName();
+            if (!empty($name)) {
+                return (string) $name;
+            }
+        } catch (Throwable) {
+        }
+
+        return (string) (config("database.connections.{$driver}.database") ?? config('database.database') ?? 'karobar');
     }
 
     /**
@@ -310,34 +610,39 @@ class BackupService
     protected function createDatabaseBackup(BackupLog $backupLog): void
     {
         $filepath = $this->getBackupFilePath($backupLog->filename, 'database');
-        
-        // Get database connection config
         $driver = config('database.default');
-        $config = config("database.connections.$driver");
-        
-        $sqlContent = '';
-        
-        if ($driver === 'sqlite' && !empty($config['database']) && file_exists($config['database'])) {
-            // For SQLite file on disk, copy the raw binary database file content directly without text headers
-            $dbPath = $config['database'];
-            $sqlContent = file_get_contents($dbPath);
+
+        $sqlitePath = $driver === 'sqlite' ? $this->resolveSqliteDatabasePath() : null;
+
+        if ($driver === 'sqlite' && $sqlitePath && $sqlitePath !== ':memory:' && is_file($sqlitePath)) {
+            $sqlContent = $this->readSqliteDatabaseContent($sqlitePath);
         } else {
-            // For in-memory SQLite (:memory:), MySQL, MariaDB, or PostgreSQL, generate SQL dump
             $sqlContent = $this->generateSqlDump();
         }
-        
-        // Compress with gzip
-        $gzContent = gzencode($sqlContent, 9);
-        file_put_contents($filepath, $gzContent);
-        
+
+        if ($sqlContent === '') {
+            throw new \RuntimeException('Database dump produced empty content.');
+        }
+
+        $gzContent = function_exists('gzencode') ? gzencode($sqlContent, 6) : $sqlContent;
+        if ($gzContent === false) {
+            throw new \RuntimeException('Failed to compress database backup.');
+        }
+
+        if (file_put_contents($filepath, $gzContent) === false) {
+            throw new \RuntimeException("Failed to write database backup file to [{$filepath}]. Check storage permissions.");
+        }
+
+        clearstatcache(true, $filepath);
+
         $backupLog->update([
             'path' => 'backups/' . basename($filepath),
-            'size' => filesize($filepath),
+            'size' => (int) @filesize($filepath),
             'status' => 'completed',
             'metadata' => [
-                'database' => config('database.database'),
+                'database' => basename($this->resolveDatabaseName()),
                 'driver' => $driver,
-                'compressed' => true,
+                'compressed' => function_exists('gzencode'),
             ],
         ]);
     }
@@ -348,85 +653,129 @@ class BackupService
     protected function generateSqlDump(): string
     {
         $driver = config('database.default');
-        
+
         if ($driver === 'mysql' || $driver === 'mariadb') {
             return $this->generateMysqlDump();
         } elseif ($driver === 'pgsql') {
             return $this->generatePgsqlDump();
         }
-        
+
         return $this->generateGenericDump();
     }
 
     /**
-     * Generate MySQL dump
+     * Generate MySQL / MariaDB dump safely across any database name on Laravel Herd / standard MySQL.
      */
     protected function generateMysqlDump(): string
     {
-        $output = "-- Pharmacy ERP Database Backup\n";
+        $driver = config('database.default', 'mysql');
+        $dbName = $this->resolveDatabaseName();
+
+        $output = "-- Karobar ERP Database Backup (MySQL/MariaDB)\n";
         $output .= "-- Generated: " . now()->toIso8601String() . "\n";
-        $output .= "-- Database: " . (config('database.database') ?? 'unknown') . "\n\n";
-        
-        // Get all tables
-        $tables = DB::select('SHOW TABLES');
-        $tablePrefix = config('database.connections.mysql.prefix', '');
-        $key = 'Tables_in_' . (config('database.database') ?? 'database');
-        
+        $output .= "-- Database: " . $dbName . "\n\n";
+        $output .= "SET FOREIGN_KEY_CHECKS = 0;\n";
+        $output .= "SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';\n\n";
+
+        try {
+            $tables = DB::select("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'");
+        } catch (Throwable) {
+            $tables = DB::select('SHOW TABLES');
+        }
+
+        $tablePrefix = (string) config("database.connections.{$driver}.prefix", '');
+
         foreach ($tables as $table) {
-            $tableName = $table->$key;
-            if ($tablePrefix && !str_starts_with($tableName, $tablePrefix)) {
+            $rowValues = array_values((array) $table);
+            $tableName = $rowValues[0] ?? null;
+            if (!is_string($tableName) || $tableName === '') {
                 continue;
             }
-            
-            $output .= "\n-- Table structure for `$tableName`\n";
-            $output .= "DROP TABLE IF EXISTS `$tableName`;\n";
-            
-            // Get create statement
+
+            if ($tablePrefix !== '' && !str_starts_with($tableName, $tablePrefix)) {
+                continue;
+            }
+
+            $output .= "\n-- Table structure for `{$tableName}`\n";
+            $output .= "DROP TABLE IF EXISTS `{$tableName}`;\n";
+
             try {
-                $createResult = DB::select("SHOW CREATE TABLE `$tableName`");
+                $createResult = DB::select("SHOW CREATE TABLE `{$tableName}`");
                 if (!empty($createResult)) {
                     $createRow = (array) $createResult[0];
-                    $createSql = array_values($createRow)[1];
-                    $output .= $createSql . ";\n\n";
+                    $createSql = $createRow['Create Table'] ?? (array_values($createRow)[1] ?? null);
+                    if (is_string($createSql) && $createSql !== '') {
+                        $output .= $createSql . ";\n\n";
+                    }
                 }
-            } catch (\Exception $e) {
-                $output .= "-- Could not get CREATE TABLE structure\n\n";
+            } catch (Throwable $e) {
+                $output .= "-- Could not get CREATE TABLE structure: " . $e->getMessage() . "\n\n";
             }
-            
-            // Get table data
+
+            if (in_array($tableName, $this->ephemeralTables, true)) {
+                continue;
+            }
+
             try {
-                $rows = DB::table($tableName)->get();
-                if ($rows->isNotEmpty()) {
-                    $output .= "-- Dumping data for `$tableName`\n";
-                    
-                    $columns = DB::getSchemaBuilder()->getColumnListing($tableName);
-                    $columnList = '`' . implode('`, `', $columns) . '`';
-                    
+                $columns = DB::getSchemaBuilder()->getColumnListing($tableName);
+                if (empty($columns)) {
+                    continue;
+                }
+
+                $columnList = '`' . implode('`, `', $columns) . '`';
+                $hasHeader = false;
+
+                DB::table($tableName)->orderBy($columns[0])->chunk(250, function ($rows) use (&$output, &$hasHeader, $tableName, $columns, $columnList) {
+                    if ($rows->isEmpty()) {
+                        return;
+                    }
+
+                    if (!$hasHeader) {
+                        $output .= "-- Dumping data for `{$tableName}`\n";
+                        $hasHeader = true;
+                    }
+
+                    $tuples = [];
                     foreach ($rows as $row) {
+                        $rowArr = (array) $row;
                         $values = [];
                         foreach ($columns as $col) {
-                            $value = $row->$col;
+                            $value = $rowArr[$col] ?? null;
                             if ($value === null) {
                                 $values[] = 'NULL';
                             } elseif (is_bool($value)) {
                                 $values[] = $value ? '1' : '0';
-                            } elseif (is_numeric($value)) {
-                                $values[] = $value;
+                            } elseif (is_int($value) || is_float($value)) {
+                                $values[] = (string) $value;
                             } elseif (is_string($value)) {
                                 $values[] = $this->quoteSqlValue($value);
                             } else {
                                 $values[] = $this->quoteSqlValue((string) json_encode($value));
                             }
                         }
-                        $output .= "INSERT INTO `$tableName` ($columnList) VALUES (" . implode(', ', $values) . ");\n";
+                        $tuples[] = '(' . implode(', ', $values) . ')';
+
+                        if (count($tuples) >= 100) {
+                            $output .= "INSERT INTO `{$tableName}` ({$columnList}) VALUES " . implode(",\n", $tuples) . ";\n";
+                            $tuples = [];
+                        }
                     }
+
+                    if (!empty($tuples)) {
+                        $output .= "INSERT INTO `{$tableName}` ({$columnList}) VALUES " . implode(",\n", $tuples) . ";\n";
+                    }
+                });
+
+                if ($hasHeader) {
                     $output .= "\n";
                 }
-            } catch (\Exception $e) {
-                $output .= "-- Could not dump table data: " . $e->getMessage() . "\n\n";
+            } catch (Throwable $e) {
+                $output .= "-- Could not dump table data for {$tableName}: " . $e->getMessage() . "\n\n";
             }
         }
-        
+
+        $output .= "\nSET FOREIGN_KEY_CHECKS = 1;\n";
+
         return $output;
     }
 
@@ -435,101 +784,117 @@ class BackupService
      */
     protected function generatePgsqlDump(): string
     {
-        $output = "-- Pharmacy ERP Database Backup (PostgreSQL)\n";
+        $output = "-- Karobar ERP Database Backup (PostgreSQL)\n";
         $output .= "-- Generated: " . now()->toIso8601String() . "\n\n";
-        
+
         try {
             $tables = DB::select("SELECT tablename FROM pg_tables WHERE schemaname = 'public'");
-            
+
             foreach ($tables as $table) {
-                $tableName = $table->tablename;
-                $output .= "-- Table: $tableName\n\n";
-                
+                $tableName = $table->tablename ?? null;
+                if (!$tableName || in_array($tableName, $this->ephemeralTables, true)) {
+                    continue;
+                }
+
+                $output .= "-- Table: {$tableName}\n\n";
+
                 try {
-                    $rows = DB::table($tableName)->get();
-                    if ($rows->isNotEmpty()) {
-                        $columns = DB::getSchemaBuilder()->getColumnListing($tableName);
-                        $columnList = '"' . implode('", "', $columns) . '"';
-                        
-                        foreach ($rows as $row) {
-                            $values = [];
-                            foreach ($columns as $col) {
-                                $value = $row->$col;
-                                if ($value === null) {
-                                    $values[] = 'NULL';
-                                } elseif (is_bool($value)) {
-                                    $values[] = $value ? 'TRUE' : 'FALSE';
-                                } elseif (is_numeric($value)) {
-                                    $values[] = $value;
-                                } else {
-                                    $values[] = "'" . str_replace("'", "''", $value) . "'";
-                                }
-                            }
-                            $output .= "INSERT INTO \"$tableName\" ($columnList) VALUES (" . implode(', ', $values) . ");\n";
-                        }
-                        $output .= "\n";
+                    $columns = DB::getSchemaBuilder()->getColumnListing($tableName);
+                    if (empty($columns)) {
+                        continue;
                     }
-                } catch (\Exception $e) {
+
+                    $columnList = '"' . implode('", "', $columns) . '"';
+                    $rows = DB::table($tableName)->get();
+
+                    foreach ($rows as $row) {
+                        $rowArr = (array) $row;
+                        $values = [];
+                        foreach ($columns as $col) {
+                            $value = $rowArr[$col] ?? null;
+                            if ($value === null) {
+                                $values[] = 'NULL';
+                            } elseif (is_bool($value)) {
+                                $values[] = $value ? 'TRUE' : 'FALSE';
+                            } elseif (is_int($value) || is_float($value)) {
+                                $values[] = (string) $value;
+                            } else {
+                                $values[] = $this->quoteStandardSqlString((string) $value);
+                            }
+                        }
+                        $output .= "INSERT INTO \"{$tableName}\" ({$columnList}) VALUES (" . implode(', ', $values) . ");\n";
+                    }
+                    $output .= "\n";
+                } catch (Throwable $e) {
                     $output .= "-- Could not dump table data: " . $e->getMessage() . "\n\n";
                 }
             }
-        } catch (\Exception $e) {
+        } catch (Throwable $e) {
             $output .= "-- Could not get tables: " . $e->getMessage() . "\n";
         }
-        
+
         return $output;
     }
 
     /**
-     * Generate generic SQL dump
+     * Generate generic SQLite SQL dump (for :memory: SQLite or fallback).
      */
     protected function generateGenericDump(): string
     {
-        $output = "-- Pharmacy ERP Database Backup\n";
+        $output = "-- Karobar ERP Database Backup\n";
         $output .= "-- Generated: " . now()->toIso8601String() . "\n\n";
-        
+
         try {
             $tables = DB::select("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'migrations'");
-            
+
             foreach ($tables as $table) {
-                $tableName = $table->name;
-                $output .= "-- Table: $tableName\n";
-                $output .= "DELETE FROM `$tableName`;\n";
-                
+                $tableName = $table->name ?? null;
+                if (!$tableName || in_array($tableName, $this->ephemeralTables, true)) {
+                    continue;
+                }
+
+                $output .= "-- Table: {$tableName}\n";
+                $output .= "DELETE FROM `{$tableName}`;\n";
+
                 try {
+                    $columns = DB::getSchemaBuilder()->getColumnListing($tableName);
+                    if (empty($columns)) {
+                        continue;
+                    }
+
+                    $columnList = '`' . implode('`, `', $columns) . '`';
                     $rows = DB::table($tableName)->get();
+
                     if ($rows->isNotEmpty()) {
-                        $columns = DB::getSchemaBuilder()->getColumnListing($tableName);
-                        $columnList = '`' . implode('`, `', $columns) . '`';
-                        
                         foreach ($rows as $row) {
+                            $rowArr = (array) $row;
                             $values = [];
                             foreach ($columns as $col) {
-                                $value = $row->$col;
+                                $value = $rowArr[$col] ?? null;
                                 if ($value === null) {
                                     $values[] = 'NULL';
                                 } elseif (is_bool($value)) {
                                     $values[] = $value ? '1' : '0';
-                                } elseif (is_numeric($value)) {
-                                    $values[] = $value;
+                                } elseif (is_int($value) || is_float($value)) {
+                                    $values[] = (string) $value;
                                 } elseif (is_string($value)) {
-                                    $values[] = "'" . addslashes($value) . "'";
+                                    $values[] = $this->quoteStandardSqlString($value);
                                 } else {
-                                    $values[] = "'" . addslashes(json_encode($value)) . "'";
+                                    $values[] = $this->quoteStandardSqlString((string) json_encode($value));
                                 }
                             }
-                            $output .= "INSERT INTO `$tableName` ($columnList) VALUES (" . implode(', ', $values) . ");\n";
+                            $output .= "INSERT INTO `{$tableName}` ({$columnList}) VALUES (" . implode(', ', $values) . ");\n";
                         }
                         $output .= "\n";
                     }
-                } catch (\Exception $e) {
+                } catch (Throwable $e) {
                     $output .= "-- Could not dump table data: " . $e->getMessage() . "\n\n";
                 }
             }
-        } catch (\Exception $e) {
+        } catch (Throwable $e) {
             $output .= "-- Could not get tables: " . $e->getMessage() . "\n";
         }
-        
+
         return $output;
     }
 
@@ -539,21 +904,26 @@ class BackupService
     protected function createSettingsBackup(BackupLog $backupLog): void
     {
         $filepath = $this->getBackupFilePath($backupLog->filename, 'settings');
-        
+
         $settings = \App\Models\Setting::first();
-        
+
         $backupData = [
             'generated_at' => now()->toIso8601String(),
             'type' => 'settings',
             'version' => '1.0',
             'data' => $settings ? $settings->toArray() : null,
         ];
-        
-        file_put_contents($filepath, json_encode($backupData, JSON_PRETTY_PRINT));
-        
+
+        $written = file_put_contents($filepath, json_encode($backupData, JSON_PRETTY_PRINT));
+        if ($written === false) {
+            throw new \RuntimeException("Failed to write settings backup file to [{$filepath}]. Check storage permissions.");
+        }
+
+        clearstatcache(true, $filepath);
+
         $backupLog->update([
             'path' => 'backups/' . basename($filepath),
-            'size' => filesize($filepath),
+            'size' => (int) @filesize($filepath),
             'status' => 'completed',
             'metadata' => [
                 'settings_backup' => true,
@@ -562,46 +932,33 @@ class BackupService
     }
 
     /**
-     * Create full backup (database + settings + files)
+     * Create full backup (database + settings + files).
+     * Works with ZipArchive when ext-zip is enabled, and automatically falls back to a
+     * pure-PHP PKZIP archive builder when ext-zip is not enabled on Laravel Herd.
      */
     protected function createFullBackup(BackupLog $backupLog): void
     {
         $filepath = $this->getBackupFilePath($backupLog->filename, 'full');
-        
-        $zip = new ZipArchive();
-        
-        if ($zip->open($filepath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            throw new \Exception('Could not create zip archive');
-        }
-        
-        // Add database backup
-        $dbFilename = "database.sql.gz";
-        $tempDbPath = $this->backupPath . '/temp_db_' . time() . '.sql.gz';
-        
+        $dbFilename = 'database.sql.gz';
         $driver = config('database.default');
-        
-        $dbContent = '';
-        if ($driver === 'sqlite') {
-            $config = config('database.connections.sqlite');
-            if (!empty($config['database']) && file_exists($config['database'])) {
-                $dbPath = $config['database'];
-                $dbContent = file_get_contents($dbPath);
-            } else {
-                $dbContent = $this->generateSqlDump();
-            }
+
+        $sqlitePath = $driver === 'sqlite' ? $this->resolveSqliteDatabasePath() : null;
+
+        if ($driver === 'sqlite' && $sqlitePath && $sqlitePath !== ':memory:' && is_file($sqlitePath)) {
+            $dbContent = $this->readSqliteDatabaseContent($sqlitePath);
         } else {
             $dbContent = $this->generateSqlDump();
         }
-        
-        if (!empty($dbContent)) {
-            $gzContent = gzencode($dbContent, 9);
-            file_put_contents($tempDbPath, $gzContent);
-            if (file_exists($tempDbPath)) {
-                $zip->addFile($tempDbPath, 'database/' . $dbFilename);
+
+        $entries = [];
+
+        if ($dbContent !== '') {
+            $gzContent = function_exists('gzencode') ? gzencode($dbContent, 6) : $dbContent;
+            if ($gzContent !== false) {
+                $entries['database/' . $dbFilename] = $gzContent;
             }
         }
-        
-        // Add settings backup
+
         $settings = \App\Models\Setting::first();
         $settingsData = [
             'generated_at' => now()->toIso8601String(),
@@ -609,17 +966,20 @@ class BackupService
             'version' => '1.0',
             'data' => $settings ? $settings->toArray() : null,
         ];
-        $zip->addFromString('settings.json', json_encode($settingsData, JSON_PRETTY_PRINT));
-        
-        // Add logo files if exist
+        $entries['settings.json'] = (string) json_encode($settingsData, JSON_PRETTY_PRINT);
+
+        $hasLogoFile = false;
         if ($settings && $settings->logo_path) {
-            $fullLogoPath = storage_path('app/public/' . $settings->logo_path);
-            if (file_exists($fullLogoPath)) {
-                $zip->addFile($fullLogoPath, 'files/' . basename($settings->logo_path));
+            $fullLogoPath = storage_path('app/public/' . ltrim($settings->logo_path, '/\\'));
+            if (is_file($fullLogoPath)) {
+                $logoBytes = @file_get_contents($fullLogoPath);
+                if ($logoBytes !== false) {
+                    $entries['files/' . basename($settings->logo_path)] = $logoBytes;
+                    $hasLogoFile = true;
+                }
             }
         }
-        
-        // Add manifest
+
         $manifest = [
             'generated_at' => now()->toIso8601String(),
             'type' => 'full',
@@ -627,27 +987,276 @@ class BackupService
             'database_driver' => $driver,
             'database_backup' => 'database/' . $dbFilename,
             'settings_backup' => 'settings.json',
-            'files_included' => !empty($settings?->logo_path),
+            'files_included' => $hasLogoFile,
         ];
-        
-        $zip->addFromString('manifest.json', json_encode($manifest, JSON_PRETTY_PRINT));
-        $zip->close();
-        
-        // Clean up temp file
-        if (file_exists($tempDbPath)) {
-            unlink($tempDbPath);
+        $entries['manifest.json'] = (string) json_encode($manifest, JSON_PRETTY_PRINT);
+
+        $this->writeZipArchiveEntries($filepath, $entries);
+
+        clearstatcache(true, $filepath);
+        if (!is_file($filepath) || (int) @filesize($filepath) === 0) {
+            throw new \RuntimeException('Failed to create full backup ZIP archive.');
         }
-        
+
         $backupLog->update([
             'path' => 'backups/' . basename($filepath),
-            'size' => filesize($filepath),
+            'size' => (int) @filesize($filepath),
             'status' => 'completed',
             'metadata' => [
                 'database_backup' => $dbFilename,
                 'settings_backup' => true,
-                'files_included' => !empty($settings?->logo_path),
+                'files_included' => $hasLogoFile,
             ],
         ]);
+    }
+
+    /**
+     * Write a map of [entryName => binaryContent] to a .zip file using ZipArchive if available,
+     * or pure-PHP PKZIP format if ext-zip is not installed/enabled on Laravel Herd.
+     */
+    public function writeZipArchiveEntries(string $filepath, array $entries): void
+    {
+        $dir = dirname($filepath);
+        if (!File::exists($dir)) {
+            File::makeDirectory($dir, 0755, true, true);
+        }
+
+        if (class_exists(ZipArchive::class)) {
+            try {
+                $zip = new ZipArchive();
+                if ($zip->open($filepath, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true) {
+                    foreach ($entries as $entryName => $content) {
+                        $zip->addFromString($entryName, (string) $content);
+                    }
+                    if ($zip->close() && is_file($filepath) && filesize($filepath) > 0) {
+                        return;
+                    }
+                }
+            } catch (Throwable) {
+                // Fall through to pure-PHP PKZIP builder
+            }
+        }
+
+        $this->writePurePhpZipArchive($filepath, $entries);
+    }
+
+    /**
+     * Pure-PHP PKZIP writer (requires zero extensions beyond core PHP).
+     */
+    public function writePurePhpZipArchive(string $filepath, array $entries): void
+    {
+        $fh = @fopen($filepath, 'wb');
+        if ($fh === false) {
+            throw new \RuntimeException("Cannot open [{$filepath}] for writing ZIP archive.");
+        }
+
+        $centralDirectory = '';
+        $offset = 0;
+        $entryCount = 0;
+        $canDeflate = function_exists('gzdeflate');
+
+        try {
+            foreach ($entries as $rawName => $content) {
+                $name = ltrim(str_replace('\\', '/', (string) $rawName), '/');
+                $data = (string) $content;
+                $uncompressedSize = strlen($data);
+                $crc = crc32($data);
+
+                if ($canDeflate && $uncompressedSize > 0) {
+                    $compressedData = gzdeflate($data, 6);
+                    if ($compressedData !== false && strlen($compressedData) < $uncompressedSize) {
+                        $method = 8; // Deflate
+                    } else {
+                        $compressedData = $data;
+                        $method = 0; // Store
+                    }
+                } else {
+                    $compressedData = $data;
+                    $method = 0; // Store
+                }
+
+                $compressedSize = strlen($compressedData);
+                $nameLength = strlen($name);
+
+                // Local file header (signature 0x04034b50)
+                $localHeader = pack(
+                    'VvvvvvVVVvv',
+                    0x04034b50,
+                    20, // version needed to extract (2.0)
+                    0,  // general purpose bit flag
+                    $method,
+                    0,  // last mod file time
+                    0,  // last mod file date
+                    $crc,
+                    $compressedSize,
+                    $uncompressedSize,
+                    $nameLength,
+                    0   // extra field length
+                ) . $name;
+
+                fwrite($fh, $localHeader);
+                if ($compressedSize > 0) {
+                    fwrite($fh, $compressedData);
+                }
+
+                // Central directory file header (signature 0x02014b50)
+                $centralDirectory .= pack(
+                    'VvvvvvvVVVvvvvvVV',
+                    0x02014b50,
+                    20, // version made by
+                    20, // version needed to extract
+                    0,  // general purpose bit flag
+                    $method,
+                    0,  // last mod file time
+                    0,  // last mod file date
+                    $crc,
+                    $compressedSize,
+                    $uncompressedSize,
+                    $nameLength,
+                    0,  // extra field length
+                    0,  // file comment length
+                    0,  // disk number start
+                    0,  // internal file attributes
+                    32, // external file attributes (archive bit)
+                    $offset
+                ) . $name;
+
+                $offset += strlen($localHeader) + $compressedSize;
+                $entryCount++;
+            }
+
+            // End of central directory record (signature 0x06054b50)
+            $eocd = pack(
+                'VvvvvVVv',
+                0x06054b50,
+                0,
+                0,
+                $entryCount,
+                $entryCount,
+                strlen($centralDirectory),
+                $offset,
+                0
+            );
+
+            fwrite($fh, $centralDirectory);
+            fwrite($fh, $eocd);
+        } finally {
+            fclose($fh);
+        }
+    }
+
+    /**
+     * Read all entries [entryName => uncompressedContent] from a .zip file using ZipArchive
+     * or pure-PHP PKZIP reader fallback.
+     */
+    public function readZipArchiveEntries(string $filepath, bool $namesOnly = false): array
+    {
+        if (!is_file($filepath)) {
+            throw new \RuntimeException('Could not open backup zip file.');
+        }
+
+        if (class_exists(ZipArchive::class)) {
+            $zip = new ZipArchive();
+            if ($zip->open($filepath) === true) {
+                $entries = [];
+                for ($i = 0; $i < $zip->numFiles; $i++) {
+                    $name = $zip->getNameIndex($i);
+                    if ($name === false) {
+                        continue;
+                    }
+                    $this->assertSafeZipEntryName($name);
+                    if (str_ends_with($name, '/')) {
+                        continue;
+                    }
+                    $entries[$name] = $namesOnly ? true : (string) $zip->getFromIndex($i);
+                }
+                $zip->close();
+                return $entries;
+            }
+        }
+
+        return $this->readPurePhpZipArchiveEntries($filepath, $namesOnly);
+    }
+
+    /**
+     * Pure-PHP PKZIP reader for listing and extracting ZIP entries without ext-zip.
+     */
+    public function readPurePhpZipArchiveEntries(string $filepath, bool $namesOnly = false): array
+    {
+        $raw = @file_get_contents($filepath);
+        if ($raw === false || strlen($raw) < 22 || substr($raw, 0, 4) !== "PK\x03\x04") {
+            throw new \RuntimeException('Cannot open ZIP file. File may be corrupted.');
+        }
+
+        $entries = [];
+        $len = strlen($raw);
+        $pos = 0;
+
+        while ($pos + 30 <= $len) {
+            $sig = substr($raw, $pos, 4);
+            if ($sig === "PK\x01\x02" || $sig === "PK\x05\x06") {
+                // Reached central directory
+                break;
+            }
+            if ($sig !== "PK\x03\x04") {
+                throw new \RuntimeException('Invalid local header inside ZIP archive.');
+            }
+
+            $header = unpack('vversion/vflag/vmethod/vtime/vdate/Vcrc/VcompSize/VuncompSize/vnameLen/vextraLen', substr($raw, $pos + 4, 26));
+            $nameLen = $header['nameLen'];
+            $extraLen = $header['extraLen'];
+            $compSize = $header['compSize'];
+            $method = $header['method'];
+
+            $namePos = $pos + 30;
+            $entryName = substr($raw, $namePos, $nameLen);
+            $this->assertSafeZipEntryName($entryName);
+
+            $dataPos = $namePos + $nameLen + $extraLen;
+            if ($dataPos + $compSize > $len) {
+                throw new \RuntimeException('Truncated ZIP archive entry.');
+            }
+
+            if (!str_ends_with($entryName, '/')) {
+                if ($namesOnly) {
+                    $entries[$entryName] = true;
+                } else {
+                    $compData = substr($raw, $dataPos, $compSize);
+                    if ($method === 0) {
+                        $entries[$entryName] = $compData;
+                    } elseif ($method === 8) {
+                        $inflated = @gzinflate($compData);
+                        if ($inflated === false) {
+                            throw new \RuntimeException("Failed to decompress ZIP entry [{$entryName}].");
+                        }
+                        $entries[$entryName] = $inflated;
+                    } else {
+                        throw new \RuntimeException("Unsupported ZIP compression method [{$method}].");
+                    }
+                }
+            }
+
+            $pos = $dataPos + $compSize;
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Validate a ZIP entry name against Zip-Slip path traversal attacks.
+     */
+    protected function assertSafeZipEntryName(string $entryName): void
+    {
+        if (
+            $entryName === ''
+            || str_contains($entryName, "\0")
+            || preg_match('#(^|[\\\\/])\.\.([\\\\/]|$)#', $entryName)
+            || str_starts_with($entryName, '/')
+            || str_starts_with($entryName, '\\')
+            || str_contains($entryName, ':')
+        ) {
+            throw new \RuntimeException('Unsafe file path detected inside backup archive.');
+        }
     }
 
     /**
@@ -655,6 +1264,8 @@ class BackupService
      */
     public function listBackups(): array
     {
+        $this->ensureBackupSchema();
+
         return BackupLog::orderByDesc('created_at')
             ->get()
             ->map(function ($backup) {
@@ -666,13 +1277,13 @@ class BackupService
                     'size' => $backup->size,
                     'formatted_size' => $backup->formatted_size,
                     'status' => $backup->status,
-                    'is_automated' => (bool)$backup->is_automated,
+                    'is_automated' => (bool) $backup->is_automated,
                     'storage_destination' => $backup->storage_destination ?? 'local',
                     'remote_path' => $backup->remote_path,
                     'remote_status' => $backup->remote_status ?? 'skipped',
                     'remote_error' => $backup->remote_error,
                     'created_at' => $backup->created_at,
-                    'created_at_formatted' => $backup->created_at->format('M d, Y h:i A'),
+                    'created_at_formatted' => $backup->created_at ? $backup->created_at->format('M d, Y h:i A') : '',
                     'error_message' => $backup->error_message,
                     'metadata' => $backup->metadata,
                 ];
@@ -686,19 +1297,18 @@ class BackupService
     public function getBackupForDownload(int $id): ?BackupLog
     {
         $backup = BackupLog::find($id);
-        
+
         if (!$backup || !in_array($backup->status, ['completed', 'restored', 'pending'])) {
             return null;
         }
-        
+
         $filepath = $this->getBackupFilePath($backup->filename, $backup->type);
         if (!file_exists($filepath)) {
             return null;
         }
-        
-        // Temporarily add the full_path property
+
         $backup->full_path = $filepath;
-        
+
         return $backup;
     }
 
@@ -708,7 +1318,7 @@ class BackupService
     public function getDownloadPath(int $id): ?string
     {
         $backup = $this->getBackupForDownload($id);
-        
+
         return $backup?->full_path;
     }
 
@@ -717,23 +1327,26 @@ class BackupService
      */
     public function restoreBackup(int $id, string $password): bool
     {
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
+
         $backup = BackupLog::find($id);
-        
+
         if (!$backup || !in_array($backup->status, ['completed', 'restored', 'pending'])) {
-            throw new \Exception('Backup not found or invalid');
+            throw new \RuntimeException('Backup not found or invalid');
         }
-        
+
         // Verify password
         $user = Auth::user();
         if (!$user || !\Illuminate\Support\Facades\Hash::check($password, $user->password)) {
-            throw new \Exception('Invalid password');
+            throw new \RuntimeException('Invalid password');
         }
-        
+
         $filepath = $this->getBackupFilePath($backup->filename, $backup->type);
         if (!file_exists($filepath)) {
-            throw new \Exception('Backup file not found');
+            throw new \RuntimeException('Backup file not found');
         }
-        
+
         try {
             switch ($backup->type) {
                 case 'database':
@@ -746,27 +1359,31 @@ class BackupService
                     $this->restoreFullBackup($filepath);
                     break;
             }
-            
-            // Update backup log status if it exists in restored database
+
+            // Ensure backup tables still have all current columns after restoring an older snapshot
+            $this->ensureBackupSchema();
+
             try {
                 BackupLog::where('id', $backup->id)->update([
                     'status' => 'restored',
                 ]);
-            } catch (\Exception $ignored) {
+            } catch (Throwable) {
                 // Ignore if the backup record was created after the restored snapshot
             }
-            
+
             return true;
-            
-        } catch (\Exception $e) {
+
+        } catch (Throwable $e) {
             try {
+                $this->ensureBackupSchema();
                 $backup->update([
                     'status' => 'failed',
                     'error_message' => 'Restore failed: ' . $e->getMessage(),
                 ]);
-            } catch (\Exception $ignored) {}
-            
-            throw new \Exception('Restore failed: ' . $e->getMessage());
+            } catch (Throwable) {
+            }
+
+            throw new \RuntimeException('Restore failed: ' . $e->getMessage(), (int) $e->getCode(), $e);
         }
     }
 
@@ -775,16 +1392,18 @@ class BackupService
      */
     protected function restoreDatabaseBackup(string $filepath): void
     {
-        // Decompress
         $compressed = file_get_contents($filepath);
+        if ($compressed === false || $compressed === '') {
+            throw new \RuntimeException('Failed to read backup file');
+        }
+
         $sqlContent = @gzdecode($compressed);
-        
         if ($sqlContent === false) {
             $sqlContent = $compressed;
         }
 
         if (empty($sqlContent)) {
-            throw new \Exception('Failed to read or decompress backup file');
+            throw new \RuntimeException('Failed to read or decompress backup file');
         }
 
         // Preserve this machine's currently valid license across database restores
@@ -799,28 +1418,42 @@ class BackupService
                     unset($preservedLicenseAttributes['id']);
                 }
             }
-        } catch (\Throwable $ignored) {
+        } catch (Throwable) {
         }
-        
-        $driver = config('database.default');
-        
-        if ($driver === 'sqlite') {
-            $config = config('database.connections.sqlite');
-            $dbPath = $config['database'] ?? null;
-            if (!$dbPath) {
-                throw new \Exception('SQLite database path is not configured.');
+
+        // Preserve active user sessions & tokens so the user stays logged in after restore on Herd
+        $preservedSessions = [];
+        $preservedTokens = [];
+        try {
+            if (Schema::hasTable('sessions')) {
+                $preservedSessions = DB::table('sessions')->get()->map(fn ($r) => (array) $r)->all();
             }
-            
+            if (Schema::hasTable('personal_access_tokens')) {
+                $preservedTokens = DB::table('personal_access_tokens')->get()->map(fn ($r) => (array) $r)->all();
+            }
+        } catch (Throwable) {
+        }
+
+        $driver = config('database.default');
+
+        if ($driver === 'sqlite') {
+            $dbPath = $this->resolveSqliteDatabasePath();
+            if (!$dbPath) {
+                throw new \RuntimeException('SQLite database path is not configured.');
+            }
+
             // Check if this backup contains a raw binary SQLite database and target is a file on disk
-            // (even if an older backup had a text header prepended, locate "SQLite format 3")
             $sqliteMagicPos = strpos($sqlContent, 'SQLite format 3');
-            
+
             if ($sqliteMagicPos !== false && $dbPath !== ':memory:') {
                 $rawDbContent = substr($sqlContent, $sqliteMagicPos);
-                
+
                 // Disconnect SQLite PDO to release active file locks
                 DB::disconnect('sqlite');
                 DB::purge('sqlite');
+                if (function_exists('gc_collect_cycles')) {
+                    gc_collect_cycles();
+                }
 
                 // Safety backup of current database
                 if (file_exists($dbPath)) {
@@ -835,15 +1468,36 @@ class BackupService
                     @unlink($dbPath . '-shm');
                 }
 
-                $written = file_put_contents($dbPath, $rawDbContent);
+                $written = @file_put_contents($dbPath, $rawDbContent);
+
                 if ($written === false) {
-                    throw new \Exception("Failed to write to database file [{$dbPath}]. Check file permissions.");
+                    // Fallback for Windows Herd when the database file is held open by a process handle:
+                    // write raw SQLite bytes to a temporary file and use SQLite3::backup() online backup API
+                    $tempRestoreSqlite = $this->backupPath . '/temp_restore_src_' . uniqid('', true) . '.sqlite';
+                    if (@file_put_contents($tempRestoreSqlite, $rawDbContent) !== false && class_exists(\SQLite3::class)) {
+                        try {
+                            $srcDb = new \SQLite3($tempRestoreSqlite, SQLITE3_OPEN_READONLY);
+                            $dstDb = new \SQLite3($dbPath, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE);
+                            $srcDb->backup($dstDb);
+                            $dstDb->close();
+                            $srcDb->close();
+                            $written = strlen($rawDbContent);
+                        } catch (Throwable $sqliteErr) {
+                            @unlink($tempRestoreSqlite);
+                            throw new \RuntimeException("Failed to write to database file [{$dbPath}]: " . $sqliteErr->getMessage());
+                        }
+                        @unlink($tempRestoreSqlite);
+                    } else {
+                        throw new \RuntimeException("Failed to write to database file [{$dbPath}]. Check file permissions.");
+                    }
                 }
 
                 // Reconnect to restored database
                 DB::purge('sqlite');
                 DB::reconnect('sqlite');
 
+                $this->ensureBackupSchema();
+                $this->restorePreservedAuthState($preservedSessions, $preservedTokens);
                 $this->reconcileLicenseAfterRestore($preservedLicenseAttributes);
                 return;
             } else {
@@ -851,11 +1505,37 @@ class BackupService
                 $this->executeSqlStatements($sqlContent, $dbPath);
             }
         } else {
-            // For MySQL/PostgreSQL, execute SQL statements
+            // For MySQL/MariaDB/PostgreSQL, execute SQL statements
             $this->executeSqlStatements($sqlContent);
         }
 
+        $this->ensureBackupSchema();
+        $this->restorePreservedAuthState($preservedSessions, $preservedTokens);
         $this->reconcileLicenseAfterRestore($preservedLicenseAttributes);
+    }
+
+    /**
+     * Restore active user sessions and personal access tokens after a database restore.
+     */
+    protected function restorePreservedAuthState(array $preservedSessions, array $preservedTokens): void
+    {
+        try {
+            if (!empty($preservedSessions) && Schema::hasTable('sessions')) {
+                foreach ($preservedSessions as $sessionRow) {
+                    if (!empty($sessionRow['id'])) {
+                        DB::table('sessions')->updateOrInsert(['id' => $sessionRow['id']], $sessionRow);
+                    }
+                }
+            }
+            if (!empty($preservedTokens) && Schema::hasTable('personal_access_tokens')) {
+                foreach ($preservedTokens as $tokenRow) {
+                    if (!empty($tokenRow['token'])) {
+                        DB::table('personal_access_tokens')->updateOrInsert(['token' => $tokenRow['token']], $tokenRow);
+                    }
+                }
+            }
+        } catch (Throwable) {
+        }
     }
 
     /**
@@ -872,8 +1552,118 @@ class BackupService
                 \App\Models\License::query()->delete();
                 DB::table('licenses')->insert($preservedLicenseAttributes);
             }
-        } catch (\Throwable $ignored) {
+        } catch (Throwable) {
         }
+    }
+
+    /**
+     * Split a SQL dump into individual statements while respecting quoted string literals and SQL comments.
+     */
+    public function splitSqlStatements(string $sqlContent): array
+    {
+        $statements = [];
+        $current = '';
+        $length = strlen($sqlContent);
+        $inSingle = false;
+        $inDouble = false;
+        $inBacktick = false;
+        $inLineComment = false;
+        $inBlockComment = false;
+
+        for ($i = 0; $i < $length; $i++) {
+            $ch = $sqlContent[$i];
+            $next = $i + 1 < $length ? $sqlContent[$i + 1] : '';
+
+            if ($inLineComment) {
+                if ($ch === "\n") {
+                    $inLineComment = false;
+                }
+                continue;
+            }
+
+            if ($inBlockComment) {
+                if ($ch === '*' && $next === '/') {
+                    $inBlockComment = false;
+                    $i++;
+                }
+                continue;
+            }
+
+            if (!$inSingle && !$inDouble && !$inBacktick) {
+                if ($ch === '-' && $next === '-') {
+                    $inLineComment = true;
+                    $i++;
+                    continue;
+                }
+                if ($ch === '/' && $next === '*') {
+                    $inBlockComment = true;
+                    $i++;
+                    continue;
+                }
+            }
+
+            if ($ch === "'" && !$inDouble && !$inBacktick) {
+                if ($inSingle) {
+                    // Check for doubled single quote ''
+                    if ($next === "'") {
+                        $current .= "''";
+                        $i++;
+                        continue;
+                    }
+                    // Check for backslash-escaped quote \'
+                    $backslashes = 0;
+                    $k = $i - 1;
+                    while ($k >= 0 && $sqlContent[$k] === '\\') {
+                        $backslashes++;
+                        $k--;
+                    }
+                    if ($backslashes % 2 === 1) {
+                        $current .= $ch;
+                        continue;
+                    }
+                    $inSingle = false;
+                } else {
+                    $inSingle = true;
+                }
+                $current .= $ch;
+                continue;
+            }
+
+            if ($ch === '"' && !$inSingle && !$inBacktick) {
+                if ($inDouble && $next === '"') {
+                    $current .= '""';
+                    $i++;
+                    continue;
+                }
+                $inDouble = !$inDouble;
+                $current .= $ch;
+                continue;
+            }
+
+            if ($ch === '`' && !$inSingle && !$inDouble) {
+                $inBacktick = !$inBacktick;
+                $current .= $ch;
+                continue;
+            }
+
+            if ($ch === ';' && !$inSingle && !$inDouble && !$inBacktick) {
+                $trimmed = trim($current);
+                if ($trimmed !== '') {
+                    $statements[] = $trimmed;
+                }
+                $current = '';
+                continue;
+            }
+
+            $current .= $ch;
+        }
+
+        $trimmed = trim($current);
+        if ($trimmed !== '') {
+            $statements[] = $trimmed;
+        }
+
+        return $statements;
     }
 
     /**
@@ -885,27 +1675,12 @@ class BackupService
 
         if ($driver === 'sqlite') {
             DB::statement('PRAGMA foreign_keys = OFF;');
-        } elseif ($driver === 'mysql') {
+        } elseif ($driver === 'mysql' || $driver === 'mariadb') {
             DB::statement('SET FOREIGN_KEY_CHECKS = 0;');
         }
 
-        // Remove comments
-        $lines = explode("\n", $sqlContent);
-        $cleanLines = [];
-        foreach ($lines as $line) {
-            $trimmed = trim($line);
-            if (!str_starts_with($trimmed, '--') && !str_starts_with($trimmed, '/*') && !empty($trimmed)) {
-                $cleanLines[] = $line;
-            }
-        }
-        $cleanSql = implode("\n", $cleanLines);
-        
-        // Split by semicolons
-        $statements = array_filter(array_map('trim', explode(";\n", $cleanSql)));
-        if (empty($statements)) {
-            $statements = array_filter(array_map('trim', explode(';', $cleanSql)));
-        }
-        
+        $statements = $this->splitSqlStatements($sqlContent);
+
         // Validate all statements before executing any of them
         foreach ($statements as $statement) {
             $trimmedStmt = trim($statement);
@@ -913,26 +1688,33 @@ class BackupService
                 continue;
             }
             if (preg_match('/\b(ATTACH\s+DATABASE|INTO\s+(OUTFILE|DUMPFILE)|LOAD_FILE\s*\(|COPY\s+.*\s+TO\s+PROGRAM)\b/i', $trimmedStmt)) {
-                throw new \Exception('Unsafe SQL statement detected in backup file.');
+                throw new \RuntimeException('Unsafe SQL statement detected in backup file.');
             }
         }
 
-        DB::transaction(function () use ($statements) {
+        DB::transaction(function () use ($statements, $driver) {
             foreach ($statements as $statement) {
                 $statement = trim($statement);
-                if (!empty($statement)) {
-                    try {
-                        DB::unprepared($statement);
-                    } catch (\Exception $e) {
-                        Log::warning('SQL execution warning: ' . $e->getMessage());
-                    }
+                if ($statement === '') {
+                    continue;
+                }
+
+                // Normalize legacy backslash-escaped quotes when executing on SQLite
+                if ($driver === 'sqlite' && str_contains($statement, "\\'")) {
+                    $statement = str_replace("\\'", "''", $statement);
+                }
+
+                try {
+                    DB::unprepared($statement);
+                } catch (Throwable $e) {
+                    Log::warning('SQL execution warning: ' . $e->getMessage());
                 }
             }
         });
 
         if ($driver === 'sqlite') {
             DB::statement('PRAGMA foreign_keys = ON;');
-        } elseif ($driver === 'mysql') {
+        } elseif ($driver === 'mysql' || $driver === 'mariadb') {
             DB::statement('SET FOREIGN_KEY_CHECKS = 1;');
         }
     }
@@ -942,8 +1724,8 @@ class BackupService
      */
     protected function filterRestoredSettingsAttributes(array $raw): array
     {
-        $columns = \Illuminate\Support\Facades\Schema::hasTable('settings')
-            ? \Illuminate\Support\Facades\Schema::getColumnListing('settings')
+        $columns = Schema::hasTable('settings')
+            ? Schema::getColumnListing('settings')
             : [];
         $excluded = ['id', 'created_at', 'updated_at'];
         $allowed = array_diff($columns, $excluded);
@@ -957,12 +1739,12 @@ class BackupService
     protected function restoreSettingsBackup(string $filepath): void
     {
         $content = file_get_contents($filepath);
-        $data = json_decode($content, true);
-        
+        $data = json_decode((string) $content, true);
+
         if (!$data || !isset($data['data']) || !is_array($data['data'])) {
-            throw new \Exception('Invalid settings backup format');
+            throw new \RuntimeException('Invalid settings backup format');
         }
-        
+
         $settings = \App\Models\Setting::firstOrCreate(['id' => 1]);
         $filtered = $this->filterRestoredSettingsAttributes($data['data']);
         if (!empty($filtered)) {
@@ -971,61 +1753,49 @@ class BackupService
     }
 
     /**
-     * Restore full backup
+     * Restore full backup (supports both ZipArchive and pure-PHP ZIP extraction fallback)
      */
     protected function restoreFullBackup(string $filepath): void
     {
-        $zip = new ZipArchive();
-        if ($zip->open($filepath) !== true) {
-            throw new \Exception('Could not open backup zip file');
-        }
+        $entries = $this->readZipArchiveEntries($filepath, false);
 
-        // Prevent Zip Slip path traversal prior to extraction
-        for ($i = 0; $i < $zip->numFiles; $i++) {
-            $entryName = $zip->getNameIndex($i);
-            if (
-                $entryName === false
-                || str_contains($entryName, "\0")
-                || preg_match('#(^|[\\\\/])\.\.([\\\\/]|$)#', $entryName)
-                || str_starts_with($entryName, '/')
-                || str_starts_with($entryName, '\\')
-                || str_contains($entryName, ':')
-            ) {
-                $zip->close();
-                throw new \Exception('Unsafe file path detected inside backup archive.');
+        $tempDir = $this->backupPath . '/temp_restore_' . uniqid('', true);
+        File::makeDirectory($tempDir, 0755, true, true);
+
+        try {
+            foreach ($entries as $entryName => $content) {
+                $this->assertSafeZipEntryName($entryName);
+                $targetPath = $tempDir . '/' . ltrim(str_replace('\\', '/', $entryName), '/');
+                $targetDir = dirname($targetPath);
+                if (!File::exists($targetDir)) {
+                    File::makeDirectory($targetDir, 0755, true, true);
+                }
+                file_put_contents($targetPath, $content);
             }
-        }
-        
-        // Extract to temp directory
-        $tempDir = $this->backupPath . '/temp_restore_' . time();
-        File::makeDirectory($tempDir, 0755, true);
-        
-        $zip->extractTo($tempDir);
-        $zip->close();
-        
-        // Restore database
-        $dbBackupPath = $tempDir . '/database/database.sql.gz';
-        if (file_exists($dbBackupPath)) {
-            $this->restoreDatabaseBackup($dbBackupPath);
-        }
-        
-        // Restore settings
-        $settingsPath = $tempDir . '/settings.json';
-        if (file_exists($settingsPath)) {
-            $content = file_get_contents($settingsPath);
-            $data = json_decode($content, true);
-            
-            if ($data && isset($data['data']) && is_array($data['data'])) {
-                $settings = \App\Models\Setting::firstOrCreate(['id' => 1]);
-                $filtered = $this->filterRestoredSettingsAttributes($data['data']);
-                if (!empty($filtered)) {
-                    $settings->forceFill($filtered)->save();
+
+            // Restore database
+            $dbBackupPath = $tempDir . '/database/database.sql.gz';
+            if (file_exists($dbBackupPath)) {
+                $this->restoreDatabaseBackup($dbBackupPath);
+            }
+
+            // Restore settings
+            $settingsPath = $tempDir . '/settings.json';
+            if (file_exists($settingsPath)) {
+                $content = file_get_contents($settingsPath);
+                $data = json_decode((string) $content, true);
+
+                if ($data && isset($data['data']) && is_array($data['data'])) {
+                    $settings = \App\Models\Setting::firstOrCreate(['id' => 1]);
+                    $filtered = $this->filterRestoredSettingsAttributes($data['data']);
+                    if (!empty($filtered)) {
+                        $settings->forceFill($filtered)->save();
+                    }
                 }
             }
+        } finally {
+            File::deleteDirectory($tempDir);
         }
-        
-        // Clean up temp directory
-        File::deleteDirectory($tempDir);
     }
 
     /**
@@ -1034,20 +1804,18 @@ class BackupService
     public function deleteBackup(int $id): bool
     {
         $backup = BackupLog::find($id);
-        
+
         if (!$backup) {
             return false;
         }
-        
-        // Delete file
+
         $filepath = $this->getBackupFilePath($backup->filename, $backup->type);
         if (file_exists($filepath)) {
-            unlink($filepath);
+            @unlink($filepath);
         }
-        
-        // Delete record
+
         $backup->delete();
-        
+
         return true;
     }
 
@@ -1056,13 +1824,13 @@ class BackupService
      */
     protected function cleanupOldBackups(): void
     {
-        $schedule = \App\Models\BackupSchedule::getSchedule();
+        $schedule = BackupSchedule::getSchedule();
         $maxKeep = $schedule->max_backups_keep ?? $this->maxBackups;
         $retentionDays = $schedule->retention_days ?? $this->retentionDays;
 
         // Remove by count
         $backups = BackupLog::orderByDesc('created_at')->skip($maxKeep)->take(100)->get();
-        
+
         foreach ($backups as $backup) {
             $filepath = $this->getBackupFilePath($backup->filename, $backup->type);
             if (file_exists($filepath)) {
@@ -1070,11 +1838,11 @@ class BackupService
             }
             $backup->delete();
         }
-        
+
         // Remove by age
         $expiredDate = now()->subDays($retentionDays);
         $oldBackups = BackupLog::where('created_at', '<', $expiredDate)->get();
-        
+
         foreach ($oldBackups as $backup) {
             $filepath = $this->getBackupFilePath($backup->filename, $backup->type);
             if (file_exists($filepath)) {
@@ -1094,28 +1862,24 @@ class BackupService
 
         $errors = [];
 
-        // Check file size
         if ($file->getSize() > $maxSize) {
             $errors[] = 'File size exceeds maximum limit of 500MB';
         }
 
-        // Check extension
         $extension = strtolower($file->getClientOriginalExtension());
         if (!in_array($extension, $allowedExtensions)) {
             $errors[] = 'Invalid file extension. Allowed: .zip, .sql.gz, .gz, .json';
         }
 
-        // For ZIP files, try to validate structure
+        // For ZIP files, validate structure (supports ZipArchive and pure-PHP fallback)
         if ($extension === 'zip') {
-            $zip = new ZipArchive();
-            if ($zip->open($file->getPathname()) === true) {
-                // Check for required files
+            try {
+                $entries = $this->readZipArchiveEntries($file->getPathname(), true);
                 $hasManifest = false;
                 $hasDatabase = false;
                 $hasSettings = false;
 
-                for ($i = 0; $i < $zip->numFiles; $i++) {
-                    $name = $zip->getNameIndex($i);
+                foreach (array_keys($entries) as $name) {
                     if (str_ends_with($name, 'manifest.json')) {
                         $hasManifest = true;
                     }
@@ -1130,25 +1894,23 @@ class BackupService
                 if (!$hasManifest && !$hasDatabase && !$hasSettings) {
                     $errors[] = 'Invalid ZIP structure. Missing required backup files.';
                 }
-
-                $zip->close();
-            } else {
+            } catch (Throwable) {
                 $errors[] = 'Cannot open ZIP file. File may be corrupted.';
             }
         }
 
-        // For gz files, try to decompress
+        // For gz files, verify GZIP magic bytes
         if (in_array($extension, ['gz', 'sql.gz'])) {
-            $content = file_get_contents($file->getPathname(), false, null, 0, 100);
-            if (substr($content, 0, 2) !== "\x1f\x8b") {
+            $content = @file_get_contents($file->getPathname(), false, null, 0, 100);
+            if ($content === false || substr($content, 0, 2) !== "\x1f\x8b") {
                 $errors[] = 'Invalid GZIP format. File may be corrupted.';
             }
         }
 
         // For json files, validate JSON structure
         if ($extension === 'json') {
-            $content = file_get_contents($file->getPathname());
-            $data = json_decode($content, true);
+            $content = @file_get_contents($file->getPathname());
+            $data = json_decode((string) $content, true);
             if ($data === null || !isset($data['data'])) {
                 $errors[] = 'Invalid JSON settings backup format.';
             }
@@ -1165,11 +1927,14 @@ class BackupService
      */
     public function uploadBackup(UploadedFile $file, ?int $userId = null): BackupLog
     {
-        $extension = strtolower($file->getClientOriginalExtension());
-        $timestamp = now()->format('Y-m-d_His');
-        $filename = "backup_uploaded_{$timestamp}";
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
 
-        // Determine backup type from file
+        $this->ensureBackupDirectoryExists();
+        $this->ensureBackupSchema();
+
+        $extension = strtolower($file->getClientOriginalExtension());
+
         $type = 'database';
         if ($extension === 'zip') {
             $type = 'full';
@@ -1177,7 +1942,8 @@ class BackupService
             $type = 'settings';
         }
 
-        // Create backup log entry
+        $filename = $this->generateUniqueBackupFilename($type, 'backup_uploaded');
+
         $backupLog = BackupLog::create([
             'filename' => $filename,
             'type' => $type,
@@ -1194,20 +1960,13 @@ class BackupService
         try {
             $filepath = $this->getBackupFilePath($filename, $type);
 
-            // Move uploaded file to backup directory
             $file->move(dirname($filepath), basename($filepath));
 
-            // For ZIP files, verify structure
             if ($type === 'full') {
-                $zip = new ZipArchive();
-                if ($zip->open($filepath) !== true) {
-                    throw new \Exception('Cannot open uploaded ZIP file');
-                }
-
-                // Extract manifest to get metadata
-                $manifestContent = $zip->getFromName('manifest.json');
+                $entries = $this->readZipArchiveEntries($filepath, false);
+                $manifestContent = $entries['manifest.json'] ?? null;
                 if ($manifestContent) {
-                    $manifest = json_decode($manifestContent, true);
+                    $manifest = json_decode((string) $manifestContent, true);
                     if ($manifest) {
                         $backupLog->update([
                             'metadata' => array_merge(
@@ -1217,15 +1976,13 @@ class BackupService
                         ]);
                     }
                 }
-                $zip->close();
             }
 
-            // For .gz or .sql.gz files, verify it's valid gzip
             if (in_array($extension, ['gz', 'sql.gz'])) {
                 $compressed = file_get_contents($filepath);
-                $testDecompress = gzdecode($compressed);
+                $testDecompress = @gzdecode((string) $compressed);
                 if ($testDecompress === false) {
-                    throw new \Exception('Invalid gzip file format. The file may be corrupted or not a valid gzip archive.');
+                    throw new \RuntimeException('Invalid gzip file format. The file may be corrupted or not a valid gzip archive.');
                 }
             }
 
@@ -1236,19 +1993,21 @@ class BackupService
 
             return $backupLog;
 
-        } catch (\Exception $e) {
-            $backupLog->update([
-                'status' => 'failed',
-                'error_message' => $e->getMessage(),
-            ]);
-
-            // Clean up uploaded file
-            $filepath = $this->getBackupFilePath($filename, $type);
-            if (file_exists($filepath)) {
-                unlink($filepath);
+        } catch (Throwable $e) {
+            try {
+                $backupLog->update([
+                    'status' => 'failed',
+                    'error_message' => $e->getMessage(),
+                ]);
+            } catch (Throwable) {
             }
 
-            throw $e;
+            $filepath = $this->getBackupFilePath($filename, $type);
+            if (file_exists($filepath)) {
+                @unlink($filepath);
+            }
+
+            throw new \RuntimeException($e->getMessage(), (int) $e->getCode(), $e);
         }
     }
 
@@ -1257,33 +2016,33 @@ class BackupService
      */
     public function restoreFromFile(string $filepath, string $password): bool
     {
-        // Verify password
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
+
         $user = Auth::user();
         if (!$user || !\Illuminate\Support\Facades\Hash::check($password, $user->password)) {
-            throw new \Exception('Invalid password');
+            throw new \RuntimeException('Invalid password');
         }
 
         if (!file_exists($filepath)) {
-            throw new \Exception('Backup file not found');
+            throw new \RuntimeException('Backup file not found');
         }
 
         $extension = strtolower(pathinfo($filepath, PATHINFO_EXTENSION));
 
         try {
-            // Determine backup type from file extension
             if ($extension === 'zip') {
                 $this->restoreFullBackup($filepath);
             } elseif ($extension === 'json') {
                 $this->restoreSettingsBackup($filepath);
             } else {
-                // Assume gzip SQL backup
                 $this->restoreDatabaseBackup($filepath);
             }
 
             return true;
 
-        } catch (\Exception $e) {
-            throw new \Exception('Restore failed: ' . $e->getMessage());
+        } catch (Throwable $e) {
+            throw new \RuntimeException('Restore failed: ' . $e->getMessage(), (int) $e->getCode(), $e);
         }
     }
 
@@ -1303,4 +2062,3 @@ class BackupService
         return 'database';
     }
 }
-

@@ -47,7 +47,10 @@ class RunScheduledBackup extends Command
             }
         }
 
-        $destDesc = !empty($schedule->custom_backup_path) ? $schedule->custom_backup_path : 'Default storage';
+        $customPath = ($schedule->storage_destination === 'custom_folder' && !empty($schedule->custom_backup_path))
+            ? $schedule->custom_backup_path
+            : null;
+        $destDesc = $customPath ?: 'Default storage';
         $this->info("Starting scheduled backup (Type: {$schedule->backup_type}, Destination: {$destDesc})...");
 
         try {
@@ -55,7 +58,7 @@ class RunScheduledBackup extends Command
                 type: $schedule->backup_type ?? 'full',
                 userId: null,
                 isAutomated: true,
-                customBackupPath: $schedule->custom_backup_path
+                customBackupPath: $customPath
             );
 
             $schedule->update([
@@ -69,7 +72,7 @@ class RunScheduledBackup extends Command
 
             return self::SUCCESS;
 
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             $errorMessage = $e->getMessage();
             $this->error("Scheduled backup failed: {$errorMessage}");
             Log::error("Scheduled backup execution failed: {$errorMessage}");

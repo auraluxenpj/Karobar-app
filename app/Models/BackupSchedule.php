@@ -44,7 +44,7 @@ class BackupSchedule extends Model
      */
     public static function getSchedule(): self
     {
-        return static::firstOrCreate([], [
+        $defaults = [
             'is_automated' => false,
             'frequency' => 'daily',
             'time_of_day' => '02:00',
@@ -59,7 +59,18 @@ class BackupSchedule extends Model
             'notify_on_failure' => true,
             'notification_email' => null,
             'last_run_status' => 'none',
-        ]);
+        ];
+
+        try {
+            return static::firstOrCreate([], $defaults);
+        } catch (\Throwable) {
+            try {
+                app(\App\Services\BackupService::class)->ensureBackupSchema();
+                return static::firstOrCreate([], $defaults);
+            } catch (\Throwable) {
+                return new static($defaults);
+            }
+        }
     }
 }
 

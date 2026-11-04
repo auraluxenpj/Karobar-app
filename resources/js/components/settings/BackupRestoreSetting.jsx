@@ -1,5 +1,5 @@
 // resources/js/components/settings/BackupRestoreSetting.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { FilePond, registerPlugin } from "react-filepond";
@@ -33,11 +33,19 @@ const BACKUP_STATUS = {
 export default function BackupRestoreSetting() {
   const { loading: permsLoading, canFor } = usePermissions();
 
-  const can = useState(() =>
-    typeof canFor === "function" ? canFor("backup") : {
-      view: false, create: false, delete: false, upload: false, restore: false
-    }
-  )[0];
+  const can = useMemo(
+    () =>
+      typeof canFor === "function"
+        ? canFor("backup")
+        : {
+            view: false,
+            create: false,
+            delete: false,
+            upload: false,
+            restore: false,
+          },
+    [canFor]
+  );
 
   // Backup management state
   const [backups, setBackups] = useState([]);
@@ -104,7 +112,7 @@ export default function BackupRestoreSetting() {
       await fetchBackups();
       await fetchBackupStats();
     } catch (error) {
-      const msg = error.response?.data?.message || error.response?.data?.error || "Failed to create backup";
+      const msg = error.response?.data?.error || error.response?.data?.message || "Failed to create backup";
       toast.error(msg);
     } finally {
       setCreatingBackup(false);
@@ -125,7 +133,8 @@ export default function BackupRestoreSetting() {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      const filename = `${backup.filename}.${backup.type === 'full' ? 'zip' : 'sql.gz'}`;
+      const ext = backup.type === 'full' ? 'zip' : backup.type === 'settings' ? 'json' : 'sql.gz';
+      const filename = `${backup.filename}.${ext}`;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();

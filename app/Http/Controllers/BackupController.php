@@ -49,14 +49,19 @@ class BackupController extends Controller
             'custom_backup_path' => ['nullable', 'string', 'max:500'],
         ]);
 
-        if (!empty($validated['custom_backup_path'])) {
-            try {
-                $this->backupService->assertSafeBackupDirectory($validated['custom_backup_path']);
-            } catch (\InvalidArgumentException $e) {
-                return response()->json([
-                    'message' => $e->getMessage(),
-                    'errors' => ['custom_backup_path' => [$e->getMessage()]],
-                ], 422);
+        $customBackupPath = $validated['custom_backup_path'] ?? null;
+        if (!empty($customBackupPath)) {
+            if (!$this->backupService->isReachableHostPath($customBackupPath)) {
+                $customBackupPath = null;
+            } else {
+                try {
+                    $this->backupService->assertSafeBackupDirectory($customBackupPath);
+                } catch (\InvalidArgumentException $e) {
+                    return response()->json([
+                        'message' => $e->getMessage(),
+                        'errors' => ['custom_backup_path' => [$e->getMessage()]],
+                    ], 422);
+                }
             }
         }
         
@@ -67,7 +72,7 @@ class BackupController extends Controller
                 type: $validated['type'],
                 userId: $userId,
                 isAutomated: false,
-                customBackupPath: $validated['custom_backup_path'] ?? null
+                customBackupPath: $customBackupPath
             );
             
             return response()->json([
@@ -85,13 +90,13 @@ class BackupController extends Controller
                     'remote_path' => $backup->remote_path,
                     'remote_status' => $backup->remote_status ?? 'skipped',
                     'remote_error' => $backup->remote_error,
-                    'created_at' => $backup->created_at->format('M d, Y h:i A'),
+                    'created_at' => $backup->created_at ? $backup->created_at->format('M d, Y h:i A') : '',
                 ],
             ], 201);
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
-                'message' => 'Failed to create backup',
+                'message' => 'Failed to create backup: ' . $e->getMessage(),
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -154,9 +159,9 @@ class BackupController extends Controller
                 'message' => 'Backup restored successfully. Please refresh the page.',
             ]);
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
-                'message' => 'Restore failed',
+                'message' => 'Restore failed: ' . $e->getMessage(),
                 'error' => $e->getMessage(),
             ], 422);
         }
@@ -245,7 +250,7 @@ class BackupController extends Controller
                 'errors' => $validation['errors'],
             ]);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'valid' => false,
                 'errors' => [$e->getMessage()],
@@ -305,9 +310,9 @@ class BackupController extends Controller
                 'message' => 'Database error during upload',
                 'error' => 'A backup with a similar filename may already exist. Please try again.',
             ], 422);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
-                'message' => 'Failed to upload backup',
+                'message' => 'Failed to upload backup: ' . $e->getMessage(),
                 'error' => $e->getMessage(),
             ], 422);
         }
@@ -354,9 +359,9 @@ class BackupController extends Controller
                 'message' => 'Backup restored successfully. Please refresh the page.',
             ]);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
-                'message' => 'Restore failed',
+                'message' => 'Restore failed: ' . $e->getMessage(),
                 'error' => $e->getMessage(),
             ], 422);
         }
@@ -506,7 +511,7 @@ class BackupController extends Controller
                 'message' => "Folder is accessible, writable, and ready for backups ({$freeSpaceFormatted} free).",
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'path' => $customPath,
@@ -714,9 +719,9 @@ class BackupController extends Controller
                 'output' => Artisan::output(),
             ], 500);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return response()->json([
-                'message' => 'Scheduled backup execution failed',
+                'message' => 'Scheduled backup execution failed: ' . $e->getMessage(),
                 'error' => $e->getMessage(),
             ], 500);
         }

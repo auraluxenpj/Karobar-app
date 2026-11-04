@@ -26,7 +26,12 @@ class LocalWhatsAppAgentService
             if (!Schema::hasTable('settings')) {
                 return;
             }
-            if (Schema::hasColumn('settings', 'whatsapp_enabled') && Schema::hasColumn('settings', 'whatsapp_access_token')) {
+            if (
+                Schema::hasColumn('settings', 'whatsapp_enabled')
+                && Schema::hasColumn('settings', 'whatsapp_access_token')
+                && Schema::hasColumn('settings', 'share_paper_size')
+                && Schema::hasColumn('settings', 'share_show_logo')
+            ) {
                 return;
             }
 
@@ -63,6 +68,12 @@ class LocalWhatsAppAgentService
                 }
                 if (!Schema::hasColumn('settings', 'whatsapp_auto_fallback')) {
                     $table->boolean('whatsapp_auto_fallback')->default(true);
+                }
+                if (!Schema::hasColumn('settings', 'share_paper_size')) {
+                    $table->string('share_paper_size', 20)->nullable()->default('a4');
+                }
+                if (!Schema::hasColumn('settings', 'share_show_logo')) {
+                    $table->boolean('share_show_logo')->default(true);
                 }
             });
         } catch (Throwable) {

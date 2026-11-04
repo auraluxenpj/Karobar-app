@@ -284,7 +284,7 @@ export default function BackupsIndex() {
           retention_days: s.retention_days || 30,
           max_backups_keep: s.max_backups_keep || 10,
           custom_backup_path: s.custom_backup_path || "",
-          storage_destination: s.custom_backup_path ? "custom_folder" : (s.storage_destination || "local"),
+          storage_destination: s.storage_destination || (s.custom_backup_path ? "custom_folder" : "local"),
           notify_on_failure: Boolean(s.notify_on_failure),
           notification_email: s.notification_email || "",
           last_run_at: s.last_run_at,
@@ -332,7 +332,7 @@ export default function BackupsIndex() {
       await fetchBackups();
       await fetchStatsAndSchedule();
     } catch (error) {
-      const msg = error.response?.data?.message || error.response?.data?.error || "Failed to create backup";
+      const msg = error.response?.data?.error || error.response?.data?.message || "Failed to create backup";
       toast.error(msg);
     } finally {
       setCreatingBackup(false);

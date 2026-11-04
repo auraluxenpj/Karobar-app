@@ -257,4 +257,80 @@ class AutomatedBackupAndOffsiteStorageTest extends TestCase
             'name' => 'Newly Added Customer After Backup',
         ]);
     }
+
+    public function test_full_backup_and_restore_with_single_quotes_and_semicolons(): void
+    {
+        \App\Models\Customer::forceCreate([
+            'name' => "Owner's Special Pharmacy; Branch #1",
+            'phone' => '03001112233',
+            'address' => "123 St; Apt 'B'",
+        ]);
+
+        $response = $this->actingAs($this->adminUser)
+            ->postJson('/api/backups', [
+                'type' => 'full',
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('backup.status', 'completed')
+            ->assertJsonPath('backup.type', 'full');
+
+        $backupId = $response->json('backup.id');
+
+        // Mutate customer after backup
+        \App\Models\Customer::where('phone', '03001112233')->delete();
+        $this->assertDatabaseMissing('customers', ['phone' => '03001112233']);
+
+        // Restore full backup
+        $restoreResponse = $this->actingAs($this->adminUser)
+            ->postJson("/api/backups/{$backupId}/restore", [
+                'password' => 'password123',
+            ]);
+
+        $restoreResponse->assertStatus(200);
+
+        $this->assertDatabaseHas('customers', [
+            'name' => "Owner's Special Pharmacy; Branch #1",
+            'phone' => '03001112233',
+        ]);
+    }
+
+    public function test_pure_php_zip_fallback_writes_and_reads_valid_archive_without_ext_zip(): void
+    {
+        $service = app(\App\Services\BackupService::class);
+        $tempZip = sys_get_temp_dir() . '/karobar_pure_zip_test_' . uniqid() . '.zip';
+
+        $expectedEntries = [
+            'manifest.json' => json_encode(['type' => 'full', 'version' => '1.0']),
+            'settings.json' => json_encode(['data' => ['company_name' => 'Karobar Herd Store']]),
+            'database/database.sql.gz' => gzencode("-- SQL dump content\nSELECT 1;", 6),
+        ];
+
+        $service->writePurePhpZipArchive($tempZip, $expectedEntries);
+        $this->assertFileExists($tempZip);
+        $this->assertGreaterThan(0, filesize($tempZip));
+
+        $readBack = $service->readPurePhpZipArchiveEntries($tempZip, false);
+        $this->assertEquals($expectedEntries['manifest.json'], $readBack['manifest.json']);
+        $this->assertEquals($expectedEntries['settings.json'], $readBack['settings.json']);
+        $this->assertEquals($expectedEntries['database/database.sql.gz'], $readBack['database/database.sql.gz']);
+
+        @unlink($tempZip);
+    }
+
+    public function test_self_healing_schema_and_unreachable_foreign_host_path_fallback(): void
+    {
+        // Simulate a Herd deployment where backup_schedules was not migrated yet or has a foreign machine path
+        \Illuminate\Support\Facades\Schema::dropIfExists('backup_schedules');
+
+        $response = $this->actingAs($this->adminUser)
+            ->postJson('/api/backups', [
+                'type' => 'full',
+                'custom_backup_path' => '/Users/nonexistent_foreign_machine_user_99999/Downloads',
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('backup.status', 'completed')
+            ->assertJsonPath('backup.storage_destination', 'local');
+    }
 }
