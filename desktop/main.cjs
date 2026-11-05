@@ -1,8 +1,10 @@
 const { app, BrowserWindow, ipcMain, dialog, Tray, Menu, shell } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const os = require("os");
 const net = require("net");
 const http = require("http");
+const https = require("https");
 const { spawn, execFileSync } = require("child_process");
 
 let mainWindow = null;
@@ -311,6 +313,14 @@ function createApplicationMenu() {
         },
         { type: "separator" },
         {
+          label: "Check for Software Updates…",
+          click: () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send("karobar:trigger-update-check", { manual: true });
+            }
+          },
+        },
+        {
           label: "Run Database Backup Now",
           click: () => {
             try {
@@ -334,7 +344,7 @@ function createApplicationMenu() {
         },
         { type: "separator" },
         {
-          label: "Exit Karobar ERP",
+          label: "Exit Karobar-App",
           accelerator: "Alt+F4",
           click: () => {
             isQuitting = true;
@@ -500,7 +510,7 @@ function createMainWindow() {
     minWidth: 1024,
     minHeight: 680,
     show: false,
-    title: "Karobar App ERP",
+    title: "Karobar-App",
     icon: iconPath,
     autoHideMenuBar: false,
     webPreferences: {
@@ -521,7 +531,7 @@ function createMainWindow() {
           width: 980,
           height: 760,
           autoHideMenuBar: true,
-          title: "Karobar ERP — Print / Document Preview",
+          title: "Karobar-App — Print / Document Preview",
         },
       };
     }
@@ -554,11 +564,21 @@ function createSystemTray() {
     tray = new Tray(iconPath);
     const contextMenu = Menu.buildFromTemplate([
       {
-        label: "Open Karobar ERP",
+        label: "Open Karobar-App",
         click: () => {
           if (mainWindow) {
             mainWindow.show();
             mainWindow.focus();
+          }
+        },
+      },
+      {
+        label: "Check for Updates…",
+        click: () => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.show();
+            mainWindow.focus();
+            mainWindow.webContents.send("karobar:trigger-update-check", { manual: true });
           }
         },
       },
@@ -577,14 +597,14 @@ function createSystemTray() {
       },
       { type: "separator" },
       {
-        label: "Quit Karobar ERP",
+        label: "Quit Karobar-App",
         click: () => {
           isQuitting = true;
           app.quit();
         },
       },
     ]);
-    tray.setToolTip("Karobar App ERP v2");
+    tray.setToolTip("Karobar-App");
     tray.setContextMenu(contextMenu);
   } catch {
     // Ignore tray icon errors if format is unsupported on platform
@@ -666,6 +686,257 @@ ipcMain.handle("karobar:run-backup-now", async () => {
     return { ok: true };
   } catch (err) {
     return { ok: false, message: err?.message || "Backup failed" };
+  }
+});
+
+ipcMain.handle("karobar:open-external-url", async (_event, url) => {
+  if (typeof url === "string" && /^https?:\/\//i.test(url)) {
+    await shell.openExternal(url);
+    return { ok: true };
+  }
+  return { ok: false };
+});
+
+function fetchJsonUrl(url, redirectCount = 0) {
+  return new Promise((resolve, reject) => {
+    if (redirectCount > 6) {
+      return reject(new Error("Too many redirects"));
+    }
+    const client = url.startsWith("https:") ? https : http;
+    const req = client.get(
+      url,
+      {
+        headers: {
+          "User-Agent": "Karobar-App-Desktop-Updater/2.0",
+          Accept: "application/json",
+        },
+        timeout: 8000,
+      },
+      (res) => {
+        if (
+          res.statusCode &&
+          res.statusCode >= 300 &&
+          res.statusCode < 400 &&
+          res.headers.location
+        ) {
+          res.resume();
+          const nextUrl = new URL(res.headers.location, url).toString();
+          return resolve(fetchJsonUrl(nextUrl, redirectCount + 1));
+        }
+        if (res.statusCode !== 200) {
+          res.resume();
+          return reject(new Error(`HTTP ${res.statusCode}`));
+        }
+        let body = "";
+        res.setEncoding("utf8");
+        res.on("data", (chunk) => {
+          body += chunk;
+        });
+        res.on("end", () => {
+          try {
+            resolve(JSON.parse(body));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }
+    );
+    req.on("error", reject);
+    req.on("timeout", () => {
+      req.destroy(new Error("Request timed out"));
+    });
+  });
+}
+
+ipcMain.handle("karobar:check-for-updates", async (_event, options = {}) => {
+  try {
+    const forceParam = options?.force ? "?force=1" : "";
+    const data = await fetchJsonUrl(`http://127.0.0.1:${activePort}/api/system/check-update${forceParam}`);
+    return data;
+  } catch (err) {
+    return { ok: false, update_available: false, message: err?.message || "Update check failed" };
+  }
+});
+
+function downloadFileWithProgress(url, destPath, onProgress, redirectCount = 0) {
+  return new Promise((resolve, reject) => {
+    if (redirectCount > 8) {
+      return reject(new Error("Too many redirects while downloading update."));
+    }
+    const client = url.startsWith("https:") ? https : http;
+    const req = client.get(
+      url,
+      {
+        headers: {
+          "User-Agent": "Karobar-App-Desktop-Updater/2.0",
+          Accept: "application/octet-stream,*/*",
+        },
+      },
+      (res) => {
+        if (
+          res.statusCode &&
+          res.statusCode >= 300 &&
+          res.statusCode < 400 &&
+          res.headers.location
+        ) {
+          res.resume();
+          const nextUrl = new URL(res.headers.location, url).toString();
+          return resolve(
+            downloadFileWithProgress(nextUrl, destPath, onProgress, redirectCount + 1)
+          );
+        }
+
+        if (res.statusCode !== 200) {
+          res.resume();
+          return reject(new Error(`Download failed with HTTP status ${res.statusCode}`));
+        }
+
+        const totalBytes = parseInt(res.headers["content-length"] || "0", 10);
+        let downloadedBytes = 0;
+        const fileStream = fs.createWriteStream(destPath);
+
+        res.on("data", (chunk) => {
+          downloadedBytes += chunk.length;
+          if (typeof onProgress === "function") {
+            const percent =
+              totalBytes > 0
+                ? Math.min(99, Math.round((downloadedBytes / totalBytes) * 100))
+                : 50;
+            onProgress({
+              status: "downloading",
+              percent,
+              downloadedMB: (downloadedBytes / (1024 * 1024)).toFixed(1),
+              totalMB: totalBytes > 0 ? (totalBytes / (1024 * 1024)).toFixed(1) : null,
+            });
+          }
+        });
+
+        res.pipe(fileStream);
+
+        fileStream.on("finish", () => {
+          fileStream.close(() => resolve(destPath));
+        });
+
+        fileStream.on("error", (err) => {
+          try {
+            fs.unlinkSync(destPath);
+          } catch {
+            // ignore
+          }
+          reject(err);
+        });
+      }
+    );
+
+    req.on("error", (err) => {
+      try {
+        fs.unlinkSync(destPath);
+      } catch {
+        // ignore
+      }
+      reject(err);
+    });
+  });
+}
+
+function sendUpdateProgress(payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("karobar:update-progress", payload);
+  }
+}
+
+ipcMain.handle("karobar:download-and-install-update", async (_event, payload = {}) => {
+  const downloadUrl =
+    payload.downloadUrl ||
+    "https://github.com/shzdasim/Karobar-App/releases/latest/download/Karobar-App-Setup.exe";
+  const versionLabel = payload.version || "latest";
+  const tempInstallerPath = path.join(
+    os.tmpdir(),
+    `Karobar-App-Setup-${String(versionLabel).replace(/[^a-zA-Z0-9._-]/g, "")}.exe`
+  );
+
+  try {
+    sendUpdateProgress({
+      status: "starting",
+      percent: 2,
+      message: "Preparing zero-data-loss update download…",
+    });
+
+    await downloadFileWithProgress(downloadUrl, tempInstallerPath, (progress) => {
+      sendUpdateProgress({
+        ...progress,
+        message: progress.totalMB
+          ? `Downloading update (${progress.downloadedMB} MB / ${progress.totalMB} MB)…`
+          : `Downloading update (${progress.downloadedMB} MB)…`,
+      });
+    });
+
+    sendUpdateProgress({
+      status: "backing-up",
+      percent: 99,
+      message: "Creating safety database snapshot before applying update…",
+    });
+
+    try {
+      execFileSync(resolvePhpBinary(), ["artisan", "backup:run-scheduled", "--force"], {
+        cwd: APP_ROOT,
+        windowsHide: true,
+      });
+    } catch {
+      // Best-effort backup; karobar:install --upgrade-only also creates pre-upgrade-YYYYmmdd.sqlite
+    }
+
+    sendUpdateProgress({
+      status: "installing",
+      percent: 100,
+      message: "Launching Karobar-App updater & restarting…",
+    });
+
+    if (process.platform === "win32") {
+      const installDir = path.dirname(process.execPath);
+      // Stop PHP server & scheduler so no files inside the installation directory are locked
+      isQuitting = true;
+      stopBackendServices();
+
+      const installerArgs = [
+        "/VERYSILENT",
+        "/SUPPRESSMSGBOXES",
+        "/NORESTART",
+        "/CLOSEAPPLICATIONS",
+        "/UPGRADE=1",
+        `/DIR=${installDir}`,
+      ];
+
+      const updaterProc = spawn(tempInstallerPath, installerArgs, {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: false,
+      });
+      updaterProc.unref();
+
+      setTimeout(() => {
+        app.quit();
+      }, 600);
+
+      return { ok: true, installing: true };
+    } else {
+      await shell.showItemInFolder(tempInstallerPath);
+      return {
+        ok: true,
+        installing: false,
+        message: `Downloaded installer to ${tempInstallerPath}`,
+      };
+    }
+  } catch (err) {
+    sendUpdateProgress({
+      status: "error",
+      percent: 0,
+      message: err?.message || "Failed to download or launch update installer.",
+    });
+    return {
+      ok: false,
+      message: err?.message || "Failed to download update.",
+    };
   }
 });
 

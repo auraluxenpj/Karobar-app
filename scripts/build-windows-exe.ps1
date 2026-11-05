@@ -1,16 +1,35 @@
 <#
 .SYNOPSIS
-    Automated Windows .exe Build & Inno Setup Packaging Pipeline for Karobar-App-ERP-v2.
+    Automated Windows .exe Build, Code Signing & Zero-Data-Loss OTA Release Pipeline for Karobar-App.
 .DESCRIPTION
-    1. Builds the Vite React 19 SPA (`npm run build`)
-    2. Packages the Electron Desktop Shell (`KarobarERP.exe`)
-    3. Stages the Laravel 13 production runtime + portable PHP 8.3 (with sodium, sqlite3, gd, zip) + portable Node.js 22 (for WhatsApp Agent)
-    4. Compiles `installer/karobar.iss` via Inno Setup 6 into `dist/installer/Karobar-ERP-Setup-v2.0.0.exe`
+    1. Stamps `public/version.json` with the current version & GitHub Actions build number (`2.0.<run_number>`)
+    2. Builds the Vite React 19 SPA (`npm run build`)
+    3. Packages the Electron Desktop Shell (`Karobar-App.exe`)
+    4. Stages the Laravel 13 production runtime + portable PHP 8.4 (with sodium, sqlite3, gd, zip) + portable Node.js 22 (for WhatsApp Agent)
+    5. Compiles `installer/karobar.iss` via Inno Setup 6 into `dist/installer/Karobar-App-Setup.exe` and generates `dist/installer/latest-release.json`
 #>
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 Set-Location $RepoRoot
+
+$BuildNumber = if ($env:GITHUB_RUN_NUMBER) { [int]$env:GITHUB_RUN_NUMBER } else { 1 }
+$AppVersion  = if ($env:KAROBAR_APP_VERSION -and $env:KAROBAR_APP_VERSION -ne "" -and $env:KAROBAR_APP_VERSION -ne "auto") { $env:KAROBAR_APP_VERSION } else { "2.0.$BuildNumber" }
+$CommitSha   = if ($env:GITHUB_SHA) { $env:GITHUB_SHA.Substring(0, 7) } else { "local" }
+$ReleasedAt  = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+$RepoSlug    = if ($env:GITHUB_REPOSITORY) { $env:GITHUB_REPOSITORY } else { "shzdasim/Karobar-App" }
+
+Write-Host "==> [0/6] Stamping Karobar-App Version Metadata: v$AppVersion (Build #$BuildNumber, Commit $CommitSha)..." -ForegroundColor Cyan
+$VersionMeta = [ordered]@{
+    app_name     = "Karobar-App"
+    version      = $AppVersion
+    build_number = $BuildNumber
+    commit_sha   = $CommitSha
+    repository   = $RepoSlug
+    released_at  = $ReleasedAt
+}
+$VersionMetaJson = $VersionMeta | ConvertTo-Json -Depth 4
+Set-Content -Path (Join-Path $RepoRoot "public\version.json") -Value $VersionMetaJson -Encoding UTF8
 
 $DistDir    = Join-Path $RepoRoot "dist"
 $CacheDir   = Join-Path $DistDir "cache"
@@ -25,13 +44,13 @@ npm ci
 npm run build
 npm prune --omit=dev
 
-Write-Host "==> [2/6] Packaging Electron Desktop Shell (KarobarERP.exe)..." -ForegroundColor Cyan
+Write-Host "==> [2/6] Packaging Electron Desktop Shell (Karobar-App.exe)..." -ForegroundColor Cyan
 Push-Location (Join-Path $RepoRoot "desktop")
 npm install
 npm run pack:win64
 Pop-Location
 
-$ElectronUnpacked = Join-Path $ShellDir "KarobarERP-win32-x64"
+$ElectronUnpacked = Join-Path $ShellDir "Karobar-App-win32-x64"
 if (-not (Test-Path $ElectronUnpacked)) {
     throw "Electron shell build failed: $ElectronUnpacked not found."
 }
@@ -74,14 +93,16 @@ $WaModulesDir = Join-Path $AppStage "node_modules"
 New-Item -ItemType Directory -Force -Path $WaModulesDir | Out-Null
 Copy-Item -Path (Join-Path $RepoRoot "node_modules\*") -Destination $WaModulesDir -Recurse -Force
 
-# Clean dev/test artifacts from staged public, database & storage
+# Clean dev/test artifacts from staged public, database & storage so upgrades NEVER overwrite end-user database.sqlite or .env
 Remove-Item -Path (Join-Path $AppStage "public\hot") -Force -ErrorAction SilentlyContinue
 Remove-Item -Path (Join-Path $AppStage "public\storage") -Recurse -Force -ErrorAction SilentlyContinue
 Remove-Item -Path (Join-Path $AppStage "database\*.sqlite*") -Force -ErrorAction SilentlyContinue
+Remove-Item -Path (Join-Path $AppStage ".env") -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path `
     (Join-Path $AppStage "storage\app\public"), `
     (Join-Path $AppStage "storage\app\backups"), `
     (Join-Path $AppStage "storage\app\whatsapp-agent"), `
+    (Join-Path $AppStage "storage\backups"), `
     (Join-Path $AppStage "storage\framework\cache"), `
     (Join-Path $AppStage "storage\framework\sessions"), `
     (Join-Path $AppStage "storage\framework\views"), `
@@ -120,7 +141,7 @@ foreach ($vcDll in @("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll")) 
     }
 }
 
-# Configure php.ini with all extensions required by Karobar-App-ERP-v2
+# Configure php.ini with all extensions required by Karobar-App
 $PhpIni = @"
 [PHP]
 engine = On
@@ -189,7 +210,7 @@ if ($LocalNodeCmd -and (Test-Path $LocalNodeCmd.Source)) {
     Copy-Item -Path $NodeBinFile.FullName -Destination (Join-Path $NodeRuntimeDir "node.exe") -Force
 }
 
-Write-Host "==> [6/6] Code Signing & Compiling Windows Installer (Karobar-ERP-Setup-v2.0.0.exe)..." -ForegroundColor Cyan
+Write-Host "==> [6/6] Code Signing & Compiling Windows Installer (Karobar-App-Setup.exe v$AppVersion)..." -ForegroundColor Cyan
 
 # Provision Authenticode Code Signing Certificate bound to Malik Asim Shahzad (https://github.com/shzdasim)
 $InstallerOutDir = Join-Path $DistDir "installer"
@@ -218,7 +239,7 @@ if ($env:WINDOWS_CERT_PFX_BASE64) {
     $SigningCert = New-SelfSignedCertificate `
         -Type CodeSigningCert `
         -Subject "CN=Malik Asim Shahzad (shzdasim), O=Malik Asim Shahzad, OU=https://github.com/shzdasim/Karobar-App, C=PK" `
-        -FriendlyName "Malik Asim Shahzad - Karobar App ERP Developer Certificate" `
+        -FriendlyName "Malik Asim Shahzad - Karobar-App Developer Certificate" `
         -KeyAlgorithm RSA `
         -KeyLength 2048 `
         -HashAlgorithm "SHA256" `
@@ -242,9 +263,9 @@ function Invoke-KarobarAuthenticodeSign([string]$TargetExe) {
     if (-not (Test-Path $TargetExe)) { return }
     Write-Host "    Signing executable: $(Split-Path -Leaf $TargetExe)" -ForegroundColor Gray
     if ($SignToolExe -and (Test-Path $SignToolExe)) {
-        & $SignToolExe sign /f $PfxPath /p $PfxPasswordPlain /fd SHA256 /d "Karobar App ERP - Malik Asim Shahzad" /du "https://github.com/shzdasim/Karobar-App" /tr "http://timestamp.digicert.com" /td SHA256 $TargetExe
+        & $SignToolExe sign /f $PfxPath /p $PfxPasswordPlain /fd SHA256 /d "Karobar-App - Malik Asim Shahzad" /du "https://github.com/shzdasim/Karobar-App" /tr "http://timestamp.digicert.com" /td SHA256 $TargetExe
         if ($LASTEXITCODE -ne 0) {
-            & $SignToolExe sign /f $PfxPath /p $PfxPasswordPlain /fd SHA256 /d "Karobar App ERP - Malik Asim Shahzad" /du "https://github.com/shzdasim/Karobar-App" $TargetExe
+            & $SignToolExe sign /f $PfxPath /p $PfxPasswordPlain /fd SHA256 /d "Karobar-App - Malik Asim Shahzad" /du "https://github.com/shzdasim/Karobar-App" $TargetExe
         }
     } else {
         $sigRes = Set-AuthenticodeSignature -FilePath $TargetExe -Certificate $SigningCert -HashAlgorithm SHA256 -TimestampServer "http://timestamp.digicert.com"
@@ -255,7 +276,7 @@ function Invoke-KarobarAuthenticodeSign([string]$TargetExe) {
 }
 
 # Sign the packaged Electron application executable before building the installer
-Invoke-KarobarAuthenticodeSign (Join-Path $StageDir "KarobarERP.exe")
+Invoke-KarobarAuthenticodeSign (Join-Path $StageDir "Karobar-App.exe")
 
 $IsccCandidates = @(
     "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
@@ -277,28 +298,26 @@ if (-not $IsccExe) {
 
 if ($SignToolExe -and (Test-Path $SignToolExe)) {
     # Pass SignTool to ISCC so Inno Setup signs the inner elevated setup.tmp executable, unins000.exe, AND the outer setup.exe
-    $SignCmd = "`$q$SignToolExe`$q sign /f `$q$PfxPath`$q /p `$q$PfxPasswordPlain`$q /fd SHA256 /d `$qKarobar App ERP - Malik Asim Shahzad`$q /du `$qhttps://github.com/shzdasim/Karobar-App`$q `$f"
-    & $IsccExe "/DSignToolEnabled=1" "/Skarobarsign=$SignCmd" (Join-Path $RepoRoot "installer\karobar.iss")
+    $SignCmd = "`$q$SignToolExe`$q sign /f `$q$PfxPath`$q /p `$q$PfxPasswordPlain`$q /fd SHA256 /d `$qKarobar-App - Malik Asim Shahzad`$q /du `$qhttps://github.com/shzdasim/Karobar-App`$q `$f"
+    & $IsccExe "/DMyAppVersion=$AppVersion" "/DSignToolEnabled=1" "/Skarobarsign=$SignCmd" (Join-Path $RepoRoot "installer\karobar.iss")
 } else {
-    & $IsccExe (Join-Path $RepoRoot "installer\karobar.iss")
+    & $IsccExe "/DMyAppVersion=$AppVersion" (Join-Path $RepoRoot "installer\karobar.iss")
 }
 if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup compilation failed with exit code $LASTEXITCODE"
 }
 
 # Timestamp and verify the final compiled Inno Setup .exe installer
-$FinalInstallerExe = Join-Path $InstallerOutDir "Karobar-ERP-Setup-v2.0.0.exe"
+$FinalInstallerExe = Join-Path $InstallerOutDir "Karobar-App-Setup.exe"
 Invoke-KarobarAuthenticodeSign $FinalInstallerExe
 $VerifySig = Get-AuthenticodeSignature -FilePath $FinalInstallerExe
 Write-Host "    Authenticode Signature Status: $($VerifySig.Status) | Signer: $($VerifySig.SignerCertificate.Subject)" -ForegroundColor Green
 
-# Generate 1-Click Certificate Trust & Installer Launcher (Install-Karobar-ERP.bat)
-# Installing a .cer by double-clicking in Explorer places it in CurrentUser instead of LocalMachine\Root, which UAC ignores.
-# This helper script installs the certificate into LocalMachine\Root and LocalMachine\TrustedPublisher, unblocks Mark-of-the-Web, and runs the signed installer.
-$HelperBatPath = Join-Path $InstallerOutDir "Install-Karobar-ERP.bat"
+# Generate 1-Click Certificate Trust & Installer Launcher (Install-Karobar-App.bat)
+$HelperBatPath = Join-Path $InstallerOutDir "Install-Karobar-App.bat"
 $HelperBatContent = @"
 @echo off
-title Karobar App ERP v2.0 - Verified Publisher Installer
+title Karobar-App v$AppVersion - Verified Publisher Installer
 :: Request Administrator elevation if not already elevated
 net session >nul 2>&1
 if %errorlevel% neq 0 (
@@ -312,14 +331,40 @@ certutil.exe -addstore -f "Root" "%~dp0MalikAsimShahzad-KarobarERP.cer" >nul 2>&
 certutil.exe -addstore -f "TrustedPublisher" "%~dp0MalikAsimShahzad-KarobarERP.cer" >nul 2>&1
 echo [2/3] Clearing browser download security zone mark...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path '%~dp0' | Unblock-File -ErrorAction SilentlyContinue"
-echo [3/3] Launching Signed Karobar ERP Setup Wizard...
-start "" "%~dp0Karobar-ERP-Setup-v2.0.0.exe"
+echo [3/3] Launching Signed Karobar-App Setup Wizard...
+start "" "%~dp0Karobar-App-Setup.exe"
 "@
 Set-Content -Path $HelperBatPath -Value $HelperBatContent -Encoding ASCII
 
+# Generate latest-release.json manifest for in-app Over-The-Air (OTA) update checks
+$RecentCommits = ""
+try {
+    $RecentCommits = (git log -n 5 --pretty=format:"• %s (%h)" 2>$null) -join "`n"
+} catch {
+    $RecentCommits = "• Performance improvements, bug fixes, and new features."
+}
+if (-not $RecentCommits) {
+    $RecentCommits = "• Performance improvements, bug fixes, and new features."
+}
+
+$LatestReleaseManifest = [ordered]@{
+    app_name      = "Karobar-App"
+    version       = $AppVersion
+    build_number  = $BuildNumber
+    commit_sha    = $CommitSha
+    release_name  = "Karobar-App v$AppVersion (Build #$BuildNumber)"
+    released_at   = $ReleasedAt
+    notes         = $RecentCommits
+    download_url  = "https://github.com/$RepoSlug/releases/latest/download/Karobar-App-Setup.exe"
+    bundle_url    = "https://github.com/$RepoSlug/releases/latest/download/Karobar-App-Setup-Bundle.zip"
+    release_url   = "https://github.com/$RepoSlug/releases/latest"
+    zero_data_loss = $true
+}
+Set-Content -Path (Join-Path $InstallerOutDir "latest-release.json") -Value ($LatestReleaseManifest | ConvertTo-Json -Depth 4) -Encoding UTF8
+
 Write-Host "================================================================================" -ForegroundColor Green
-Write-Host "SUCCESS! Signed Windows .exe Installer generated at:" -ForegroundColor Green
-Write-Host "  dist\installer\Karobar-ERP-Setup-v2.0.0.exe" -ForegroundColor Yellow
+Write-Host "SUCCESS! Signed Windows .exe Installer & OTA Update Manifest generated at:" -ForegroundColor Green
+Write-Host "  dist\installer\Karobar-App-Setup.exe (v$AppVersion, Build #$BuildNumber)" -ForegroundColor Yellow
+Write-Host "  dist\installer\latest-release.json" -ForegroundColor Yellow
 Write-Host "  Publisher: Malik Asim Shahzad (https://github.com/shzdasim/Karobar-App)" -ForegroundColor Yellow
 Write-Host "================================================================================" -ForegroundColor Green
-

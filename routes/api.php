@@ -48,12 +48,16 @@ use App\Http\Controllers\UserPreferenceController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\UserDemandController;
 use App\Http\Controllers\CubeAssistantController;
+use App\Http\Controllers\Api\SystemUpdateController;
 
 /*
 |--------------------------------------------------------------------------
 | Public/Auth endpoints
 |--------------------------------------------------------------------------
 */
+Route::get('/system/version', [SystemUpdateController::class, 'version']);
+Route::get('/system/check-update', [SystemUpdateController::class, 'checkUpdate']);
+
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 Route::middleware(['auth:sanctum', 'token.expiry'])->get('/user', [AuthController::class, 'user']);
 Route::middleware(['auth:sanctum', 'token.expiry'])->put('/profile', [AuthController::class, 'updateProfile']);

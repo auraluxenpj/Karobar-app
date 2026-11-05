@@ -1,25 +1,18 @@
-name: Build Windows .exe Installer (Karobar ERP v2)
+name: Build & Release Karobar-App (.exe)
 
 on:
   push:
     branches: [main]
-    paths:
-      - ".github/workflows/build-windows-exe.yml"
-      - "scripts/build-windows-exe.ps1"
-      - "installer/**"
-      - "desktop/**"
-      - "resources/**"
-      - "app/**"
   workflow_dispatch:
     inputs:
       app_version:
-        description: "Installer Version (e.g. 2.0.0)"
+        description: "Optional Custom Version (leave 'auto' for 2.0.<build_number>)"
         required: false
-        default: "2.0.0"
+        default: "auto"
 
 jobs:
   build-windows-exe:
-    name: Compile Karobar-ERP-Setup.exe (Win64)
+    name: Compile & Release Karobar-App-Setup.exe (Win64)
     runs-on: windows-latest
     permissions:
       contents: write
@@ -29,6 +22,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
 
       - name: Setup PHP 8.4 (with sodium, sqlite, gd, zip)
         uses: shivammathur/setup-php@v2
@@ -52,6 +47,8 @@ jobs:
 
       - name: Build Windows Desktop Shell & Inno Setup .exe Installer
         shell: pwsh
+        env:
+          KAROBAR_APP_VERSION: ${{ inputs.app_version }}
         run: ./scripts/build-windows-exe.ps1
 
       - name: Attest Build Provenance to GitHub (shzdasim/Karobar-App)
@@ -60,47 +57,58 @@ jobs:
         with:
           subject-path: "dist/installer/*.exe"
 
-      - name: Upload Karobar-ERP-Setup.exe Artifact
+      - name: Upload Karobar-App-Setup.exe Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Karobar-ERP-Setup-Windows-x64
+          name: Karobar-App-Setup-Windows-x64
           path: |
             dist/installer/*.exe
             dist/installer/*.cer
             dist/installer/*.bat
+            dist/installer/latest-release.json
           retention-days: 30
 
-      - name: Publish / Update Official GitHub Release (v2.0.0)
+      - name: Publish Official GitHub Release & OTA Update Manifest
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $ReleaseTag = "v2.0.0"
-          $ReleaseTitle = "Karobar App ERP v2.0.0 — Windows 64-Bit Standalone Desktop Edition"
-          $BundleZip = "dist/installer/Karobar-ERP-Setup-v2.0.0-Bundle.zip"
+          $Manifest = Get-Content "dist/installer/latest-release.json" -Raw | ConvertFrom-Json
+          $AppVersion = $Manifest.version
+          $BuildNumber = $Manifest.build_number
+          $ReleaseTag = "v$AppVersion"
+          $ReleaseTitle = "Karobar-App v$AppVersion (Build #$BuildNumber) — Windows 64-Bit Desktop Edition"
+          $BundleZip = "dist/installer/Karobar-App-Setup-Bundle.zip"
           if (Test-Path $BundleZip) { Remove-Item -Force $BundleZip }
-          Compress-Archive -Path "dist/installer/Karobar-ERP-Setup-v2.0.0.exe", "dist/installer/MalikAsimShahzad-KarobarERP.cer", "dist/installer/Install-Karobar-ERP.bat" -DestinationPath $BundleZip -Force
 
+          Compress-Archive -Path `
+              "dist/installer/Karobar-App-Setup.exe", `
+              "dist/installer/MalikAsimShahzad-KarobarERP.cer", `
+              "dist/installer/Install-Karobar-App.bat" `
+              -DestinationPath $BundleZip -Force
+
+          $RecentChanges = $Manifest.notes
           $ReleaseNotes = @"
-          ## Karobar App ERP v2.0.0 (Windows 64-Bit Standalone `.exe`)
+          ## Karobar-App v$AppVersion (Build #$BuildNumber — Windows 64-Bit Standalone `.exe`)
           **Author & Developer:** Malik Asim Shahzad ([@shzdasim](https://github.com/shzdasim))
 
-          ### Highlights in This Release
-          - **Standalone Zero-Dependency Windows Desktop App**: Bundled with portable PHP 8.4 (Sodium + SQLite3 + GD), Node.js 22 LTS (Local WhatsApp Agent), and Electron Desktop Shell.
-          - **Existing Herd SQLite Database Import**: Choose between starting with a fresh database or importing an existing Laravel Herd `database.sqlite` file during installation (automatically clears only old users & old license records while keeping 100% of products, batches, invoices, ledgers, customers, suppliers, and accounts intact).
-          - **Hardware-Bound Ed25519 Licensing (`KRB-XXXX-XXXX-XXXX-XXXX`)**: Single-machine cryptographic binding with 1-click Machine ID copy in the installer wizard.
-          - **Windows Native Top Menu Bar + Multi-Window (MDI Sub-Windows)**: Access all ERP modules from the native Windows top menu bar and open multiple floating/tiled sub-windows (Sales, Purchases, POS, Ledgers) simultaneously inside the main window.
-          - **Authenticode Signed**: Signed with persistent Developer Certificate (`Malik Asim Shahzad (shzdasim)`).
+          ### What's New in Build #$BuildNumber
+          $RecentChanges
 
-          ### Quick Installation Instructions
-          1. Download **`Karobar-ERP-Setup-v2.0.0-Bundle.zip`** (or download `Karobar-ERP-Setup-v2.0.0.exe` directly).
-          2. Extract and run **`Install-Karobar-ERP.bat`** to automatically register `MalikAsimShahzad-KarobarERP.cer` into Windows Local Machine Trusted Root & Trusted Publishers and launch the installer as a verified publisher.
+          ### Key Capabilities
+          - **In-App Over-The-Air (OTA) Updates with 100% Zero Data Loss**: Installed copies of `Karobar-App` automatically detect this release when connected to the internet and offer a 1-click **"Update & Restart Now"** upgrade that backs up and preserves 100% of your SQLite database, invoices, products, ledgers, users, WhatsApp session, and license.
+          - **Existing Herd SQLite Database Import**: Import an existing Laravel Herd `database.sqlite` file during installation (clears only old users & old license records while keeping 100% of business data intact).
+          - **Hardware-Bound Ed25519 Licensing (`KRB-XXXX-XXXX-XXXX-XXXX`)**: Single-machine cryptographic binding with 1-click Machine ID copy.
+          - **Windows Native Top Menu Bar + Multi-Window (MDI Sub-Windows)**: Open multiple floating or tiled sub-windows (Sales, Purchases, POS, Ledgers) simultaneously inside the main window.
+
+          ### Installation / Manual Update Instructions
+          - **Existing Users**: Simply open `Karobar-App` while connected to the internet and click **"Update & Restart Now"** on the update notification!
+          - **New Installations**: Download **`Karobar-App-Setup-Bundle.zip`**, extract it, and run **`Install-Karobar-App.bat`** (or run **`Karobar-App-Setup.exe`** directly).
           "@
 
           $NotesFile = "dist/installer/release-notes.md"
           Set-Content -Path $NotesFile -Value $ReleaseNotes -Encoding UTF8
 
-          # Ensure tag points to current commit
           git tag -f $ReleaseTag $env:GITHUB_SHA
           git push origin "refs/tags/$ReleaseTag" --force
 
@@ -109,21 +117,21 @@ jobs:
               Write-Host "Updating existing GitHub Release $ReleaseTag..." -ForegroundColor Cyan
               gh release edit $ReleaseTag --title $ReleaseTitle --notes-file $NotesFile --latest
               gh release upload $ReleaseTag `
-                  "dist/installer/Karobar-ERP-Setup-v2.0.0.exe" `
-                  "dist/installer/Karobar-ERP-Setup-v2.0.0-Bundle.zip" `
+                  "dist/installer/Karobar-App-Setup.exe" `
+                  "dist/installer/Karobar-App-Setup-Bundle.zip" `
+                  "dist/installer/latest-release.json" `
                   "dist/installer/MalikAsimShahzad-KarobarERP.cer" `
-                  "dist/installer/Install-Karobar-ERP.bat" `
+                  "dist/installer/Install-Karobar-App.bat" `
                   --clobber
           } else {
               Write-Host "Creating new GitHub Release $ReleaseTag..." -ForegroundColor Cyan
               gh release create $ReleaseTag `
-                  "dist/installer/Karobar-ERP-Setup-v2.0.0.exe" `
-                  "dist/installer/Karobar-ERP-Setup-v2.0.0-Bundle.zip" `
+                  "dist/installer/Karobar-App-Setup.exe" `
+                  "dist/installer/Karobar-App-Setup-Bundle.zip" `
+                  "dist/installer/latest-release.json" `
                   "dist/installer/MalikAsimShahzad-KarobarERP.cer" `
-                  "dist/installer/Install-Karobar-ERP.bat" `
+                  "dist/installer/Install-Karobar-App.bat" `
                   --title $ReleaseTitle `
                   --notes-file $NotesFile `
                   --latest
           }
-
-

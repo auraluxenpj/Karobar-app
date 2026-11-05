@@ -9,6 +9,7 @@ import PageSkeleton from "../components/PageSkeleton.jsx";
 import SubWindowManager, {
   resolveTitleForPath,
 } from "../components/SubWindowManager.jsx";
+import AppUpdateNotification from "../components/AppUpdateNotification.jsx";
 import { Toaster } from "react-hot-toast";
 
 const SIDEBAR_PIN_STORAGE_KEY = "karobar_sidebar_pinned";
@@ -23,7 +24,7 @@ export default function DashboardLayout({ children }) {
       window.self !== window.top);
 
   // Brand from /api/settings
-  const [appName, setAppName] = useState("ERP");
+  const [appName, setAppName] = useState("Karobar-App");
   const [logoUrl, setLogoUrl] = useState(null);
 
   // Multi-Window (MDI Sub-Windows) State inside Main Window
@@ -119,10 +120,10 @@ export default function DashboardLayout({ children }) {
       try {
         const { data } = await axios.get("/api/sale-system");
         const sn = (data?.store_name || "").trim();
-        setAppName(sn || "ERP");
+        setAppName(sn || "Karobar-App");
         setLogoUrl(data?.logo_url || null);
       } catch {
-        setAppName("ERP");
+        setAppName("Karobar-App");
         setLogoUrl(null);
       }
     })();
@@ -232,7 +233,7 @@ export default function DashboardLayout({ children }) {
   const pageTitle = resolvePageTitle(currentPath);
 
   useEffect(() => {
-    document.title = `${pageTitle} - ${appName || "ERP"}`;
+    document.title = `${pageTitle} - ${appName || "Karobar-App"}`;
   }, [pageTitle, appName]);
 
   // --- Sub-Window (MDI) Operations Inside Main Window ---
@@ -758,6 +759,8 @@ export default function DashboardLayout({ children }) {
           onGridWindows={gridSubWindows}
           onCloseAll={closeAllSubWindows}
         />
+
+        <AppUpdateNotification />
       </div>
     </div>
   );

@@ -22,6 +22,7 @@ class KarobarInstallCommand extends Command
                             {--license-key= : Direct license key string to activate}
                             {--admin-config= : Path to JSON file with admin name, email, and password from Inno Setup}
                             {--import-sqlite= : Optional path to an existing Herd/Karobar SQLite database to import (clears only users & license)}
+                            {--upgrade-only : Perform a zero-data-loss in-place software upgrade (backs up DB, runs new migrations & permissions, preserves all users, license & data)}
                             {--admin-name=Store Administrator : Initial Admin full name}
                             {--admin-email=admin@example.com : Initial Admin email address}
                             {--admin-password=password : Initial Admin password}
@@ -32,7 +33,7 @@ class KarobarInstallCommand extends Command
                             {--cleanup-temp : Delete temporary --seal-file and --admin-config files after installation}
                             {--json : Output result as JSON}';
 
-    protected $description = 'Bootstrap a fresh or upgraded Karobar-App-ERP Windows desktop installation (DB, roles, admin account, hardware-bound license, and Genie setup state)';
+    protected $description = 'Bootstrap a fresh or upgraded Karobar-App Windows desktop installation (DB, roles, admin account, hardware-bound license, and Genie setup state)';
 
     public function handle(LicenseService $licenseService): int
     {
@@ -41,9 +42,16 @@ class KarobarInstallCommand extends Command
             $this->ensureEnvironmentAndDatabaseFile();
         }
 
-        // 1.5. Check if the user selected an existing Herd SQLite database to import during installation
         $adminData = $this->resolveAdminCredentials();
-        $importSqlitePath = $this->resolveImportSqlitePath($adminData);
+        $isUpgradeOnly = (bool) $this->option('upgrade-only') || !empty($adminData['upgrade_only']);
+
+        // 1.2. If performing an in-place upgrade over an existing installation, create a pre-upgrade SQLite backup first
+        if ($isUpgradeOnly && !app()->runningUnitTests()) {
+            $this->createPreUpgradeSafetyBackup();
+        }
+
+        // 1.5. Check if the user selected an existing Herd SQLite database to import during installation
+        $importSqlitePath = $isUpgradeOnly ? '' : $this->resolveImportSqlitePath($adminData);
         $importedExistingDb = false;
 
         if ($importSqlitePath !== '') {
@@ -54,7 +62,7 @@ class KarobarInstallCommand extends Command
             $importedExistingDb = true;
         }
 
-        // 2. Run database migrations (safely adds any new v2 tables/columns to imported or fresh DB)
+        // 2. Run database migrations (safely adds any new v2 tables/columns to imported, upgraded, or fresh DB)
         if (!$this->option('skip-migrate')) {
             Artisan::call('migrate', ['--force' => true]);
         }
@@ -71,6 +79,31 @@ class KarobarInstallCommand extends Command
             Artisan::call('db:seed', ['--class' => ThemeSettingSeeder::class, '--force' => true]);
         }
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        // 3.5. If --upgrade-only and an Admin user already exists, preserve all existing users, license, and settings untouched!
+        if ($isUpgradeOnly && User::query()->exists()) {
+            if ($this->option('cleanup-temp')) {
+                $this->cleanupTempFiles();
+            }
+            $firstAdmin = User::query()->first();
+            $setting = Setting::first();
+            $result = [
+                'ok'                 => true,
+                'upgraded'           => true,
+                'admin_email'        => $firstAdmin?->email,
+                'admin_name'         => $firstAdmin?->name,
+                'machine_id'         => $licenseService->computeMachineId(),
+                'licensed'           => $licenseService->currentStatus()['valid'] ?? false,
+                'store_name'         => $setting?->store_name,
+                'is_setup_completed' => (bool) ($setting?->is_setup_completed ?? true),
+            ];
+            if ($this->option('json')) {
+                $this->line(json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            } else {
+                $this->info('Karobar-App upgraded in-place with zero data loss.');
+            }
+            return self::SUCCESS;
+        }
 
         // 4. Resolve and create the initial Administrator account chosen during the .exe installer wizard
         $adminEmail = strtolower(trim($adminData['email']));
@@ -164,14 +197,7 @@ class KarobarInstallCommand extends Command
 
         // 7. Cleanup temporary installer files if requested
         if ($this->option('cleanup-temp')) {
-            $sealFile = trim((string) $this->option('seal-file'));
-            if ($sealFile !== '' && is_file($sealFile)) {
-                @unlink($sealFile);
-            }
-            $adminConfigFile = trim((string) $this->option('admin-config'));
-            if ($adminConfigFile !== '' && is_file($adminConfigFile)) {
-                @unlink($adminConfigFile);
-            }
+            $this->cleanupTempFiles();
         }
 
         $result = [
@@ -188,13 +214,58 @@ class KarobarInstallCommand extends Command
         if ($this->option('json')) {
             $this->line(json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         } else {
-            $this->info('Karobar-App-ERP installation initialized successfully.');
+            $this->info('Karobar-App installation initialized successfully.');
             $this->line("Admin Account : {$adminUser->name} <{$adminUser->email}>");
             $this->line("Machine ID    : {$result['machine_id']}");
             $this->line('Setup Wizard  : Pending first-time login (/setup)');
         }
 
         return self::SUCCESS;
+    }
+
+    protected function cleanupTempFiles(): void
+    {
+        $sealFile = trim((string) $this->option('seal-file'));
+        if ($sealFile !== '' && is_file($sealFile)) {
+            @unlink($sealFile);
+        }
+        $adminConfigFile = trim((string) $this->option('admin-config'));
+        if ($adminConfigFile !== '' && is_file($adminConfigFile)) {
+            @unlink($adminConfigFile);
+        }
+    }
+
+    protected function createPreUpgradeSafetyBackup(): void
+    {
+        $dbPath = config('database.connections.sqlite.database');
+        if (!is_string($dbPath) || $dbPath === '' || $dbPath === ':memory:' || !is_file($dbPath) || @filesize($dbPath) < 16) {
+            return;
+        }
+
+        try {
+            DB::statement('PRAGMA wal_checkpoint(TRUNCATE);');
+        } catch (\Throwable) {
+            // Ignore
+        }
+
+        $backupDir = storage_path('backups');
+        if (!is_dir($backupDir)) {
+            @mkdir($backupDir, 0755, true);
+        }
+
+        $timestamp = date('Ymd-His');
+        $backupFile = $backupDir . DIRECTORY_SEPARATOR . "pre-upgrade-{$timestamp}.sqlite";
+        @copy($dbPath, $backupFile);
+
+        // Keep only the 10 most recent pre-upgrade backups to avoid filling disk
+        $existingBackups = glob($backupDir . DIRECTORY_SEPARATOR . 'pre-upgrade-*.sqlite') ?: [];
+        if (count($existingBackups) > 10) {
+            sort($existingBackups);
+            $toDelete = array_slice($existingBackups, 0, count($existingBackups) - 10);
+            foreach ($toDelete as $oldFile) {
+                @unlink($oldFile);
+            }
+        }
     }
 
     protected function ensureEnvironmentAndDatabaseFile(): void
@@ -271,6 +342,7 @@ class KarobarInstallCommand extends Command
                     'email'         => (string) ($decoded['email'] ?? 'admin@example.com'),
                     'password'      => (string) ($decoded['password'] ?? 'password'),
                     'import_sqlite' => trim((string) ($decoded['import_sqlite'] ?? '')),
+                    'upgrade_only'  => !empty($decoded['upgrade_only']),
                 ];
             }
         }
@@ -280,6 +352,7 @@ class KarobarInstallCommand extends Command
             'email'         => (string) $this->option('admin-email'),
             'password'      => (string) $this->option('admin-password'),
             'import_sqlite' => trim((string) $this->option('import-sqlite')),
+            'upgrade_only'  => (bool) $this->option('upgrade-only'),
         ];
     }
 

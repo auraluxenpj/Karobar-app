@@ -411,5 +411,96 @@ class WindowsInstallerAndSetupGenieTest extends TestCase
         $this->assertDatabaseHas('customers', ['id' => 20, 'name' => 'Al-Shifa Clinic']);
         $this->assertDatabaseHas('products', ['id' => 30, 'name' => 'Augmentin 625mg Tabs', 'quantity' => 120]);
     }
+
+    public function test_in_place_ota_upgrade_preserves_all_users_licenses_and_store_data_and_checks_github_releases(): void
+    {
+        // 1. Seed existing installed store with Admin, Cashier, License, Settings, and Products
+        $existingAdmin = User::create([
+            'name'     => 'Existing Store Owner',
+            'email'    => 'owner@karobar.pk',
+            'password' => bcrypt('ownerpass123'),
+            'status'   => 'active',
+        ]);
+        $existingCashier = User::create([
+            'name'     => 'Counter Cashier',
+            'email'    => 'cashier@karobar.pk',
+            'password' => bcrypt('cashierpass123'),
+            'status'   => 'active',
+        ]);
+
+        License::create([
+            'license_key'  => 'KRBL.EXISTING-BOUND-KEY.SIG',
+            'payload'      => ['name' => 'Madina Medical Store', 'machine' => $this->machineA],
+            'valid'        => true,
+            'machine_hash' => $this->machineA,
+            'activated_at' => now()->subDays(30),
+        ]);
+
+        Setting::create([
+            'id'                 => 1,
+            'store_name'         => 'Madina Medical Store',
+            'is_setup_completed' => true,
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('categories')->insert([
+            'id'         => 50,
+            'name'       => 'Pain Relief',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // 2. Run karobar:install via admin-init.json with upgrade_only=true (simulating Inno Setup /UPGRADE=1)
+        $adminConfigPath = sys_get_temp_dir() . '/test-ota-upgrade-' . uniqid() . '.json';
+        file_put_contents($adminConfigPath, json_encode(['upgrade_only' => true]));
+
+        $exitCode = Artisan::call('karobar:install', [
+            '--admin-config' => $adminConfigPath,
+            '--cleanup-temp' => true,
+            '--skip-migrate' => true,
+            '--json'         => true,
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertFileDoesNotExist($adminConfigPath);
+
+        // Verify ALL existing users, license, settings, and categories were 100% preserved untouched
+        $this->assertDatabaseCount('users', 2);
+        $this->assertDatabaseHas('users', ['email' => 'owner@karobar.pk']);
+        $this->assertDatabaseHas('users', ['email' => 'cashier@karobar.pk']);
+        $this->assertDatabaseCount('licenses', 1);
+        $this->assertDatabaseHas('licenses', ['license_key' => 'KRBL.EXISTING-BOUND-KEY.SIG']);
+        $this->assertDatabaseHas('settings', ['store_name' => 'Madina Medical Store', 'is_setup_completed' => 1]);
+        $this->assertDatabaseHas('categories', ['id' => 50, 'name' => 'Pain Relief']);
+
+        // 3. Verify /api/system/version and /api/system/check-update OTA endpoints
+        $this->getJson('/api/system/version')
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('app_name', 'Karobar-App');
+
+        \Illuminate\Support\Facades\Http::fake([
+            'https://github.com/shzdasim/Karobar-App/releases/latest/download/latest-release.json' => \Illuminate\Support\Facades\Http::response([
+                'app_name'       => 'Karobar-App',
+                'version'        => '2.0.99',
+                'build_number'   => 99,
+                'commit_sha'     => 'abc9999',
+                'release_name'   => 'Karobar-App v2.0.99 (Build #99)',
+                'released_at'    => '2026-11-05T12:00:00Z',
+                'notes'          => '• Added new POS shortcut and batch report filters',
+                'download_url'   => 'https://github.com/shzdasim/Karobar-App/releases/latest/download/Karobar-App-Setup.exe',
+                'bundle_url'     => 'https://github.com/shzdasim/Karobar-App/releases/latest/download/Karobar-App-Setup-Bundle.zip',
+                'release_url'    => 'https://github.com/shzdasim/Karobar-App/releases/latest',
+                'zero_data_loss' => true,
+            ], 200),
+        ]);
+
+        $this->getJson('/api/system/check-update?force=1')
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('update_available', true)
+            ->assertJsonPath('latest_version', '2.0.99')
+            ->assertJsonPath('latest_build', 99)
+            ->assertJsonPath('zero_data_loss', true);
+    }
 }
 

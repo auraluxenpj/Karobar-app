@@ -1,21 +1,27 @@
 ; ==============================================================================
-; Karobar App ERP v2.0 — Inno Setup 6 Windows (.exe) Installer Script
+; Karobar-App — Inno Setup 6 Windows (.exe) Installer & Zero-Data-Loss Updater
 ; ==============================================================================
 ; Features:
 ;   1. Terms & Conditions (EULA) acceptance gate
 ;   2. Privacy Policy & Data Ownership acceptance gate
-;   3. Pre-install Hardware Machine ID display + Ed25519 License Key binding gate
-;   4. Initial Administrator Account creation wizard (Name, Email, Password)
-;   5. Custom installation directory picker ("Install anywhere on C:\, D:\, etc.")
-;   6. Post-install database migration, role seeding, license sealing & Genie Setup flag
+;   3. Smart Database Mode:
+;      - Auto-detects existing installation for 100% Zero-Data-Loss In-Place Update
+;      - Fresh Database for new store installations
+;      - Herd SQLite Database Import (clears only users & license, keeps 100% of data)
+;   4. Pre-install Hardware Machine ID display + Ed25519 License Key binding gate
+;   5. Initial Administrator Account creation wizard (Name, Email, Password)
+;   6. Custom installation directory picker ("Install anywhere on C:\, D:\, etc.")
+;   7. Supports silent OTA updates (/VERYSILENT /UPGRADE=1) triggered from inside Karobar-App
 ; ==============================================================================
 
-#define MyAppName "Karobar App ERP"
-#define MyAppVersion "2.0.0"
+#define MyAppName "Karobar-App"
+#ifndef MyAppVersion
+  #define MyAppVersion "2.0.1"
+#endif
 #define MyAppPublisher "Malik Asim Shahzad (shzdasim)"
 #define MyAppURL "https://github.com/shzdasim/Karobar-App"
 #define MyAppSupportURL "https://github.com/shzdasim"
-#define MyAppExeName "KarobarERP.exe"
+#define MyAppExeName "Karobar-App.exe"
 #define BuildStageDir "..\dist\stage"
 
 [Setup]
@@ -35,13 +41,15 @@ VersionInfoTextVersion={#MyAppVersion}
 VersionInfoCopyright=Copyright (C) 2026 Malik Asim Shahzad (https://github.com/shzdasim)
 VersionInfoProductName={#MyAppName}
 VersionInfoProductVersion={#MyAppVersion}.0
-DefaultDirName={autopf}\Karobar ERP
+DefaultDirName={autopf}\Karobar-App
 DefaultGroupName={#MyAppName}
 DisableDirPage=no
 AllowNoIcons=yes
+CloseApplications=yes
+RestartApplications=no
 LicenseFile=legal\TermsAndConditions.txt
 OutputDir=..\dist\installer
-OutputBaseFilename=Karobar-ERP-Setup-v{#MyAppVersion}
+OutputBaseFilename=Karobar-App-Setup
 SetupIconFile=..\desktop\icon.ico
 Compression=lzma2/fast
 SolidCompression=no
@@ -69,6 +77,7 @@ Name: "{app}\app\storage\app"; Permissions: users-modify
 Name: "{app}\app\storage\app\public"; Permissions: users-modify
 Name: "{app}\app\storage\app\backups"; Permissions: users-modify
 Name: "{app}\app\storage\app\whatsapp-agent"; Permissions: users-modify
+Name: "{app}\app\storage\backups"; Permissions: users-modify
 Name: "{app}\app\storage\framework"; Permissions: users-modify
 Name: "{app}\app\storage\framework\cache"; Permissions: users-modify
 Name: "{app}\app\storage\framework\sessions"; Permissions: users-modify
@@ -89,7 +98,10 @@ Source: "{#BuildStageDir}\app\runtime\php\ext\php_sodium.dll"; Flags: dontcopy
 Source: "precheck.php"; Flags: dontcopy
 Source: "..\desktop\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 ; Full staged Electron + Laravel + PHP + Node application bundle
-Source: "{#BuildStageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; CRITICAL ZERO-DATA-LOSS EXCLUSIONS: Never overwrite existing SQLite database, .env, machine-id, license-clock, WhatsApp session, uploaded logos/files, or backups!
+Source: "{#BuildStageDir}\*"; DestDir: "{app}"; \
+  Excludes: "app\database\database.sqlite*,app\storage\app\.machine-id,app\storage\app\.license-clock,app\storage\app\whatsapp-auth\*,app\storage\app\public\*,app\storage\app\backups\*,app\storage\backups\*,app\.env"; \
+  Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"
@@ -97,7 +109,7 @@ Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"; IconFilename
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; Tasks: desktopicon
 
 [Run]
-; Install Developer Authenticode Certificate into local Trusted Root & Trusted Publishers store so KarobarERP.exe is trusted on this PC
+; Install Developer Authenticode Certificate into local Trusted Root & Trusted Publishers store so Karobar-App.exe is trusted on this PC
 Filename: "{sys}\certutil.exe"; \
   Parameters: "-addstore -f ""Root"" ""{app}\app\desktop\MalikAsimShahzad-KarobarERP.cer"""; \
   Flags: runhidden waituntilterminated; \
@@ -108,23 +120,38 @@ Filename: "{sys}\certutil.exe"; \
   Flags: runhidden waituntilterminated; \
   Check: FileExists(ExpandConstant('{app}\app\desktop\MalikAsimShahzad-KarobarERP.cer'))
 
-; Post-Install Bootstrapper: migrates SQLite DB, creates the Admin account entered in the wizard, seals the hardware-bound license, and sets is_setup_completed=false so first login opens the Genie Setup Wizard (/setup)
+; Post-Install / Upgrade Bootstrapper:
+; - In upgrade mode (--upgrade-only via admin-init.json): backs up SQLite DB, runs new migrations & permissions, preserves 100% of users, license, settings & store data.
+; - In fresh/import mode: migrates SQLite DB, creates Admin account, seals hardware-bound license.
 Filename: "{app}\app\runtime\php\php.exe"; \
   Parameters: "artisan karobar:install --seal-file=""{tmp}\install-license.seal"" --admin-config=""{tmp}\admin-init.json"" --accept-legal --cleanup-temp"; \
   WorkingDir: "{app}\app"; \
-  StatusMsg: "Initializing Karobar ERP database, administrator account, and hardware license seal..."; \
+  StatusMsg: "Updating Karobar-App database schema and runtime configuration..."; \
   Flags: runhidden waituntilterminated
 
-; Launch the Desktop Application after installation completes
+; Launch the Desktop Application after interactive installation completes
 Filename: "{app}\{#MyAppExeName}"; \
   Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; \
-  Flags: nowait postinstall skipifsilent
+  Flags: nowait postinstall skipifsilent; \
+  Check: not IsCliUpgradeMode
+
+; Automatically relaunch Karobar-App.exe after a silent 1-click OTA update (/UPGRADE=1)
+Filename: "{app}\{#MyAppExeName}"; \
+  Flags: nowait; \
+  Check: IsCliUpgradeMode
 
 [Code]
 var
   PrivacyPage: TWizardPage;
   PrivacyMemo: TNewMemo;
   PrivacyAcceptCheck: TNewCheckBox;
+
+  DatabaseImportPage: TWizardPage;
+  KeepExistingDbRadio: TNewRadioButton;
+  FreshDbRadio: TNewRadioButton;
+  ImportDbRadio: TNewRadioButton;
+  SqliteFileEdit: TNewEdit;
+  BrowseSqliteBtn: TNewButton;
 
   LicenseKeyPage: TWizardPage;
   MachineIdEdit: TNewEdit;
@@ -137,13 +164,27 @@ var
   AdminPasswordEdit: TPasswordEdit;
   AdminConfirmPasswordEdit: TPasswordEdit;
 
-  DatabaseImportPage: TWizardPage;
-  FreshDbRadio: TNewRadioButton;
-  ImportDbRadio: TNewRadioButton;
-  SqliteFileEdit: TNewEdit;
-  BrowseSqliteBtn: TNewButton;
-
   DetectedMachineId: String;
+
+function IsCliUpgradeMode(): Boolean;
+begin
+  Result := (ExpandConstant('{param:UPGRADE|0}') = '1');
+end;
+
+function ExistingInstallDbPath(): String;
+begin
+  Result := ExpandConstant('{app}\app\database\database.sqlite');
+end;
+
+function HasExistingInstalledDatabase(): Boolean;
+begin
+  Result := FileExists(ExistingInstallDbPath());
+end;
+
+function IsUpgradeDatabaseModeSelected(): Boolean;
+begin
+  Result := IsCliUpgradeMode() or ( Assigned(KeepExistingDbRadio) and KeepExistingDbRadio.Checked );
+end;
 
 { Compute deterministic hardware Machine ID using bundled portable PHP + precheck.php }
 function ComputeInstallerMachineId(): String;
@@ -152,6 +193,11 @@ var
   OutId: AnsiString;
 begin
   Result := 'KRB-DETECTING';
+  if IsCliUpgradeMode() then
+  begin
+    Result := 'KRB-UPGRADE-MODE';
+    Exit;
+  end;
   try
     try
       ExtractTemporaryFile('vcruntime140.dll');
@@ -215,7 +261,7 @@ begin
   PrivacyPage := CreateCustomPage(
     wpLicense,
     'Privacy Policy & Data Ownership Agreement',
-    'Please review how Karobar App ERP stores and protects your store data before continuing.'
+    'Please review how Karobar-App stores and protects your store data before continuing.'
   );
 
   PrivacyMemo := TNewMemo.Create(PrivacyPage);
@@ -227,13 +273,13 @@ begin
   PrivacyMemo.ScrollBars := ssVertical;
   PrivacyMemo.ReadOnly := True;
   PrivacyMemo.Text :=
-    'KAROBAR APP ERP v2.0 — PRIVACY POLICY & DATA OWNERSHIP' + #13#10 + #13#10 +
+    'KAROBAR-APP — PRIVACY POLICY & DATA OWNERSHIP' + #13#10 + #13#10 +
     '1. 100% LOCAL-FIRST DATA OWNERSHIP' + #13#10 +
     'All business data (products, batches, invoices, ledgers, accounts, and HR records) is stored locally on your computer inside your chosen installation directory. We do not collect, upload, or sell your store records to any external server.' + #13#10 + #13#10 +
     '2. HARDWARE IDENTIFICATION FOR SINGLE-MACHINE LICENSING' + #13#10 +
     'To permanently bind your software license to this machine, the Software computes a one-way cryptographic hash (KRB-XXXX-XXXX-XXXX-XXXX) from your OS and hardware identifiers.' + #13#10 + #13#10 +
-    '3. OPTIONAL INTEGRATIONS (WHATSAPP, SMTP EMAIL & CUBE AI)' + #13#10 +
-    'Outbound messages via the built-in Local WhatsApp Agent, SMTP Email, or Cube AI Co-Pilot only occur when explicitly enabled by the Store Administrator in Settings.' + #13#10 + #13#10 +
+    '3. ZERO-DATA-LOSS SOFTWARE UPDATES' + #13#10 +
+    'When connected to the internet, Karobar-App checks GitHub Releases for new features and bug fixes. Applying an update preserves 100% of your local database, users, license, and settings.' + #13#10 + #13#10 +
     '4. LOCAL SECURITY & ACCESS CONTROL' + #13#10 +
     'Administrator credentials created in the next step are hashed locally using bcrypt.';
 
@@ -242,9 +288,106 @@ begin
   PrivacyAcceptCheck.Left := 0;
   PrivacyAcceptCheck.Top := PrivacyMemo.Top + PrivacyMemo.Height + ScaleY(10);
   PrivacyAcceptCheck.Width := PrivacyPage.SurfaceWidth;
-  PrivacyAcceptCheck.Caption := 'I have read and agree to the Karobar App ERP Privacy Policy';
+  PrivacyAcceptCheck.Caption := 'I have read and agree to the Karobar-App Privacy Policy';
   PrivacyAcceptCheck.Checked := False;
   PrivacyAcceptCheck.OnClick := @OnPrivacyCheckClick;
+end;
+
+procedure OnDbModeChange(Sender: TObject);
+begin
+  SqliteFileEdit.Enabled := ImportDbRadio.Checked;
+  BrowseSqliteBtn.Enabled := ImportDbRadio.Checked;
+end;
+
+procedure OnBrowseSqliteClick(Sender: TObject);
+var
+  SelectedFile: String;
+begin
+  SelectedFile := SqliteFileEdit.Text;
+  if GetOpenFileName(
+    'Select Existing Herd / Karobar SQLite Database File',
+    SelectedFile,
+    '',
+    'SQLite Database Files (*.sqlite;*.db;*.sqlite3)|*.sqlite;*.db;*.sqlite3|All Files (*.*)|*.*',
+    'sqlite'
+  ) then
+  begin
+    SqliteFileEdit.Text := SelectedFile;
+    ImportDbRadio.Checked := True;
+    OnDbModeChange(Sender);
+  end;
+end;
+
+procedure CreateDatabaseImportPage();
+var
+  InfoLabel, FileLabel: TNewStaticText;
+begin
+  DatabaseImportPage := CreateCustomPage(
+    wpSelectDir,
+    'Database Setup, Software Update & Herd SQLite Import',
+    'Choose whether to update an existing Karobar-App installation, start fresh, or import a Herd SQLite database.'
+  );
+
+  KeepExistingDbRadio := TNewRadioButton.Create(DatabaseImportPage);
+  KeepExistingDbRadio.Parent := DatabaseImportPage.Surface;
+  KeepExistingDbRadio.Left := 0;
+  KeepExistingDbRadio.Top := ScaleY(2);
+  KeepExistingDbRadio.Width := DatabaseImportPage.SurfaceWidth;
+  KeepExistingDbRadio.Caption := 'Keep Existing Database & License (In-Place Update — 100% Zero Data Loss)';
+  KeepExistingDbRadio.Checked := False;
+  KeepExistingDbRadio.OnClick := @OnDbModeChange;
+
+  FreshDbRadio := TNewRadioButton.Create(DatabaseImportPage);
+  FreshDbRadio.Parent := DatabaseImportPage.Surface;
+  FreshDbRadio.Left := 0;
+  FreshDbRadio.Top := KeepExistingDbRadio.Top + ScaleY(26);
+  FreshDbRadio.Width := DatabaseImportPage.SurfaceWidth;
+  FreshDbRadio.Caption := 'Start with a Fresh Database (New Store Installation)';
+  FreshDbRadio.Checked := True;
+  FreshDbRadio.OnClick := @OnDbModeChange;
+
+  ImportDbRadio := TNewRadioButton.Create(DatabaseImportPage);
+  ImportDbRadio.Parent := DatabaseImportPage.Surface;
+  ImportDbRadio.Left := 0;
+  ImportDbRadio.Top := FreshDbRadio.Top + ScaleY(26);
+  ImportDbRadio.Width := DatabaseImportPage.SurfaceWidth;
+  ImportDbRadio.Caption := 'Import Existing SQLite Database (From Herd / Existing Karobar Deployment)';
+  ImportDbRadio.Checked := False;
+  ImportDbRadio.OnClick := @OnDbModeChange;
+
+  InfoLabel := TNewStaticText.Create(DatabaseImportPage);
+  InfoLabel.Parent := DatabaseImportPage.Surface;
+  InfoLabel.Left := ScaleX(18);
+  InfoLabel.Top := ImportDbRadio.Top + ScaleY(22);
+  InfoLabel.Width := DatabaseImportPage.SurfaceWidth - ScaleX(18);
+  InfoLabel.AutoSize := False;
+  InfoLabel.WordWrap := True;
+  InfoLabel.Height := ScaleY(48);
+  InfoLabel.Caption :=
+    'If importing from Herd: All Products, Batches, Categories, Brands, Suppliers, Customers, Invoices, Returns, Ledgers, and Accounts are kept 100% intact, while only old Users and old License records are cleared.';
+
+  FileLabel := TNewStaticText.Create(DatabaseImportPage);
+  FileLabel.Parent := DatabaseImportPage.Surface;
+  FileLabel.Left := 0;
+  FileLabel.Top := InfoLabel.Top + ScaleY(52);
+  FileLabel.Caption := 'Select Existing Herd SQLite Database File (e.g. database.sqlite):';
+
+  SqliteFileEdit := TNewEdit.Create(DatabaseImportPage);
+  SqliteFileEdit.Parent := DatabaseImportPage.Surface;
+  SqliteFileEdit.Left := 0;
+  SqliteFileEdit.Top := FileLabel.Top + ScaleY(18);
+  SqliteFileEdit.Width := DatabaseImportPage.SurfaceWidth - ScaleX(100);
+  SqliteFileEdit.Enabled := False;
+
+  BrowseSqliteBtn := TNewButton.Create(DatabaseImportPage);
+  BrowseSqliteBtn.Parent := DatabaseImportPage.Surface;
+  BrowseSqliteBtn.Left := SqliteFileEdit.Width + ScaleX(8);
+  BrowseSqliteBtn.Top := SqliteFileEdit.Top - ScaleY(1);
+  BrowseSqliteBtn.Width := ScaleX(92);
+  BrowseSqliteBtn.Height := SqliteFileEdit.Height + ScaleY(2);
+  BrowseSqliteBtn.Caption := 'Browse...';
+  BrowseSqliteBtn.Enabled := False;
+  BrowseSqliteBtn.OnClick := @OnBrowseSqliteClick;
 end;
 
 procedure CreateLicenseBindingPage();
@@ -252,9 +395,9 @@ var
   MachineIdLabel, KeyLabel: TNewStaticText;
 begin
   LicenseKeyPage := CreateCustomPage(
-    PrivacyPage.ID,
+    DatabaseImportPage.ID,
     'Software License Key & Machine Binding',
-    'Enter your Karobar license key. This key will permanently bind to this computer and can never be used on another machine.'
+    'Enter your Karobar-App license key. This key will permanently bind to this computer and can never be used on another machine.'
   );
 
   MachineIdLabel := TNewStaticText.Create(LicenseKeyPage);
@@ -356,95 +499,6 @@ begin
   AdminConfirmPasswordEdit.Width := AdminAccountPage.SurfaceWidth;
 end;
 
-procedure OnDbModeChange(Sender: TObject);
-begin
-  SqliteFileEdit.Enabled := ImportDbRadio.Checked;
-  BrowseSqliteBtn.Enabled := ImportDbRadio.Checked;
-end;
-
-procedure OnBrowseSqliteClick(Sender: TObject);
-var
-  SelectedFile: String;
-begin
-  SelectedFile := SqliteFileEdit.Text;
-  if GetOpenFileName(
-    'Select Existing Herd / Karobar SQLite Database File',
-    SelectedFile,
-    '',
-    'SQLite Database Files (*.sqlite;*.db;*.sqlite3)|*.sqlite;*.db;*.sqlite3|All Files (*.*)|*.*',
-    'sqlite'
-  ) then
-  begin
-    SqliteFileEdit.Text := SelectedFile;
-    ImportDbRadio.Checked := True;
-    OnDbModeChange(Sender);
-  end;
-end;
-
-procedure CreateDatabaseImportPage();
-var
-  InfoLabel, FileLabel: TNewStaticText;
-begin
-  DatabaseImportPage := CreateCustomPage(
-    AdminAccountPage.ID,
-    'Database Setup & Herd SQLite Import (Optional)',
-    'Choose whether to start with a fresh database or import an existing SQLite database from Laravel Herd.'
-  );
-
-  FreshDbRadio := TNewRadioButton.Create(DatabaseImportPage);
-  FreshDbRadio.Parent := DatabaseImportPage.Surface;
-  FreshDbRadio.Left := 0;
-  FreshDbRadio.Top := ScaleY(4);
-  FreshDbRadio.Width := DatabaseImportPage.SurfaceWidth;
-  FreshDbRadio.Caption := 'Start with a Fresh Database (New Store Installation)';
-  FreshDbRadio.Checked := True;
-  FreshDbRadio.OnClick := @OnDbModeChange;
-
-  ImportDbRadio := TNewRadioButton.Create(DatabaseImportPage);
-  ImportDbRadio.Parent := DatabaseImportPage.Surface;
-  ImportDbRadio.Left := 0;
-  ImportDbRadio.Top := FreshDbRadio.Top + ScaleY(28);
-  ImportDbRadio.Width := DatabaseImportPage.SurfaceWidth;
-  ImportDbRadio.Caption := 'Import Existing SQLite Database (From Herd / Existing Karobar Deployment)';
-  ImportDbRadio.Checked := False;
-  ImportDbRadio.OnClick := @OnDbModeChange;
-
-  InfoLabel := TNewStaticText.Create(DatabaseImportPage);
-  InfoLabel.Parent := DatabaseImportPage.Surface;
-  InfoLabel.Left := ScaleX(18);
-  InfoLabel.Top := ImportDbRadio.Top + ScaleY(24);
-  InfoLabel.Width := DatabaseImportPage.SurfaceWidth - ScaleX(18);
-  InfoLabel.AutoSize := False;
-  InfoLabel.WordWrap := True;
-  InfoLabel.Height := ScaleY(52);
-  InfoLabel.Caption :=
-    'All Products, Batches, Categories, Brands, Suppliers, Customers, Invoices, Returns, Ledgers, and Accounts will be kept 100% intact. ' +
-    'Only old Users and old License records will be cleared and replaced with the Administrator account and License Key entered in this wizard.';
-
-  FileLabel := TNewStaticText.Create(DatabaseImportPage);
-  FileLabel.Parent := DatabaseImportPage.Surface;
-  FileLabel.Left := 0;
-  FileLabel.Top := InfoLabel.Top + ScaleY(60);
-  FileLabel.Caption := 'Select Existing SQLite Database File (e.g. database.sqlite):';
-
-  SqliteFileEdit := TNewEdit.Create(DatabaseImportPage);
-  SqliteFileEdit.Parent := DatabaseImportPage.Surface;
-  SqliteFileEdit.Left := 0;
-  SqliteFileEdit.Top := FileLabel.Top + ScaleY(20);
-  SqliteFileEdit.Width := DatabaseImportPage.SurfaceWidth - ScaleX(100);
-  SqliteFileEdit.Enabled := False;
-
-  BrowseSqliteBtn := TNewButton.Create(DatabaseImportPage);
-  BrowseSqliteBtn.Parent := DatabaseImportPage.Surface;
-  BrowseSqliteBtn.Left := SqliteFileEdit.Width + ScaleX(8);
-  BrowseSqliteBtn.Top := SqliteFileEdit.Top - ScaleY(1);
-  BrowseSqliteBtn.Width := ScaleX(92);
-  BrowseSqliteBtn.Height := SqliteFileEdit.Height + ScaleY(2);
-  BrowseSqliteBtn.Caption := 'Browse...';
-  BrowseSqliteBtn.Enabled := False;
-  BrowseSqliteBtn.OnClick := @OnBrowseSqliteClick;
-end;
-
 function EscapeJsonString(const S: String): String;
 var
   R: String;
@@ -455,13 +509,64 @@ begin
   Result := R;
 end;
 
+procedure WriteAdminInitJson();
+var
+  AdminJson, ImportPath: String;
+begin
+  if IsUpgradeDatabaseModeSelected() then
+  begin
+    AdminJson := '{"upgrade_only":true}';
+  end
+  else
+  begin
+    ImportPath := '';
+    if Assigned(ImportDbRadio) and ImportDbRadio.Checked then
+      ImportPath := Trim(SqliteFileEdit.Text);
+
+    AdminJson :=
+      '{"name":"' + EscapeJsonString(Trim(AdminNameEdit.Text)) +
+      '","email":"' + EscapeJsonString(Trim(AdminEmailEdit.Text)) +
+      '","password":"' + EscapeJsonString(AdminPasswordEdit.Text) +
+      '","import_sqlite":"' + EscapeJsonString(ImportPath) +
+      '","upgrade_only":false}';
+  end;
+
+  SaveStringToFile(ExpandConstant('{tmp}\admin-init.json'), AdminJson, False);
+end;
+
 procedure InitializeWizard();
 begin
   DetectedMachineId := ComputeInstallerMachineId();
   CreatePrivacyPolicyPage();
+  CreateDatabaseImportPage();
   CreateLicenseBindingPage();
   CreateAdminAccountPage();
-  CreateDatabaseImportPage();
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+begin
+  Result := False;
+  if IsCliUpgradeMode() then
+  begin
+    if (PageID = PrivacyPage.ID) or
+       (PageID = DatabaseImportPage.ID) or
+       (PageID = LicenseKeyPage.ID) or
+       (PageID = AdminAccountPage.ID) then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+
+  { When updating an existing installation (Keep Existing Database & License), skip License & Admin creation pages }
+  if Assigned(KeepExistingDbRadio) and KeepExistingDbRadio.Checked then
+  begin
+    if (PageID = LicenseKeyPage.ID) or (PageID = AdminAccountPage.ID) then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
 end;
 
 procedure CurPageChanged(CurPageID: Integer);
@@ -470,15 +575,44 @@ begin
   begin
     WizardForm.NextButton.Enabled := PrivacyAcceptCheck.Checked;
   end;
+
+  if CurPageID = DatabaseImportPage.ID then
+  begin
+    if HasExistingInstalledDatabase() then
+    begin
+      KeepExistingDbRadio.Enabled := True;
+      if (not ImportDbRadio.Checked) then
+      begin
+        KeepExistingDbRadio.Checked := True;
+        FreshDbRadio.Checked := False;
+      end;
+    end
+    else
+    begin
+      KeepExistingDbRadio.Enabled := False;
+      if KeepExistingDbRadio.Checked then
+      begin
+        KeepExistingDbRadio.Checked := False;
+        FreshDbRadio.Checked := True;
+      end;
+    end;
+    OnDbModeChange(nil);
+  end;
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 var
-  KeyText, AdminJson, ImportPath: String;
+  KeyText, ImportPath: String;
   VerifyResultCode: Integer;
   ErrorMsgAnsi: AnsiString;
 begin
   Result := True;
+
+  if IsCliUpgradeMode() then
+  begin
+    WriteAdminInitJson();
+    Exit;
+  end;
 
   { 1. Enforce Privacy Policy Acceptance }
   if CurPageID = PrivacyPage.ID then
@@ -491,13 +625,33 @@ begin
     end;
   end;
 
-  { 2. Enforce Cryptographic Ed25519 License Key & Single-Machine Binding Gate }
+  { 2. Enforce Database Setup / Upgrade / Herd Import Selection }
+  if CurPageID = DatabaseImportPage.ID then
+  begin
+    if ImportDbRadio.Checked then
+    begin
+      ImportPath := Trim(SqliteFileEdit.Text);
+      if (ImportPath = '') or (not FileExists(ImportPath)) then
+      begin
+        MsgBox('Please select a valid existing SQLite database file (.sqlite / .db) to import, or choose another option.', mbError, MB_OK);
+        Result := False;
+        Exit;
+      end;
+    end;
+
+    if KeepExistingDbRadio.Checked then
+    begin
+      WriteAdminInitJson();
+    end;
+  end;
+
+  { 3. Enforce Cryptographic Ed25519 License Key & Single-Machine Binding Gate }
   if CurPageID = LicenseKeyPage.ID then
   begin
     KeyText := Trim(LicenseKeyMemo.Text);
     if (Length(KeyText) < 24) or (Pos('.', KeyText) = 0) then
     begin
-      MsgBox('Please paste a valid Karobar machine-bound license key (KRBL....) to bind this installation to your computer.', mbError, MB_OK);
+      MsgBox('Please paste a valid Karobar-App machine-bound license key (KRBL....) to bind this installation to your computer.', mbError, MB_OK);
       Result := False;
       Exit;
     end;
@@ -522,7 +676,7 @@ begin
     end;
   end;
 
-  { 3. Enforce Initial Administrator Credentials Gate }
+  { 4. Enforce Initial Administrator Credentials Gate }
   if CurPageID = AdminAccountPage.ID then
   begin
     if Trim(AdminNameEdit.Text) = '' then
@@ -553,36 +707,14 @@ begin
       Exit;
     end;
 
-    AdminJson :=
-      '{"name":"' + EscapeJsonString(Trim(AdminNameEdit.Text)) +
-      '","email":"' + EscapeJsonString(Trim(AdminEmailEdit.Text)) +
-      '","password":"' + EscapeJsonString(AdminPasswordEdit.Text) +
-      '","import_sqlite":""}';
-
-    SaveStringToFile(ExpandConstant('{tmp}\admin-init.json'), AdminJson, False);
+    WriteAdminInitJson();
   end;
+end;
 
-  { 4. Enforce Optional SQLite Database Import Selection }
-  if CurPageID = DatabaseImportPage.ID then
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssInstall then
   begin
-    ImportPath := '';
-    if ImportDbRadio.Checked then
-    begin
-      ImportPath := Trim(SqliteFileEdit.Text);
-      if (ImportPath = '') or (not FileExists(ImportPath)) then
-      begin
-        MsgBox('Please select a valid existing SQLite database file (.sqlite / .db) to import, or choose "Start with a Fresh Database".', mbError, MB_OK);
-        Result := False;
-        Exit;
-      end;
-    end;
-
-    AdminJson :=
-      '{"name":"' + EscapeJsonString(Trim(AdminNameEdit.Text)) +
-      '","email":"' + EscapeJsonString(Trim(AdminEmailEdit.Text)) +
-      '","password":"' + EscapeJsonString(AdminPasswordEdit.Text) +
-      '","import_sqlite":"' + EscapeJsonString(ImportPath) + '"}';
-
-    SaveStringToFile(ExpandConstant('{tmp}\admin-init.json'), AdminJson, False);
+    WriteAdminInitJson();
   end;
 end;
