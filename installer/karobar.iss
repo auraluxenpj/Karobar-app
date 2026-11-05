@@ -159,8 +159,9 @@ end;
 
 procedure OnCopyMachineIdClick(Sender: TObject);
 begin
+  MachineIdEdit.SetFocus();
   MachineIdEdit.SelectAll();
-  MachineIdEdit.CopyToClipboard();
+  SendMessage(MachineIdEdit.Handle, $0301, 0, 0);
   MsgBox('Machine ID copied to clipboard! Send this Machine ID to Karobar Support to receive your single-machine license key.', mbInformation, MB_OK);
 end;
 
@@ -338,7 +339,7 @@ end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 var
-  KeyText, SealJson, AdminJson: String;
+  KeyText, AdminJson: String;
   VerifyResultCode: Integer;
   ErrorMsgAnsi: AnsiString;
 begin
