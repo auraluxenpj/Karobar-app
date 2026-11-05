@@ -141,6 +141,16 @@ foreach ($vcDll in @("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll")) 
     }
 }
 
+# Bundle Mozilla CA Certificate store (cacert.pem) so portable PHP cURL/OpenSSL HTTPS requests succeed on all Windows machines
+$CaCertDest = Join-Path $PhpRuntimeDir "cacert.pem"
+if (-not (Test-Path $CaCertDest)) {
+    try {
+        Invoke-WebRequest -Uri "https://curl.se/ca/cacert.pem" -OutFile $CaCertDest -UseBasicParsing
+    } catch {
+        Write-Host "    Note: cacert.pem download skipped; SystemUpdateController uses fallback verification." -ForegroundColor Gray
+    }
+}
+
 # Configure php.ini with all extensions required by Karobar-App
 $PhpIni = @"
 [PHP]

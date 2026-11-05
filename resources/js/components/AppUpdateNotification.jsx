@@ -35,13 +35,83 @@ export default function AppUpdateNotification() {
 
     setIsChecking(true);
     try {
-      const { data } = await axios.get("/api/system/check-update", {
-        params: manual ? { force: 1 } : {},
-      });
+      let data = null;
+      const desktop = typeof window !== "undefined" ? window.karobarDesktop : null;
+
+      // 1. Try native Electron HTTPS updater first on Desktop (uses Chromium/Node CA store)
+      if (desktop?.isDesktop && typeof desktop.checkForUpdates === "function") {
+        try {
+          const desktopRes = await desktop.checkForUpdates(manual);
+          if (desktopRes?.ok) {
+            data = desktopRes;
+          }
+        } catch {
+          // Fall through to backend API
+        }
+      }
+
+      // 2. Try Laravel backend /api/system/check-update
+      if (!data) {
+        try {
+          const resp = await axios.get("/api/system/check-update", {
+            params: manual ? { force: 1 } : {},
+          });
+          if (resp.data?.ok) {
+            data = resp.data;
+          }
+        } catch {
+          // Fall through to direct browser GitHub API check
+        }
+      }
+
+      // 3. Direct browser fallback to GitHub Releases API (CORS enabled: access-control-allow-origin: *)
+      if (!data) {
+        try {
+          const [verRes, ghRes] = await Promise.all([
+            axios.get("/api/system/version").catch(() => ({ data: { version: "2.0.1", build_number: 1 } })),
+            fetch("https://api.github.com/repos/shzdasim/Karobar-App/releases/latest", {
+              headers: { Accept: "application/vnd.github+json" },
+            }),
+          ]);
+          if (ghRes.ok) {
+            const release = await ghRes.json();
+            const localVer = String(verRes.data?.version || "2.0.1").replace(/^[vV]/, "");
+            const localBuild = Number(verRes.data?.build_number || 1);
+            const remoteVer = String(release.tag_name || "").replace(/^[vV]/, "");
+            const buildMatch = remoteVer.match(/^2\.0\.(\d+)$/);
+            const remoteBuild = buildMatch ? parseInt(buildMatch[1], 10) : 0;
+            const isNewer =
+              remoteBuild > 0 && localBuild > 0 && remoteBuild !== localBuild
+                ? remoteBuild > localBuild
+                : remoteVer > localVer;
+
+            data = {
+              ok: true,
+              update_available: isNewer,
+              app_name: "Karobar-App",
+              current_version: localVer,
+              current_build: localBuild,
+              latest_version: remoteVer,
+              latest_build: remoteBuild,
+              release_name: release.name || `Karobar-App v${remoteVer}`,
+              released_at: release.published_at || "",
+              notes: release.body || "New Karobar-App release available.",
+              download_url:
+                "https://github.com/shzdasim/Karobar-App/releases/latest/download/Karobar-App-Setup.exe",
+              bundle_url:
+                "https://github.com/shzdasim/Karobar-App/releases/latest/download/Karobar-App-Setup-Bundle.zip",
+              release_url: release.html_url || "https://github.com/shzdasim/Karobar-App/releases/latest",
+              zero_data_loss: true,
+            };
+          }
+        } catch {
+          // Ignore
+        }
+      }
 
       if (!data || !data.ok) {
         if (manual) {
-          toast.error(data?.message || "Could not reach GitHub Releases right now.");
+          toast.error("Could not reach GitHub Releases right now. Please check your internet connection.");
         }
         return;
       }

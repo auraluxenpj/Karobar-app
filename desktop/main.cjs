@@ -748,14 +748,137 @@ function fetchJsonUrl(url, redirectCount = 0) {
   });
 }
 
-ipcMain.handle("karobar:check-for-updates", async (_event, options = {}) => {
+function readLocalVersionMeta() {
+  const defaults = {
+    app_name: "Karobar-App",
+    version: "2.0.1",
+    build_number: 1,
+    commit_sha: "local",
+    repository: "shzdasim/Karobar-App",
+  };
   try {
-    const forceParam = options?.force ? "?force=1" : "";
-    const data = await fetchJsonUrl(`http://127.0.0.1:${activePort}/api/system/check-update${forceParam}`);
-    return data;
-  } catch (err) {
-    return { ok: false, update_available: false, message: err?.message || "Update check failed" };
+    const versionFile = path.join(APP_ROOT, "public", "version.json");
+    if (fs.existsSync(versionFile)) {
+      const parsed = JSON.parse(fs.readFileSync(versionFile, "utf8"));
+      return {
+        app_name: parsed.app_name || defaults.app_name,
+        version: String(parsed.version || defaults.version).replace(/^[vV]/, ""),
+        build_number: Number(parsed.build_number || defaults.build_number),
+        commit_sha: String(parsed.commit_sha || defaults.commit_sha),
+        repository: String(parsed.repository || defaults.repository),
+      };
+    }
+  } catch {
+    // ignore
   }
+  return defaults;
+}
+
+function compareSemverNewer(remoteVer, localVer) {
+  const rParts = String(remoteVer || "0.0.0")
+    .replace(/^[vV]/, "")
+    .split(".")
+    .map((n) => parseInt(n, 10) || 0);
+  const lParts = String(localVer || "0.0.0")
+    .replace(/^[vV]/, "")
+    .split(".")
+    .map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(rParts.length, lParts.length); i++) {
+    const r = rParts[i] || 0;
+    const l = lParts[i] || 0;
+    if (r > l) return true;
+    if (r < l) return false;
+  }
+  return false;
+}
+
+ipcMain.handle("karobar:check-for-updates", async () => {
+  const local = readLocalVersionMeta();
+  const repo = local.repository || "shzdasim/Karobar-App";
+
+  try {
+    // 1. Fetch latest-release.json directly via Node/Electron HTTPS (uses built-in Root CA bundle)
+    const manifestUrl = `https://github.com/${repo}/releases/latest/download/latest-release.json`;
+    const remote = await fetchJsonUrl(manifestUrl);
+    if (remote && remote.version) {
+      const remoteVer = String(remote.version).replace(/^[vV]/, "");
+      const remoteBuild = Number(remote.build_number || 0);
+      const isNewer =
+        remoteBuild > 0 && local.build_number > 0 && remoteBuild !== local.build_number
+          ? remoteBuild > local.build_number
+          : compareSemverNewer(remoteVer, local.version);
+
+      return {
+        ok: true,
+        update_available: isNewer,
+        app_name: "Karobar-App",
+        current_version: local.version,
+        current_build: local.build_number,
+        latest_version: remoteVer,
+        latest_build: remoteBuild,
+        release_name: remote.release_name || `Karobar-App v${remoteVer}`,
+        released_at: remote.released_at || "",
+        notes: remote.notes || "Performance improvements, bug fixes, and new features.",
+        download_url:
+          remote.download_url ||
+          `https://github.com/${repo}/releases/latest/download/Karobar-App-Setup.exe`,
+        bundle_url:
+          remote.bundle_url ||
+          `https://github.com/${repo}/releases/latest/download/Karobar-App-Setup-Bundle.zip`,
+        release_url: remote.release_url || `https://github.com/${repo}/releases/latest`,
+        zero_data_loss: true,
+      };
+    }
+  } catch {
+    // Fall through to GitHub REST API
+  }
+
+  try {
+    // 2. Fallback to GitHub REST API
+    const apiData = await fetchJsonUrl(`https://api.github.com/repos/${repo}/releases/latest`);
+    if (apiData && apiData.tag_name) {
+      const remoteVer = String(apiData.tag_name).replace(/^[vV]/, "");
+      const m = remoteVer.match(/^2\.0\.(\d+)$/);
+      const remoteBuild = m ? parseInt(m[1], 10) : 0;
+      const isNewer =
+        remoteBuild > 0 && local.build_number > 0 && remoteBuild !== local.build_number
+          ? remoteBuild > local.build_number
+          : compareSemverNewer(remoteVer, local.version);
+
+      return {
+        ok: true,
+        update_available: isNewer,
+        app_name: "Karobar-App",
+        current_version: local.version,
+        current_build: local.build_number,
+        latest_version: remoteVer,
+        latest_build: remoteBuild,
+        release_name: apiData.name || `Karobar-App v${remoteVer}`,
+        released_at: apiData.published_at || "",
+        notes: apiData.body || "New Karobar-App release available.",
+        download_url: `https://github.com/${repo}/releases/latest/download/Karobar-App-Setup.exe`,
+        bundle_url: `https://github.com/${repo}/releases/latest/download/Karobar-App-Setup-Bundle.zip`,
+        release_url: apiData.html_url || `https://github.com/${repo}/releases/latest`,
+        zero_data_loss: true,
+      };
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      update_available: false,
+      current_version: local.version,
+      current_build: local.build_number,
+      message: err?.message || "Unable to reach GitHub Releases right now.",
+    };
+  }
+
+  return {
+    ok: false,
+    update_available: false,
+    current_version: local.version,
+    current_build: local.build_number,
+    message: "Unable to reach GitHub Releases right now.",
+  };
 });
 
 function downloadFileWithProgress(url, destPath, onProgress, redirectCount = 0) {

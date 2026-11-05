@@ -107,19 +107,50 @@ class SystemUpdateController extends Controller
         ];
     }
 
+    protected function githubGet(string $url, array $headers = []): ?\Illuminate\Http\Client\Response
+    {
+        $defaultHeaders = array_merge([
+            'User-Agent' => 'Karobar-App-Updater/2.0',
+        ], $headers);
+
+        // 1. Try with standard TLS verification first
+        try {
+            $resp = Http::timeout(6)
+                ->withHeaders($defaultHeaders)
+                ->get($url);
+            if ($resp->successful()) {
+                return $resp;
+            }
+        } catch (\Throwable) {
+            // Portable PHP on Windows may lack curl.cainfo (cURL error 60); retry without local CA file requirement
+        }
+
+        // 2. Fallback for Windows portable PHP runtime where curl.cainfo is not pre-populated
+        try {
+            $resp = Http::timeout(6)
+                ->withoutVerifying()
+                ->withHeaders($defaultHeaders)
+                ->get($url);
+            if ($resp->successful()) {
+                return $resp;
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return null;
+    }
+
     protected function fetchRemoteReleaseMetadata(string $repo): ?array
     {
         // 1. Try fast manifest asset: latest-release.json from the latest GitHub Release
         try {
             $manifestUrl = "https://github.com/{$repo}/releases/latest/download/latest-release.json";
-            $resp = Http::timeout(6)
-                ->withHeaders([
-                    'Accept'     => 'application/json',
-                    'User-Agent' => 'Karobar-App-Updater/2.0',
-                ])
-                ->get($manifestUrl);
+            $resp = $this->githubGet($manifestUrl, [
+                'Accept' => 'application/json',
+            ]);
 
-            if ($resp->successful()) {
+            if ($resp && $resp->successful()) {
                 $data = $resp->json();
                 if (is_array($data) && !empty($data['version'])) {
                     return [
@@ -142,14 +173,11 @@ class SystemUpdateController extends Controller
         // 2. Fallback to GitHub Releases REST API
         try {
             $apiUrl = "https://api.github.com/repos/{$repo}/releases/latest";
-            $resp = Http::timeout(6)
-                ->withHeaders([
-                    'Accept'     => 'application/vnd.github+json',
-                    'User-Agent' => 'Karobar-App-Updater/2.0',
-                ])
-                ->get($apiUrl);
+            $resp = $this->githubGet($apiUrl, [
+                'Accept' => 'application/vnd.github+json',
+            ]);
 
-            if (!$resp->successful()) {
+            if (!$resp || !$resp->successful()) {
                 return null;
             }
 
