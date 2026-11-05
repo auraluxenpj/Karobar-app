@@ -274,5 +274,142 @@ class WindowsInstallerAndSetupGenieTest extends TestCase
             ->assertSee('Privacy Policy')
             ->assertSee('Local-First Data Ownership');
     }
+
+    public function test_installer_sqlite_import_clears_only_users_and_licenses_while_keeping_all_store_data(): void
+    {
+        // 1. Seed existing "Herd" users, old license, and existing store business data
+        $oldAdmin = User::create([
+            'name'     => 'Old Herd Admin',
+            'email'    => 'old-admin@herd.local',
+            'password' => bcrypt('oldpass123'),
+            'status'   => 'active',
+        ]);
+        $oldCashier = User::create([
+            'name'     => 'Old Herd Cashier',
+            'email'    => 'old-cashier@herd.local',
+            'password' => bcrypt('oldpass123'),
+            'status'   => 'active',
+        ]);
+
+        License::create([
+            'license_key'  => 'KRBL.OLD-HERD-KEY.SIGNATURE',
+            'payload'      => ['name' => 'Old Herd Store', 'machine' => 'KRB-0000-0000-0000-0000'],
+            'valid'        => true,
+            'machine_hash' => 'KRB-0000-0000-0000-0000',
+            'activated_at' => now()->subDays(90),
+        ]);
+
+        \Illuminate\Support\Facades\DB::table('categories')->insert([
+            'id'         => 10,
+            'name'       => 'Antibiotics',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        \Illuminate\Support\Facades\DB::table('brands')->insert([
+            'id'         => 11,
+            'name'       => 'GSK',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        \Illuminate\Support\Facades\DB::table('suppliers')->insert([
+            'id'         => 12,
+            'name'       => 'Premier Pharma Distributors',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        \Illuminate\Support\Facades\DB::table('customers')->insert([
+            'id'         => 20,
+            'name'       => 'Al-Shifa Clinic',
+            'phone'      => '03001112233',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        \Illuminate\Support\Facades\DB::table('products')->insert([
+            'id'                 => 30,
+            'product_code'       => 'PRD-AUG-625',
+            'barcode'            => '8964001234567',
+            'name'               => 'Augmentin 625mg Tabs',
+            'category_id'        => 10,
+            'brand_id'           => 11,
+            'supplier_id'        => 12,
+            'pack_size'          => 6,
+            'unit_purchase_price'=> 50.00,
+            'unit_sale_price'    => 65.00,
+            'pack_purchase_price'=> 300.00,
+            'pack_sale_price'    => 390.00,
+            'avg_price'          => 50.00,
+            'margin'             => 23.08,
+            'quantity'           => 120,
+            'created_at'         => now(),
+            'updated_at'         => now(),
+        ]);
+
+        $this->assertDatabaseCount('users', 2);
+        $this->assertDatabaseCount('licenses', 1);
+        $this->assertDatabaseCount('products', 1);
+        $this->assertDatabaseCount('customers', 1);
+
+        // 2. Issue a new hardware-bound key for Machine A
+        Artisan::call('license:issue', [
+            '--machine'    => $this->machineA,
+            '--name'       => 'City Pharmacy Sillanwali',
+            '--edition'    => 'Enterprise',
+            '--days'       => 365,
+            '--secret-key' => $this->testSecretKeyB64u,
+            '--json'       => true,
+        ]);
+        $issued = json_decode(trim(Artisan::output()), true);
+        $boundKey = $issued['license_key'];
+
+        $sealPath = sys_get_temp_dir() . '/test-herd-import-' . uniqid() . '.seal';
+        $adminConfigPath = sys_get_temp_dir() . '/test-herd-admin-' . uniqid() . '.json';
+
+        file_put_contents($sealPath, json_encode([
+            'ok'          => true,
+            'license_key' => $boundKey,
+            'machine_id'  => $this->machineA,
+        ]));
+
+        file_put_contents($adminConfigPath, json_encode([
+            'name'          => 'New Desktop Owner',
+            'email'         => 'new-owner@citypharmacy.pk',
+            'password'      => 'NewPass#2026',
+            'import_sqlite' => ':current:',
+        ]));
+
+        LicenseService::setTestOverrides($this->testPublicKeyB64u, $this->machineA, $this->baseTime);
+
+        $exitCode = Artisan::call('karobar:install', [
+            '--seal-file'    => $sealPath,
+            '--admin-config' => $adminConfigPath,
+            '--accept-legal' => true,
+            '--cleanup-temp' => true,
+            '--skip-migrate' => true,
+            '--json'         => true,
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertFileDoesNotExist($sealPath);
+        $this->assertFileDoesNotExist($adminConfigPath);
+
+        // 3. Verify old Herd users & old license were wiped and replaced ONLY by the new Admin & new License
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseMissing('users', ['email' => 'old-admin@herd.local']);
+        $this->assertDatabaseMissing('users', ['email' => 'old-cashier@herd.local']);
+        $this->assertDatabaseHas('users', [
+            'id'    => 1,
+            'email' => 'new-owner@citypharmacy.pk',
+            'name'  => 'New Desktop Owner',
+        ]);
+
+        $this->assertDatabaseCount('licenses', 1);
+        $this->assertDatabaseMissing('licenses', ['machine_hash' => 'KRB-0000-0000-0000-0000']);
+        $this->assertDatabaseHas('licenses', ['machine_hash' => $this->machineA]);
+
+        // 4. Verify 100% of business data (Categories, Customers, Products) remained intact!
+        $this->assertDatabaseHas('categories', ['id' => 10, 'name' => 'Antibiotics']);
+        $this->assertDatabaseHas('customers', ['id' => 20, 'name' => 'Al-Shifa Clinic']);
+        $this->assertDatabaseHas('products', ['id' => 30, 'name' => 'Augmentin 625mg Tabs', 'quantity' => 120]);
+    }
 }
 

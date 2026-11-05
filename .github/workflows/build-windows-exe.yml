@@ -67,5 +67,6 @@ jobs:
           path: |
             dist/installer/*.exe
             dist/installer/*.cer
+            dist/installer/*.bat
           retention-days: 30
 

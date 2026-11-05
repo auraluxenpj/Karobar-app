@@ -21,6 +21,7 @@ class KarobarInstallCommand extends Command
                             {--seal-file= : Path to verified install-license.seal file from Inno Setup}
                             {--license-key= : Direct license key string to activate}
                             {--admin-config= : Path to JSON file with admin name, email, and password from Inno Setup}
+                            {--import-sqlite= : Optional path to an existing Herd/Karobar SQLite database to import (clears only users & license)}
                             {--admin-name=Store Administrator : Initial Admin full name}
                             {--admin-email=admin@example.com : Initial Admin email address}
                             {--admin-password=password : Initial Admin password}
@@ -40,9 +41,27 @@ class KarobarInstallCommand extends Command
             $this->ensureEnvironmentAndDatabaseFile();
         }
 
-        // 2. Run database migrations
+        // 1.5. Check if the user selected an existing Herd SQLite database to import during installation
+        $adminData = $this->resolveAdminCredentials();
+        $importSqlitePath = $this->resolveImportSqlitePath($adminData);
+        $importedExistingDb = false;
+
+        if ($importSqlitePath !== '') {
+            [$importOk, $importErr] = $this->importExistingSqliteFile($importSqlitePath);
+            if (!$importOk) {
+                return $this->failInstall($importErr ?: "Failed to import SQLite database from: {$importSqlitePath}");
+            }
+            $importedExistingDb = true;
+        }
+
+        // 2. Run database migrations (safely adds any new v2 tables/columns to imported or fresh DB)
         if (!$this->option('skip-migrate')) {
             Artisan::call('migrate', ['--force' => true]);
+        }
+
+        // 2.5. If an existing Herd SQLite database was imported, clear ONLY Users and License records while keeping all store data intact
+        if ($importedExistingDb) {
+            $this->clearUsersAndLicensesOnly();
         }
 
         // 3. Seed essential Roles/Permissions & Theme presets (no dummy customers/products)
@@ -54,7 +73,6 @@ class KarobarInstallCommand extends Command
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         // 4. Resolve and create the initial Administrator account chosen during the .exe installer wizard
-        $adminData = $this->resolveAdminCredentials();
         $adminEmail = strtolower(trim($adminData['email']));
         $adminName = trim($adminData['name']) ?: 'Store Administrator';
         $adminPassword = (string) $adminData['password'];
@@ -132,9 +150,14 @@ class KarobarInstallCommand extends Command
             $setting->legal_accepted_version = trim((string) $this->option('legal-version')) ?: '2.0';
         }
 
-        if (Schema::hasColumn('settings', 'is_setup_completed') && !$setting->is_setup_completed) {
-            $setting->is_setup_completed = false;
-            $setting->setup_completed_at = null;
+        if (Schema::hasColumn('settings', 'is_setup_completed')) {
+            if ($importedExistingDb && Schema::hasTable('products') && DB::table('products')->exists()) {
+                $setting->is_setup_completed = true;
+                $setting->setup_completed_at = $setting->setup_completed_at ?: now();
+            } elseif (!$setting->is_setup_completed) {
+                $setting->is_setup_completed = false;
+                $setting->setup_completed_at = null;
+            }
         }
 
         $setting->save();
@@ -157,6 +180,7 @@ class KarobarInstallCommand extends Command
             'admin_name'         => $adminUser->name,
             'machine_id'         => $licenseService->computeMachineId(),
             'licensed'           => $activatedPayload !== null,
+            'imported_sqlite'    => $importedExistingDb,
             'store_name'         => $setting->store_name,
             'is_setup_completed' => (bool) $setting->is_setup_completed,
         ];
@@ -243,18 +267,153 @@ class KarobarInstallCommand extends Command
             $decoded = is_string($raw) ? json_decode($raw, true) : null;
             if (is_array($decoded)) {
                 return [
-                    'name'     => (string) ($decoded['name'] ?? 'Store Administrator'),
-                    'email'    => (string) ($decoded['email'] ?? 'admin@example.com'),
-                    'password' => (string) ($decoded['password'] ?? 'password'),
+                    'name'          => (string) ($decoded['name'] ?? 'Store Administrator'),
+                    'email'         => (string) ($decoded['email'] ?? 'admin@example.com'),
+                    'password'      => (string) ($decoded['password'] ?? 'password'),
+                    'import_sqlite' => trim((string) ($decoded['import_sqlite'] ?? '')),
                 ];
             }
         }
 
         return [
-            'name'     => (string) $this->option('admin-name'),
-            'email'    => (string) $this->option('admin-email'),
-            'password' => (string) $this->option('admin-password'),
+            'name'          => (string) $this->option('admin-name'),
+            'email'         => (string) $this->option('admin-email'),
+            'password'      => (string) $this->option('admin-password'),
+            'import_sqlite' => trim((string) $this->option('import-sqlite')),
         ];
+    }
+
+    protected function resolveImportSqlitePath(array $adminData): string
+    {
+        $opt = trim((string) $this->option('import-sqlite'));
+        if ($opt !== '') {
+            return $opt;
+        }
+
+        return trim((string) ($adminData['import_sqlite'] ?? ''));
+    }
+
+    /**
+     * Copy an existing Herd / Karobar SQLite database file into the application's SQLite path.
+     *
+     * @return array{0: bool, 1: string|null}
+     */
+    protected function importExistingSqliteFile(string $sourcePath): array
+    {
+        // Special test sentinel ":current:" allows in-memory unit tests to verify the user/license wipe without file replacement
+        if ($sourcePath === ':current:' && app()->runningUnitTests()) {
+            return [true, null];
+        }
+
+        if (!is_file($sourcePath) || @filesize($sourcePath) < 16) {
+            return [false, "Selected SQLite file does not exist or is empty: {$sourcePath}"];
+        }
+
+        $header = (string) @file_get_contents($sourcePath, false, null, 0, 16);
+        if (!str_starts_with($header, 'SQLite format 3')) {
+            return [false, 'Selected file is not a valid SQLite 3 database.'];
+        }
+
+        $targetDbPath = config('database.connections.sqlite.database');
+        if (!is_string($targetDbPath) || $targetDbPath === '' || $targetDbPath === ':memory:') {
+            return [true, null];
+        }
+
+        try {
+            DB::disconnect('sqlite');
+            DB::purge('sqlite');
+        } catch (\Throwable) {
+            // Ignore
+        }
+
+        $targetDir = dirname($targetDbPath);
+        if (!is_dir($targetDir)) {
+            @mkdir($targetDir, 0755, true);
+        }
+
+        // Remove any stale WAL/SHM files at destination before copying
+        if (is_file($targetDbPath . '-wal')) {
+            @unlink($targetDbPath . '-wal');
+        }
+        if (is_file($targetDbPath . '-shm')) {
+            @unlink($targetDbPath . '-shm');
+        }
+
+        if (realpath($sourcePath) !== realpath($targetDbPath)) {
+            if (!@copy($sourcePath, $targetDbPath)) {
+                return [false, "Unable to copy SQLite database from {$sourcePath} to {$targetDbPath}"];
+            }
+
+            // If the source Herd database had an active WAL file alongside it, copy and checkpoint it so zero recent transactions are lost
+            if (is_file($sourcePath . '-wal') && @filesize($sourcePath . '-wal') > 0) {
+                @copy($sourcePath . '-wal', $targetDbPath . '-wal');
+                if (is_file($sourcePath . '-shm')) {
+                    @copy($sourcePath . '-shm', $targetDbPath . '-shm');
+                }
+            }
+        }
+
+        try {
+            DB::reconnect('sqlite');
+            DB::statement('PRAGMA wal_checkpoint(TRUNCATE);');
+            DB::statement('PRAGMA journal_mode=WAL;');
+        } catch (\Throwable) {
+            // Ignore
+        }
+
+        return [true, null];
+    }
+
+    /**
+     * Clear ONLY Users, Sessions/Tokens, User Role Assignments, and License records from the imported database
+     * while preserving 100% of Products, Batches, Invoices, Returns, Ledgers, Accounts, Cash Drawer, and Settings.
+     */
+    protected function clearUsersAndLicensesOnly(): void
+    {
+        Schema::disableForeignKeyConstraints();
+
+        try {
+            $tablesToClear = [
+                'users',
+                'licenses',
+                'personal_access_tokens',
+                'password_reset_tokens',
+                'sessions',
+            ];
+
+            foreach ($tablesToClear as $table) {
+                if (Schema::hasTable($table)) {
+                    DB::table($table)->delete();
+                }
+            }
+
+            if (Schema::hasTable('model_has_roles')) {
+                DB::table('model_has_roles')
+                    ->where('model_type', User::class)
+                    ->delete();
+            }
+
+            if (Schema::hasTable('model_has_permissions')) {
+                DB::table('model_has_permissions')
+                    ->where('model_type', User::class)
+                    ->delete();
+            }
+
+            try {
+                DB::statement("DELETE FROM sqlite_sequence WHERE name IN ('users', 'licenses', 'personal_access_tokens')");
+            } catch (\Throwable) {
+                // sqlite_sequence may not exist yet
+            }
+        } finally {
+            Schema::enableForeignKeyConstraints();
+        }
+
+        if (!app()->runningUnitTests()) {
+            $clockPath = storage_path('app/.license-clock');
+            if (is_file($clockPath)) {
+                @unlink($clockPath);
+            }
+        }
     }
 
     protected function resolveLicenseKey(): string

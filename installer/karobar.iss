@@ -51,6 +51,10 @@ PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\icon.ico
+#ifdef SignToolEnabled
+SignTool=karobarsign
+SignedUninstaller=yes
+#endif
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -132,6 +136,12 @@ var
   AdminEmailEdit: TNewEdit;
   AdminPasswordEdit: TPasswordEdit;
   AdminConfirmPasswordEdit: TPasswordEdit;
+
+  DatabaseImportPage: TWizardPage;
+  FreshDbRadio: TNewRadioButton;
+  ImportDbRadio: TNewRadioButton;
+  SqliteFileEdit: TNewEdit;
+  BrowseSqliteBtn: TNewButton;
 
   DetectedMachineId: String;
 
@@ -346,6 +356,95 @@ begin
   AdminConfirmPasswordEdit.Width := AdminAccountPage.SurfaceWidth;
 end;
 
+procedure OnDbModeChange(Sender: TObject);
+begin
+  SqliteFileEdit.Enabled := ImportDbRadio.Checked;
+  BrowseSqliteBtn.Enabled := ImportDbRadio.Checked;
+end;
+
+procedure OnBrowseSqliteClick(Sender: TObject);
+var
+  SelectedFile: String;
+begin
+  SelectedFile := SqliteFileEdit.Text;
+  if GetOpenFileName(
+    'Select Existing Herd / Karobar SQLite Database File',
+    SelectedFile,
+    '',
+    'SQLite Database Files (*.sqlite;*.db;*.sqlite3)|*.sqlite;*.db;*.sqlite3|All Files (*.*)|*.*',
+    'sqlite'
+  ) then
+  begin
+    SqliteFileEdit.Text := SelectedFile;
+    ImportDbRadio.Checked := True;
+    OnDbModeChange(Sender);
+  end;
+end;
+
+procedure CreateDatabaseImportPage();
+var
+  InfoLabel, FileLabel: TNewStaticText;
+begin
+  DatabaseImportPage := CreateCustomPage(
+    AdminAccountPage.ID,
+    'Database Setup & Herd SQLite Import (Optional)',
+    'Choose whether to start with a fresh database or import an existing SQLite database from Laravel Herd.'
+  );
+
+  FreshDbRadio := TNewRadioButton.Create(DatabaseImportPage);
+  FreshDbRadio.Parent := DatabaseImportPage.Surface;
+  FreshDbRadio.Left := 0;
+  FreshDbRadio.Top := ScaleY(4);
+  FreshDbRadio.Width := DatabaseImportPage.SurfaceWidth;
+  FreshDbRadio.Caption := 'Start with a Fresh Database (New Store Installation)';
+  FreshDbRadio.Checked := True;
+  FreshDbRadio.OnClick := @OnDbModeChange;
+
+  ImportDbRadio := TNewRadioButton.Create(DatabaseImportPage);
+  ImportDbRadio.Parent := DatabaseImportPage.Surface;
+  ImportDbRadio.Left := 0;
+  ImportDbRadio.Top := FreshDbRadio.Top + ScaleY(28);
+  ImportDbRadio.Width := DatabaseImportPage.SurfaceWidth;
+  ImportDbRadio.Caption := 'Import Existing SQLite Database (From Herd / Existing Karobar Deployment)';
+  ImportDbRadio.Checked := False;
+  ImportDbRadio.OnClick := @OnDbModeChange;
+
+  InfoLabel := TNewStaticText.Create(DatabaseImportPage);
+  InfoLabel.Parent := DatabaseImportPage.Surface;
+  InfoLabel.Left := ScaleX(18);
+  InfoLabel.Top := ImportDbRadio.Top + ScaleY(24);
+  InfoLabel.Width := DatabaseImportPage.SurfaceWidth - ScaleX(18);
+  InfoLabel.AutoSize := False;
+  InfoLabel.WordWrap := True;
+  InfoLabel.Height := ScaleY(52);
+  InfoLabel.Caption :=
+    'All Products, Batches, Categories, Brands, Suppliers, Customers, Invoices, Returns, Ledgers, and Accounts will be kept 100% intact. ' +
+    'Only old Users and old License records will be cleared and replaced with the Administrator account and License Key entered in this wizard.';
+
+  FileLabel := TNewStaticText.Create(DatabaseImportPage);
+  FileLabel.Parent := DatabaseImportPage.Surface;
+  FileLabel.Left := 0;
+  FileLabel.Top := InfoLabel.Top + ScaleY(60);
+  FileLabel.Caption := 'Select Existing SQLite Database File (e.g. database.sqlite):';
+
+  SqliteFileEdit := TNewEdit.Create(DatabaseImportPage);
+  SqliteFileEdit.Parent := DatabaseImportPage.Surface;
+  SqliteFileEdit.Left := 0;
+  SqliteFileEdit.Top := FileLabel.Top + ScaleY(20);
+  SqliteFileEdit.Width := DatabaseImportPage.SurfaceWidth - ScaleX(100);
+  SqliteFileEdit.Enabled := False;
+
+  BrowseSqliteBtn := TNewButton.Create(DatabaseImportPage);
+  BrowseSqliteBtn.Parent := DatabaseImportPage.Surface;
+  BrowseSqliteBtn.Left := SqliteFileEdit.Width + ScaleX(8);
+  BrowseSqliteBtn.Top := SqliteFileEdit.Top - ScaleY(1);
+  BrowseSqliteBtn.Width := ScaleX(92);
+  BrowseSqliteBtn.Height := SqliteFileEdit.Height + ScaleY(2);
+  BrowseSqliteBtn.Caption := 'Browse...';
+  BrowseSqliteBtn.Enabled := False;
+  BrowseSqliteBtn.OnClick := @OnBrowseSqliteClick;
+end;
+
 function EscapeJsonString(const S: String): String;
 var
   R: String;
@@ -362,6 +461,7 @@ begin
   CreatePrivacyPolicyPage();
   CreateLicenseBindingPage();
   CreateAdminAccountPage();
+  CreateDatabaseImportPage();
 end;
 
 procedure CurPageChanged(CurPageID: Integer);
@@ -374,7 +474,7 @@ end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 var
-  KeyText, AdminJson: String;
+  KeyText, AdminJson, ImportPath: String;
   VerifyResultCode: Integer;
   ErrorMsgAnsi: AnsiString;
 begin
@@ -456,7 +556,32 @@ begin
     AdminJson :=
       '{"name":"' + EscapeJsonString(Trim(AdminNameEdit.Text)) +
       '","email":"' + EscapeJsonString(Trim(AdminEmailEdit.Text)) +
-      '","password":"' + EscapeJsonString(AdminPasswordEdit.Text) + '"}';
+      '","password":"' + EscapeJsonString(AdminPasswordEdit.Text) +
+      '","import_sqlite":""}';
+
+    SaveStringToFile(ExpandConstant('{tmp}\admin-init.json'), AdminJson, False);
+  end;
+
+  { 4. Enforce Optional SQLite Database Import Selection }
+  if CurPageID = DatabaseImportPage.ID then
+  begin
+    ImportPath := '';
+    if ImportDbRadio.Checked then
+    begin
+      ImportPath := Trim(SqliteFileEdit.Text);
+      if (ImportPath = '') or (not FileExists(ImportPath)) then
+      begin
+        MsgBox('Please select a valid existing SQLite database file (.sqlite / .db) to import, or choose "Start with a Fresh Database".', mbError, MB_OK);
+        Result := False;
+        Exit;
+      end;
+    end;
+
+    AdminJson :=
+      '{"name":"' + EscapeJsonString(Trim(AdminNameEdit.Text)) +
+      '","email":"' + EscapeJsonString(Trim(AdminEmailEdit.Text)) +
+      '","password":"' + EscapeJsonString(AdminPasswordEdit.Text) +
+      '","import_sqlite":"' + EscapeJsonString(ImportPath) + '"}';
 
     SaveStringToFile(ExpandConstant('{tmp}\admin-init.json'), AdminJson, False);
   end;

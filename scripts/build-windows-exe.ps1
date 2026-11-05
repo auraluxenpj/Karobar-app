@@ -194,6 +194,8 @@ Write-Host "==> [6/6] Code Signing & Compiling Windows Installer (Karobar-ERP-Se
 # Provision Authenticode Code Signing Certificate bound to Malik Asim Shahzad (https://github.com/shzdasim)
 $InstallerOutDir = Join-Path $DistDir "installer"
 New-Item -ItemType Directory -Force -Path $InstallerOutDir | Out-Null
+$RepoPfxPath = Join-Path $RepoRoot "desktop\MalikAsimShahzad-CodeSign.pfx"
+$RepoCerPath = Join-Path $RepoRoot "desktop\MalikAsimShahzad-KarobarERP.cer"
 $PfxPath = Join-Path $CacheDir "MalikAsimShahzad-CodeSign.pfx"
 $CerPath = Join-Path $DesktopStage "MalikAsimShahzad-KarobarERP.cer"
 $PfxPasswordPlain = if ($env:WINDOWS_CERT_PASSWORD) { $env:WINDOWS_CERT_PASSWORD } else { "KarobarSign2026!" }
@@ -204,6 +206,13 @@ if ($env:WINDOWS_CERT_PFX_BASE64) {
     [IO.File]::WriteAllBytes($PfxPath, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
     $SigningCert = Import-PfxCertificate -FilePath $PfxPath -CertStoreLocation "Cert:\CurrentUser\My" -Password $PfxPasswordSec
     Export-Certificate -Cert $SigningCert -FilePath $CerPath -Force | Out-Null
+} elseif ((Test-Path $RepoPfxPath) -and (Test-Path $RepoCerPath)) {
+    Write-Host "    Using persistent repository Authenticode Developer Certificate (Malik Asim Shahzad)..." -ForegroundColor Gray
+    Copy-Item -Path $RepoPfxPath -Destination $PfxPath -Force
+    Copy-Item -Path $RepoCerPath -Destination $CerPath -Force
+    $SigningCert = Import-PfxCertificate -FilePath $PfxPath -CertStoreLocation "Cert:\CurrentUser\My" -Password $PfxPasswordSec
+    Import-Certificate -FilePath $CerPath -CertStoreLocation "Cert:\LocalMachine\Root" | Out-Null
+    Import-Certificate -FilePath $CerPath -CertStoreLocation "Cert:\LocalMachine\TrustedPublisher" | Out-Null
 } else {
     Write-Host "    Generating Authenticode Developer Certificate for Malik Asim Shahzad (https://github.com/shzdasim/Karobar-App)..." -ForegroundColor Gray
     $SigningCert = New-SelfSignedCertificate `
@@ -266,16 +275,47 @@ if (-not $IsccExe) {
     throw "Inno Setup 6 (ISCC.exe) not found. Install via: winget install JRSoftware.InnoSetup"
 }
 
-& $IsccExe (Join-Path $RepoRoot "installer\karobar.iss")
+if ($SignToolExe -and (Test-Path $SignToolExe)) {
+    # Pass SignTool to ISCC so Inno Setup signs the inner elevated setup.tmp executable, unins000.exe, AND the outer setup.exe
+    $SignCmd = "`$q$SignToolExe`$q sign /f `$q$PfxPath`$q /p `$q$PfxPasswordPlain`$q /fd SHA256 /d `$qKarobar App ERP - Malik Asim Shahzad`$q /du `$qhttps://github.com/shzdasim/Karobar-App`$q `$f"
+    & $IsccExe "/DSignToolEnabled=1" "/Skarobarsign=$SignCmd" (Join-Path $RepoRoot "installer\karobar.iss")
+} else {
+    & $IsccExe (Join-Path $RepoRoot "installer\karobar.iss")
+}
 if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup compilation failed with exit code $LASTEXITCODE"
 }
 
-# Sign the final compiled Inno Setup .exe installer with Authenticode + DigiCert RFC3161 Timestamp
+# Timestamp and verify the final compiled Inno Setup .exe installer
 $FinalInstallerExe = Join-Path $InstallerOutDir "Karobar-ERP-Setup-v2.0.0.exe"
 Invoke-KarobarAuthenticodeSign $FinalInstallerExe
 $VerifySig = Get-AuthenticodeSignature -FilePath $FinalInstallerExe
 Write-Host "    Authenticode Signature Status: $($VerifySig.Status) | Signer: $($VerifySig.SignerCertificate.Subject)" -ForegroundColor Green
+
+# Generate 1-Click Certificate Trust & Installer Launcher (Install-Karobar-ERP.bat)
+# Installing a .cer by double-clicking in Explorer places it in CurrentUser instead of LocalMachine\Root, which UAC ignores.
+# This helper script installs the certificate into LocalMachine\Root and LocalMachine\TrustedPublisher, unblocks Mark-of-the-Web, and runs the signed installer.
+$HelperBatPath = Join-Path $InstallerOutDir "Install-Karobar-ERP.bat"
+$HelperBatContent = @"
+@echo off
+title Karobar App ERP v2.0 - Verified Publisher Installer
+:: Request Administrator elevation if not already elevated
+net session >nul 2>&1
+if %errorlevel% neq 0 (
+    echo Requesting Administrator privileges to trust developer certificate...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+    exit /b
+)
+cd /d "%~dp0"
+echo [1/3] Trusting Developer Certificate: Malik Asim Shahzad (https://github.com/shzdasim/Karobar-App)...
+certutil.exe -addstore -f "Root" "%~dp0MalikAsimShahzad-KarobarERP.cer" >nul 2>&1
+certutil.exe -addstore -f "TrustedPublisher" "%~dp0MalikAsimShahzad-KarobarERP.cer" >nul 2>&1
+echo [2/3] Clearing browser download security zone mark...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-ChildItem -Path '%~dp0' | Unblock-File -ErrorAction SilentlyContinue"
+echo [3/3] Launching Signed Karobar ERP Setup Wizard...
+start "" "%~dp0Karobar-ERP-Setup-v2.0.0.exe"
+"@
+Set-Content -Path $HelperBatPath -Value $HelperBatContent -Encoding ASCII
 
 Write-Host "================================================================================" -ForegroundColor Green
 Write-Host "SUCCESS! Signed Windows .exe Installer generated at:" -ForegroundColor Green
