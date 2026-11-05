@@ -8,6 +8,8 @@ on:
       - "scripts/build-windows-exe.ps1"
       - "installer/**"
       - "desktop/**"
+      - "resources/**"
+      - "app/**"
   workflow_dispatch:
     inputs:
       app_version:
