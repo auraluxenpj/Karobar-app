@@ -213,8 +213,21 @@ function createSplashWindow() {
   splashWindow.loadFile(path.join(__dirname, "splash.html"));
 }
 
+function resolveIconPath() {
+  const candidates = [
+    path.join(__dirname, "icon.ico"),
+    path.join(__dirname, "icon.png"),
+    path.join(APP_ROOT, "desktop", "icon.ico"),
+    path.join(APP_ROOT, "public", "logo.png"),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return undefined;
+}
+
 function createMainWindow() {
-  const iconPath = path.join(APP_ROOT, "public", "logo.png");
+  const iconPath = resolveIconPath();
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -222,7 +235,7 @@ function createMainWindow() {
     minHeight: 680,
     show: false,
     title: "Karobar App ERP",
-    icon: fs.existsSync(iconPath) ? iconPath : undefined,
+    icon: iconPath,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -266,8 +279,8 @@ function createMainWindow() {
 }
 
 function createSystemTray() {
-  const iconPath = path.join(APP_ROOT, "public", "logo.png");
-  if (!fs.existsSync(iconPath)) return;
+  const iconPath = resolveIconPath();
+  if (!iconPath) return;
 
   try {
     tray = new Tray(iconPath);

@@ -54,7 +54,7 @@ foreach ($dir in $CopyDirs) {
 # Stage desktop runtime scripts (excluding desktop/node_modules)
 $DesktopStage = Join-Path $AppStage "desktop"
 New-Item -ItemType Directory -Force -Path $DesktopStage | Out-Null
-foreach ($dFile in @("router.php", "main.cjs", "preload.cjs", "splash.html", "package.json")) {
+foreach ($dFile in @("router.php", "main.cjs", "preload.cjs", "splash.html", "package.json", "icon.ico", "icon.png")) {
     $dSrc = Join-Path $RepoRoot "desktop\$dFile"
     if (Test-Path $dSrc) {
         Copy-Item -Path $dSrc -Destination (Join-Path $DesktopStage $dFile) -Force
@@ -145,6 +145,28 @@ opcache.enable=1
 opcache.enable_cli=1
 "@
 Set-Content -Path (Join-Path $PhpRuntimeDir "php.ini") -Value $PhpIni -Encoding UTF8
+
+# Self-test isolated pre-install Machine ID detection (simulating Inno Setup {tmp} extraction)
+$PrecheckTestDir = Join-Path $CacheDir "precheck-self-test"
+if (Test-Path $PrecheckTestDir) { Remove-Item -Recurse -Force $PrecheckTestDir }
+New-Item -ItemType Directory -Force -Path $PrecheckTestDir | Out-Null
+foreach ($f in @("php.exe", "php8.dll", "php8ts.dll", "libsodium.dll", "vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll")) {
+    $p = Join-Path $PhpRuntimeDir $f
+    if (Test-Path $p) { Copy-Item -Path $p -Destination (Join-Path $PrecheckTestDir $f) -Force }
+}
+Copy-Item -Path (Join-Path $PhpRuntimeDir "ext\php_sodium.dll") -Destination (Join-Path $PrecheckTestDir "php_sodium.dll") -Force
+Copy-Item -Path (Join-Path $RepoRoot "installer\precheck.php") -Destination (Join-Path $PrecheckTestDir "precheck.php") -Force
+
+$TestMidOut = Join-Path $PrecheckTestDir "machine-id.txt"
+& (Join-Path $PrecheckTestDir "php.exe") -n -d extension_dir="$PrecheckTestDir" -d extension=sodium (Join-Path $PrecheckTestDir "precheck.php") machine-id $TestMidOut
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path $TestMidOut)) {
+    throw "Pre-install Machine ID self-test failed with exit code $LASTEXITCODE"
+}
+$DetectedTestMid = (Get-Content $TestMidOut -Raw).Trim()
+Write-Host "    Verified Pre-Install Machine ID Engine: $DetectedTestMid" -ForegroundColor Green
+if ($DetectedTestMid -notmatch "^KRB-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}$") {
+    throw "Invalid Machine ID format from precheck self-test: $DetectedTestMid"
+}
 
 Write-Host "==> [5/6] Provisioning Portable Node.js 22 LTS Win64 Runtime (for Local WhatsApp Agent)..." -ForegroundColor Cyan
 $NodeRuntimeDir = Join-Path $AppStage "runtime\node"

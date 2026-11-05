@@ -9,7 +9,7 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "pack:win64": "npx @electron/packager . \"KarobarERP\" --platform=win32 --arch=x64 --out=../dist/win-shell --overwrite --asar"
+    "pack:win64": "npx @electron/packager . \"KarobarERP\" --platform=win32 --arch=x64 --icon=icon.ico --out=../dist/win-shell --overwrite --asar"
   },
   "devDependencies": {
     "@electron/packager": "^18.3.6",

@@ -220,11 +220,17 @@ class LicenseService
             }
         } elseif (PHP_OS_FAMILY === 'Windows') {
             $winParts = [];
-            $out = @shell_exec('reg query "HKLM\\SOFTWARE\\Microsoft\\Cryptography" /v MachineGuid 2>nul');
+            $out = @shell_exec('reg query "HKLM\\SOFTWARE\\Microsoft\\Cryptography" /v MachineGuid /reg:64 2>nul');
+            if (!is_string($out) || !str_contains($out, 'MachineGuid')) {
+                $out = @shell_exec('reg query "HKLM\\SOFTWARE\\Microsoft\\Cryptography" /v MachineGuid 2>nul');
+            }
             if (is_string($out) && preg_match('/MachineGuid\s+REG_SZ\s+([^\r\n]+)/i', $out, $m)) {
                 $winParts[] = trim($m[1]);
             }
-            $hwOut = @shell_exec('reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\SystemInformation" /v ComputerHardwareId 2>nul');
+            $hwOut = @shell_exec('reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\SystemInformation" /v ComputerHardwareId /reg:64 2>nul');
+            if (!is_string($hwOut) || !str_contains($hwOut, 'ComputerHardwareId')) {
+                $hwOut = @shell_exec('reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\SystemInformation" /v ComputerHardwareId 2>nul');
+            }
             if (is_string($hwOut) && preg_match('/ComputerHardwareId\s+REG_SZ\s+([^\r\n]+)/i', $hwOut, $mHw)) {
                 $winParts[] = trim($mHw[1]);
             }

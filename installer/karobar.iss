@@ -30,17 +30,15 @@ AllowNoIcons=yes
 LicenseFile=legal\TermsAndConditions.txt
 OutputDir=..\dist\installer
 OutputBaseFilename=Karobar-ERP-Setup-v{#MyAppVersion}
-#if FileExists("..\public\favicon.ico") && FileSize("..\public\favicon.ico") > 0
-SetupIconFile=..\public\favicon.ico
-#endif
+SetupIconFile=..\desktop\icon.ico
 Compression=lzma2/fast
-SolidCompression=yes
+SolidCompression=no
 WizardStyle=modern
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-UninstallDisplayIcon={app}\{#MyAppExeName}
+UninstallDisplayIcon={app}\icon.ico
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -65,19 +63,22 @@ Name: "{app}\app\bootstrap\cache"; Permissions: users-modify
 [Files]
 ; Lightweight pre-install PHP + libsodium + VC++ runtime + precheck.php extracted on wizard boot to compute exact Machine ID & verify Ed25519 signature BEFORE installation
 Source: "{#BuildStageDir}\app\runtime\php\php.exe"; Flags: dontcopy
-Source: "{#BuildStageDir}\app\runtime\php\php8*.dll"; Flags: dontcopy
-Source: "{#BuildStageDir}\app\runtime\php\vcruntime*.dll"; Flags: dontcopy skipifsourcedoesntexist
-Source: "{#BuildStageDir}\app\runtime\php\msvcp140*.dll"; Flags: dontcopy skipifsourcedoesntexist
+Source: "{#BuildStageDir}\app\runtime\php\php8.dll"; Flags: dontcopy skipifsourcedoesntexist
+Source: "{#BuildStageDir}\app\runtime\php\php8ts.dll"; Flags: dontcopy skipifsourcedoesntexist
+Source: "{#BuildStageDir}\app\runtime\php\vcruntime140.dll"; Flags: dontcopy skipifsourcedoesntexist
+Source: "{#BuildStageDir}\app\runtime\php\vcruntime140_1.dll"; Flags: dontcopy skipifsourcedoesntexist
+Source: "{#BuildStageDir}\app\runtime\php\msvcp140.dll"; Flags: dontcopy skipifsourcedoesntexist
 Source: "{#BuildStageDir}\app\runtime\php\libsodium.dll"; Flags: dontcopy skipifsourcedoesntexist
 Source: "{#BuildStageDir}\app\runtime\php\ext\php_sodium.dll"; Flags: dontcopy
 Source: "precheck.php"; Flags: dontcopy
+Source: "..\desktop\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 ; Full staged Electron + Laravel + PHP + Node application bundle
 Source: "{#BuildStageDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"
+Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"; IconFilename: "{app}\icon.ico"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; Tasks: desktopicon
 
 [Run]
 ; Post-Install Bootstrapper: migrates SQLite DB, creates the Admin account entered in the wizard, seals the hardware-bound license, and sets is_setup_completed=false so first login opens the Genie Setup Wizard (/setup)
@@ -120,19 +121,30 @@ begin
   Result := 'KRB-DETECTING';
   try
     try
-      ExtractTemporaryFiles('vcruntime*.dll');
+      ExtractTemporaryFile('vcruntime140.dll');
     except
     end;
     try
-      ExtractTemporaryFiles('msvcp140*.dll');
+      ExtractTemporaryFile('vcruntime140_1.dll');
+    except
+    end;
+    try
+      ExtractTemporaryFile('msvcp140.dll');
     except
     end;
     try
       ExtractTemporaryFile('libsodium.dll');
     except
     end;
+    try
+      ExtractTemporaryFile('php8.dll');
+    except
+    end;
+    try
+      ExtractTemporaryFile('php8ts.dll');
+    except
+    end;
     ExtractTemporaryFile('php.exe');
-    ExtractTemporaryFiles('php8*.dll');
     ExtractTemporaryFile('php_sodium.dll');
     ExtractTemporaryFile('precheck.php');
     if Exec(
