@@ -94,8 +94,9 @@ New-Item -ItemType Directory -Force -Path $PhpRuntimeDir | Out-Null
 
 $LocalPhpCmd = Get-Command "php.exe" -ErrorAction SilentlyContinue
 $LocalPhpDir = if ($LocalPhpCmd) { Split-Path -Parent $LocalPhpCmd.Source } else { $null }
+$IsPhp84Plus = if ($LocalPhpCmd) { (& $LocalPhpCmd.Source -r "echo (int)(PHP_VERSION_ID >= 80401);") -eq "1" } else { $false }
 
-if ($LocalPhpDir -and (Test-Path (Join-Path $LocalPhpDir "ext\php_sodium.dll"))) {
+if ($LocalPhpDir -and $IsPhp84Plus -and (Test-Path (Join-Path $LocalPhpDir "ext\php_sodium.dll"))) {
     Write-Host "    Using host PHP 8.4+ installation from: $LocalPhpDir" -ForegroundColor Gray
     Copy-Item -Path "$LocalPhpDir\*" -Destination $PhpRuntimeDir -Recurse -Force
 } else {

@@ -1,6 +1,13 @@
 name: Build Windows .exe Installer (Karobar ERP v2)
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/build-windows-exe.yml"
+      - "scripts/build-windows-exe.ps1"
+      - "installer/**"
+      - "desktop/**"
   workflow_dispatch:
     inputs:
       app_version:
@@ -22,6 +29,7 @@ jobs:
         with:
           php-version: "8.4"
           extensions: mbstring, openssl, pdo_sqlite, sqlite3, sodium, gd, zip, fileinfo, curl
+          tools: composer:v2
           coverage: none
 
       - name: Setup Node.js 22 LTS
@@ -31,7 +39,10 @@ jobs:
           cache: "npm"
 
       - name: Install Production Composer Dependencies
-        run: composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+        shell: pwsh
+        run: |
+          php -v
+          composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 
       - name: Build Windows Desktop Shell & Inno Setup .exe Installer
         shell: pwsh
