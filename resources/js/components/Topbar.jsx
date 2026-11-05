@@ -14,6 +14,7 @@ import {
   ExclamationTriangleIcon,
   HandRaisedIcon,
   XMarkIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
 import { useLicense } from "@/context/LicenseContext.jsx";
@@ -105,6 +106,26 @@ export default function Topbar({
 
   // Click-to-Explain UI Inspector state (toggles anywhere with Alt+E)
   const [, setInspectMode] = useInspectElementState();
+
+  // Installed Karobar-App version badge state
+  const [appVersionInfo, setAppVersionInfo] = useState({ version: "2.0", build_number: null });
+  useEffect(() => {
+    let mounted = true;
+    axios
+      .get("/api/system/version")
+      .then(({ data }) => {
+        if (mounted && data?.version) {
+          setAppVersionInfo({
+            version: data.version,
+            build_number: data.build_number || null,
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const canViewAccounts = has("account.view");
 
@@ -946,7 +967,17 @@ export default function Topbar({
 
             <div className="hidden sm:block mx-0.5 h-5 w-px bg-slate-300/60 dark:bg-slate-700/60 shrink-0" />
 
-            {/* Group 3: License & User Account */}
+            {/* Group 3: Version / Update Check, License & User Account */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("karobar:check-updates"))}
+              className="hidden lg:inline-flex items-center justify-center gap-1.5 h-9 px-2.5 text-xs font-semibold rounded-xl border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 transition-all duration-150 relative z-20 shrink-0 whitespace-nowrap cursor-pointer"
+              title={`Karobar-App v${appVersionInfo.version}${appVersionInfo.build_number ? ` (Build #${appVersionInfo.build_number})` : ""} — Click to check for software updates`}
+            >
+              <ArrowPathIcon className="w-3.5 h-3.5 shrink-0" />
+              <span className="font-mono font-bold">v{appVersionInfo.version}</span>
+            </button>
+
             <button
               type="button"
               onClick={() => navigate("/settings#license")}
@@ -1009,6 +1040,16 @@ export default function Topbar({
                     className="workspace-user-menu-item sm:hidden"
                   >
                     {licLoading ? "License Status" : licValid ? `License (${leftTxt} left)` : "Activate License"}
+                  </button>
+                   <button
+                    role="menuitem"
+                    onClick={() => {
+                      setOpen(false);
+                      window.dispatchEvent(new CustomEvent("karobar:check-updates"));
+                    }}
+                    className="workspace-user-menu-item"
+                  >
+                    Check for Updates (v{appVersionInfo.version})
                   </button>
                   <button
                     role="menuitem"

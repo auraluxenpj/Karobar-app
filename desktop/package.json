@@ -1,7 +1,7 @@
 {
   "name": "karobar-app",
   "productName": "Karobar-App",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Karobar-App — Standalone Windows Desktop Application",
   "main": "main.cjs",
   "author": "Malik Asim Shahzad <shzdasim@gmail.com> (https://github.com/shzdasim)",
