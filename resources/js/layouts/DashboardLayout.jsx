@@ -7,7 +7,6 @@ import Topbar from "../components/Topbar.jsx";
 import ProtectedRoute from "../components/ProtectedRoute.jsx";
 import PageSkeleton from "../components/PageSkeleton.jsx";
 import SubWindowManager, {
-  TopNativeMenuBar,
   resolveTitleForPath,
 } from "../components/SubWindowManager.jsx";
 import { Toaster } from "react-hot-toast";
@@ -608,71 +607,22 @@ export default function DashboardLayout({ children }) {
     };
   }, [mobileSidebarOpen]);
 
-  // If this instance is rendered inside a Sub-Window iframe, render a clean, distraction-free sub-window frame
+  // If this instance is rendered inside a Sub-Window iframe, preserve .workspace-shell CSS variables & styling
   if (isSubWindow) {
     return (
-      <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-        <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 px-3 py-1 text-xs">
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="rounded border border-slate-200 dark:border-slate-700 px-2 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-800"
-              title="Back"
-            >
-              ←
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate(1)}
-              className="rounded border border-slate-200 dark:border-slate-700 px-2 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-800"
-              title="Forward"
-            >
-              →
-            </button>
-            <span className="font-semibold text-slate-700 dark:text-slate-200 ml-1">
-              {pageTitle}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5 text-[11px]">
-            <button
-              type="button"
-              onClick={() => navigate("/sale-invoices/create/retail")}
-              className="rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 font-medium hover:bg-emerald-100"
-            >
-              Retail Sale
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/purchase-invoices/create")}
-              className="rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 font-medium hover:bg-blue-100"
-            >
-              Purchase
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/sale-invoices/pos")}
-              className="rounded bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 px-2 py-0.5 font-medium hover:bg-violet-100"
-            >
-              POS
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/customer-ledger")}
-              className="rounded bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 px-2 py-0.5 font-medium hover:bg-amber-100"
-            >
-              Ledger
-            </button>
-          </div>
+      <div className="workspace-shell !p-3 !min-h-screen">
+        <div className="workspace-main">
+          <main className="workspace-content">
+            <div className="workspace-page !pt-1 !pb-2">
+              <Toaster position="top-right" reverseOrder={false} />
+              <ProtectedRoute>
+                <Suspense fallback={<PageSkeleton />}>
+                  {children ?? <Outlet />}
+                </Suspense>
+              </ProtectedRoute>
+            </div>
+          </main>
         </div>
-        <main className="flex-1 overflow-auto p-2.5">
-          <Toaster position="top-right" reverseOrder={false} />
-          <ProtectedRoute>
-            <Suspense fallback={<PageSkeleton />}>
-              {children ?? <Outlet />}
-            </Suspense>
-          </ProtectedRoute>
-        </main>
       </div>
     );
   }
@@ -769,23 +719,8 @@ export default function DashboardLayout({ children }) {
         </>
       )}
 
-      {/* Main content area — Windows Top Menu Bar + Topbar + Page + Sub-Window Manager */}
+      {/* Main content area — Topbar + Page + Sub-Window Manager */}
       <div className="workspace-main">
-        <TopNativeMenuBar
-          currentPath={currentPath}
-          currentTitle={pageTitle}
-          subWindowsCount={subWindows.length}
-          defaultSubWindowMode={defaultSubWindowMode}
-          setDefaultSubWindowMode={setDefaultSubWindowMode}
-          onOpenSubWindow={openSubWindow}
-          onTileWindows={tileSubWindows}
-          onGridWindows={gridSubWindows}
-          onCascadeWindows={cascadeSubWindows}
-          onMinimizeAll={minimizeAllSubWindows}
-          onRestoreAll={restoreAllSubWindows}
-          onCloseAll={closeAllSubWindows}
-          onOpenSalePurchaseSplit={openSalePurchaseSplit}
-        />
         <Topbar
           pageTitle={pageTitle}
           onMobileMenuClick={() => setMobileSidebarOpen(true)}
@@ -818,13 +753,10 @@ export default function DashboardLayout({ children }) {
           onToggleMaximizeWindow={toggleMaximizeSubWindow}
           onSnapWindow={snapSubWindow}
           onUpdateWindowBounds={updateSubWindowBounds}
-          onUpdateWindowRoute={updateSubWindowRoute}
           onReloadWindow={reloadSubWindow}
           onTileWindows={tileSubWindows}
           onGridWindows={gridSubWindows}
-          onCascadeWindows={cascadeSubWindows}
           onCloseAll={closeAllSubWindows}
-          onOpenSubWindow={openSubWindow}
         />
       </div>
     </div>
