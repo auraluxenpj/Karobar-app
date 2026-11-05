@@ -159,7 +159,7 @@ end;
 
 procedure OnCopyMachineIdClick(Sender: TObject);
 begin
-  MachineIdEdit.SetFocus();
+  WizardForm.ActiveControl := MachineIdEdit;
   MachineIdEdit.SelectAll();
   SendMessage(MachineIdEdit.Handle, $0301, 0, 0);
   MsgBox('Machine ID copied to clipboard! Send this Machine ID to Karobar Support to receive your single-machine license key.', mbInformation, MB_OK);
