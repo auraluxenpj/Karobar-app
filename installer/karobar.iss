@@ -68,7 +68,7 @@ Source: "{#BuildStageDir}\app\runtime\php\php.exe"; Flags: dontcopy
 Source: "{#BuildStageDir}\app\runtime\php\php8*.dll"; Flags: dontcopy
 Source: "{#BuildStageDir}\app\runtime\php\vcruntime*.dll"; Flags: dontcopy skipifsourcedoesntexist
 Source: "{#BuildStageDir}\app\runtime\php\msvcp140*.dll"; Flags: dontcopy skipifsourcedoesntexist
-Source: "{#BuildStageDir}\app\runtime\php\libsodium.dll"; Flags: dontcopy
+Source: "{#BuildStageDir}\app\runtime\php\libsodium.dll"; Flags: dontcopy skipifsourcedoesntexist
 Source: "{#BuildStageDir}\app\runtime\php\ext\php_sodium.dll"; Flags: dontcopy
 Source: "precheck.php"; Flags: dontcopy
 ; Full staged Electron + Laravel + PHP + Node application bundle
@@ -127,9 +127,12 @@ begin
       ExtractTemporaryFiles('msvcp140*.dll');
     except
     end;
+    try
+      ExtractTemporaryFile('libsodium.dll');
+    except
+    end;
     ExtractTemporaryFile('php.exe');
     ExtractTemporaryFiles('php8*.dll');
-    ExtractTemporaryFile('libsodium.dll');
     ExtractTemporaryFile('php_sodium.dll');
     ExtractTemporaryFile('precheck.php');
     if Exec(

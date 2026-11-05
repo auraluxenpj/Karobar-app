@@ -43,11 +43,21 @@ New-Item -ItemType Directory -Force -Path $StageDir, $AppStage | Out-Null
 Copy-Item -Path "$ElectronUnpacked\*" -Destination $StageDir -Recurse -Force
 
 Write-Host "==> [3/6] Staging Laravel Production Files into dist/stage/app..." -ForegroundColor Cyan
-$CopyDirs = @("app", "bootstrap", "config", "database", "desktop", "public", "resources", "routes", "scripts", "vendor")
+$CopyDirs = @("app", "bootstrap", "config", "database", "public", "resources", "routes", "scripts", "vendor")
 foreach ($dir in $CopyDirs) {
     $src = Join-Path $RepoRoot $dir
     if (Test-Path $src) {
         Copy-Item -Path $src -Destination (Join-Path $AppStage $dir) -Recurse -Force
+    }
+}
+
+# Stage desktop runtime scripts (excluding desktop/node_modules)
+$DesktopStage = Join-Path $AppStage "desktop"
+New-Item -ItemType Directory -Force -Path $DesktopStage | Out-Null
+foreach ($dFile in @("router.php", "main.cjs", "preload.cjs", "splash.html", "package.json")) {
+    $dSrc = Join-Path $RepoRoot "desktop\$dFile"
+    if (Test-Path $dSrc) {
+        Copy-Item -Path $dSrc -Destination (Join-Path $DesktopStage $dFile) -Force
     }
 }
 
@@ -78,22 +88,22 @@ New-Item -ItemType Directory -Force -Path `
     (Join-Path $AppStage "storage\logs"), `
     (Join-Path $AppStage "bootstrap\cache") | Out-Null
 
-Write-Host "==> [4/6] Provisioning Portable PHP 8.3 Win64 Runtime (with sodium, sqlite3, gd, zip)..." -ForegroundColor Cyan
+Write-Host "==> [4/6] Provisioning Portable PHP 8.4 Win64 Runtime (with sodium, sqlite3, gd, zip)..." -ForegroundColor Cyan
 $PhpRuntimeDir = Join-Path $AppStage "runtime\php"
 New-Item -ItemType Directory -Force -Path $PhpRuntimeDir | Out-Null
 
 $LocalPhpCmd = Get-Command "php.exe" -ErrorAction SilentlyContinue
 $LocalPhpDir = if ($LocalPhpCmd) { Split-Path -Parent $LocalPhpCmd.Source } else { $null }
 
-if ($LocalPhpDir -and (Test-Path (Join-Path $LocalPhpDir "ext\php_sodium.dll")) -and (Test-Path (Join-Path $LocalPhpDir "libsodium.dll"))) {
-    Write-Host "    Using host PHP 8.3 installation from: $LocalPhpDir" -ForegroundColor Gray
+if ($LocalPhpDir -and (Test-Path (Join-Path $LocalPhpDir "ext\php_sodium.dll"))) {
+    Write-Host "    Using host PHP 8.4+ installation from: $LocalPhpDir" -ForegroundColor Gray
     Copy-Item -Path "$LocalPhpDir\*" -Destination $PhpRuntimeDir -Recurse -Force
 } else {
     $PhpZipUrl = $env:KAROBAR_PHP_WIN64_URL
     if (-not $PhpZipUrl) {
-        $PhpZipUrl = "https://windows.php.net/downloads/releases/archives/php-8.3.14-nts-Win32-vs16-x64.zip"
+        $PhpZipUrl = "https://windows.php.net/downloads/releases/archives/php-8.4.4-nts-Win32-vs17-x64.zip"
     }
-    $PhpZipPath = Join-Path $CacheDir "php-8.3-win64.zip"
+    $PhpZipPath = Join-Path $CacheDir "php-8.4-win64.zip"
     if (-not (Test-Path $PhpZipPath)) {
         Invoke-WebRequest -Uri $PhpZipUrl -OutFile $PhpZipPath -Headers @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" } -UseBasicParsing
     }
@@ -166,11 +176,19 @@ $IsccExe = $IsccCandidates | Where-Object { Test-Path $_ } | Select-Object -Firs
 if (-not $IsccExe) {
     $IsccExe = (Get-Command "ISCC.exe" -ErrorAction SilentlyContinue).Source
 }
+if (-not $IsccExe -and (Get-Command "choco.exe" -ErrorAction SilentlyContinue)) {
+    Write-Host "    Installing Inno Setup 6 via Chocolatey..." -ForegroundColor Gray
+    choco install innosetup -y --no-progress
+    $IsccExe = $IsccCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
 if (-not $IsccExe) {
     throw "Inno Setup 6 (ISCC.exe) not found. Install via: winget install JRSoftware.InnoSetup"
 }
 
 & $IsccExe (Join-Path $RepoRoot "installer\karobar.iss")
+if ($LASTEXITCODE -ne 0) {
+    throw "Inno Setup compilation failed with exit code $LASTEXITCODE"
+}
 
 Write-Host "================================================================================" -ForegroundColor Green
 Write-Host "SUCCESS! Windows .exe Installer generated at:" -ForegroundColor Green
