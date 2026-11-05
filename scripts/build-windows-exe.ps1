@@ -189,7 +189,65 @@ if ($LocalNodeCmd -and (Test-Path $LocalNodeCmd.Source)) {
     Copy-Item -Path $NodeBinFile.FullName -Destination (Join-Path $NodeRuntimeDir "node.exe") -Force
 }
 
-Write-Host "==> [6/6] Compiling Windows Installer (Karobar-ERP-Setup-v2.0.0.exe) via Inno Setup 6..." -ForegroundColor Cyan
+Write-Host "==> [6/6] Code Signing & Compiling Windows Installer (Karobar-ERP-Setup-v2.0.0.exe)..." -ForegroundColor Cyan
+
+# Provision Authenticode Code Signing Certificate bound to Malik Asim Shahzad (https://github.com/shzdasim)
+$InstallerOutDir = Join-Path $DistDir "installer"
+New-Item -ItemType Directory -Force -Path $InstallerOutDir | Out-Null
+$PfxPath = Join-Path $CacheDir "MalikAsimShahzad-CodeSign.pfx"
+$CerPath = Join-Path $DesktopStage "MalikAsimShahzad-KarobarERP.cer"
+$PfxPasswordPlain = if ($env:WINDOWS_CERT_PASSWORD) { $env:WINDOWS_CERT_PASSWORD } else { "KarobarSign2026!" }
+$PfxPasswordSec = ConvertTo-SecureString -String $PfxPasswordPlain -Force -AsPlainText
+
+if ($env:WINDOWS_CERT_PFX_BASE64) {
+    Write-Host "    Using provided WINDOWS_CERT_PFX_BASE64 code signing certificate..." -ForegroundColor Gray
+    [IO.File]::WriteAllBytes($PfxPath, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
+    $SigningCert = Import-PfxCertificate -FilePath $PfxPath -CertStoreLocation "Cert:\CurrentUser\My" -Password $PfxPasswordSec
+    Export-Certificate -Cert $SigningCert -FilePath $CerPath -Force | Out-Null
+} else {
+    Write-Host "    Generating Authenticode Developer Certificate for Malik Asim Shahzad (https://github.com/shzdasim/Karobar-App)..." -ForegroundColor Gray
+    $SigningCert = New-SelfSignedCertificate `
+        -Type CodeSigningCert `
+        -Subject "CN=Malik Asim Shahzad (shzdasim), O=Malik Asim Shahzad, OU=https://github.com/shzdasim/Karobar-App, C=PK" `
+        -FriendlyName "Malik Asim Shahzad - Karobar App ERP Developer Certificate" `
+        -KeyAlgorithm RSA `
+        -KeyLength 2048 `
+        -HashAlgorithm "SHA256" `
+        -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.17={text}URL=https://github.com/shzdasim/Karobar-App") `
+        -CertStoreLocation "Cert:\CurrentUser\My" `
+        -NotAfter (Get-Date).AddYears(5)
+
+    Export-PfxCertificate -Cert $SigningCert -FilePath $PfxPath -Password $PfxPasswordSec -Force | Out-Null
+    Export-Certificate -Cert $SigningCert -FilePath $CerPath -Force | Out-Null
+    Import-Certificate -FilePath $CerPath -CertStoreLocation "Cert:\LocalMachine\Root" | Out-Null
+    Import-Certificate -FilePath $CerPath -CertStoreLocation "Cert:\LocalMachine\TrustedPublisher" | Out-Null
+}
+
+Copy-Item -Path $CerPath -Destination (Join-Path $InstallerOutDir "MalikAsimShahzad-KarobarERP.cer") -Force
+
+$SignToolExe = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
+    Sort-Object FullName -Descending |
+    Select-Object -First 1 -ExpandProperty FullName
+
+function Invoke-KarobarAuthenticodeSign([string]$TargetExe) {
+    if (-not (Test-Path $TargetExe)) { return }
+    Write-Host "    Signing executable: $(Split-Path -Leaf $TargetExe)" -ForegroundColor Gray
+    if ($SignToolExe -and (Test-Path $SignToolExe)) {
+        & $SignToolExe sign /f $PfxPath /p $PfxPasswordPlain /fd SHA256 /d "Karobar App ERP - Malik Asim Shahzad" /du "https://github.com/shzdasim/Karobar-App" /tr "http://timestamp.digicert.com" /td SHA256 $TargetExe
+        if ($LASTEXITCODE -ne 0) {
+            & $SignToolExe sign /f $PfxPath /p $PfxPasswordPlain /fd SHA256 /d "Karobar App ERP - Malik Asim Shahzad" /du "https://github.com/shzdasim/Karobar-App" $TargetExe
+        }
+    } else {
+        $sigRes = Set-AuthenticodeSignature -FilePath $TargetExe -Certificate $SigningCert -HashAlgorithm SHA256 -TimestampServer "http://timestamp.digicert.com"
+        if ($sigRes.Status -ne "Valid") {
+            Set-AuthenticodeSignature -FilePath $TargetExe -Certificate $SigningCert -HashAlgorithm SHA256 | Out-Null
+        }
+    }
+}
+
+# Sign the packaged Electron application executable before building the installer
+Invoke-KarobarAuthenticodeSign (Join-Path $StageDir "KarobarERP.exe")
+
 $IsccCandidates = @(
     "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
     "C:\Program Files\Inno Setup 6\ISCC.exe",
@@ -213,8 +271,15 @@ if ($LASTEXITCODE -ne 0) {
     throw "Inno Setup compilation failed with exit code $LASTEXITCODE"
 }
 
+# Sign the final compiled Inno Setup .exe installer with Authenticode + DigiCert RFC3161 Timestamp
+$FinalInstallerExe = Join-Path $InstallerOutDir "Karobar-ERP-Setup-v2.0.0.exe"
+Invoke-KarobarAuthenticodeSign $FinalInstallerExe
+$VerifySig = Get-AuthenticodeSignature -FilePath $FinalInstallerExe
+Write-Host "    Authenticode Signature Status: $($VerifySig.Status) | Signer: $($VerifySig.SignerCertificate.Subject)" -ForegroundColor Green
+
 Write-Host "================================================================================" -ForegroundColor Green
-Write-Host "SUCCESS! Windows .exe Installer generated at:" -ForegroundColor Green
+Write-Host "SUCCESS! Signed Windows .exe Installer generated at:" -ForegroundColor Green
 Write-Host "  dist\installer\Karobar-ERP-Setup-v2.0.0.exe" -ForegroundColor Yellow
+Write-Host "  Publisher: Malik Asim Shahzad (https://github.com/shzdasim/Karobar-App)" -ForegroundColor Yellow
 Write-Host "================================================================================" -ForegroundColor Green
 

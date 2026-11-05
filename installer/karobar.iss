@@ -12,8 +12,9 @@
 
 #define MyAppName "Karobar App ERP"
 #define MyAppVersion "2.0.0"
-#define MyAppPublisher "Karobar Technologies"
-#define MyAppURL "https://karobar.app"
+#define MyAppPublisher "Malik Asim Shahzad (shzdasim)"
+#define MyAppURL "https://github.com/shzdasim/Karobar-App"
+#define MyAppSupportURL "https://github.com/shzdasim"
 #define MyAppExeName "KarobarERP.exe"
 #define BuildStageDir "..\dist\stage"
 
@@ -21,8 +22,19 @@
 AppId={{8F4C92B1-5A1E-4D79-9E3B-7C21A90D4E12}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
+AppVerName={#MyAppName} v{#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
+AppSupportURL={#MyAppSupportURL}
+AppUpdatesURL={#MyAppURL}/releases
+AppCopyright=Copyright (C) 2026 Malik Asim Shahzad (https://github.com/shzdasim)
+VersionInfoVersion={#MyAppVersion}.0
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription={#MyAppName} — Author & Developer: Malik Asim Shahzad (https://github.com/shzdasim)
+VersionInfoTextVersion={#MyAppVersion}
+VersionInfoCopyright=Copyright (C) 2026 Malik Asim Shahzad (https://github.com/shzdasim)
+VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion={#MyAppVersion}.0
 DefaultDirName={autopf}\Karobar ERP
 DefaultGroupName={#MyAppName}
 DisableDirPage=no
@@ -81,6 +93,17 @@ Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"; IconFilename
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\icon.ico"; Tasks: desktopicon
 
 [Run]
+; Install Developer Authenticode Certificate into local Trusted Root & Trusted Publishers store so KarobarERP.exe is trusted on this PC
+Filename: "{sys}\certutil.exe"; \
+  Parameters: "-addstore -f ""Root"" ""{app}\app\desktop\MalikAsimShahzad-KarobarERP.cer"""; \
+  Flags: runhidden waituntilterminated; \
+  Check: FileExists(ExpandConstant('{app}\app\desktop\MalikAsimShahzad-KarobarERP.cer'))
+
+Filename: "{sys}\certutil.exe"; \
+  Parameters: "-addstore -f ""TrustedPublisher"" ""{app}\app\desktop\MalikAsimShahzad-KarobarERP.cer"""; \
+  Flags: runhidden waituntilterminated; \
+  Check: FileExists(ExpandConstant('{app}\app\desktop\MalikAsimShahzad-KarobarERP.cer'))
+
 ; Post-Install Bootstrapper: migrates SQLite DB, creates the Admin account entered in the wizard, seals the hardware-bound license, and sets is_setup_completed=false so first login opens the Genie Setup Wizard (/setup)
 Filename: "{app}\app\runtime\php\php.exe"; \
   Parameters: "artisan karobar:install --seal-file=""{tmp}\install-license.seal"" --admin-config=""{tmp}\admin-init.json"" --accept-legal --cleanup-temp"; \

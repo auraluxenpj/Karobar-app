@@ -62,6 +62,15 @@ class LicenseIssueCommand extends Command
 
         $secretB64u = trim((string) ($this->option('secret-key') ?: env('KAROBAR_LICENSE_SECRET_KEY', '')));
         if ($secretB64u === '') {
+            $siblingKeygen = dirname(base_path()) . DIRECTORY_SEPARATOR . 'Karobar-License-Generator' . DIRECTORY_SEPARATOR . 'keygen.php';
+            if (is_file($siblingKeygen)) {
+                $keygenSrc = (string) @file_get_contents($siblingKeygen);
+                if (preg_match("/MASTER_SECRET_B64U\s*=\s*'([^']+)'/", $keygenSrc, $m)) {
+                    $secretB64u = trim($m[1]);
+                }
+            }
+        }
+        if ($secretB64u === '') {
             $this->error('Missing Ed25519 secret key. Pass --secret-key=<base64url> or set KAROBAR_LICENSE_SECRET_KEY in your vendor .env file.');
             return self::FAILURE;
         }
@@ -93,7 +102,7 @@ class LicenseIssueCommand extends Command
             'features' => ['core', 'pos', 'inventory', 'accounting', 'hr', 'reports', 'whatsapp', 'cube_ai'],
             'seats'    => max(1, (int) $this->option('seats')),
             'iat'      => $now,
-            'nbf'      => $now - 60,
+            'nbf'      => null,
             'exp'      => $exp,
         ];
 

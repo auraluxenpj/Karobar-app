@@ -19,6 +19,10 @@ jobs:
   build-windows-exe:
     name: Compile Karobar-ERP-Setup.exe (Win64)
     runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
 
     steps:
       - name: Checkout Repository
@@ -48,10 +52,18 @@ jobs:
         shell: pwsh
         run: ./scripts/build-windows-exe.ps1
 
+      - name: Attest Build Provenance to GitHub (shzdasim/Karobar-App)
+        uses: actions/attest-build-provenance@v2
+        continue-on-error: true
+        with:
+          subject-path: "dist/installer/*.exe"
+
       - name: Upload Karobar-ERP-Setup.exe Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Karobar-ERP-Setup-Windows-x64
-          path: dist/installer/*.exe
+          path: |
+            dist/installer/*.exe
+            dist/installer/*.cer
           retention-days: 30
 

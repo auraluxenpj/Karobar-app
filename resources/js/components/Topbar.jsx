@@ -56,6 +56,7 @@ export default function Topbar({
   onMobileMenuClick,
   sidebarPinned = false,
   onDesktopDockOpen,
+  onOpenCurrentInSubWindow,
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
@@ -582,7 +583,10 @@ export default function Topbar({
   const getButtonClass = (baseColor, hoverColor, shadowColor) => 
     `inline-flex items-center gap-1.5 ${buttonStyleClass} px-3 py-1 text-xs font-semibold transition-colors focus:outline-hidden focus:ring-2 focus:ring-${baseColor}/50 relative z-50 ${isOutlined ? 'border-2' : 'shadow-xs'}`;
 
-  const openInNewTab = (path) => window.open(path, "_blank", "noopener,noreferrer");
+  const openInNewTab = (path, title) =>
+    window.dispatchEvent(
+      new CustomEvent("karobar:open-subwindow", { detail: { path, title } })
+    );
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -781,6 +785,19 @@ export default function Topbar({
 
             {/* Click-to-Explain Element Inspector (Alt+E) */}
             <InspectElementTopbarButton />
+
+            {/* Open Current View in a Floating Sub-Window inside Main Window */}
+            {onOpenCurrentInSubWindow && (
+              <button
+                type="button"
+                onClick={onOpenCurrentInSubWindow}
+                title={`Open "${pageTitle || "Current View"}" in a floating Sub-Window inside Main Window (Ctrl+Shift+N)`}
+                className="inline-flex items-center justify-center gap-1.5 h-9 px-2.5 rounded-xl bg-blue-50/90 dark:bg-blue-950/60 hover:bg-blue-600 hover:text-white border border-blue-200 dark:border-blue-800 text-xs font-semibold text-blue-700 dark:text-blue-300 transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap"
+              >
+                <span>⧉</span>
+                <span className="hidden xl:inline">Sub-Window</span>
+              </button>
+            )}
           </div>
 
           {/* Right: 1) Financial Registers | 2) System Utilities | 3) License & User */}

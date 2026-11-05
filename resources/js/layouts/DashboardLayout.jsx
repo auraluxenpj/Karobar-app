@@ -1,21 +1,38 @@
 // src/layouts/DashboardLayout.jsx
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar.jsx";
 import Topbar from "../components/Topbar.jsx";
 import ProtectedRoute from "../components/ProtectedRoute.jsx";
 import PageSkeleton from "../components/PageSkeleton.jsx";
+import SubWindowManager, {
+  TopNativeMenuBar,
+  resolveTitleForPath,
+} from "../components/SubWindowManager.jsx";
 import { Toaster } from "react-hot-toast";
 
 const SIDEBAR_PIN_STORAGE_KEY = "karobar_sidebar_pinned";
 
 export default function DashboardLayout({ children }) {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const isSubWindow =
+    typeof window !== "undefined" &&
+    (new URLSearchParams(location.search).get("subwindow") === "1" ||
+      window.self !== window.top);
 
   // Brand from /api/settings
   const [appName, setAppName] = useState("ERP");
   const [logoUrl, setLogoUrl] = useState(null);
+
+  // Multi-Window (MDI Sub-Windows) State inside Main Window
+  const [subWindows, setSubWindows] = useState([]);
+  const [activeSubWindowId, setActiveSubWindowId] = useState(null);
+  const [defaultSubWindowMode, setDefaultSubWindowMode] = useState(false);
+  const zCounterRef = useRef(100);
+  const winIdCounterRef = useRef(1);
 
   // Mobile sidebar state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -219,6 +236,343 @@ export default function DashboardLayout({ children }) {
     document.title = `${pageTitle} - ${appName || "ERP"}`;
   }, [pageTitle, appName]);
 
+  // --- Sub-Window (MDI) Operations Inside Main Window ---
+  const openSubWindow = useCallback((path, title, customBounds = null) => {
+    const cleanPath = (path || "/dashboard").split("?")[0];
+    const resolvedTitle = title || resolveTitleForPath(cleanPath, "Workspace Window");
+    const nextZ = ++zCounterRef.current;
+    const nextId = `subwin-${winIdCounterRef.current++}-${Date.now().toString(36)}`;
+
+    setSubWindows((prev) => {
+      const idx = prev.length;
+      const offset = (idx % 6) * 32;
+      const vw = typeof window !== "undefined" ? window.innerWidth : 1366;
+      const vh = typeof window !== "undefined" ? window.innerHeight : 820;
+      const defaultW = Math.min(1040, Math.max(640, Math.floor(vw * 0.72)));
+      const defaultH = Math.min(720, Math.max(460, Math.floor(vh * 0.76)));
+      const defaultX = Math.max(24, Math.min(vw - defaultW - 24, 90 + offset));
+      const defaultY = Math.max(44, Math.min(vh - defaultH - 56, 56 + offset));
+
+      return [
+        ...prev,
+        {
+          id: nextId,
+          title: resolvedTitle,
+          path: cleanPath,
+          x: customBounds?.x ?? defaultX,
+          y: customBounds?.y ?? defaultY,
+          width: customBounds?.width ?? defaultW,
+          height: customBounds?.height ?? defaultH,
+          isMinimized: false,
+          isMaximized: false,
+          zIndex: nextZ,
+          reloadKey: 0,
+        },
+      ];
+    });
+    setActiveSubWindowId(nextId);
+  }, []);
+
+  const focusSubWindow = useCallback((id) => {
+    const nextZ = ++zCounterRef.current;
+    setSubWindows((prev) =>
+      prev.map((w) =>
+        w.id === id ? { ...w, isMinimized: false, zIndex: nextZ } : w
+      )
+    );
+    setActiveSubWindowId(id);
+  }, []);
+
+  const closeSubWindow = useCallback((id) => {
+    setSubWindows((prev) => {
+      const remaining = prev.filter((w) => w.id !== id);
+      if (remaining.length > 0) {
+        const topWin = [...remaining].sort((a, b) => b.zIndex - a.zIndex)[0];
+        setActiveSubWindowId(topWin.id);
+      } else {
+        setActiveSubWindowId(null);
+      }
+      return remaining;
+    });
+  }, []);
+
+  const minimizeSubWindow = useCallback((id) => {
+    setSubWindows((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, isMinimized: true } : w))
+    );
+  }, []);
+
+  const toggleMaximizeSubWindow = useCallback((id) => {
+    const nextZ = ++zCounterRef.current;
+    setSubWindows((prev) =>
+      prev.map((w) =>
+        w.id === id
+          ? { ...w, isMaximized: !w.isMaximized, isMinimized: false, zIndex: nextZ }
+          : w
+      )
+    );
+    setActiveSubWindowId(id);
+  }, []);
+
+  const snapSubWindow = useCallback((id, side) => {
+    const vw = typeof window !== "undefined" ? window.innerWidth : 1366;
+    const vh = typeof window !== "undefined" ? window.innerHeight : 820;
+    const halfW = Math.floor((vw - 24) / 2);
+    const fullH = Math.max(360, vh - 88);
+    const nextZ = ++zCounterRef.current;
+
+    setSubWindows((prev) =>
+      prev.map((w) =>
+        w.id === id
+          ? {
+              ...w,
+              isMaximized: false,
+              isMinimized: false,
+              x: side === "left" ? 8 : 16 + halfW,
+              y: 38,
+              width: halfW,
+              height: fullH,
+              zIndex: nextZ,
+            }
+          : w
+      )
+    );
+    setActiveSubWindowId(id);
+  }, []);
+
+  const updateSubWindowBounds = useCallback((id, patch) => {
+    setSubWindows((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, ...patch } : w))
+    );
+  }, []);
+
+  const updateSubWindowRoute = useCallback((id, path, title) => {
+    setSubWindows((prev) =>
+      prev.map((w) =>
+        w.id === id
+          ? { ...w, path, title, reloadKey: (w.reloadKey || 0) + 1 }
+          : w
+      )
+    );
+  }, []);
+
+  const reloadSubWindow = useCallback((id) => {
+    setSubWindows((prev) =>
+      prev.map((w) =>
+        w.id === id ? { ...w, reloadKey: (w.reloadKey || 0) + 1 } : w
+      )
+    );
+  }, []);
+
+  const tileSubWindows = useCallback(() => {
+    setSubWindows((prev) => {
+      const visible = prev.map((w) => ({
+        ...w,
+        isMinimized: false,
+        isMaximized: false,
+      }));
+      const count = visible.length;
+      if (!count) return visible;
+      const vw = typeof window !== "undefined" ? window.innerWidth : 1366;
+      const vh = typeof window !== "undefined" ? window.innerHeight : 820;
+      const cols = Math.min(count, 2);
+      const rows = Math.ceil(count / cols);
+      const cellW = Math.floor((vw - 24) / cols);
+      const cellH = Math.floor((vh - 92) / rows);
+
+      return visible.map((w, i) => {
+        const col = i % cols;
+        const row = Math.floor(i / cols);
+        return {
+          ...w,
+          x: 8 + col * (cellW + 8),
+          y: 38 + row * (cellH + 6),
+          width: cellW,
+          height: cellH,
+          zIndex: ++zCounterRef.current,
+        };
+      });
+    });
+  }, []);
+
+  const gridSubWindows = useCallback(() => {
+    setSubWindows((prev) => {
+      const visible = prev.map((w) => ({
+        ...w,
+        isMinimized: false,
+        isMaximized: false,
+      }));
+      const count = visible.length;
+      if (!count) return visible;
+      const vw = typeof window !== "undefined" ? window.innerWidth : 1366;
+      const vh = typeof window !== "undefined" ? window.innerHeight : 820;
+      const cols = count === 1 ? 1 : 2;
+      const rows = Math.max(1, Math.min(2, Math.ceil(count / 2)));
+      const cellW = Math.floor((vw - 24) / cols);
+      const cellH = Math.floor((vh - 92) / rows);
+
+      return visible.map((w, i) => {
+        const slot = i % 4;
+        const col = slot % cols;
+        const row = Math.floor(slot / cols);
+        return {
+          ...w,
+          x: 8 + col * (cellW + 8),
+          y: 38 + row * (cellH + 6),
+          width: cellW,
+          height: cellH,
+          zIndex: ++zCounterRef.current,
+        };
+      });
+    });
+  }, []);
+
+  const cascadeSubWindows = useCallback(() => {
+    const vw = typeof window !== "undefined" ? window.innerWidth : 1366;
+    const vh = typeof window !== "undefined" ? window.innerHeight : 820;
+    const baseW = Math.min(980, Math.floor(vw * 0.68));
+    const baseH = Math.min(680, Math.floor(vh * 0.72));
+
+    setSubWindows((prev) =>
+      prev.map((w, i) => ({
+        ...w,
+        isMinimized: false,
+        isMaximized: false,
+        x: 40 + (i % 7) * 34,
+        y: 46 + (i % 7) * 32,
+        width: baseW,
+        height: baseH,
+        zIndex: ++zCounterRef.current,
+      }))
+    );
+  }, []);
+
+  const minimizeAllSubWindows = useCallback(() => {
+    setSubWindows((prev) => prev.map((w) => ({ ...w, isMinimized: true })));
+  }, []);
+
+  const restoreAllSubWindows = useCallback(() => {
+    setSubWindows((prev) => prev.map((w) => ({ ...w, isMinimized: false })));
+  }, []);
+
+  const closeAllSubWindows = useCallback(() => {
+    setSubWindows([]);
+    setActiveSubWindowId(null);
+  }, []);
+
+  const openSalePurchaseSplit = useCallback(() => {
+    const vw = typeof window !== "undefined" ? window.innerWidth : 1366;
+    const vh = typeof window !== "undefined" ? window.innerHeight : 820;
+    const halfW = Math.floor((vw - 24) / 2);
+    const fullH = Math.max(380, vh - 88);
+
+    openSubWindow("/sale-invoices/create/retail", "Create Retail Sale", {
+      x: 8,
+      y: 38,
+      width: halfW,
+      height: fullH,
+    });
+    openSubWindow("/purchase-invoices/create", "Create Purchase Invoice", {
+      x: 16 + halfW,
+      y: 38,
+      width: halfW,
+      height: fullH,
+    });
+  }, [openSubWindow]);
+
+  // Listen to Electron Native Top Menu IPC events & Custom DOM events (only in main window)
+  useEffect(() => {
+    if (isSubWindow) return;
+
+    const handleCustomOpen = (e) => {
+      const detail = e.detail || {};
+      openSubWindow(
+        detail.path || currentPath || "/dashboard",
+        detail.title || pageTitle
+      );
+    };
+
+    window.addEventListener("karobar:open-subwindow", handleCustomOpen);
+
+    const desktopApi = window.karobarDesktop;
+    const unsubNav = desktopApi?.onNavigate?.((payload) => {
+      if (payload?.path) {
+        navigate(payload.path);
+      }
+    });
+    const unsubSubWin = desktopApi?.onOpenSubWindow?.((payload) => {
+      if (payload?.path) {
+        openSubWindow(payload.path, payload.title);
+      }
+    });
+    const unsubCmd = desktopApi?.onWindowCommand?.((payload) => {
+      const cmd = payload?.command;
+      if (cmd === "open-current") {
+        openSubWindow(currentPath || "/dashboard", pageTitle);
+      } else if (cmd === "preset-sale-purchase") {
+        openSalePurchaseSplit();
+      } else if (cmd === "tile") {
+        tileSubWindows();
+      } else if (cmd === "grid") {
+        gridSubWindows();
+      } else if (cmd === "cascade") {
+        cascadeSubWindows();
+      } else if (cmd === "minimize-all") {
+        minimizeAllSubWindows();
+      } else if (cmd === "restore-all") {
+        restoreAllSubWindows();
+      } else if (cmd === "close-all") {
+        closeAllSubWindows();
+      } else if (cmd === "set-menu-subwindow-mode") {
+        setDefaultSubWindowMode(Boolean(payload?.enabled));
+      }
+    });
+
+    const handleKeyShortcuts = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
+        const key = e.key.toLowerCase();
+        if (key === "n") {
+          e.preventDefault();
+          openSubWindow(currentPath || "/dashboard", pageTitle);
+        } else if (key === "p") {
+          e.preventDefault();
+          openSubWindow("/sale-invoices/pos", "Barcode POS");
+        } else if (key === "s") {
+          e.preventDefault();
+          openSubWindow("/sale-invoices/create/retail", "Create Retail Sale");
+        } else if (key === "u") {
+          e.preventDefault();
+          openSubWindow("/purchase-invoices/create", "Create Purchase Invoice");
+        } else if (key === "t") {
+          e.preventDefault();
+          tileSubWindows();
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyShortcuts);
+
+    return () => {
+      window.removeEventListener("karobar:open-subwindow", handleCustomOpen);
+      window.removeEventListener("keydown", handleKeyShortcuts);
+      if (typeof unsubNav === "function") unsubNav();
+      if (typeof unsubSubWin === "function") unsubSubWin();
+      if (typeof unsubCmd === "function") unsubCmd();
+    };
+  }, [
+    isSubWindow,
+    currentPath,
+    pageTitle,
+    navigate,
+    openSubWindow,
+    openSalePurchaseSplit,
+    tileSubWindows,
+    gridSubWindows,
+    cascadeSubWindows,
+    minimizeAllSubWindows,
+    restoreAllSubWindows,
+    closeAllSubWindows,
+  ]);
+
   // Close mobile sidebar and floating dock on route change
   useEffect(() => {
     setMobileSidebarOpen(false);
@@ -253,6 +607,75 @@ export default function DashboardLayout({ children }) {
       document.body.style.overflow = "";
     };
   }, [mobileSidebarOpen]);
+
+  // If this instance is rendered inside a Sub-Window iframe, render a clean, distraction-free sub-window frame
+  if (isSubWindow) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+        <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 px-3 py-1 text-xs">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="rounded border border-slate-200 dark:border-slate-700 px-2 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-800"
+              title="Back"
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(1)}
+              className="rounded border border-slate-200 dark:border-slate-700 px-2 py-0.5 hover:bg-slate-100 dark:hover:bg-slate-800"
+              title="Forward"
+            >
+              →
+            </button>
+            <span className="font-semibold text-slate-700 dark:text-slate-200 ml-1">
+              {pageTitle}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px]">
+            <button
+              type="button"
+              onClick={() => navigate("/sale-invoices/create/retail")}
+              className="rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 font-medium hover:bg-emerald-100"
+            >
+              Retail Sale
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/purchase-invoices/create")}
+              className="rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 font-medium hover:bg-blue-100"
+            >
+              Purchase
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/sale-invoices/pos")}
+              className="rounded bg-violet-50 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 px-2 py-0.5 font-medium hover:bg-violet-100"
+            >
+              POS
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/customer-ledger")}
+              className="rounded bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 px-2 py-0.5 font-medium hover:bg-amber-100"
+            >
+              Ledger
+            </button>
+          </div>
+        </div>
+        <main className="flex-1 overflow-auto p-2.5">
+          <Toaster position="top-right" reverseOrder={false} />
+          <ProtectedRoute>
+            <Suspense fallback={<PageSkeleton />}>
+              {children ?? <Outlet />}
+            </Suspense>
+          </ProtectedRoute>
+        </main>
+      </div>
+    );
+  }
 
   // --- Responsive layout ---
   //  • Mobile (< lg):  sidebar becomes a slide-over overlay
@@ -346,8 +769,23 @@ export default function DashboardLayout({ children }) {
         </>
       )}
 
-      {/* Main content area — topbar + page */}
+      {/* Main content area — Windows Top Menu Bar + Topbar + Page + Sub-Window Manager */}
       <div className="workspace-main">
+        <TopNativeMenuBar
+          currentPath={currentPath}
+          currentTitle={pageTitle}
+          subWindowsCount={subWindows.length}
+          defaultSubWindowMode={defaultSubWindowMode}
+          setDefaultSubWindowMode={setDefaultSubWindowMode}
+          onOpenSubWindow={openSubWindow}
+          onTileWindows={tileSubWindows}
+          onGridWindows={gridSubWindows}
+          onCascadeWindows={cascadeSubWindows}
+          onMinimizeAll={minimizeAllSubWindows}
+          onRestoreAll={restoreAllSubWindows}
+          onCloseAll={closeAllSubWindows}
+          onOpenSalePurchaseSplit={openSalePurchaseSplit}
+        />
         <Topbar
           pageTitle={pageTitle}
           onMobileMenuClick={() => setMobileSidebarOpen(true)}
@@ -356,6 +794,9 @@ export default function DashboardLayout({ children }) {
             clearDockTimers();
             setDockOpen((v) => !v);
           }}
+          onOpenCurrentInSubWindow={() =>
+            openSubWindow(currentPath || "/dashboard", pageTitle)
+          }
         />
         <main className="workspace-content">
           <div className="workspace-page">
@@ -367,6 +808,24 @@ export default function DashboardLayout({ children }) {
             </ProtectedRoute>
           </div>
         </main>
+
+        <SubWindowManager
+          windows={subWindows}
+          activeWindowId={activeSubWindowId}
+          onFocusWindow={focusSubWindow}
+          onCloseWindow={closeSubWindow}
+          onMinimizeWindow={minimizeSubWindow}
+          onToggleMaximizeWindow={toggleMaximizeSubWindow}
+          onSnapWindow={snapSubWindow}
+          onUpdateWindowBounds={updateSubWindowBounds}
+          onUpdateWindowRoute={updateSubWindowRoute}
+          onReloadWindow={reloadSubWindow}
+          onTileWindows={tileSubWindows}
+          onGridWindows={gridSubWindows}
+          onCascadeWindows={cascadeSubWindows}
+          onCloseAll={closeAllSubWindows}
+          onOpenSubWindow={openSubWindow}
+        />
       </div>
     </div>
   );

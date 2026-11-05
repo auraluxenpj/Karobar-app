@@ -226,6 +226,272 @@ function resolveIconPath() {
   return undefined;
 }
 
+let openMenuClicksInSubWindow = false;
+
+function sendNavigate(routePath, title) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (openMenuClicksInSubWindow) {
+    mainWindow.webContents.send("karobar:open-subwindow", { path: routePath, title });
+  } else {
+    mainWindow.webContents.send("karobar:navigate", { path: routePath, title });
+  }
+}
+
+function sendOpenSubWindow(routePath, title) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("karobar:open-subwindow", { path: routePath, title });
+}
+
+function sendWindowCommand(command, payload = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send("karobar:window-command", { command, ...payload });
+}
+
+function buildSectionMenu(sectionLabel, items) {
+  return {
+    label: sectionLabel,
+    submenu: [
+      ...items.map((item) => ({
+        label: item.label,
+        accelerator: item.accelerator || undefined,
+        click: () => sendNavigate(item.path, item.label),
+      })),
+      { type: "separator" },
+      {
+        label: "Open in Sub-Window ▸",
+        submenu: items.map((item) => ({
+          label: `⧉ ${item.label}`,
+          click: () => sendOpenSubWindow(item.path, item.label),
+        })),
+      },
+    ],
+  };
+}
+
+function createApplicationMenu() {
+  const menuTemplate = [
+    {
+      label: "File & Workspace",
+      submenu: [
+        {
+          label: "Dashboard (Main View)",
+          accelerator: "Alt+D",
+          click: () => sendNavigate("/dashboard", "Dashboard"),
+        },
+        {
+          label: "Open Current Page in Sub-Window",
+          accelerator: "CmdOrCtrl+Shift+N",
+          click: () => sendWindowCommand("open-current"),
+        },
+        { type: "separator" },
+        {
+          label: "Quick Sub-Window: Barcode POS",
+          accelerator: "CmdOrCtrl+Shift+P",
+          click: () => sendOpenSubWindow("/sale-invoices/pos", "Barcode POS"),
+        },
+        {
+          label: "Quick Sub-Window: Retail Sale Invoice",
+          accelerator: "CmdOrCtrl+Shift+S",
+          click: () => sendOpenSubWindow("/sale-invoices/create/retail", "Create Retail Sale"),
+        },
+        {
+          label: "Quick Sub-Window: Wholesale Invoice",
+          accelerator: "CmdOrCtrl+Shift+W",
+          click: () => sendOpenSubWindow("/sale-invoices/create/wholesale", "Create Wholesale Sale"),
+        },
+        {
+          label: "Quick Sub-Window: Purchase Invoice",
+          accelerator: "CmdOrCtrl+Shift+U",
+          click: () => sendOpenSubWindow("/purchase-invoices/create", "Create Purchase Invoice"),
+        },
+        {
+          label: "Quick Sub-Window: Customer Ledger",
+          accelerator: "CmdOrCtrl+Shift+L",
+          click: () => sendOpenSubWindow("/customer-ledger", "Customer Ledger"),
+        },
+        { type: "separator" },
+        {
+          label: "Run Database Backup Now",
+          click: () => {
+            try {
+              execFileSync(resolvePhpBinary(), ["artisan", "backup:run-scheduled", "--force"], {
+                cwd: APP_ROOT,
+                windowsHide: true,
+              });
+            } catch {
+              // ignore
+            }
+          },
+        },
+        {
+          label: "Reload Application",
+          accelerator: "CmdOrCtrl+R",
+          click: () => {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.reload();
+            }
+          },
+        },
+        { type: "separator" },
+        {
+          label: "Exit Karobar ERP",
+          accelerator: "Alt+F4",
+          click: () => {
+            isQuitting = true;
+            app.quit();
+          },
+        },
+      ],
+    },
+    buildSectionMenu("Items & Masters", [
+      { label: "Products", path: "/products" },
+      { label: "Add Product", path: "/products/create" },
+      { label: "Product Batches", path: "/product-batches" },
+      { label: "Categories", path: "/categories" },
+      { label: "Brands", path: "/brands" },
+      { label: "Add Brand", path: "/brands/create" },
+      { label: "Suppliers", path: "/suppliers" },
+      { label: "Add Supplier", path: "/suppliers/create" },
+      { label: "Customers", path: "/customers" },
+      { label: "Add Customer", path: "/customers/create" },
+      { label: "Barcode Studio", path: "/barcode-labels" },
+    ]),
+    buildSectionMenu("Invoices & POS", [
+      { label: "Barcode POS Terminal", path: "/sale-invoices/pos" },
+      { label: "Sale Invoices", path: "/sale-invoices" },
+      { label: "Create Retail Sale Invoice", path: "/sale-invoices/create/retail" },
+      { label: "Wholesale Invoices", path: "/wholesale-invoices" },
+      { label: "Create Wholesale Invoice", path: "/sale-invoices/create/wholesale" },
+      { label: "Purchase Invoices", path: "/purchase-invoices" },
+      { label: "Create Purchase Invoice", path: "/purchase-invoices/create" },
+      { label: "Purchase Orders", path: "/purchase-orders" },
+      { label: "Create Purchase Order", path: "/purchase-orders/create" },
+      { label: "Smart Reorder Forecast", path: "/smart-reorder" },
+    ]),
+    buildSectionMenu("Returns", [
+      { label: "Sale Returns", path: "/sale-returns" },
+      { label: "Create Sale Return", path: "/sale-returns/create" },
+      { label: "Purchase Returns", path: "/purchase-returns" },
+      { label: "Create Purchase Return", path: "/purchase-returns/create" },
+    ]),
+    buildSectionMenu("Stock & Inventory", [
+      { label: "Batch & Expiry", path: "/batch-expiry" },
+      { label: "User Demands", path: "/user-demands" },
+      { label: "Request Product", path: "/user-demands/create" },
+      { label: "Stock Adjustments", path: "/stock-adjustments" },
+      { label: "Add Stock Adjustment", path: "/stock-adjustments/create" },
+      { label: "Stocktake Sessions", path: "/stocktake-sessions" },
+      { label: "New Stocktake Session", path: "/stocktake-sessions/create" },
+      { label: "Quarantine & Disposal", path: "/stock-disposals" },
+      { label: "New Disposal", path: "/stock-disposals/create" },
+    ]),
+    buildSectionMenu("Finance & Ledgers", [
+      { label: "Customer Ledger", path: "/customer-ledger" },
+      { label: "Supplier Ledger", path: "/supplier-ledger" },
+      { label: "Payment Vouchers", path: "/payments" },
+      { label: "Cash Drawer", path: "/cash-drawer" },
+      { label: "Financial Accounts", path: "/accounts" },
+      { label: "Operating Expenses", path: "/expenses" },
+      { label: "Double-Entry & GL", path: "/accounting" },
+      { label: "HR, Payroll & Commissions", path: "/hr-payroll" },
+    ]),
+    buildSectionMenu("Reports", [
+      { label: "Net Profit (P&L)", path: "/reports/net-profit" },
+      { label: "Statutory Tax Return", path: "/reports/tax-return" },
+      { label: "Cost of Sale", path: "/reports/cost-of-sale" },
+      { label: "Cost of Sale Detail", path: "/reports/cost-of-sale-detail" },
+      { label: "Outstanding Aging", path: "/reports/outstanding-aging" },
+      { label: "Sale Detail", path: "/reports/sale-detail" },
+      { label: "Purchase Detail", path: "/reports/purchase-detail" },
+      { label: "Purchase Summary", path: "/reports/purchase-summary" },
+      { label: "Sale Returns Report", path: "/reports/sale-returns" },
+      { label: "Purchase Returns Report", path: "/reports/purchase-returns" },
+      { label: "Current Stock", path: "/reports/current-stock" },
+      { label: "Low Stock & Reorder", path: "/reports/reorder" },
+      { label: "Product Comprehensive", path: "/reports/product-comprehensive" },
+      { label: "Near Expiry Product", path: "/reports/near-expiry-product" },
+      { label: "Stock Adjustment Report", path: "/reports/stock-adjustment" },
+    ]),
+    buildSectionMenu("System & Settings", [
+      { label: "Settings", path: "/settings" },
+      { label: "Users", path: "/users" },
+      { label: "Add User", path: "/users/create" },
+      { label: "Roles", path: "/roles" },
+      { label: "Create Role", path: "/roles/create" },
+      { label: "Backups & Storage", path: "/backups" },
+      { label: "Setup Genie Wizard", path: "/setup" },
+      { label: "License Activation", path: "/license-activation" },
+    ]),
+    {
+      label: "Sub-Windows (MDI)",
+      submenu: [
+        {
+          label: "Always Open Top Menu Clicks in Sub-Window",
+          type: "checkbox",
+          checked: openMenuClicksInSubWindow,
+          click: (menuItem) => {
+            openMenuClicksInSubWindow = Boolean(menuItem.checked);
+            sendWindowCommand("set-menu-subwindow-mode", { enabled: openMenuClicksInSubWindow });
+          },
+        },
+        { type: "separator" },
+        {
+          label: "+ New Sub-Window (Current Page)",
+          accelerator: "CmdOrCtrl+Shift+N",
+          click: () => sendWindowCommand("open-current"),
+        },
+        {
+          label: "+ Sale & Purchase Split Workspace (Dual Sub-Windows)",
+          accelerator: "CmdOrCtrl+Shift+D",
+          click: () => sendWindowCommand("preset-sale-purchase"),
+        },
+        { type: "separator" },
+        {
+          label: "Tile Sub-Windows Side-by-Side (2 Columns)",
+          accelerator: "CmdOrCtrl+Shift+T",
+          click: () => sendWindowCommand("tile"),
+        },
+        {
+          label: "Grid Sub-Windows (2x2 Quad View)",
+          accelerator: "CmdOrCtrl+Shift+G",
+          click: () => sendWindowCommand("grid"),
+        },
+        {
+          label: "Cascade Sub-Windows",
+          accelerator: "CmdOrCtrl+Shift+C",
+          click: () => sendWindowCommand("cascade"),
+        },
+        {
+          label: "Minimize All Sub-Windows",
+          accelerator: "CmdOrCtrl+Shift+M",
+          click: () => sendWindowCommand("minimize-all"),
+        },
+        {
+          label: "Restore All Sub-Windows",
+          click: () => sendWindowCommand("restore-all"),
+        },
+        {
+          label: "Close All Sub-Windows",
+          accelerator: "CmdOrCtrl+Shift+X",
+          click: () => sendWindowCommand("close-all"),
+        },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { role: "resetZoom" },
+      ],
+    },
+  ];
+
+  const appMenu = Menu.buildFromTemplate(menuTemplate);
+  Menu.setApplicationMenu(appMenu);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setMenu(appMenu);
+    mainWindow.setMenuBarVisibility(true);
+  }
+}
+
 function createMainWindow() {
   const iconPath = resolveIconPath();
   mainWindow = new BrowserWindow({
@@ -236,13 +502,15 @@ function createMainWindow() {
     show: false,
     title: "Karobar App ERP",
     icon: iconPath,
-    autoHideMenuBar: true,
+    autoHideMenuBar: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+
+  createApplicationMenu();
 
   // Handle print preview windows and external links gracefully
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
