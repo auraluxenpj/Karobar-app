@@ -345,7 +345,9 @@ Route::middleware(['auth:sanctum', 'licensed', 'token.expiry'])->group(function 
     Route::put('/sale-invoices/{saleInvoice}/meta',[SaleInvoiceController::class, 'updateMeta']);
 
 
-    // Settings
+    // Settings & First-Login Genie Setup Wizard
+    Route::get('/setup/state',                           [SettingController::class, 'setupState']);
+    Route::post('/setup/complete',                       [SettingController::class, 'completeSetup']);
     Route::get('/settings',                              [SettingController::class, 'show']);
     Route::post('/settings',                             [SettingController::class, 'update']);
     Route::post('/settings/test-smtp',                   [SettingController::class, 'testSmtp']);

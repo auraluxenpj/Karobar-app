@@ -53,7 +53,11 @@ class SettingController extends Controller
     // actions in retail-only mode). Returns only the two mode fields.
     public function saleSystem()
     {
-        $setting = Setting::first();
+        $setting = Schema::hasTable('settings') ? Setting::first() : null;
+        $hasSetupCol = $setting && Schema::hasColumn('settings', 'is_setup_completed');
+        $isSetupCompleted = $hasSetupCol
+            ? (bool) $setting->is_setup_completed
+            : (bool) (!empty($setting?->store_name) && $setting?->store_name !== 'Karobar App');
 
         return response()->json([
             'store_name'              => $setting?->store_name ?? 'Karobar App',
@@ -64,6 +68,8 @@ class SettingController extends Controller
             'currency_symbol'         => $setting?->currency_symbol ?? 'Rs.',
             'currency_position'       => $setting?->currency_position ?? 'before',
             'currency_decimal_places' => (int)($setting?->currency_decimal_places ?? 2),
+            'is_setup_completed'      => $isSetupCompleted,
+            'setup_completed_at'      => $setting?->setup_completed_at?->toIso8601String(),
         ]);
     }
 
@@ -389,12 +395,179 @@ class SettingController extends Controller
         if ($request->has('currency_decimal_places')) {
             $setting->currency_decimal_places = (int)$request->input('currency_decimal_places');
         }
+
+        if (Schema::hasColumn('settings', 'is_setup_completed')) {
+            if ($request->has('is_setup_completed')) {
+                $setting->is_setup_completed = $request->boolean('is_setup_completed');
+                if ($setting->is_setup_completed && !$setting->setup_completed_at) {
+                    $setting->setup_completed_at = now();
+                }
+            } elseif (!empty(trim((string) $setting->store_name)) && $setting->store_name !== 'Karobar App') {
+                $setting->is_setup_completed = true;
+                if (!$setting->setup_completed_at) {
+                    $setting->setup_completed_at = now();
+                }
+            }
+        }
         
         $setting->save();
         $setting->applyWhatsAppConfig();
         $setting->applyCubeAiConfig();
 
         return response()->json($this->appendCubeMetadata($setting->fresh(), $submittedSecrets));
+    }
+
+    // GET /api/setup/state
+    public function setupState(\App\Services\LicenseService $licenseService)
+    {
+        $this->authorize('view', Setting::class);
+
+        $setting = Setting::firstOrCreate(['id' => 1], [
+            'printer_type'            => 'thermal',
+            'thermal_template'        => 'standard',
+            'a4_template'             => 'standard',
+            'share_paper_size'        => 'a4',
+            'share_show_logo'         => true,
+            'navigation_style'        => 'sidebar',
+            'sale_system'             => 'retail_wholesale',
+            'shop_type'               => 'pharmacy',
+            'currency_code'           => 'PKR',
+            'currency_symbol'         => 'Rs.',
+            'currency_position'       => 'before',
+            'currency_decimal_places' => 2,
+            'expiry_warning_days'     => 90,
+            'cube_ai_enabled'         => true,
+            'cube_groq_enabled'        => true,
+            'cube_groq_model'         => 'llama-3.3-70b-versatile',
+            'cube_groq_daily_limit'   => 250,
+            'cube_gemini_enabled'     => true,
+            'cube_gemini_model'       => 'gemini-3.8-flash',
+            'cube_gemini_daily_limit' => 250,
+        ]);
+
+        $licenseStatus = $licenseService->currentStatus();
+        $licenseStatus['machine_id'] = $licenseService->computeMachineId();
+
+        // Pre-populate store_name in memory if not yet set and license has a store name claim
+        $licensedStoreName = trim((string) ($licenseStatus['payload']['name'] ?? ''));
+        if (
+            (empty($setting->store_name) || $setting->store_name === 'Karobar App')
+            && $licensedStoreName !== ''
+        ) {
+            $setting->store_name = $licensedStoreName;
+        }
+
+        $themes = Schema::hasTable('theme_settings')
+            ? \App\Models\ThemeSetting::orderBy('id')->get()
+            : collect();
+
+        $backupSchedule = null;
+        try {
+            $backupSchedule = \App\Models\BackupSchedule::getSchedule();
+        } catch (\Throwable) {
+            $backupSchedule = null;
+        }
+
+        return response()->json([
+            'setting'         => $this->appendCubeMetadata($setting),
+            'license'         => $licenseStatus,
+            'themes'          => $themes,
+            'backup_schedule' => $backupSchedule,
+            'accounts_count'  => Schema::hasTable('accounts') ? \App\Models\Account::count() : 0,
+            'locations_count' => Schema::hasTable('storage_locations') ? \App\Models\StorageLocation::count() : 0,
+        ]);
+    }
+
+    // POST /api/setup/complete
+    public function completeSetup(Request $request)
+    {
+        $this->authorize('update', Setting::class);
+
+        $request->validate([
+            'store_name' => ['required', 'string', 'min:2', 'max:255'],
+        ]);
+
+        if (!$request->has('printer_type')) {
+            $request->merge(['printer_type' => 'thermal']);
+        }
+        $request->merge(['is_setup_completed' => true]);
+
+        // 1. Update core settings (Store profile, Sale system, Currency, Navigation, Printer, Sharing, WhatsApp, SMTP, Cube AI)
+        $response = $this->update($request);
+
+        // 2. Optionally activate selected Theme preset
+        if ($request->filled('theme_id') && Schema::hasTable('theme_settings')) {
+            $theme = \App\Models\ThemeSetting::find((int) $request->input('theme_id'));
+            if ($theme) {
+                \App\Models\ThemeSetting::where('id', '!=', $theme->id)->update(['is_active' => false]);
+                $theme->update(['is_active' => true]);
+            }
+        }
+
+        // 3. Optionally configure Automated Backup Schedule
+        if ($request->hasAny(['backup_is_automated', 'backup_frequency', 'backup_time_of_day', 'custom_backup_path'])) {
+            try {
+                $schedule = \App\Models\BackupSchedule::getSchedule();
+                if ($request->has('backup_is_automated')) {
+                    $schedule->is_automated = $request->boolean('backup_is_automated');
+                }
+                if ($request->filled('backup_frequency') && in_array($request->input('backup_frequency'), ['daily', 'weekly', 'monthly'], true)) {
+                    $schedule->frequency = $request->input('backup_frequency');
+                }
+                if ($request->filled('backup_time_of_day')) {
+                    $schedule->time_of_day = trim((string) $request->input('backup_time_of_day'));
+                }
+                if ($request->has('custom_backup_path')) {
+                    $customPath = trim((string) $request->input('custom_backup_path'));
+                    $schedule->custom_backup_path = $customPath !== '' ? $customPath : null;
+                    $schedule->storage_destination = $customPath !== '' ? 'custom_folder' : 'local';
+                }
+                $schedule->save();
+            } catch (\Throwable) {
+                // Ignore backup schedule errors during setup
+            }
+        }
+
+        // 4. Optionally seed default Financial Accounts (Cash in Hand)
+        if ($request->boolean('seed_default_accounts', true) && Schema::hasTable('accounts')) {
+            try {
+                app(\App\Services\AccountService::class)->syncCashDrawerBalance();
+            } catch (\Throwable) {
+                // Ignore
+            }
+        }
+
+        // 5. Optionally seed default Storage Locations (Shop Counter, Main Godown, Cold Fridge)
+        if ($request->boolean('seed_default_locations', true) && Schema::hasTable('storage_locations')) {
+            try {
+                if (\App\Models\StorageLocation::count() === 0) {
+                    $defaults = [
+                        ['name' => 'Shop Counter', 'code' => 'SHOP-COUNTER', 'type' => 'shop', 'default_rack' => 'A-1', 'is_default' => true, 'is_active' => true, 'notes' => 'Primary retail dispensing counter'],
+                        ['name' => 'Main Godown', 'code' => 'MAIN-GODOWN', 'type' => 'godown', 'default_rack' => 'G-1', 'is_default' => false, 'is_active' => true, 'notes' => 'Bulk reserve stockroom'],
+                        ['name' => 'Cold Fridge', 'code' => 'COLD-FRIDGE', 'type' => 'cold_storage', 'default_rack' => 'CF-1', 'is_default' => false, 'is_active' => true, 'notes' => 'Temperature-controlled refrigerator (2°C - 8°C)'],
+                    ];
+                    foreach ($defaults as $loc) {
+                        \App\Models\StorageLocation::firstOrCreate(['code' => $loc['code']], $loc);
+                    }
+                }
+            } catch (\Throwable) {
+                // Ignore
+            }
+        }
+
+        // Ensure is_setup_completed is persisted
+        $setting = Setting::first();
+        if ($setting && Schema::hasColumn('settings', 'is_setup_completed')) {
+            $setting->is_setup_completed = true;
+            $setting->setup_completed_at = $setting->setup_completed_at ?? now();
+            $setting->save();
+        }
+
+        $data = $response->getData(true);
+        $data['is_setup_completed'] = true;
+        $data['setup_completed_at'] = $setting?->setup_completed_at?->toIso8601String();
+
+        return response()->json($data);
     }
 
     // POST /api/settings/test-whatsapp

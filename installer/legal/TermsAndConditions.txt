@@ -1,0 +1,29 @@
+================================================================================
+KAROBAR APP ERP v2.0 — END-USER LICENSE AGREEMENT (TERMS AND CONDITIONS)
+================================================================================
+
+IMPORTANT — READ CAREFULLY BEFORE INSTALLING:
+This End-User License Agreement ("Agreement") is a binding legal contract between you (either an individual or a business entity, "Licensee") and Karobar Technologies ("Publisher") for the Karobar App ERP v2 software product ("Software").
+
+By selecting "I accept the agreement" and proceeding with the installation, you agree to be bound by the terms of this Agreement.
+
+1. SINGLE-MACHINE HARDWARE-BOUND LICENSE GRANT
+   (a) Each Karobar App ERP license key (cryptographic KRBL. certificate) is permanently bound to the unique hardware fingerprint ("Machine ID", formatted as KRB-XXXX-XXXX-XXXX-XXXX) of the single computer on which it is activated.
+   (b) Once bound to this computer's Machine ID, the license key can NEVER be used to install or activate the Software on any other computer.
+   (c) Copying or cloning the installed Software folder or SQLite database to a second computer will trigger automatic cryptographic revocation of the license on the target machine.
+
+2. ANTI-TAMPERING & SYSTEM CLOCK INTEGRITY
+   The Software uses Ed25519 digital signatures, HMAC-sealed database records, and monotonic High-Water Mark clock verification. You may not:
+   (a) Modify, decompile, patch, or tamper with any PHP, JavaScript, or binary files in the installation directory;
+   (b) Alter the SQLite `licenses` table or `.machine-id` / `.license-clock` security seals;
+   (c) Roll back your computer's system clock to circumvent license expiration dates.
+
+3. PERMITTED COMMERCIAL & ON-PREMISE USE
+   You are granted a non-exclusive, non-transferable license to install and run the Software in any directory or drive on the licensed computer to manage inventory, point-of-sale (POS) billing, wholesale/retail invoicing, batch expiry tracking, financial accounting, and HR/payroll for your store.
+
+4. LOCAL DATA STORAGE & BACKUP RESPONSIBILITY
+   Because Karobar App ERP operates as an on-premise desktop application, all database records reside locally on your computer. You are solely responsible for configuring and maintaining regular backups (using the built-in Automated Backup feature) to an external USB drive, secondary hard drive partition (e.g., D:\), or off-site folder.
+
+5. WARRANTY DISCLAIMER & LIMITATION OF LIABILITY
+   THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. IN NO EVENT SHALL THE PUBLISHER BE LIABLE FOR ANY LOST PROFITS, DATA LOSS DUE TO HARDWARE FAILURE, TAX CALCULATION DISCREPANCIES, OR INDIRECT DAMAGES ARISING OUT OF THE USE OF THE SOFTWARE.
+

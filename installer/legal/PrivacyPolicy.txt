@@ -1,0 +1,22 @@
+================================================================================
+KAROBAR APP ERP v2.0 — PRIVACY POLICY & DATA OWNERSHIP AGREEMENT
+================================================================================
+
+1. 100% LOCAL-FIRST DATA OWNERSHIP
+   Karobar App ERP is designed with a local-first architecture. All of your business data — including products, batches, purchase orders, retail/wholesale sale invoices, customer & supplier ledgers, financial accounts, and staff payroll — is stored locally on your computer inside your chosen installation directory (`database/database.sqlite`).
+   We do NOT upload, harvest, or sell your business, customer, or financial records to any external cloud server.
+
+2. HARDWARE FINGERPRINTING FOR LICENSE ENFORCEMENT
+   To bind your software license to this specific computer, the installer and application compute a deterministic, one-way cryptographic HMAC digest (`KRB-XXXX-XXXX-XXXX-XXXX`) from your operating system and motherboard/hardware identifiers. Raw hardware serial numbers never leave your computer.
+
+3. OPTIONAL OUTBOUND INTEGRATIONS
+   The Software includes optional communication and AI features that only transmit data when explicitly enabled by the Store Administrator in Settings:
+   - Built-in Local WhatsApp Agent (`@whiskeysockets/baileys`): Connects directly from your computer to WhatsApp servers using your linked WhatsApp device session to send invoices and payment reminders to your customers.
+   - Custom SMTP Email: Sends invoice PDFs and backup alerts directly through your configured SMTP email server.
+   - Cube Hybrid AI Assistant: When enabled with your Groq or Google Gemini API key, sends only the prompt context needed to answer your operational query.
+
+4. ADMINISTRATOR CREDENTIALS & ACCESS CONTROL
+   The Administrator email and password you create during this installation are stored locally in your SQLite database using strong bcrypt cryptographic hashing. You have full control over staff accounts, roles, and granular permissions.
+
+By checking "I have read and agree to the Karobar App Privacy Policy" below, you acknowledge and consent to these data handling practices.
+

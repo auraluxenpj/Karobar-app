@@ -1,0 +1,46 @@
+name: Build Windows .exe Installer (Karobar ERP v2)
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_version:
+        description: "Installer Version (e.g. 2.0.0)"
+        required: false
+        default: "2.0.0"
+
+jobs:
+  build-windows-exe:
+    name: Compile Karobar-ERP-Setup.exe (Win64)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.3 (with sodium, sqlite, gd, zip)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mbstring, openssl, pdo_sqlite, sqlite3, sodium, gd, zip, fileinfo, curl
+          coverage: none
+
+      - name: Setup Node.js 22 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install Production Composer Dependencies
+        run: composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+
+      - name: Build Windows Desktop Shell & Inno Setup .exe Installer
+        shell: pwsh
+        run: ./scripts/build-windows-exe.ps1
+
+      - name: Upload Karobar-ERP-Setup.exe Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Karobar-ERP-Setup-Windows-x64
+          path: dist/installer/*.exe
+          retention-days: 30
+

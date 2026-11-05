@@ -326,6 +326,21 @@ Route::get('/print/share-preview/{size}/{template}', function (string $size, str
 // (add any other Blade/PDF routes here)
 // Route::get('/reports/sale-detail/pdf', ...);
 
+// Legal pages (Terms of Service & Privacy Policy)
+Route::get('/terms-of-service', function () {
+    return view('legal.document', [
+        'type'  => 'terms',
+        'title' => 'Terms and Conditions (End-User License Agreement)',
+    ]);
+})->name('legal.terms');
+
+Route::get('/privacy-policy', function () {
+    return view('legal.document', [
+        'type'  => 'privacy',
+        'title' => 'Privacy Policy & Data Handling Agreement',
+    ]);
+})->name('legal.privacy');
+
 // --- React SPA catch-all LAST and excluding /print/* and /privacy-policy etc ---
 Route::view('/{path?}', 'index')
     ->where('path', '^(?!print/|privacy-policy|terms-of-service).*$');

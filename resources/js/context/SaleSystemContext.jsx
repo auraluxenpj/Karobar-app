@@ -8,6 +8,7 @@ import {
   useRef,
 } from "react";
 import axios from "axios";
+import { useAuth } from "./AuthContext.jsx";
 
 const SaleSystemCtx = createContext(null);
 
@@ -33,13 +34,19 @@ const FALLBACK_CONTEXT = {
   shopType: DEFAULT_SHOP_TYPE,
   isPharmacy: true,
   isGeneralStore: false,
+  isSetupCompleted: true,
   loading: false,
   refreshSaleSystem: noopRefresh,
 };
 
 export function SaleSystemProvider({ children }) {
+  const auth = useAuth();
+  const currentToken =
+    auth?.token || (typeof window !== "undefined" ? localStorage.getItem("token") : null);
+
   const [saleSystem, setSaleSystem] = useState(DEFAULT_SALE_SYSTEM);
   const [shopType, setShopType] = useState(DEFAULT_SHOP_TYPE);
+  const [isSetupCompleted, setIsSetupCompleted] = useState(true);
   const [loading, setLoading] = useState(true);
 
   // Concurrency / lifecycle guards:
@@ -61,14 +68,26 @@ export function SaleSystemProvider({ children }) {
       retryTimerRef.current = null;
     }
 
+    const activeToken =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!activeToken) {
+      setLoading(false);
+      return;
+    }
+
     const requestId = ++requestIdRef.current;
 
     try {
-      const { data } = await axios.get("/api/sale-system");
+      const { data } = await axios.get("/api/sale-system", {
+        headers: { Authorization: `Bearer ${activeToken}` },
+      });
       if (!mountedRef.current || requestId !== requestIdRef.current) return;
 
       setSaleSystem(data?.sale_system || DEFAULT_SALE_SYSTEM);
       setShopType(data?.shop_type || DEFAULT_SHOP_TYPE);
+      if (typeof data?.is_setup_completed === "boolean") {
+        setIsSetupCompleted(data.is_setup_completed);
+      }
       setLoading(false);
     } catch (error) {
       if (!mountedRef.current || requestId !== requestIdRef.current) return;
@@ -90,7 +109,12 @@ export function SaleSystemProvider({ children }) {
 
   useEffect(() => {
     mountedRef.current = true;
-    fetchSaleSystem();
+    if (currentToken) {
+      setLoading(true);
+      fetchSaleSystem();
+    } else {
+      setLoading(false);
+    }
 
     // Listen for settings changes to refresh sale system setting
     const handleSettingsChange = () => {
@@ -107,7 +131,7 @@ export function SaleSystemProvider({ children }) {
         retryTimerRef.current = null;
       }
     };
-  }, [fetchSaleSystem]);
+  }, [currentToken, fetchSaleSystem]);
 
   // Memoize the context value so consumers only re-render when the actual
   // state changes; the derived flags are computed inside the memo.
@@ -120,10 +144,11 @@ export function SaleSystemProvider({ children }) {
       shopType,
       isPharmacy: shopType === "pharmacy",
       isGeneralStore: shopType === "general_store",
+      isSetupCompleted,
       loading,
       refreshSaleSystem: fetchSaleSystem,
     }),
-    [saleSystem, shopType, loading, fetchSaleSystem]
+    [saleSystem, shopType, isSetupCompleted, loading, fetchSaleSystem]
   );
 
   return (

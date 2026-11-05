@@ -61,6 +61,11 @@ class Setting extends Model
         'cube_gemini_api_key',
         'cube_gemini_model',
         'cube_gemini_daily_limit',
+        'is_setup_completed',
+        'setup_completed_at',
+        'terms_accepted_at',
+        'privacy_accepted_at',
+        'legal_accepted_version',
     ];
 
     protected $casts = [
@@ -74,6 +79,10 @@ class Setting extends Model
         'cube_groq_daily_limit'   => 'integer',
         'cube_gemini_enabled'     => 'boolean',
         'cube_gemini_daily_limit' => 'integer',
+        'is_setup_completed'      => 'boolean',
+        'setup_completed_at'      => 'datetime',
+        'terms_accepted_at'       => 'datetime',
+        'privacy_accepted_at'     => 'datetime',
     ];
 
     protected $hidden = [

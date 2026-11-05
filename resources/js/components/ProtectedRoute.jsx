@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useLicense } from "../context/LicenseContext.jsx";
+import { useSaleSystem } from "../context/SaleSystemContext.jsx";
 import { usePermissions } from "../api/usePermissions.js";
 import PageSkeleton from "./PageSkeleton.jsx";
 import { saveLastVisitedPath } from "../utils/lastVisitedPage.js";
@@ -97,15 +98,20 @@ export default function ProtectedRoute({
   const token = localStorage.getItem("token");
   const location = useLocation();
   const { loading: licenseLoading, valid: licenseValid } = useLicense();
+  const { isSetupCompleted, loading: saleSystemLoading } = useSaleSystem();
   const { loading: permsLoading, has } = usePermissions();
 
   useEffect(() => {
-    saveLastVisitedPath(location);
+    if (location.pathname !== "/setup") {
+      saveLastVisitedPath(location);
+    }
   }, [location.pathname, location.search, location.hash]);
 
   // Check authentication first
   if (!token) {
-    saveLastVisitedPath(location);
+    if (location.pathname !== "/setup") {
+      saveLastVisitedPath(location);
+    }
     const fullPath = `${location.pathname}${location.search || ""}${location.hash || ""}`;
     return <Navigate to="/" state={{ from: fullPath }} replace />;
   }
@@ -143,6 +149,11 @@ export default function ProtectedRoute({
   // If we have an explicit license check result and it's invalid, redirect
   if (!licenseValid) {
     return <Navigate to="/activate" replace />;
+  }
+
+  // Redirect to the First-Login Genie Setup Wizard (/setup) if store onboarding has not been completed yet
+  if (!saleSystemLoading && isSetupCompleted === false && location.pathname !== "/setup") {
+    return <Navigate to="/setup" replace />;
   }
 
   return content;

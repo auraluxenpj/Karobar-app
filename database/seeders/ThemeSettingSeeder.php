@@ -37,7 +37,7 @@ class ThemeSettingSeeder extends Seeder
                 'is_active' => true,
             ]);
 
-            $this->command->info('Default theme created successfully.');
+            $this->command?->info('Default theme created successfully.');
         }
     }
 }

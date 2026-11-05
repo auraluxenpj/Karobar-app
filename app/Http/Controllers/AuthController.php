@@ -70,11 +70,26 @@ class AuthController extends Controller
             'remember_token_expires_at' => $expiresAt,
         ]);
 
+        $isSetupCompleted = true;
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('settings')) {
+                $setting = \App\Models\Setting::first();
+                if (\Illuminate\Support\Facades\Schema::hasColumn('settings', 'is_setup_completed')) {
+                    $isSetupCompleted = $setting ? (bool) $setting->is_setup_completed : false;
+                } else {
+                    $isSetupCompleted = (bool) (!empty($setting?->store_name) && $setting?->store_name !== 'Karobar App');
+                }
+            }
+        } catch (\Throwable) {
+            $isSetupCompleted = true;
+        }
+
         $response = [
-            'token' => $token,
-            'user'  => $user->load('roles'),
-            'expires_at' => $expiresAt->toIso8601String(),
-            'remember_me' => $rememberMe,
+            'token'              => $token,
+            'user'               => $user->load('roles'),
+            'expires_at'         => $expiresAt->toIso8601String(),
+            'remember_me'        => $rememberMe,
+            'is_setup_completed' => $isSetupCompleted,
         ];
 
         // If license was cleared due to machine change, inform the client

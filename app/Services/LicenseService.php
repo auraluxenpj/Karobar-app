@@ -219,9 +219,17 @@ class LicenseService
                 }
             }
         } elseif (PHP_OS_FAMILY === 'Windows') {
+            $winParts = [];
             $out = @shell_exec('reg query "HKLM\\SOFTWARE\\Microsoft\\Cryptography" /v MachineGuid 2>nul');
             if (is_string($out) && preg_match('/MachineGuid\s+REG_SZ\s+([^\r\n]+)/i', $out, $m)) {
-                $hwToken = 'win:' . trim($m[1]);
+                $winParts[] = trim($m[1]);
+            }
+            $hwOut = @shell_exec('reg query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\SystemInformation" /v ComputerHardwareId 2>nul');
+            if (is_string($hwOut) && preg_match('/ComputerHardwareId\s+REG_SZ\s+([^\r\n]+)/i', $hwOut, $mHw)) {
+                $winParts[] = trim($mHw[1]);
+            }
+            if (!empty($winParts)) {
+                $hwToken = 'win:' . implode(':', $winParts);
             }
         } elseif (PHP_OS_FAMILY === 'Linux') {
             foreach (['/etc/machine-id', '/var/lib/dbus/machine-id', '/sys/class/dmi/id/product_uuid'] as $file) {
@@ -246,11 +254,30 @@ class LicenseService
     }
 
     /**
+     * Sign a license payload array with a raw 64-byte Ed25519 secret key and return a canonical KRBL. key string.
+     */
+    public function signPayload(array $payload, string $secretKeyRaw): string
+    {
+        if (strlen($secretKeyRaw) !== SODIUM_CRYPTO_SIGN_SECRETKEYBYTES) {
+            throw new \InvalidArgumentException('Ed25519 secret key must be 64 raw bytes.');
+        }
+
+        $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if (!is_string($payloadJson) || $payloadJson === '') {
+            throw new \RuntimeException('Failed to encode license payload to JSON.');
+        }
+
+        $sig = sodium_crypto_sign_detached($payloadJson, $secretKeyRaw);
+
+        return self::KEY_PREFIX . self::b64uEncode($sig) . '.' . self::b64uEncode($payloadJson);
+    }
+
+    /**
      * Verify a raw license key string (signature, claims, monotonic clock, expiry, and pre-bound machine ID).
      *
      * @return array [bool valid, array|null payload, string|null reason]
      */
-    public function verifyString(string $licenseKey, ?string $machineId = null): array
+    public function verifyString(string $licenseKey, ?string $machineId = null, bool $requireMachineBinding = false): array
     {
         $normalized = $this->normalizeLicenseKey($licenseKey, false);
 
@@ -310,6 +337,10 @@ class LicenseService
             return [false, $payload, 'Expired'];
         }
 
+        if ($requireMachineBinding && empty($payload['machine'])) {
+            return [false, $payload, 'License key is not bound to a Machine ID'];
+        }
+
         // Always enforce signed machine binding if the license payload specifies a machine ID
         if (!empty($payload['machine'])) {
             $actualMachine = $machineId ?: $this->computeMachineId();
@@ -327,10 +358,10 @@ class LicenseService
      *
      * @return array [bool ok, array|null payload, string|null reason, License|null record]
      */
-    public function activateLicenseKey(string $licenseKey): array
+    public function activateLicenseKey(string $licenseKey, bool $requireMachineBinding = false): array
     {
         $machineId = $this->computeMachineId();
-        [$ok, $payload, $reason] = $this->verifyString($licenseKey, $machineId);
+        [$ok, $payload, $reason] = $this->verifyString($licenseKey, $machineId, $requireMachineBinding);
 
         if (!$ok || !is_array($payload)) {
             return [false, $payload, $reason ?? 'Invalid license', null];

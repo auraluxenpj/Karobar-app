@@ -120,6 +120,7 @@ const RolesIndex = registerLazy(() => import("../pages/roles/index.jsx"), ["/rol
 const CreateRole = registerLazy(() => import("../pages/roles/Create.jsx"), ["/roles/create"]);
 const EditRole = registerLazy(() => import("../pages/roles/Edit.jsx"));
 const ActivateLicense = registerLazy(() => import("../pages/ActivateLicense.jsx"), ["/activate"]);
+const SetupWizard = registerLazy(() => import("../pages/SetupWizard.jsx"), ["/setup"]);
 
 function RouteFallback() {
   return <PageSkeleton fullScreen />;
@@ -164,6 +165,16 @@ export default function AppRoutes() {
             <AuthGuard requireAuth={false}>
               <ResetPassword />
             </AuthGuard>
+          }
+        />
+
+        {/* First-Login Genie Setup Wizard (Fullscreen Protected Route) */}
+        <Route
+          path="/setup"
+          element={
+            <ProtectedRoute fullScreen shellOnly>
+              <SetupWizard />
+            </ProtectedRoute>
           }
         />
 

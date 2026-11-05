@@ -87,10 +87,15 @@ export default function Login() {
 
       if (!data.license_revoked) {
         // Check license status asynchronously in the background and send user directly
-        // to their last visited page (or /dashboard if none)
+        // to /setup on first-time login or to their last visited page (or /dashboard if none)
         refreshLicense();
-        const targetPath = getLastVisitedPath(location.state?.from);
-        navigate(targetPath, { replace: true });
+        window.dispatchEvent(new CustomEvent("settingsChanged"));
+        if (data.is_setup_completed === false) {
+          navigate("/setup", { replace: true });
+        } else {
+          const targetPath = getLastVisitedPath(location.state?.from);
+          navigate(targetPath, { replace: true });
+        }
       }
     } catch (err) {
       const msg =
