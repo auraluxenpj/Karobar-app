@@ -27,6 +27,7 @@ import ShareDocumentModal from "@/components/ShareDocumentModal.jsx";
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { usePermissions, Guard } from "@/api/usePermissions.js";
 import { useSaleSystem } from "@/context/SaleSystemContext.jsx";
+import { printUrlViaIframe } from "@/utils/printHelper.js";
 
 // Reusable components
 import {
@@ -492,17 +493,24 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
     ].join(",");
 
     const w = window.open("about:blank", "salePrintWin", features);
-    if (!w) {
-      toast.error("Popup blocked. Please allow popups to print.");
-      return;
-    }
-
-    try { w.opener = null; } catch {}
 
     try {
       const { data } = await axios.get(`/api/sale-invoices/${id}/print-url`);
       const url = data.url;
-      w.location.replace(url);
+      if (!w) {
+        await printUrlViaIframe(url);
+        return;
+      }
+
+      try {
+        w.location.replace(url);
+      } catch {
+        const w2 = window.open(url, "salePrintWin", features);
+        if (!w2) {
+          await printUrlViaIframe(url);
+          return;
+        }
+      }
 
       w.onload = () => {
         try { w.focus(); w.print(); } catch {}
@@ -517,7 +525,7 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
         if (w.closed) clearInterval(timer);
       }, 400);
     } catch (err) {
-      try { w.close(); } catch {}
+      try { if (w) w.close(); } catch {}
       toast.error(err?.response?.data?.message || "Failed to generate print link.");
     }
   };

@@ -76,7 +76,7 @@
   .thankyou { font-size:14px; font-style:italic; margin-top:15px; }
 </style>
 </head>
-<body>
+<body onload="window.print()">
 <div class="print-actions">
   <button onclick="window.print()">PRINT</button>
 </div>

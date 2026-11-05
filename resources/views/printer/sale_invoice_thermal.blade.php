@@ -105,7 +105,7 @@
   .foot { margin-top:6px; text-align:center; }
 </style>
 </head>
-<body>
+<body onload="window.print()">
 <div class="print-actions">
   <button onclick="window.print()">Print</button>
 </div>

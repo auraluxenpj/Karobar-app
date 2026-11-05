@@ -74,7 +74,7 @@
   .thankyou { text-align:center; margin-top:15px; font-size:12px; font-style:italic; }
 </style>
 </head>
-<body>
+<body onload="window.print()">
 <div class="print-actions">
   <button onclick="window.print()">Print</button>
 </div>

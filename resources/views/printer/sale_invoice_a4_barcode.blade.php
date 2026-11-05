@@ -98,7 +98,7 @@
   .powered { font-size:9px; color:#adb5bd; margin-top:5px; }
 </style>
 </head>
-<body>
+<body onload="window.print()">
 <div class="print-actions">
   <button onclick="window.print()">Print Invoice</button>
 </div>

@@ -73,7 +73,7 @@
   .foot { margin-top:6px; text-align:center; font-size:8px; }
 </style>
 </head>
-<body>
+<body onload="window.print()">
 <div class="print-actions">
   <button onclick="window.print()">Print</button>
 </div>

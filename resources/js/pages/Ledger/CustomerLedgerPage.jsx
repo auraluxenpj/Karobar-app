@@ -9,6 +9,7 @@ import ShareDocumentModal from "@/components/ShareDocumentModal.jsx";
 import { usePermissions, Guard } from "@/api/usePermissions.js";
 import { useTheme } from "@/context/ThemeContext.jsx";
 import { getThemeButtonClasses } from "@/utils/buttonStyles";
+import { printUrlViaIframe } from "@/utils/printHelper.js";
 
 // 🧊 glass primitives
 import { GlassCard, GlassSectionHeader, GlassInput } from "@/components/Glass.jsx";
@@ -659,8 +660,6 @@ const [customers, setCustomers] = useState([]);
     if (!can.view) return toast.error("You don't have permission to print.");
     if (!customerId) return toast.error("Select a customer first");
     const w = window.open("about:blank", "_blank");
-    if (!w) return toast.error("Popup blocked. Please allow popups to print.");
-    try { w.opener = null; } catch {}
     try {
       const { data } = await axios.get("/api/customer-ledger/print-url", {
         params: {
@@ -670,9 +669,13 @@ const [customers, setCustomers] = useState([]);
           to: toDate || undefined,
         },
       });
+      if (!w) {
+        await printUrlViaIframe(data.url);
+        return;
+      }
       w.location.replace(data.url);
     } catch (err) {
-      try { w.close(); } catch {}
+      try { if (w) w.close(); } catch {}
       toast.error(err?.response?.data?.message || "Failed to generate print link.");
     }
   };

@@ -502,6 +502,51 @@ function createApplicationMenu() {
   }
 }
 
+function isInternalOrPrintPopupUrl(rawUrl) {
+  const u = String(rawUrl || "").trim();
+  if (
+    !u ||
+    u === "about:blank" ||
+    u.startsWith("about:") ||
+    u.startsWith("blob:") ||
+    u.startsWith("data:") ||
+    u.startsWith("/") ||
+    u.startsWith("http://127.0.0.1") ||
+    u.startsWith("http://localhost")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function configurePopupAndPrintHandler(contents) {
+  if (!contents || typeof contents.setWindowOpenHandler !== "function") return;
+
+  contents.setWindowOpenHandler(({ url }) => {
+    if (isInternalOrPrintPopupUrl(url)) {
+      return {
+        action: "allow",
+        overrideBrowserWindowOptions: {
+          width: 980,
+          height: 760,
+          autoHideMenuBar: true,
+          title: "Karobar-App — Print / Document Preview",
+          icon: resolveIconPath(),
+          webPreferences: {
+            contextIsolation: true,
+            nodeIntegration: false,
+          },
+        },
+      };
+    }
+
+    if (/^(https?:|mailto:|whatsapp:|tel:)/i.test(url)) {
+      shell.openExternal(url);
+    }
+    return { action: "deny" };
+  });
+}
+
 function createMainWindow() {
   const iconPath = resolveIconPath();
   mainWindow = new BrowserWindow({
@@ -522,22 +567,8 @@ function createMainWindow() {
 
   createApplicationMenu();
 
-  // Handle print preview windows and external links gracefully
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith(`http://127.0.0.1:${activePort}`)) {
-      return {
-        action: "allow",
-        overrideBrowserWindowOptions: {
-          width: 980,
-          height: 760,
-          autoHideMenuBar: true,
-          title: "Karobar-App — Print / Document Preview",
-        },
-      };
-    }
-    shell.openExternal(url);
-    return { action: "deny" };
-  });
+  // Allow print popups (about:blank, blob:, local print routes) and open external web links in default browser
+  configurePopupAndPrintHandler(mainWindow.webContents);
 
   mainWindow.loadURL(`http://127.0.0.1:${activePort}/`);
 
@@ -610,6 +641,11 @@ function createSystemTray() {
     // Ignore tray icon errors if format is unsupported on platform
   }
 }
+
+// Ensure sub-window iframes and child windows also allow print popups
+app.on("web-contents-created", (_event, contents) => {
+  configurePopupAndPrintHandler(contents);
+});
 
 // Single-Instance Lock: prevent multiple conflicting instances on the same PC
 const gotSingleLock = app.requestSingleInstanceLock();

@@ -83,7 +83,7 @@
   .powered { text-align:center; margin-top:8px; font-size:9px; color:#9ca3af; }
 </style>
 </head>
-<body>
+<body onload="window.print()">
 <div class="print-actions">
   <button onclick="window.print()">Print Invoice</button>
 </div>

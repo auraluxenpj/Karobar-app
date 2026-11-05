@@ -18,6 +18,7 @@ import {
 import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { useTheme } from "@/context/ThemeContext.jsx";
 import { usePermissions } from "@/api/usePermissions.js";
+import { printHtmlViaIframe } from "@/utils/printHelper.js";
 
 const TRANSACTION_TYPE_OPTIONS = [
   { value: "cash_in", label: "Cash In (Add Money / Float)" },
@@ -189,10 +190,6 @@ export default function CashDrawerModal({ isOpen, onClose, onSessionUpdated }) {
     const diff = Number(session.difference || 0);
 
     const win = window.open("", "_blank", "width=800,height=900");
-    if (!win) {
-      alert("Please allow popups to print shift report.");
-      return;
-    }
 
     const orderedTxns = sortAndAttachRunningBalance(transactions || [], session.opening_balance);
     const rowsHtml = orderedTxns.map((tx, idx) => {
@@ -312,9 +309,13 @@ export default function CashDrawerModal({ isOpen, onClose, onSessionUpdated }) {
       </html>
     `;
 
-    win.document.open();
-    win.document.write(htmlContent);
-    win.document.close();
+    if (win) {
+      win.document.open();
+      win.document.write(htmlContent);
+      win.document.close();
+    } else {
+      printHtmlViaIframe(htmlContent);
+    }
   };
 
   useEffect(() => {

@@ -22,6 +22,7 @@ import { useTheme } from "@/context/ThemeContext.jsx";
 import { getThemeButtonClasses } from "@/utils/buttonStyles";
 import BrandSearch from "../components/BrandSearch.jsx";
 import SupplierSearch from "../components/SupplierSearch.jsx";
+import { printHtmlViaIframe } from "@/utils/printHelper.js";
 
 import { arrangePurchaseOrderRows, purchaseOrderArrangements } from "@/utils/purchaseOrderArrangement";
 
@@ -461,7 +462,10 @@ ${isA4 ? `
     ].join(",");
 
     const w = window.open("", "poPrintWin", features);
-    if (!w) return toast.error("Popup blocked. Please allow popups to print.");
+    if (!w) {
+      printHtmlViaIframe(html);
+      return;
+    }
 
     w.document.open();
     w.document.write(html);

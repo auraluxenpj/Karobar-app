@@ -17,6 +17,7 @@ import RecordPaymentModal from "@/components/RecordPaymentModal.jsx";
 import InvoiceDraftsModal from "@/components/InvoiceDraftsModal.jsx";
 import ShareDocumentModal from "@/components/ShareDocumentModal.jsx";
 import { useSaleSystem } from "@/context/SaleSystemContext.jsx";
+import { printUrlViaIframe } from "@/utils/printHelper.js";
 
 // Helper to determine text color based on background brightness
 const getContrastText = (hexColor) => {
@@ -334,12 +335,9 @@ export default function SaleInvoiceShow({ defaultSaleType = null }) {
 
     if (!w || w.closed) {
       w = window.open("about:blank", "salePrintWin", features);
-      if (!w) {
-        toast.error("Popup blocked. Please allow popups to print.");
-        return;
+      if (w) {
+        popupRef.current = w;
       }
-      try { w.opener = null; } catch {}
-      popupRef.current = w;
     } else {
       try { w.focus(); } catch {}
     }
@@ -348,15 +346,19 @@ export default function SaleInvoiceShow({ defaultSaleType = null }) {
       const { data } = await axios.get(`/api/sale-invoices/${id}/print-url`);
       const url = data.url;
 
+      if (!w) {
+        await printUrlViaIframe(url);
+        return;
+      }
+
       try {
         w.location.replace(url);
       } catch {
         const w2 = window.open(url, "salePrintWin", features);
         if (!w2) {
-          toast.error("Popup blocked. Please allow popups to print.");
+          await printUrlViaIframe(url);
           return;
         }
-        try { w2.opener = null; } catch {}
         popupRef.current = w2;
         w = w2;
       }
@@ -376,7 +378,7 @@ export default function SaleInvoiceShow({ defaultSaleType = null }) {
         if (w.closed) clearInterval(timer);
       }, 400);
     } catch (err) {
-      try { w.close(); } catch {}
+      try { if (w) w.close(); } catch {}
       toast.error(err?.response?.data?.message || "Failed to generate print link.");
     }
   };

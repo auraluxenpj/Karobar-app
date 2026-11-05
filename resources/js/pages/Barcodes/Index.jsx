@@ -10,6 +10,7 @@ import { usePermissions } from "@/api/usePermissions";
 import { getThemeButtonClasses } from "@/utils/buttonStyles";
 import { BarcodeSvg, generateBarcodeSvgString } from "@/utils/barcode";
 import ProductSearchInput from "@/components/ProductSearchInput.jsx";
+import { printHtmlViaIframe } from "@/utils/printHelper.js";
 import {
   QrCodeIcon,
   PrinterIcon,
@@ -1043,13 +1044,8 @@ export default function BarcodeIndex() {
         storeInfo.store_name ||
         "Karobar Store";
 
-      // Open print window
+      // Open print window (falls back to hidden print iframe if popups are blocked)
       const printWindow = window.open("", "_blank", "width=850,height=700");
-      if (!printWindow) {
-        toast.error("Popup blocked! Please allow popups for this site to print labels.");
-        setIsPrinting(false);
-        return;
-      }
 
       // Generate HTML content for printing
       const isRoll = layout.paper_type === "roll";
@@ -1308,9 +1304,13 @@ export default function BarcodeIndex() {
         </html>
       `;
 
-      printWindow.document.open();
-      printWindow.document.write(fullHtml);
-      printWindow.document.close();
+      if (printWindow) {
+        printWindow.document.open();
+        printWindow.document.write(fullHtml);
+        printWindow.document.close();
+      } else {
+        printHtmlViaIframe(fullHtml);
+      }
     } catch (err) {
       toast.error("Failed to generate print layout");
     } finally {

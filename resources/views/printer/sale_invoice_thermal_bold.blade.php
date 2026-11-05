@@ -75,7 +75,7 @@
   .foot { margin-top:12px; text-align:center; font-size:10px; text-transform:uppercase; }
 </style>
 </head>
-<body>
+<body onload="window.print()">
 <div class="print-actions">
   <button onclick="window.print()">PRINT</button>
 </div>

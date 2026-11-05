@@ -89,7 +89,7 @@
   .foot { margin-top:10px; text-align:center; font-size:8px; color:#666; border-top:1px dotted #999; padding-top:6px; }
 </style>
 </head>
-<body>
+<body onload="window.print()">
 <div class="print-actions">
   <button onclick="window.print()">Print</button>
 </div>
