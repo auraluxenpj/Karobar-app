@@ -762,7 +762,9 @@ export default function DashboardLayout({ children }) {
           onCloseAll={closeAllSubWindows}
         />
 
-        <AppUpdateNotification />
+        {typeof window !== "undefined" && window.karobarDesktop?.isDesktop && (
+          <AppUpdateNotification />
+        )}
         <SessionExpiryModal />
       </div>
     </div>
