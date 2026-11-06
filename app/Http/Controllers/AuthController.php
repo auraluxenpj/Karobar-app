@@ -216,6 +216,7 @@ public function extendSession(Request $request): JsonResponse
 
     if ($accessToken) {
         $accessToken->forceFill([
+            'created_at' => now(),
             'expires_at' => $expiresAt,
         ])->save();
     }
