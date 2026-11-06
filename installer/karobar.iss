@@ -45,7 +45,7 @@ DefaultDirName={autopf}\Karobar-App
 DefaultGroupName={#MyAppName}
 DisableDirPage=no
 AllowNoIcons=yes
-CloseApplications=yes
+CloseApplications=force
 RestartApplications=no
 LicenseFile=legal\TermsAndConditions.txt
 OutputDir=..\dist\installer
@@ -55,7 +55,7 @@ Compression=lzma2/fast
 SolidCompression=no
 WizardStyle=modern
 PrivilegesRequired=admin
-PrivilegesRequiredOverridesAllowed=dialog
+PrivilegesRequiredOverridesAllowed=dialog commandline
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\icon.ico
@@ -71,6 +71,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
 
 [Dirs]
+Name: "{app}"; Permissions: users-modify
+Name: "{app}\app"; Permissions: users-modify
+Name: "{app}\resources"; Permissions: users-modify
 Name: "{app}\app\database"; Permissions: users-modify
 Name: "{app}\app\storage"; Permissions: users-modify
 Name: "{app}\app\storage\app"; Permissions: users-modify
@@ -168,7 +171,7 @@ var
 
 function IsCliUpgradeMode(): Boolean;
 begin
-  Result := (ExpandConstant('{param:UPGRADE|0}') = '1');
+  Result := WizardSilent() or (ExpandConstant('{param:UPGRADE|0}') = '1');
 end;
 
 function ExistingInstallDbPath(): String;
@@ -541,6 +544,14 @@ begin
   CreateDatabaseImportPage();
   CreateLicenseBindingPage();
   CreateAdminAccountPage();
+
+  if IsCliUpgradeMode() then
+  begin
+    PrivacyAcceptCheck.Checked := True;
+    KeepExistingDbRadio.Checked := True;
+    FreshDbRadio.Checked := False;
+    WriteAdminInitJson();
+  end;
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;

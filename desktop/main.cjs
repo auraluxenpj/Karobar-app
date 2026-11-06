@@ -1045,6 +1045,12 @@ ipcMain.handle("karobar:download-and-install-update", async (_event, payload = {
       // Best-effort backup; karobar:install --upgrade-only also creates pre-upgrade-YYYYmmdd.sqlite
     }
 
+    // Verify the downloaded installer file exists and is a complete binary (> 5 MB)
+    const stat = fs.existsSync(tempInstallerPath) ? fs.statSync(tempInstallerPath) : null;
+    if (!stat || stat.size < 5 * 1024 * 1024) {
+      throw new Error("Downloaded update file is incomplete. Please try again.");
+    }
+
     sendUpdateProgress({
       status: "installing",
       percent: 100,
@@ -1053,29 +1059,75 @@ ipcMain.handle("karobar:download-and-install-update", async (_event, payload = {
 
     if (process.platform === "win32") {
       const installDir = path.dirname(process.execPath);
+      const appExePath = process.execPath;
+      const updateBatPath = path.join(os.tmpdir(), "karobar-apply-update.bat");
+
+      // Write elevated updater batch script that waits for Karobar-App.exe & php.exe to exit,
+      // runs the Inno Setup installer in /SILENT /UPGRADE=1 mode (showing progress bar),
+      // runs karobar:install --upgrade-only, and relaunches Karobar-App.exe
+      const batLines = [
+        "@echo off",
+        `title Karobar-App Software Updater (v${versionLabel})`,
+        "echo ==========================================================================",
+        `echo   Karobar-App v${versionLabel} — Zero-Data-Loss Automatic Software Update`,
+        "echo   Closing running Karobar-App processes before applying update...",
+        "echo ==========================================================================",
+        "timeout /t 2 /nobreak >nul",
+        'taskkill /F /IM "Karobar-App.exe" >nul 2>&1',
+        'taskkill /F /IM "KarobarERP.exe" >nul 2>&1',
+        "timeout /t 1 /nobreak >nul",
+        "echo.",
+        `echo [1/3] Installing Karobar-App v${versionLabel} update (100%% database & license preserved)...`,
+        `"${tempInstallerPath}" /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /UPGRADE=1 "/DIR=${installDir}"`,
+        "echo.",
+        "echo [2/3] Applying database migrations and permission sync...",
+        `if exist "${installDir}\\app\\runtime\\php\\php.exe" (`,
+        `  pushd "${installDir}\\app"`,
+        `  "${installDir}\\app\\runtime\\php\\php.exe" artisan karobar:install --upgrade-only --cleanup-temp >nul 2>&1`,
+        "  popd",
+        ")",
+        "echo.",
+        "echo [3/3] Relaunching Karobar-App...",
+        'tasklist /FI "IMAGENAME eq Karobar-App.exe" 2>NUL | find /I /N "Karobar-App.exe">NUL',
+        'if "%ERRORLEVEL%" neq "0" (',
+        `  if exist "${appExePath}" (`,
+        `    start "" "${appExePath}"`,
+        `  ) else if exist "${installDir}\\Karobar-App.exe" (`,
+        `    start "" "${installDir}\\Karobar-App.exe"`,
+        "  )",
+        ")",
+        "exit /b 0",
+      ];
+      fs.writeFileSync(updateBatPath, batLines.join("\r\n"), "utf8");
+
       // Stop PHP server & scheduler so no files inside the installation directory are locked
       isQuitting = true;
       stopBackendServices();
 
-      const installerArgs = [
-        "/VERYSILENT",
-        "/SUPPRESSMSGBOXES",
-        "/NORESTART",
-        "/CLOSEAPPLICATIONS",
-        "/UPGRADE=1",
-        `/DIR=${installDir}`,
-      ];
+      // Use PowerShell Start-Process -Verb RunAs (ShellExecuteEx 'runas') because Windows CreateProcessW
+      // fails with ERROR_ELEVATION_REQUIRED (740) when spawning a requireAdministrator installer directly
+      const escapedBat = updateBatPath.replace(/'/g, "''");
+      const escapedExe = tempInstallerPath.replace(/'/g, "''");
+      const escapedDir = installDir.replace(/'/g, "''");
+      const psScript = `try { Start-Process -FilePath '${escapedBat}' -Verb RunAs -WindowStyle Normal -ErrorAction Stop } catch { Start-Process -FilePath '${escapedExe}' -ArgumentList '/SILENT','/SUPPRESSMSGBOXES','/NORESTART','/CLOSEAPPLICATIONS','/FORCECLOSEAPPLICATIONS','/UPGRADE=1','/DIR=${escapedDir}' }`;
 
-      const updaterProc = spawn(tempInstallerPath, installerArgs, {
-        detached: true,
-        stdio: "ignore",
-        windowsHide: false,
+      const updaterProc = spawn(
+        "powershell.exe",
+        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psScript],
+        {
+          detached: true,
+          stdio: "ignore",
+          windowsHide: true,
+        }
+      );
+      updaterProc.on("error", () => {
+        shell.openPath(tempInstallerPath);
       });
       updaterProc.unref();
 
       setTimeout(() => {
         app.quit();
-      }, 600);
+      }, 900);
 
       return { ok: true, installing: true };
     } else {
