@@ -94,7 +94,7 @@ export default function ProductsIndex() {
   const controllerRef = useRef(null);
   const debounceRef = useRef(null);
 
-  // 🔒 permissions
+  // permissions
   const { loading: permsLoading, canFor, has } = usePermissions();
   const can = useMemo(
     () => ({
@@ -106,7 +106,7 @@ export default function ProductsIndex() {
     [canFor, permsLoading, has]
   );
 
-  // 🎨 Dynamic button palette using theme colors
+  // Dynamic button palette using theme colors
   // Get dark mode state and theme colors
   const { isDark, theme } = useTheme();
 

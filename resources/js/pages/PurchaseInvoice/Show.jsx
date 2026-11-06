@@ -146,7 +146,7 @@ export default function PurchaseInvoiceShow() {
   const btnDanger = getButtonClasses.danger;
   const btnGlass = getButtonClasses.glass;
 
-  // 🔒 permissions
+  // permissions
   const { loading: permsLoading, canFor } = usePermissions?.() || {};
   const can = useMemo(
     () =>

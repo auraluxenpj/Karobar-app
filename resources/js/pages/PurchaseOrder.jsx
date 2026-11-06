@@ -87,7 +87,7 @@ export default function PurchaseOrder() {
   const navigate = useNavigate();
   const today = new Date().toISOString().split("T")[0];
 
-  // 🔒 permissions (support both has() and canFor())
+  // permissions (support both has() and canFor())
   const { loading: permsLoading, has, canFor } = usePermissions?.() || {};
   const canView =
     typeof has === "function"

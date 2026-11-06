@@ -100,7 +100,7 @@ export default function StockAdjustmentsIndex() {
   // AbortController for fetches
   const controllerRef = useRef(null);
 
-  // 🔒 permissions
+  // permissions
   const { loading: permsLoading, canFor } = usePermissions();
   const can = useMemo(
     () =>

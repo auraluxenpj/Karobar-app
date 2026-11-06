@@ -117,7 +117,7 @@ export default function CostOfSaleDetailReport() {
       setData(responseData);
 
       if (!responseData.invoices?.length) {
-        toast("No data found for selected filters.", { icon: "ℹ️" });
+        toast("No data found for selected filters.");
       }
     } catch (err) {
       console.error(err);

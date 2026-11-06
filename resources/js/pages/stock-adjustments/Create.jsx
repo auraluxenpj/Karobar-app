@@ -8,7 +8,7 @@ import { usePermissions } from "@/api/usePermissions.js";
 export default function CreateStockAdjustment(){
   const navigate = useNavigate();
 
-  // 🔒 permissions
+  // permissions
   const { loading: permsLoading, canFor } = usePermissions();
   const can = useMemo(
     () => (typeof canFor === "function" ? canFor("stock-adjustment") : {

@@ -261,7 +261,7 @@ class PurchaseOrderController extends Controller
     {
         $this->authorize('generate', PurchaseOrderForecast::class);
 
-        // ✅ added optional knobs (packs)
+        // added optional knobs (packs)
         $data = $request->validate([
             'date_from'      => 'required|date',
             'date_to'        => 'required|date|after_or_equal:date_from',

@@ -1220,14 +1220,14 @@ class CubeKnowledgeRetriever
             'answer_en' => "I do not have enough verified documentation in the Karobar-App knowledge base for **\"{$question}\"**.\n\n"
                 ."Please clarify which Karobar-App screen or workflow you are working on.\n\n"
                 ."**Your Current Screen ({$screenTitleEn} — `{$screenRoute}`):**\n{$summaryEn}\n\n"
-                ."💡 **Examples of questions I can guide you through:**\n"
+                ."**Examples of questions I can guide you through:**\n"
                 ."• *\"How to create a Purchase Order or Purchase Invoice\"*\n"
                 ."• *\"How to sell loose tablets or hold a bill on POS\"*\n"
                 ."• *\"How to record Customer Udhar or Supplier Payment\"*",
             'answer_ur' => "کاروبار ایپ کی مستند گائیڈ میں آپ کے سوال **\"{$question}\"** کے بارے میں کافی تصدیق شدہ معلومات موجود نہیں ہیں۔\n\n"
                 ."براہِ کرم وضاحت کریں کہ آپ کس اسکرین یا فیچر کے بارے میں جاننا چاہتے ہیں۔\n\n"
                 ."**آپ کی موجودہ اسکرین ({$screenTitleUr} — `{$screenRoute}`):**\n{$summaryUr}\n\n"
-                ."💡 **آپ یہ سوالات پوچھ سکتے ہیں:**\n"
+                ."**آپ یہ سوالات پوچھ سکتے ہیں:**\n"
                 ."• *\"پرچیز آرڈر یا نیا اسٹاک کیسے ڈالیں\"*\n"
                 ."• *\"کھلی گولیاں کیسے بیچیں یا بل ہولڈ کیسے کریں\"*\n"
                 ."• *\"گاہک کا ادھار کھاتہ یا سپلائر پیمنٹ کیسے درج کریں\"*",

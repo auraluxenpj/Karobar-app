@@ -151,7 +151,7 @@ export default function UserForm({ onSubmit, initial, submitting }) {
     // friendly headings
     const map = {
       barcode: "Barcode Studio & Generator",
-      "barcode-pos": "⚡ Barcode POS",
+      "barcode-pos": "Barcode POS",
       "batch-expiry": "Batch Expiry & Tracking",
       "sale-invoice": "Sale Invoice",
       "purchase-invoice": "Purchase Invoice",

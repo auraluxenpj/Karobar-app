@@ -149,7 +149,7 @@ export default function SaleDetailReport() {
         ? res.data.data
         : [];
       setData(rows);
-      if (!rows.length) toast("No data found for selected range.", { icon: "ℹ️" });
+      if (!rows.length) toast("No data found for selected range.");
     } catch (err) {
       console.error(err);
       toast.error("Failed to fetch Sale Detail report");

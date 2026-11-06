@@ -13,7 +13,7 @@ import {
   ShieldCheckIcon,
 } from "@heroicons/react/24/solid";
 
-// 🔒 permissions
+// permissions
 import { usePermissions, Guard } from "@/api/usePermissions.js";
 
 // Reusable components
@@ -50,7 +50,7 @@ export default function RolesIndex() {
   const debounceRef = useRef(null);
   const navigate = useNavigate();
 
-  // 🔒 permissions for 'role'
+  // permissions for 'role'
   const { loading: permsLoading, canFor } = usePermissions();
   const can = useMemo(
     () =>
@@ -60,7 +60,7 @@ export default function RolesIndex() {
     [canFor]
   );
 
-  // 🎨 theme accent used for the primary action and the active page chip
+  // theme accent used for the primary action and the active page chip
   const { theme } = useTheme();
   const primaryColor = theme?.primary_color || '#3b82f6';
   const primaryTextColor = getContrastText(primaryColor);

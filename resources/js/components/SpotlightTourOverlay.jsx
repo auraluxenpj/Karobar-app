@@ -353,7 +353,6 @@ export function findBestTourTargetElement(step, explicitSelector = null) {
 function describeControlType(el) {
   if (!el) {
     return {
-      icon: "🧭",
       en: "Screen Workspace",
       ur: "اسکرین کا حصہ",
       canTriggerClick: false,
@@ -369,7 +368,6 @@ function describeControlType(el) {
       (el.getAttribute?.("placeholder") || "").toLowerCase().includes("search")
     ) {
       return {
-        icon: "🔍",
         en: "Live Search & Scanner Input",
         ur: "لائیو سرچ اور اسکینر باکس",
         canTriggerClick: false,
@@ -377,7 +375,6 @@ function describeControlType(el) {
       };
     }
     return {
-      icon: "⌨️",
       en: "Interactive Input Field",
       ur: "انٹرایکٹو ان پٹ فیلڈ",
       canTriggerClick: false,
@@ -387,7 +384,6 @@ function describeControlType(el) {
 
   if (tag === "select" || el.classList?.contains("react-select-container")) {
     return {
-      icon: "📂",
       en: "Interactive Dropdown Selector",
       ur: "ڈراپ ڈاؤن سلیکٹر",
       canTriggerClick: false,
@@ -402,7 +398,6 @@ function describeControlType(el) {
     el.getAttribute?.("role") === "tab"
   ) {
     return {
-      icon: "⚡",
       en: "Interactive Action Button",
       ur: "انٹرایکٹو ایکشن بٹن",
       canTriggerClick: true,
@@ -417,7 +412,6 @@ function describeControlType(el) {
     el.querySelector?.("table")
   ) {
     return {
-      icon: "📋",
       en: "Interactive Data Table",
       ur: "انٹرایکٹو ڈیٹا ٹیبل",
       canTriggerClick: false,
@@ -427,7 +421,6 @@ function describeControlType(el) {
 
   if (el.querySelector?.("input:not([type='hidden']), select, textarea")) {
     return {
-      icon: "🔍",
       en: "Interactive Filter & Input Panel",
       ur: "فلٹر اور ان پٹ سیکشن",
       canTriggerClick: false,
@@ -436,7 +429,6 @@ function describeControlType(el) {
   }
 
   return {
-    icon: "🎯",
     en: "Highlighted Screen Section",
     ur: "نمایاں کردہ اسکرین سیکشن",
     canTriggerClick: false,
@@ -684,11 +676,11 @@ function buildRetailSaleInvoiceFormSteps(container, currentPath) {
         ur: "ٹاپ کمانڈ بار: نقد (Debit) بمقابلہ ادھار (Credit)، ڈرافٹس اور POS",
       },
       instruction: {
-        en: "Start here: toggle between Debit (Cash — full payment auto-received) and Credit (Udhar — posts to Customer Ledger, shortcut Alt+T). Your invoice auto-saves as you type—press Alt+H anytime to hold/recall drafts, switch to '⚡ Barcode POS', or press Alt+S to Create/Save.",
+        en: "Start here: toggle between Debit (Cash — full payment auto-received) and Credit (Udhar — posts to Customer Ledger, shortcut Alt+T). Your invoice auto-saves as you type—press Alt+H anytime to hold/recall drafts, switch to 'Barcode POS', or press Alt+S to Create/Save.",
         ur: "یہاں سے بل کی قسم منتخب کریں: نقد فروخت کے لیے Debit یا کھاتے میں ادھار لکھنے کے لیے Credit (شارٹ کٹ Alt+T)۔ بل ٹائپ کرتے وقت خودکار ڈرافٹ محفوظ ہوتا رہتا ہے (ہولڈ بل دیکھنے کے لیے Alt+H اور بل محفوظ کرنے کے لیے Alt+S دبائیں)۔",
       },
       observedInstruction: {
-        en: "Start here: toggle between Debit (Cash — full payment auto-received) and Credit (Udhar — posts to Customer Ledger, shortcut Alt+T). Your invoice auto-saves as you type—press Alt+H anytime to hold/recall drafts, switch to '⚡ Barcode POS', or press Alt+S to Create/Save.",
+        en: "Start here: toggle between Debit (Cash — full payment auto-received) and Credit (Udhar — posts to Customer Ledger, shortcut Alt+T). Your invoice auto-saves as you type—press Alt+H anytime to hold/recall drafts, switch to 'Barcode POS', or press Alt+S to Create/Save.",
         ur: "یہاں سے بل کی قسم منتخب کریں: نقد فروخت کے لیے Debit یا کھاتے میں ادھار لکھنے کے لیے Credit (شارٹ کٹ Alt+T)۔ بل ٹائپ کرتے وقت خودکار ڈرافٹ محفوظ ہوتا رہتا ہے (ہولڈ بل دیکھنے کے لیے Alt+H اور بل محفوظ کرنے کے لیے Alt+S دبائیں)۔",
       },
       checkpoint: {
@@ -1118,11 +1110,11 @@ function buildPurchaseInvoiceFormSteps(container, currentPath) {
         ur: "پرچیز سمری فوٹر: بل ڈسکاؤنٹ/ٹیکس، پیمنٹ اکاؤنٹ اور محفوظ کرنا (Alt+S)",
       },
       instruction: {
-        en: "In Row 1 of the footer, enter any flat bill-level 'Disc %' / 'Discount' or 'Tax %' / 'Tax' (WHT/GST) and confirm 'Total Amount'. In Row 2, choose the Payment Method & Account (Cash, Bank, Card, Wallet), enter 'Total Paid' (click 🔗 to auto-match full Total Amount in Debit mode, or enter 0/partial in Credit mode), and click 'Save Purchase Invoice' (Alt+S).",
+        en: "In Row 1 of the footer, enter any flat bill-level 'Disc %' / 'Discount' or 'Tax %' / 'Tax' (WHT/GST) and confirm 'Total Amount'. In Row 2, choose the Payment Method & Account (Cash, Bank, Card, Wallet), enter 'Total Paid' (click the Relink icon to auto-match full Total Amount in Debit mode, or enter 0/partial in Credit mode), and click 'Save Purchase Invoice' (Alt+S).",
         ur: "فوٹر کی پہلی قطار میں بل کا مجموعی ڈسکاؤنٹ یا ودہولڈنگ ٹیکس ('Tax %') درج کریں اور 'Total Amount' چیک کریں۔ دوسری قطار میں پیمنٹ اکاؤنٹ منتخب کریں، ادا شدہ رقم ('Total Paid') لکھیں (ادھار بل میں بقایا رقم سپلائر کھاتے میں چلی جائے گی) اور 'Save Purchase Invoice' (Alt+S) پر کلک کریں۔",
       },
       observedInstruction: {
-        en: "In Row 1 of the footer, enter any flat bill-level 'Disc %' / 'Discount' or 'Tax %' / 'Tax' (WHT/GST) and confirm 'Total Amount'. In Row 2, choose the Payment Method & Account (Cash, Bank, Card, Wallet), enter 'Total Paid' (click 🔗 to auto-match full Total Amount in Debit mode, or enter 0/partial in Credit mode), and click 'Save Purchase Invoice' (Alt+S).",
+        en: "In Row 1 of the footer, enter any flat bill-level 'Disc %' / 'Discount' or 'Tax %' / 'Tax' (WHT/GST) and confirm 'Total Amount'. In Row 2, choose the Payment Method & Account (Cash, Bank, Card, Wallet), enter 'Total Paid' (click the Relink icon to auto-match full Total Amount in Debit mode, or enter 0/partial in Credit mode), and click 'Save Purchase Invoice' (Alt+S).",
         ur: "فوٹر کی پہلی قطار میں بل کا مجموعی ڈسکاؤنٹ یا ودہولڈنگ ٹیکس ('Tax %') درج کریں اور 'Total Amount' چیک کریں۔ دوسری قطار میں پیمنٹ اکاؤنٹ منتخب کریں، ادا شدہ رقم ('Total Paid') لکھیں (ادھار بل میں بقایا رقم سپلائر کھاتے میں چلی جائے گی) اور 'Save Purchase Invoice' (Alt+S) پر کلک کریں۔",
       },
       checkpoint: {
@@ -2831,7 +2823,6 @@ export default function SpotlightTourOverlay({
   const [actionCompleted, setActionCompleted] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(false);
   const [controlMeta, setControlMeta] = useState({
-    icon: "🎯",
     en: "Screen Section",
     ur: "اسکرین سیکشن",
     canTriggerClick: false,
@@ -2958,7 +2949,6 @@ export default function SpotlightTourOverlay({
       activeTargetRef.current = null;
       setTargetRect(null);
       setControlMeta({
-        icon: "🧭",
         en: `Requires ${currentStep.screen}`,
         ur: `صفحہ کھولیں: ${currentStep.screen}`,
         canTriggerClick: false,

@@ -15,7 +15,7 @@ import {
 export default function CategoriesModal({ isOpen, onClose, categories, onRefresh }) {
   const { isDark, theme } = useTheme();
 
-  // 🎨 Dynamic Button styles using theme colors (matching ThemeSetting.jsx)
+  // Dynamic Button styles using theme colors (matching ThemeSetting.jsx)
   const themeColors = useMemo(() => ({
     primary: theme?.primary_color || "#3b82f6",
     primaryHover: theme?.primary_hover || "#2563eb",

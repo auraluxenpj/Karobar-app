@@ -412,7 +412,7 @@ export default function AccountsModal({ isOpen, onClose, onAccountUpdated, onOpe
 
   const presetOptions = [
     {
-      label: "🇵🇰 Pakistani Banks",
+      label: "Pakistani Banks",
       options: DEFAULT_PAKISTAN_PRESETS.filter((p) => p.group === "Pakistani Banks").map((p) => ({
         value: p.code,
         label: p.name,
@@ -420,7 +420,7 @@ export default function AccountsModal({ isOpen, onClose, onAccountUpdated, onOpe
       })),
     },
     {
-      label: "📱 Pakistani Mobile Wallets",
+      label: "Pakistani Mobile Wallets",
       options: DEFAULT_PAKISTAN_PRESETS.filter((p) => p.group === "Pakistani Mobile Wallets").map((p) => ({
         value: p.code,
         label: p.name,
@@ -428,7 +428,7 @@ export default function AccountsModal({ isOpen, onClose, onAccountUpdated, onOpe
       })),
     },
     {
-      label: "💳 Cash & Card Terminals",
+      label: "Cash & Card Terminals",
       options: DEFAULT_PAKISTAN_PRESETS.filter((p) => p.group === "Cash & Terminals").map((p) => ({
         value: p.code,
         label: p.name,
@@ -1086,7 +1086,7 @@ export default function AccountsModal({ isOpen, onClose, onAccountUpdated, onOpe
               {/* Quick Preset Selector */}
               <div>
                 <label className={`block text-xs font-bold mb-1.5 ${isDark ? "text-slate-300" : "text-slate-700"}`}>
-                  🇵🇰 Select Bank / Wallet Preset (Quick Fill)
+                  Select Bank / Wallet Preset (Quick Fill)
                 </label>
                 <Select
                   options={presetOptions}

@@ -52,7 +52,7 @@ class BrandImportController extends Controller
 
         $token = (string) $request->string('token');
         $relative = "imports/brands/{$token}.csv"; // SAME folder we saved to
-        // ✅ use the SAME disk we used to save the file
+        // use the SAME disk we used to save the file
         if (!Storage::disk('local')->exists($relative)) {
             return response()->json(['message' => 'Upload token expired or file missing.'], 404);
         }

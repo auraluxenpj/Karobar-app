@@ -29,7 +29,7 @@ export default function NetProfitReport() {
   const canExport = !permsLoading && has("report.net-profit.export");
   const printRef = useRef(null);
 
-  // 🎨 Dynamic Button styles using theme colors (matching ThemeSetting.jsx)
+  // Dynamic Button styles using theme colors (matching ThemeSetting.jsx)
   const themeColors = useMemo(() => ({
     primary: theme?.primary_color || "#3b82f6",
     primaryHover: theme?.primary_hover || "#2563eb",
@@ -376,7 +376,7 @@ export default function NetProfitReport() {
                 {formatCurrency(kpis.net_profit)}
               </div>
               <div className="text-[11px] opacity-80 mt-1 truncate">
-                {kpis.is_profitable ? "✓ Profitable operation" : "⚠ Operating at a loss"}
+                {kpis.is_profitable ? "Profitable operation" : "Operating at a loss"}
               </div>
             </div>
           </div>

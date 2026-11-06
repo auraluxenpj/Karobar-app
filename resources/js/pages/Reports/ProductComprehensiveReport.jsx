@@ -149,7 +149,7 @@ export default function ProductComprehensiveReport() {
       });
 
       if (!responseData.transactions?.length) {
-        toast("No transactions found for this product.", { icon: "ℹ️" });
+        toast("No transactions found for this product.");
       }
     } catch (err) {
       console.error(err);

@@ -159,7 +159,7 @@ export default function StocktakeReview() {
     setFinalizing(true);
     try {
       const { data } = await axios.post(`/api/stocktake-sessions/${id}/finalize`);
-      toast.success(`✅ Session finalized — Stock adjustment ${data.stock_adjustment?.posted_number || ""} posted`);
+      toast.success(`Session finalized — Stock adjustment ${data.stock_adjustment?.posted_number || ""} posted`);
       navigate("/stocktake-sessions");
     } catch (err) {
       toast.error(err?.response?.data?.message || "Finalization failed");

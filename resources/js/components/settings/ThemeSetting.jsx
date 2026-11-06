@@ -28,7 +28,7 @@ const BUTTON_STYLES = [
   {
     id: 'rounded', // stored id kept for saved themes
     name: 'Neumorphic',
-    icon: '◼',
+    icon: '■',
     description: 'Soft emboss with rising fill',
     className: 'rounded-lg',
     variant: 'neumorphic'

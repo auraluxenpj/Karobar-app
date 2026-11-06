@@ -66,7 +66,7 @@ class StockAdjustmentController extends Controller
 
     public function index(Request $request)
     {
-        // 🔒 list
+        // list
         $this->authorize('viewAny', StockAdjustment::class);
 
         $q = trim((string)$request->get('q'));
@@ -109,14 +109,14 @@ class StockAdjustmentController extends Controller
         }
 
         $adj = StockAdjustment::with($with)->findOrFail($id);
-        // 🔒 view instance
+        // view instance
         $this->authorize('view', $adj);
         return $adj;
     }
 
     public function newCode()
     {
-        // 🔒 require create (same pattern as SaleInvoice::generateNewCode)
+        // require create (same pattern as SaleInvoice::generateNewCode)
         $this->authorize('create', StockAdjustment::class);
 
         $prefix = 'STADJ-';
@@ -133,7 +133,7 @@ class StockAdjustmentController extends Controller
 
     public function store(Request $request)
     {
-        // 🔒 create
+        // create
         $this->authorize('create', StockAdjustment::class);
 
         $data = $this->validatePayload($request);
@@ -255,7 +255,7 @@ class StockAdjustmentController extends Controller
     public function destroy($id)
     {
         $adj = StockAdjustment::with('items.product')->findOrFail($id);
-        // 🔒 delete instance
+        // delete instance
         $this->authorize('delete', $adj);
 
         if (Schema::hasTable('stock_disposals') && DB::table('stock_disposals')->where('stock_adjustment_id', $adj->id)->exists()) {

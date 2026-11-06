@@ -18,6 +18,10 @@ import {
   PrinterIcon,
   ClockIcon,
   ShareIcon,
+  ChevronDoubleLeftIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronDoubleRightIcon,
 } from "@heroicons/react/24/solid";
 import { usePermissions, Guard } from "@/api/usePermissions.js";
 import DocumentHistoryModal from "@/components/DocumentHistoryModal.jsx";
@@ -78,7 +82,7 @@ export default function SaleReturnsIndex() {
   // AbortController for fetches
   const controllerRef = useRef(null);
 
-  // 🔒 permissions
+  // permissions
   const { loading: permsLoading, canFor } = usePermissions();
   const can = useMemo(
     () =>
@@ -582,14 +586,14 @@ export default function SaleReturnsIndex() {
               disabled={page === 1}
               className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === 1 ? 'opacity-40' : ''}`}
             >
-              ⏮
+              <ChevronDoubleLeftIcon className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
               className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === 1 ? 'opacity-40' : ''}`}
             >
-              ◀
+              <ChevronLeftIcon className="w-3.5 h-3.5" />
             </button>
 
             {/* Page numbers */}
@@ -629,14 +633,14 @@ export default function SaleReturnsIndex() {
               disabled={page === pageCount}
               className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === pageCount ? 'opacity-40' : ''}`}
             >
-              ▶
+              <ChevronRightIcon className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setPage(pageCount)}
               disabled={page === pageCount}
               className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === pageCount ? 'opacity-40' : ''}`}
             >
-              ⏭
+              <ChevronDoubleRightIcon className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

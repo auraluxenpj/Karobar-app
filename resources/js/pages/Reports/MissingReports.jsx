@@ -191,7 +191,7 @@ export default function MissingReports({ type }) {
         });
         setWorkQueuePayload(data);
         if (!data?.parties?.length) {
-          toast("No overdue balances found matching criteria.", { icon: "ℹ️" });
+          toast("No overdue balances found matching criteria.");
         }
       } else {
         const { data } = await axios.get(report.endpoint, {
@@ -205,7 +205,7 @@ export default function MissingReports({ type }) {
         });
         setPayload(data);
         if (!(data?.rows?.length || data?.customers?.length || data?.suppliers?.length)) {
-          toast("No data found for the selected report.", { icon: "ℹ️" });
+          toast("No data found for the selected report.");
         }
       }
     } catch (error) {

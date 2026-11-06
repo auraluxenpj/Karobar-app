@@ -13,6 +13,10 @@ import {
   ArrowPathIcon,
   PlusIcon,
   Squares2X2Icon,
+  ChevronDoubleLeftIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronDoubleRightIcon,
 } from "@heroicons/react/24/solid";
 import CategoryImportModal from "../components/CategoryImportModel.jsx";
 import { usePermissions, Guard } from "@/api/usePermissions.js";
@@ -41,7 +45,7 @@ export default function Categories() {
   const nameRef = useRef(null);
   const saveBtnRef = useRef(null);
 
-  // 🎨 Get theme colors
+  // Get theme colors
   const { isDark, theme } = useTheme();
 
   // Memoize theme colors for performance
@@ -66,7 +70,7 @@ export default function Categories() {
     };
   }, [theme]);
 
-  // 🔒 permissions
+  // permissions
   const { loading: permsLoading, canFor } = usePermissions();
   const can = useMemo(
     () =>
@@ -106,7 +110,7 @@ export default function Categories() {
 
   useEffect(() => { nameRef.current?.focus(); }, [editingId]);
 
-  // 🔒 Alt+S save
+  // Alt+S save
   useEffect(() => {
     const onKeyDown = (e) => {
       if (e.altKey && (e.key || "").toLowerCase() === "s") {
@@ -217,7 +221,7 @@ export default function Categories() {
   const start = (page - 1) * pageSize;
   const paged = filtered.slice(start, start + pageSize);
 
-  // 🎨 Dynamic Button styles using theme colors
+  // Dynamic Button styles using theme colors
   const buttonStyle = theme?.button_style || 'modern';
   
   const getButtonClasses = useMemo(
@@ -497,14 +501,14 @@ return (
                   disabled={page === 1}
                   className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === 1 ? 'opacity-40' : ''}`}
                 >
-                  ⏮
+                  <ChevronDoubleLeftIcon className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
                   className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === 1 ? 'opacity-40' : ''}`}
                 >
-                  ◀
+                  <ChevronLeftIcon className="w-3.5 h-3.5" />
                 </button>
                 <span className="mx-1 px-2 py-0.5 rounded-sm bg-gray-100 dark:bg-slate-700 font-medium">
                   {page}
@@ -514,14 +518,14 @@ return (
                   disabled={page === pageCount}
                   className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === pageCount ? 'opacity-40' : ''}`}
                 >
-                  ▶
+                  <ChevronRightIcon className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={() => setPage(pageCount)}
                   disabled={page === pageCount}
                   className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === pageCount ? 'opacity-40' : ''}`}
                 >
-                  ⏭
+                  <ChevronDoubleRightIcon className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

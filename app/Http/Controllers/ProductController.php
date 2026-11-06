@@ -194,7 +194,7 @@ class ProductController extends Controller
             });
         }
 
-        // 🔍 Field-specific matching for name, brand, supplier, formulation, barcode, and rack
+        // Field-specific matching for name, brand, supplier, formulation, barcode, and rack
         if ($qName !== '') {
             $q->where('name', 'like', $qName.'%');
         }
@@ -219,7 +219,7 @@ class ProductController extends Controller
             $q->where('rack', 'like', $qRack.'%');
         }
 
-        // 🟠 Low stock only — running products (ever purchased) whose on-hand
+        // Low stock only — running products (ever purchased) whose on-hand
         // quantity has dropped below pack_size. Matches the dashboard count and
         // the low-stock notification logic.
         if ($lowStock === 1) {

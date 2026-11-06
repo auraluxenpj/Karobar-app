@@ -1292,7 +1292,7 @@ export function GuideBotAvatar({
                 fontSize="8.5"
                 fontWeight="900"
               >
-                ⚡100%
+                100%
               </text>
             </g>
           </g>

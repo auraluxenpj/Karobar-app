@@ -16,6 +16,10 @@ import {
   ClockIcon,
   ArrowUturnLeftIcon,
   ShareIcon,
+  ChevronDoubleLeftIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronDoubleRightIcon,
 } from "@heroicons/react/24/solid";
 import InvoiceDraftsModal from "@/components/InvoiceDraftsModal.jsx";
 import DocumentHistoryModal from "@/components/DocumentHistoryModal.jsx";
@@ -88,7 +92,7 @@ export default function PurchaseInvoicesIndex() {
   const controllerRef = useRef(null);
   const debounceRef = useRef(null);
 
-  // 🔒 permissions
+  // permissions
   const { loading: permsLoading, canFor } = usePermissions();
   const can = useMemo(
     () =>
@@ -98,7 +102,7 @@ export default function PurchaseInvoicesIndex() {
     [canFor]
   );
 
-  // 🎨 Get theme colors
+  // Get theme colors
   const { isDark, theme } = useTheme();
 
   // Memoize theme colors for performance
@@ -123,7 +127,7 @@ export default function PurchaseInvoicesIndex() {
     };
   }, [theme]);
 
-  // 🎨 Dynamic Button styles using theme colors
+  // Dynamic Button styles using theme colors
   const buttonStyle = theme?.button_style || 'modern';
   
   const getButtonClasses = useMemo(
@@ -680,7 +684,7 @@ export default function PurchaseInvoicesIndex() {
               disabled={page === 1}
               className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === 1 ? 'opacity-40' : ''}`}
             >
-              ⏮
+              <ChevronDoubleLeftIcon className="w-3.5 h-3.5" />
             </button>
             <button 
               aria-label="Previous page"
@@ -688,7 +692,7 @@ export default function PurchaseInvoicesIndex() {
               disabled={page === 1}
               className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === 1 ? 'opacity-40' : ''}`}
             >
-              ◀
+              <ChevronLeftIcon className="w-3.5 h-3.5" />
             </button>
             
             {/* Page numbers */}
@@ -729,7 +733,7 @@ export default function PurchaseInvoicesIndex() {
               disabled={page === lastPage}
               className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === lastPage ? 'opacity-40' : ''}`}
             >
-              ▶
+              <ChevronRightIcon className="w-3.5 h-3.5" />
             </button>
             <button 
               aria-label="Last page"
@@ -737,7 +741,7 @@ export default function PurchaseInvoicesIndex() {
               disabled={page === lastPage}
               className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === lastPage ? 'opacity-40' : ''}`}
             >
-              ⏭
+              <ChevronDoubleRightIcon className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

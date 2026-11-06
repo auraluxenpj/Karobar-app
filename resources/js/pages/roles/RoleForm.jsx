@@ -76,7 +76,7 @@ export default function RoleForm({ onSubmit, initial, submitting }) {
   const titleizeModule = (m) => {
     const map = {
       barcode: "Barcode Studio & Generator",
-      "barcode-pos": "⚡ Barcode POS",
+      "barcode-pos": "Barcode POS",
       "batch-expiry": "Batch Expiry & Tracking",
       "sale-invoice": "Sale Invoice",
       "purchase-invoice": "Purchase Invoice",

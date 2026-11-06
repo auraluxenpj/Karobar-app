@@ -149,7 +149,7 @@ export default function NearExpiryProductReport() {
       const summary = responseData.summary || {};
 
       setData({ rows, summary });
-      if (!rows.length) toast("No near expiry products found.", { icon: "ℹ️" });
+      if (!rows.length) toast("No near expiry products found.");
     } catch (err) {
       console.error(err);
       toast.error("Failed to fetch Near Expiry Product report");

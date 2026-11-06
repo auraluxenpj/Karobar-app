@@ -782,7 +782,7 @@ export const TRAINED_ERP_INTENTS = [
     requiredGroups: [["transfer", "deposit", "bank", "wallet", "jazzcash", "easypaisa", "account", "ٹرانسفر", "بینک", "اکاؤنٹ"]],
     keywords: ["transfer", "jazzcash", "easypaisa"],
     title: {
-      en: "How to Manage Bank / Wallet Accounts & Transfer Funds (Cash ↔ Bank)",
+      en: "How to Manage Bank / Wallet Accounts & Transfer Funds (Cash / Bank)",
       ur: "بینک / والٹ اکاؤنٹس بنانے اور کیش سے بینک میں رقم منتقل کرنے کا طریقہ",
     },
     en: "To manage your **Bank Accounts**, **Mobile Wallets (JazzCash / EasyPaisa)**, and **Cash Drawer** balances:\n\n1. Open **Financial Accounts** (`/accounts`) or press **`Alt + A`** from anywhere.\n2. **Add a Bank or Wallet:** Click **+ Add Account**, choose the type (`Bank`, `Mobile Wallet`, or `Cash`), enter the Account Title/Number and Opening Balance, and click **Save**.\n3. **Transfer Money (e.g., Cash Drawer → Bank Deposit):** Click **Transfer Funds**, select **From Account** (e.g., Cash Drawer) and **To Account** (e.g., Meezan Bank), enter the **Amount**, and click **Transfer**.",
@@ -1293,7 +1293,7 @@ export const TRAINED_ERP_INTENTS = [
       en: "Cube — Capabilities & Safety Boundaries",
       ur: "کیوب (Cube) کی صلاحیتیں اور حفاظتی حدود",
     },
-    en: "**Cube** is your AI software assistant and interactive demonstrator built for **Karobar App ERP v2** (not a human operator):\n\n• **What Cube does:** Answers your questions concisely, diagnoses issues, explains how screens work, and runs grounded, step-by-step interactive walkthroughs.\n• **Safety Boundaries:**\n  1. **No Silent Destructive Actions:** Cube will never silently delete customers, void invoices, or post ledger entries without your explicit action on the screen.\n  2. **Observed vs. Documented Truth:** Cube clearly badges whether an instruction is **🟢 Observed on your current screen** or **📘 Documented for Karobar v2026.10**.",
+    en: "**Cube** is your AI software assistant and interactive demonstrator built for **Karobar App ERP v2** (not a human operator):\n\n• **What Cube does:** Answers your questions concisely, diagnoses issues, explains how screens work, and runs grounded, step-by-step interactive walkthroughs.\n• **Safety Boundaries:**\n  1. **No Silent Destructive Actions:** Cube will never silently delete customers, void invoices, or post ledger entries without your explicit action on the screen.\n  2. **Observed vs. Documented Truth:** Cube clearly badges whether an instruction is **Observed on your current screen** or **Documented for Karobar v2026.10**.",
     ur: "**کیوب (Cube)** کاروبار ایپ کا مخصوص اے آئی اسسٹنٹ اور انٹرایکٹو گائیڈ ہے:\n\n• **Cube کا کام:** آپ کے سوالات کو سمجھنا، مسائل کی تشخیص کرنا، سافٹ ویئر کے فیچرز کی وضاحت کرنا اور مرحلہ وار عملی ڈیمو (Walkthrough) دکھانا۔\n• **حفاظتی اصول:** اسسٹنٹ کبھی بھی آپ کی اجازت کے بغیر کوئی بل، گاہک یا کھاتہ خودکار طور پر ڈیلیٹ یا تبدیل نہیں کرتا، اور ہمیشہ واضح بتاتا ہے کہ معلومات آپ کی موجودہ اسکرین سے دیکھی گئی ہیں یا دستاویزات سے۔",
     links: [
       { path: "/dashboard", en: "Dashboard", ur: "ڈیش بورڈ" },
@@ -1312,8 +1312,8 @@ export const TRAINED_ERP_INTENTS = [
     preferredAgent: "nova",
     riskLevel: "high_destructive",
     title: {
-      en: "🛡️ Safety Guardrail: Destructive Action vs. Non-Destructive Guide",
-      ur: "🛡️ حفاظتی وارننگ: ریکارڈ ڈیلیٹ کرنے کے اثرات اور محفوظ طریقہ",
+      en: "Safety Guardrail: Destructive Action vs. Non-Destructive Guide",
+      ur: "حفاظتی وارننگ: ریکارڈ ڈیلیٹ کرنے کے اثرات اور محفوظ طریقہ",
     },
     en: "Deleting a master record (such as a **Customer**, **Supplier**, or **Product**) affects historical invoices and ledger statements, so **I do not execute deletions automatically**.\n\n**What will be affected if you delete a record:**\n• If a Customer or Supplier already has posted invoices or ledger transactions, the system protects accounting integrity by preventing orphan ledger entries.\n• **How to perform it safely yourself:** Open **Customers (`/customers`)** or **Suppliers (`/suppliers`)**, locate the unused record, and click the **Delete** icon—the app will ask for your confirmation first.",
     ur: "کسی گاہک، سپلائر یا پروڈکٹ کو ڈیلیٹ کرنے سے کھاتوں اور پرانے بلوں پر اثر پڑتا ہے، اس لیے **اسسٹنٹ خودکار طور پر کوئی ریکارڈ ڈیلیٹ نہیں کرتا**۔\n\n**محفوظ طریقہ کار:**\n• اگر کسی گاہک یا سپلائر کے کھاتے میں لین دین موجود ہو تو سسٹم اکاؤنٹنگ کو محفوظ رکھنے کے لیے اسے غلطی سے ڈیلیٹ ہونے سے روکتا ہے۔\n• غیر استعمال شدہ ریکارڈ ہٹانے کے لیے متعلقہ صفحہ (`/customers` یا `/suppliers`) کھول کر خود تصدیق (Confirm) کے بعد ڈیلیٹ کریں۔",
@@ -2062,24 +2062,24 @@ export function buildEvidenceBadge(evidenceType, currentGuide = null, providerLa
   switch (evidenceType) {
     case EVIDENCE_TYPES.LIVE_DOM_INSPECTION:
       return {
-        en: `🟢 Live DOM Inspection (${screenTitleEn})`,
-        ur: `🟢 لائیو اسکرین کنٹرول کا معائنہ (${screenTitleUr})`,
+        en: `Live DOM Inspection (${screenTitleEn})`,
+        ur: `لائیو اسکرین کنٹرول کا معائنہ (${screenTitleUr})`,
       };
     case EVIDENCE_TYPES.CURRENT_SCREEN_CONTEXT:
       return {
-        en: `🧭 Current Screen Context (${screenTitleEn})`,
-        ur: `🧭 موجودہ اسکرین کا سیاق و سباق (${screenTitleUr})`,
+        en: `Current Screen Context (${screenTitleEn})`,
+        ur: `موجودہ اسکرین کا سیاق و سباق (${screenTitleUr})`,
       };
     case EVIDENCE_TYPES.AI_GROUNDED_DOCS:
       return {
-        en: `✨ AI-Assisted Explanation • Generated by ${providerLabel || "Generative AI"} (v${PRODUCT_VERSION})`,
-        ur: `✨ اے آئی سے تیار کردہ وضاحت • ${providerLabel || "Generative AI"} (v${PRODUCT_VERSION})`,
+        en: `AI-Assisted Explanation • Generated by ${providerLabel || "Generative AI"} (v${PRODUCT_VERSION})`,
+        ur: `اے آئی سے تیار کردہ وضاحت • ${providerLabel || "Generative AI"} (v${PRODUCT_VERSION})`,
       };
     case EVIDENCE_TYPES.DOCUMENTED_INFO:
     default:
       return {
-        en: `📘 Documented in Karobar Knowledge Base (v${PRODUCT_VERSION})`,
-        ur: `📘 کاروبار ایپ مستند گائیڈ میں درج معلومات (v${PRODUCT_VERSION})`,
+        en: `Documented in Karobar Knowledge Base (v${PRODUCT_VERSION})`,
+        ur: `کاروبار ایپ مستند گائیڈ میں درج معلومات (v${PRODUCT_VERSION})`,
       };
   }
 }
@@ -2535,8 +2535,8 @@ export function evaluateLocalQuery(
       en: `How Can I Help You on ${fallbackGuide?.title?.en || "Karobar ERP"}?`,
       ur: `${fallbackGuide?.title?.ur || "کاروبار ایپ"} — میں آپ کی کیا مدد کر سکتا ہوں؟`,
     },
-    en: `I want to make sure I give you the exact answer for **"${raw}"**.\n\nHere is what your current screen (**${fallbackGuide?.title?.en || "Dashboard"}**) does:\n${fallbackGuide?.summary?.en || ""}\n\n💡 **Or ask me directly about any Karobar workflow:**\n• **Purchasing:** *"How to make a Purchase Order"*, *"How to add new stock"*, *"How to return items to supplier"*\n• **Sales & POS:** *"How to sell loose tablets"*, *"How to give discount"*, *"How to hold a bill"*, *"How to find substitute medicine"*\n• **Finance & HR:** *"How to check customer udhar"*, *"How to pay supplier"*, *"How to mark attendance & pay salary"*`,
-    ur: `آپ کے سوال **"${raw}"** کے حوالے سے رہنمائی:\n\nآپ اس وقت **${fallbackGuide?.title?.ur || "ڈیش بورڈ"}** اسکرین پر موجود ہیں:\n${fallbackGuide?.summary?.ur || ""}\n\n💡 **آپ مجھ سے کوئی بھی مخصوص سوال پوچھ سکتے ہیں:**\n• **خریداری:** *"پرچیز آرڈر کیسے بنائیں"*, *"نیا اسٹاک کیسے ڈالیں"*, *"سپلائر کو مال واپس کیسے کریں"*\n• **سیلز اور POS:** *"کھلی گولیاں کیسے بیچیں"*, *"ڈسکاؤنٹ کیسے دیں"*, *"بل ہولڈ کیسے کریں"*\n• **کھاتے اور اسٹاف:** *"گاہک کا ادھار کھاتہ"*, *"سپلائر کو پیمنٹ"*, *"ملازمین کی حاضری اور تنخواہ"*`,
+    en: `I want to make sure I give you the exact answer for **"${raw}"**.\n\nHere is what your current screen (**${fallbackGuide?.title?.en || "Dashboard"}**) does:\n${fallbackGuide?.summary?.en || ""}\n\n**Or ask me directly about any Karobar workflow:**\n• **Purchasing:** *"How to make a Purchase Order"*, *"How to add new stock"*, *"How to return items to supplier"*\n• **Sales & POS:** *"How to sell loose tablets"*, *"How to give discount"*, *"How to hold a bill"*, *"How to find substitute medicine"*\n• **Finance & HR:** *"How to check customer udhar"*, *"How to pay supplier"*, *"How to mark attendance & pay salary"*`,
+    ur: `آپ کے سوال **"${raw}"** کے حوالے سے رہنمائی:\n\nآپ اس وقت **${fallbackGuide?.title?.ur || "ڈیش بورڈ"}** اسکرین پر موجود ہیں:\n${fallbackGuide?.summary?.ur || ""}\n\n**آپ مجھ سے کوئی بھی مخصوص سوال پوچھ سکتے ہیں:**\n• **خریداری:** *"پرچیز آرڈر کیسے بنائیں"*, *"نیا اسٹاک کیسے ڈالیں"*, *"سپلائر کو مال واپس کیسے کریں"*\n• **سیلز اور POS:** *"کھلی گولیاں کیسے بیچیں"*, *"ڈسکاؤنٹ کیسے دیں"*, *"بل ہولڈ کیسے کریں"*\n• **کھاتے اور اسٹاف:** *"گاہک کا ادھار کھاتہ"*, *"سپلائر کو پیمنٹ"*, *"ملازمین کی حاضری اور تنخواہ"*`,
     links: [
       ...(fallbackGuide?.key && !fallbackGuide.key.includes(":")
         ? [{ path: fallbackGuide.key, en: `Current: ${fallbackGuide.title.en}`, ur: `${fallbackGuide.title.ur}` }]

@@ -101,7 +101,7 @@
 <body>
   @forelse($rows as $idx => $inv)
     <!-- Invoice {{ $idx + 1 }} -->
-    <h1>📊 Sale Invoice Analysis Report</h1>
+    <h1>Sale Invoice Analysis Report</h1>
     
     <h2 class="invoice-header">
       Invoice Number: <span class="invoice-number">{{ $inv['posted_number'] ?? 'N/A' }}</span>
@@ -141,7 +141,7 @@
     </div>
 
     <!-- Product-wise Cost, Sale Price, and Profit Analysis -->
-    <h2>📦 Product-wise Cost, Sale Price, and Profit Analysis</h2>
+    <h2>Product-wise Cost, Sale Price, and Profit Analysis</h2>
     <table>
       <thead>
         <tr>
@@ -193,7 +193,7 @@
 
     <!-- Financial Summary -->
     <div class="financial-summary">
-      <h3>💰 Financial Summary</h3>
+      <h3>Financial Summary</h3>
       <div class="summary-grid">
         <div class="summary-box">
           <strong>Total Cost of Goods</strong>
@@ -216,7 +216,7 @@
 
     <!-- Notes -->
     <div class="notes">
-      <h3>📝 Notes</h3>
+      <h3>Notes</h3>
       <ul>
         <li><strong>Cost Price (Unit)</strong> = avg_price from products table (includes weighted average with bonus impact)</li>
         <li><strong>Sale Price (Unit)</strong> = Unit sale price from the invoice</li>
@@ -243,10 +243,10 @@
   <!-- Overall Summary (if multiple invoices) -->
   @if(count($rows) > 1)
     <div class="page-break"></div>
-    <h1>📊 Cost of Sale Detail Report - Summary</h1>
+    <h1>Cost of Sale Detail Report - Summary</h1>
     
     <div class="financial-summary">
-      <h3>💰 Overall Financial Summary</h3>
+      <h3>Overall Financial Summary</h3>
       <div class="summary-grid">
         <div class="summary-box">
           <strong>Total Invoices</strong>

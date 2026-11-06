@@ -153,7 +153,7 @@ export function useInvoiceDraft({ type, form, setForm, enabled = true, onDraftLo
     async (title = null) => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       if (!hasMeaningfulData(latestFormRef.current)) {
-        toast.error("Cannot hold invoice with zero products selected. Please add at least one product.", { icon: "⚠️" });
+        toast.error("Cannot hold invoice with zero products selected. Please add at least one product.");
         return null;
       }
       const res = await performSave(latestFormRef.current, title);
@@ -170,7 +170,7 @@ export function useInvoiceDraft({ type, form, setForm, enabled = true, onDraftLo
     async (title = null) => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       if (!hasMeaningfulData(latestFormRef.current)) {
-        toast.error("Cannot hold invoice with zero products selected. Please add at least one product.", { icon: "⚠️" });
+        toast.error("Cannot hold invoice with zero products selected. Please add at least one product.");
         return null;
       }
       const res = await performSave(latestFormRef.current, title);
@@ -233,9 +233,9 @@ export function useInvoiceDraft({ type, form, setForm, enabled = true, onDraftLo
         }
         const issuesCount = Object.keys(annotations.item_issues || {}).length;
         if (issuesCount > 0) {
-          toast(
+          toast.error(
             `Draft resumed. Note: ${issuesCount} item(s) have stock or batch availability changes.`,
-            { icon: "⚠️", duration: 5000 }
+            { duration: 5000 }
           );
         } else {
           toast.success(`Resumed draft: "${draft.title || "Draft"}"`);

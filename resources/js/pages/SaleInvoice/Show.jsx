@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { MagnifyingGlassIcon, PrinterIcon, PencilSquareIcon, TrashIcon, PlusIcon, ArrowLeftIcon, ClockIcon, ArrowUturnLeftIcon, BanknotesIcon, ShareIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
-// 🔒 permissions
+// permissions
 import { usePermissions, Guard } from "@/api/usePermissions.js";
 import PageSkeleton from "@/components/PageSkeleton.jsx";
 import { useTheme } from "@/context/ThemeContext";
@@ -176,7 +176,7 @@ export default function SaleInvoiceShow({ defaultSaleType = null }) {
   const chip =
     "px-1 py-0.5 border rounded-sm bg-gray-50 dark:bg-slate-700 text-[10px] leading-none text-gray-700 dark:text-gray-300";
 
-  // 🔒 permissions
+  // permissions
   const { loading: permsLoading, canFor } = usePermissions?.() || {};
   const can = useMemo(
     () =>

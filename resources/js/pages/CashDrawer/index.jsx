@@ -249,7 +249,7 @@ function TwoColumnTxnRow({ txn, index, formatCurrency, isDark }) {
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 transition-colors"
                 title={`Open ${refInfo.label}`}
               >
-                {refInfo.label} ↗
+                {refInfo.label}
               </Link>
             ) : (
               <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
@@ -316,7 +316,7 @@ function TxnRow({ txn, index, formatCurrency, isDark }) {
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50 transition-colors"
               title={`Open ${refInfo.label}`}
             >
-              {refInfo.label} ↗
+              {refInfo.label}
             </Link>
           ) : (
             <span className="px-2 py-0.5 rounded-md font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">

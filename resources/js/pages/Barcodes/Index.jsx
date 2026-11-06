@@ -134,8 +134,8 @@ export default function BarcodeIndex() {
   const [brandsList, setBrandsList] = useState([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [loadingBrands, setLoadingBrands] = useState(false);
-  const [selectedSupplierOpt, setSelectedSupplierOpt] = useState({ value: null, label: "🏢 All Suppliers" });
-  const [selectedBrandOpt, setSelectedBrandOpt] = useState({ value: null, label: "🏷️ All Brands" });
+  const [selectedSupplierOpt, setSelectedSupplierOpt] = useState({ value: null, label: "All Suppliers" });
+  const [selectedBrandOpt, setSelectedBrandOpt] = useState({ value: null, label: "All Brands" });
   const supplierSearchTimerRef = useRef(null);
   const brandSearchTimerRef = useRef(null);
 
@@ -293,12 +293,12 @@ export default function BarcodeIndex() {
 
   // Options for Supplier, Brand and PO/PI Selects
   const supplierOptions = useMemo(() => [
-    { value: null, label: "🏢 All Suppliers" },
+    { value: null, label: "All Suppliers" },
     ...suppliersList.map((s) => ({ value: s.id, label: s.name })),
   ], [suppliersList]);
 
   const brandOptions = useMemo(() => [
-    { value: null, label: "🏷️ All Brands" },
+    { value: null, label: "All Brands" },
     ...brandsList.map((b) => ({ value: b.id, label: b.name })),
   ], [brandsList]);
 
@@ -1713,7 +1713,7 @@ export default function BarcodeIndex() {
                     </label>
                     <Select
                       value={selectedSupplierOpt}
-                      onChange={(opt) => setSelectedSupplierOpt(opt || { value: null, label: "🏢 All Suppliers" })}
+                      onChange={(opt) => setSelectedSupplierOpt(opt || { value: null, label: "All Suppliers" })}
                       onInputChange={handleSupplierInputChange}
                       options={supplierOptions}
                       styles={batchSelectStyles}
@@ -1740,7 +1740,7 @@ export default function BarcodeIndex() {
                     <Select
                       value={selectedBrandOpt}
                       onChange={(opt) => {
-                        const resolved = opt || { value: null, label: "🏷️ All Brands" };
+                        const resolved = opt || { value: null, label: "All Brands" };
                         setSelectedBrandOpt(resolved);
                         const activeBrandId = resolved?.value ? Number(resolved.value) : null;
                         setPoItemSelections((prev) =>
@@ -2065,9 +2065,9 @@ export default function BarcodeIndex() {
                               batch_number: b.batch_number,
                               expiry_date: b.expiry_date || "",
                               quantity: Number(b.quantity || 0),
-                              label: `🏷️ ${b.batch_number || "Batch"} (Exp: ${expStr}) — ${b.quantity} stock${
-                                isFefo ? " ⭐ FEFO" : ""
-                              }${isExpired ? " ⚠️ Expired" : ""}`,
+                              label: `${b.batch_number || "Batch"} (Exp: ${expStr}) — ${b.quantity} stock${
+                                isFefo ? " [FEFO]" : ""
+                              }${isExpired ? " [Expired]" : ""}`,
                             });
                           });
                         }
@@ -2092,7 +2092,7 @@ export default function BarcodeIndex() {
                           batch_number: "",
                           expiry_date: "",
                           quantity: unassignedQty,
-                          label: `📦 Unassigned Stock (${unassignedQty} unit${unassignedQty === 1 ? "" : "s"})`,
+                          label: `Unassigned Stock (${unassignedQty} unit${unassignedQty === 1 ? "" : "s"})`,
                         });
 
                         // 3. Custom Batch & Expiry Entry
@@ -2102,7 +2102,7 @@ export default function BarcodeIndex() {
                           batch_id: "custom",
                           batch_number: item.custom_batch_number || "",
                           expiry_date: item.custom_expiry_date || "",
-                          label: "✏️ Custom Batch & Expiry Entry…",
+                          label: "Custom Batch & Expiry Entry…",
                         });
 
                         // Determine current selected option
@@ -2457,7 +2457,8 @@ export default function BarcodeIndex() {
                 <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 space-y-2.5">
                   <label className="flex items-center justify-between cursor-pointer">
                     <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                      <span>🏷️</span> Show Price Tag
+                      <TagIcon className="w-4 h-4 text-slate-400" />
+                      Show Price Tag
                     </span>
                     <input
                       type="checkbox"
@@ -2660,7 +2661,8 @@ export default function BarcodeIndex() {
                     }`}
                   >
                     <div className="font-bold flex items-center gap-2">
-                      <span>🏷️</span> Thermal Roll Printer
+                      <PrinterIcon className="w-4 h-4 shrink-0" />
+                      <span>Thermal Roll Printer</span>
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                       Continuous die-cut roll (Xprinter, Zebra, TSC, Rongta, Dymo)
@@ -2676,7 +2678,8 @@ export default function BarcodeIndex() {
                     }`}
                   >
                     <div className="font-bold flex items-center gap-2">
-                      <span>📄</span> A4 / Letter Sticker Sheet
+                      <DocumentDuplicateIcon className="w-4 h-4 shrink-0" />
+                      <span>A4 / Letter Sticker Sheet</span>
                     </div>
                     <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                       Office laser &amp; inkjet printers (Avery 5160, 24-up, 40-up sheets)

@@ -15,6 +15,7 @@ import {
   XMarkIcon,
   Squares2X2Icon,
   CheckCircleIcon,
+  CheckIcon,
   BoltIcon,
   CommandLineIcon,
   ArrowTopRightOnSquareIcon,
@@ -27,6 +28,13 @@ import {
   ChevronLeftIcon,
   ExclamationTriangleIcon,
   LightBulbIcon,
+  ChatBubbleLeftRightIcon,
+  BookOpenIcon,
+  ShieldCheckIcon,
+  PencilSquareIcon,
+  ClipboardDocumentIcon,
+  PlayIcon,
+  MapPinIcon,
 } from "@heroicons/react/24/outline";
 import { useTheme } from "@/context/ThemeContext.jsx";
 import {
@@ -147,40 +155,40 @@ function FormattedBotMessage({ text, isUrdu = false }) {
 
 // Stationary tricks performed along the bottom
 const STATIONARY_TRICKS = [
-  { id: "rubiks", durationMs: 3600, badge: "Solving Cube 🧩" },
-  { id: "headphones", durationMs: 3600, badge: "Music Vibe 🎧" },
-  { id: "backflip", durationMs: 2600, badge: "360° Flip! 🤸" },
-  { id: "dance", durationMs: 3400, badge: "Robot Boogie ♪" },
-  { id: "juggle", durationMs: 3200, badge: "Cube Juggle 🎲" },
-  { id: "shades", durationMs: 3000, badge: "Cool Shades 🕶️" },
-  { id: "charge", durationMs: 3000, badge: "Supercharge ⚡" },
-  { id: "scan", durationMs: 2800, badge: "Screen Scan 🔍" },
+  { id: "rubiks", durationMs: 3600, badge: "Solving Cube" },
+  { id: "headphones", durationMs: 3600, badge: "Music Vibe" },
+  { id: "backflip", durationMs: 2600, badge: "360° Flip!" },
+  { id: "dance", durationMs: 3400, badge: "Robot Boogie" },
+  { id: "juggle", durationMs: 3200, badge: "Cube Juggle" },
+  { id: "shades", durationMs: 3000, badge: "Cool Shades" },
+  { id: "charge", durationMs: 3000, badge: "Supercharge" },
+  { id: "scan", durationMs: 2800, badge: "Screen Scan" },
 ];
 
 // Stage tricks performed by the mascot inside the Guide Bot popup header when open
 const POPUP_STAGE_TRICKS = [
-  { id: "rubiks", en: "Solving Cube 🧩", ur: "کیوب حل کر رہا ہے 🧩" },
-  { id: "headphones", en: "Vibing to Music 🎧", ur: "میوزک سن رہا ہے 🎧" },
-  { id: "juggle", en: "Cube Juggle 🎲", ur: "کیوب جگنگ 🎲" },
-  { id: "shades", en: "Cool Shades 🕶️", ur: "کول چشمہ 🕶️" },
-  { id: "charge", en: "Coffee Boost ☕", ur: "کافی بوسٹ ☕" },
-  { id: "dance", en: "Robot Groove ♫", ur: "روبوٹ ڈانس ♫" },
-  { id: "backflip", en: "360° Flip 🤸", ur: "360° فلپ 🤸" },
+  { id: "rubiks", en: "Solving Cube", ur: "کیوب حل کر رہا ہے" },
+  { id: "headphones", en: "Vibing to Music", ur: "میوزک سن رہا ہے" },
+  { id: "juggle", en: "Cube Juggle", ur: "کیوب جگنگ" },
+  { id: "shades", en: "Cool Shades", ur: "کول چشمہ" },
+  { id: "charge", en: "Coffee Boost", ur: "کافی بوسٹ" },
+  { id: "dance", en: "Robot Groove", ur: "روبوٹ ڈانس" },
+  { id: "backflip", en: "360° Flip", ur: "360° فلپ" },
 ];
 
 const TRICK_BADGES = {
-  rubiks: "Solving Cube 🧩",
-  headphones: "Music Vibe 🎧",
-  spy: "Inspecting 🕵️‍♂️",
-  backflip: "360° Flip! 🤸",
-  dance: "Robot Boogie ♪",
-  juggle: "Cube Juggle 🎲",
-  shades: "Cool Shades 🕶️",
-  charge: "Supercharge ⚡",
-  scan: "Screen Scan 🔍",
-  hoverboard: "Hover-Glide 🛹",
-  sleep: "Resting... 💤",
-  wake: "Ready! ⚡",
+  rubiks: "Solving Cube",
+  headphones: "Music Vibe",
+  spy: "Inspecting",
+  backflip: "360° Flip!",
+  dance: "Robot Boogie",
+  juggle: "Cube Juggle",
+  shades: "Cool Shades",
+  charge: "Supercharge",
+  scan: "Screen Scan",
+  hoverboard: "Hover-Glide",
+  sleep: "Resting...",
+  wake: "Ready!",
 };
 
 /**
@@ -500,7 +508,7 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
   };
 
   const pillText = state.isHovered
-    ? "Ask Guide Bot ✨"
+    ? "Ask Guide Bot"
     : state.activeTrick && TRICK_BADGES[state.activeTrick]
     ? TRICK_BADGES[state.activeTrick]
     : null;
@@ -545,7 +553,7 @@ function RoamingCubeCompanion({ onOpen, screenTitle }) {
                 : "bg-slate-900/95 text-white border-slate-700 dark:bg-white/95 dark:text-slate-900 dark:border-slate-200"
             }`}
           >
-            {pillText || "Guide Bot ✨"}
+            {pillText || "Guide Bot"}
           </span>
 
           <GuideBotAvatar
@@ -704,7 +712,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
   }, []);
 
   // Automatically cycle the Guide Bot popup mascot through fun stage tricks
-  // (Solving Rubik's Cube 🧩, Wearing Headphones & Listening to Music 🎧, etc.) while open
+  // (Solving Rubik's Cube, Wearing Headphones & Listening to Music, etc.) while open
   useEffect(() => {
     if (!isOpen) return;
     const timer = window.setInterval(() => {
@@ -2075,7 +2083,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         id: `walkthrough-${currentScreenWorkflowId || displayedGuide?.key || "screen"}`,
         type: "walkthrough",
         workflowId: currentScreenWorkflowId || "dynamic_screen_tour",
-        icon: "🎯",
         en: "Interactive Spotlight Tour (Live Step-by-Step)",
         ur: "لائیو اسپاٹ لائٹ گائیڈ (مرحلہ وار عملی ڈیمو)",
       },
@@ -2084,7 +2091,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       chips.push({
         id: "steps",
         type: "steps",
-        icon: "🪜",
         en: "How to use (Steps)",
         ur: "استعمال کا طریقہ",
       });
@@ -2093,7 +2099,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       chips.push({
         id: "features",
         type: "features",
-        icon: "✨",
         en: "Key features",
         ur: "اہم خصوصیات",
       });
@@ -2102,7 +2107,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       chips.push({
         id: "impacts",
         type: "impacts",
-        icon: "📊",
         en: "Stock & ledger impact",
         ur: "کھاتے اور اسٹاک پر اثر",
       });
@@ -2111,7 +2115,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       chips.push({
         id: "shortcuts",
         type: "shortcuts",
-        icon: "⌨️",
         en: "Shortcuts",
         ur: "شارٹ کٹس",
       });
@@ -2120,7 +2123,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       chips.push({
         id: `faq-${idx}`,
         type: "faq",
-        icon: "❓",
         en: faq.q.en,
         ur: faq.q.ur,
         faq,
@@ -2140,7 +2142,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       {
         id: "add-product",
         cmd: "/add-product",
-        icon: "➕",
         en: "Add New Product",
         ur: "نئی پروڈکٹ شامل کریں",
         descEn: "Guided wizard with DB duplicate check & staged preview",
@@ -2150,7 +2151,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       {
         id: "edit-product",
         cmd: "/edit-product",
-        icon: "✏️",
         en: "Edit Existing Product",
         ur: "پروڈکٹ کی قیمت یا تفصیل بدلیں",
         descEn: "Update price, rack, formulation, or barcode with before/after diff",
@@ -2160,7 +2160,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       {
         id: "autofill",
         cmd: "/autofill",
-        icon: "🧪",
         en: "Auto-Fill Formulations (Google Search)",
         ur: "گوگل سرچ سے فارمولیشن لگائیں",
         descEn: "Search Google for verified generic salts & generate detailed report",
@@ -2170,7 +2169,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       {
         id: "add-brand",
         cmd: "/add-brand",
-        icon: "🏷️",
         en: "Add New Brand",
         ur: "نیا برانڈ شامل کریں",
         descEn: "Create a pharmaceutical or consumer brand with preview",
@@ -2180,7 +2178,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       {
         id: "add-category",
         cmd: "/add-category",
-        icon: "📂",
         en: "Add New Category",
         ur: "نئی کیٹیگری بنائیں",
         descEn: "Create a product category with staged preview",
@@ -2190,7 +2187,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       {
         id: "add-supplier",
         cmd: "/add-supplier",
-        icon: "🚚",
         en: "Add New Supplier",
         ur: "نیا سپلائر شامل کریں",
         descEn: "Register a distributor or supplier account",
@@ -2200,7 +2196,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       {
         id: "add-customer",
         cmd: "/add-customer",
-        icon: "👤",
         en: "Add New Customer",
         ur: "نیا کسٹمر شامل کریں",
         descEn: "Create a customer profile for credit / khata billing",
@@ -2210,7 +2205,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       {
         id: "demand",
         cmd: "/demand",
-        icon: "📋",
         en: "Log Customer Demand",
         ur: "کسٹمر ڈیمانڈ درج کریں",
         descEn: "Record an out-of-stock item requested by a customer",
@@ -2220,7 +2214,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       {
         id: "explain",
         cmd: "/explain",
-        icon: "📘",
         en: `Explain ${displayedGuide?.title?.en || "Current Screen"}`,
         ur: `${displayedGuide?.title?.ur || "اس اسکرین"} کا مکمل طریقہ`,
         descEn: "Step-by-step workflow, fields & accounting impact",
@@ -2232,7 +2225,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       {
         id: "walkthrough",
         cmd: "/walkthrough",
-        icon: "🎯",
         en: "Interactive Spotlight Tour",
         ur: "لائیو اسپاٹ لائٹ گائیڈ",
         descEn: "Highlight live buttons and fields step by step on screen",
@@ -2244,7 +2236,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       {
         id: "tasks",
         cmd: "/tasks",
-        icon: "📊",
         en: "Open Background Tasks Monitor",
         ur: "بیک گراؤنڈ ٹاسک رپورٹ کھولیں",
         descEn: "Open the full-screen detailed popup for formulation auto-fill",
@@ -2254,7 +2245,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       {
         id: "clear",
         cmd: "/clear",
-        icon: "🧹",
         en: "Clear Chat Conversation",
         ur: "چیٹ صاف کریں",
         descEn: "Reset the current AI chat thread and start fresh",
@@ -2564,7 +2554,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   }
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white transition-all cursor-pointer shadow-2xs"
                 >
-                  <span aria-hidden="true">🎯</span>
+                  <PlayIcon className="w-3.5 h-3.5 shrink-0" />
                   <span>
                     {isUr
                       ? "لائیو اسپاٹ لائٹ گائیڈ شروع کریں (Spotlight Tour)"
@@ -2710,28 +2700,24 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   {[
                     {
                       key: "stock",
-                      icon: "📦",
                       en: "Stock & Batches",
                       ur: "اسٹاک اور بیچز",
                       val: impactMatrix.stock,
                     },
                     {
                       key: "ledger",
-                      icon: "📒",
                       en: "Party Khata / Ledger",
                       ur: "کسٹمر / سپلائر کھاتہ",
                       val: impactMatrix.ledger,
                     },
                     {
                       key: "treasury",
-                      icon: "💵",
                       en: "Cash Drawer & Bank",
                       ur: "کیش ڈراور اور بینک",
                       val: impactMatrix.treasury,
                     },
                     {
                       key: "gl",
-                      icon: "⚖️",
                       en: "Double-Entry GL",
                       ur: "جنرل لیجر (GL)",
                       val: impactMatrix.gl,
@@ -2746,7 +2732,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                       }`}
                     >
                       <div className="flex items-center gap-1 text-[11px] font-extrabold text-purple-600 dark:text-purple-400">
-                        <span>{item.icon}</span>
                         <span>{isUr ? item.ur : item.en}</span>
                       </div>
                       <p
@@ -2858,7 +2843,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
           className={cardBaseClass}
         >
           <p className="text-xs font-extrabold text-purple-700 dark:text-purple-300">
-            {isUr ? "📊 اسٹاک اور کھاتے پر اثر:" : "📊 Stock & Accounting Impact:"}
+            {isUr ? "اسٹاک اور کھاتے پر اثر:" : "Stock & Accounting Impact:"}
           </p>
           <p
             className={`text-[13px] leading-relaxed ${
@@ -2985,7 +2970,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-200/60 dark:border-slate-800/80">
           <div className="flex items-center gap-2 min-w-0">
             <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 text-white text-xs font-black shrink-0 shadow-2xs">
-              🤖
+              <SparklesIcon className="w-3.5 h-3.5" />
             </span>
             <div className="min-w-0">
               <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
@@ -3011,7 +2996,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 onClick={stopLiveStream}
                 className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-500/30 cursor-pointer"
               >
-                {isUr ? "مکمل دکھائیں" : "⏹ Show Full"}
+                {isUr ? "مکمل دکھائیں" : "Show Full"}
               </button>
             </div>
           )}
@@ -3027,7 +3012,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
             }`}
           >
             <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold">
-              <span aria-hidden="true">🪜</span>
               <span>
                 {isUr
                   ? msg.taskMeta.step_info.label_ur || msg.taskMeta.step_info.label_en
@@ -3086,7 +3070,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 }`}
               >
                 <span className="inline-flex items-center gap-1.5">
-                  <span aria-hidden="true">🔍</span>
+                  <MagnifyingGlassIcon className="w-3.5 h-3.5 shrink-0" />
                   <span>
                     {isUr
                       ? `ڈیٹا بیس میں موجود ملتے جلتے ریکارڈز (${msg.taskMeta.db_matches.length})`
@@ -3187,7 +3171,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
             {/* Header: Permission Status & Pre-DB Guard Badge */}
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-amber-700 dark:text-amber-300">
-                <span aria-hidden="true">🛡️</span>
+                <ShieldCheckIcon className="w-4 h-4 shrink-0" />
                 <span>
                   {isUr
                     ? msg.taskMeta?.proposed_task?.label_ur ||
@@ -3207,11 +3191,11 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 >
                   {msg.permissionResolved === "approved"
                     ? isUr
-                      ? "✅ اجازت دے دی گئی (Posted)"
-                      : "✅ Approved & Posted"
+                      ? "اجازت دے دی گئی (Posted)"
+                      : "Approved & Posted"
                     : isUr
-                    ? "✕ منسوخ شدہ (Not Posted)"
-                    : "✕ Denied (Not Posted)"}
+                    ? "منسوخ شدہ (Not Posted)"
+                    : "Denied (Not Posted)"}
                 </span>
               ) : (
                 <span className="px-2 py-0.5 rounded-full text-[9.5px] font-extrabold bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-500/30">
@@ -3361,8 +3345,8 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   <CheckCircleIcon className="w-4 h-4 shrink-0" />
                   <span>
                     {isUr
-                      ? "✅ اجازت دیں اور ڈیٹا بیس میں محفوظ کریں"
-                      : "✅ Approve & Post to Database"}
+                      ? "اجازت دیں اور ڈیٹا بیس میں محفوظ کریں"
+                      : "Approve & Post to Database"}
                   </span>
                 </button>
 
@@ -3377,7 +3361,8 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                       : "bg-white hover:bg-slate-100 border-slate-300 text-slate-700"
                   }`}
                 >
-                  <span>✏️ {isUr ? "تفصیل تبدیل کریں" : "Modify Details"}</span>
+                  <PencilSquareIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>{isUr ? "تفصیل تبدیل کریں" : "Modify Details"}</span>
                 </button>
 
                 <button
@@ -3389,7 +3374,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 >
                   <XMarkIcon className="w-3.5 h-3.5 shrink-0" />
                   <span>
-                    {isUr ? "✕ منسوخ کریں (Do Not Post)" : "✕ Deny & Do Not Post"}
+                    {isUr ? "منسوخ کریں (Do Not Post)" : "Deny & Do Not Post"}
                   </span>
                 </button>
               </div>
@@ -3416,7 +3401,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 </span>
               </span>
               <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
-                {isUr ? "✅ اجازت کے بعد ڈیٹا بیس میں محفوظ" : "✅ Posted to Database"}
+                {isUr ? "اجازت کے بعد ڈیٹا بیس میں محفوظ" : "Posted to Database"}
               </span>
             </div>
 
@@ -3597,7 +3582,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 onClick={() => startCubeDemo(msg.workflowId)}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs transition-all cursor-pointer"
               >
-                <span aria-hidden="true">🎯</span>
+                <PlayIcon className="w-3.5 h-3.5 shrink-0" />
                 <span>
                   {isUr
                     ? "مرحلہ وار عملی گائیڈ شروع کریں (Interactive Demo)"
@@ -3647,18 +3632,29 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 }
               }}
               title={isUr ? "کاپی کریں" : "Copy response"}
-              className="px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
-              {copiedMsgId === msg.id ? "✓ Copied" : "📋 Copy"}
+              {copiedMsgId === msg.id ? (
+                <>
+                  <CheckIcon className="w-3 h-3 shrink-0 text-emerald-500" />
+                  <span>Copied</span>
+                </>
+              ) : (
+                <>
+                  <ClipboardDocumentIcon className="w-3 h-3 shrink-0" />
+                  <span>Copy</span>
+                </>
+              )}
             </button>
             {msg.questionText && !isTaskAwaitingPermission && (
               <button
                 type="button"
                 onClick={() => handleAskSubmit(null, msg.questionText, true)}
                 title={isUr ? "دوبارہ تیار کریں" : "Regenerate response"}
-                className="px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
-                🔄 {isUr ? "دوبارہ" : "Retry"}
+                <ArrowPathIcon className="w-3 h-3 shrink-0" />
+                <span>{isUr ? "دوبارہ" : "Retry"}</span>
               </button>
             )}
           </div>
@@ -3732,9 +3728,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         {/* Report Title & Popup / Separate Page / Export CSV Buttons */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm" aria-hidden="true">
-              📋
-            </span>
             <span className="text-xs font-extrabold text-indigo-700 dark:text-indigo-300">
               {isUr
                 ? "تفصیلی آٹو فل رپورٹ (Detailed Formulation Report)"
@@ -3745,33 +3738,30 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
             <button
               type="button"
               onClick={() => setIsBgTaskDetailPopupOpen(true)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors cursor-pointer"
+              className="inline-flex items-center px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors cursor-pointer"
             >
-              <ArrowsPointingOutIcon className="w-3 h-3 shrink-0" />
               <span>{isUr ? "بڑی پاپ اپ ونڈو" : "Open Popup"}</span>
             </button>
             <button
               type="button"
               onClick={() => handleNavigateToRoute("/background-tasks")}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold border transition-colors cursor-pointer ${
+              className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold border transition-colors cursor-pointer ${
                 isDark
                   ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-indigo-300"
                   : "bg-white hover:bg-indigo-50 border-slate-200 text-indigo-700"
               }`}
             >
-              <ArrowTopRightOnSquareIcon className="w-3 h-3 shrink-0" />
               <span>{isUr ? "الگ صفحہ" : "Separate Page"}</span>
             </button>
             <button
               type="button"
               onClick={() => exportAutoFillReportCsv(reportData)}
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold border transition-colors cursor-pointer ${
+              className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold border transition-colors cursor-pointer ${
                 isDark
                   ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-emerald-300"
                   : "bg-white hover:bg-emerald-50 border-slate-200 text-emerald-700"
               }`}
             >
-              <span aria-hidden="true">📥</span>
               <span>{isUr ? "CSV ڈاؤن لوڈ" : "Export CSV"}</span>
             </button>
           </div>
@@ -3783,18 +3773,18 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
             {[
               {
                 id: "all",
-                en: `📋 All Scanned (${filledList.length + skippedList.length})`,
-                ur: `📋 تمام (${filledList.length + skippedList.length})`,
+                en: `All Scanned (${filledList.length + skippedList.length})`,
+                ur: `تمام (${filledList.length + skippedList.length})`,
               },
               {
                 id: "filled",
-                en: `✅ Filled (${totalFilled})`,
-                ur: `✅ فارمولیشن لگی (${totalFilled})`,
+                en: `Filled (${totalFilled})`,
+                ur: `فارمولیشن لگی (${totalFilled})`,
               },
               {
                 id: "skipped",
-                en: `⏭️ Skipped (${totalSkipped})`,
-                ur: `⏭️ چھوڑی گئیں (${totalSkipped})`,
+                en: `Skipped (${totalSkipped})`,
+                ur: `چھوڑی گئیں (${totalSkipped})`,
               },
             ].map((tab) => {
               const active = reportFilterTab === tab.id;
@@ -3861,11 +3851,11 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                       >
                         {isFilled
                           ? isUr
-                            ? "✅ اپڈیٹ شدہ"
-                            : "✅ Filled"
+                            ? "اپڈیٹ شدہ"
+                            : "Filled"
                           : isUr
-                          ? "⏭️ چھوڑی گئی"
-                          : "⏭️ Skipped"}
+                          ? "چھوڑی گئی"
+                          : "Skipped"}
                       </span>
                       <span className="font-bold text-slate-900 dark:text-white truncate">
                         {row.name}
@@ -3886,7 +3876,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                           {row.formulation}
                         </span>
                         <span className="text-[10px] text-indigo-600 dark:text-indigo-400">
-                          🔍{" "}
                           {isUr
                             ? row.source_ur || "گوگل سرچ سے تصدیق شدہ"
                             : row.source_en || "Google Search Verified"}
@@ -3988,7 +3977,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               }}
               className="px-2.5 py-1 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
             >
-              {isUr ? `🎯 مرحلہ ${stepIndex + 1} جاری رکھیں` : `🎯 Resume Step ${stepIndex + 1}`}
+              {isUr ? `مرحلہ ${stepIndex + 1} جاری رکھیں` : `Resume Step ${stepIndex + 1}`}
             </button>
             <button
               type="button"
@@ -4017,7 +4006,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-extrabold shrink-0">
-              🎯
+              <PlayIcon className="w-3 h-3" />
             </span>
             <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300 truncate">
               {isUr ? tourTitle.ur : tourTitle.en}
@@ -4034,7 +4023,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               }}
               className="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-2xs cursor-pointer"
             >
-              {isUr ? "🔦 لائیو اسپاٹ لائٹ کھولیں" : "🔦 Live On-Screen Spotlight"}
+              {isUr ? "لائیو اسپاٹ لائٹ کھولیں" : "Live On-Screen Spotlight"}
             </button>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
               {isUr
@@ -4063,20 +4052,25 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         {/* Grounded Provenance Status: Observed on Current Screen vs. Conditional */}
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <span
-            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
+            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
               isOnTargetScreen
                 ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                 : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
             }`}
           >
+            <span
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                isOnTargetScreen ? "bg-emerald-500" : "bg-amber-500"
+              }`}
+            />
             <span>
               {isOnTargetScreen
                 ? isUr
-                  ? `🟢 موجودہ اسکرین پر مشاہدہ شدہ (${step.screen || location.pathname})`
-                  : `🟢 Observed on current screen (${step.screen || location.pathname})`
+                  ? `موجودہ اسکرین پر مشاہدہ شدہ (${step.screen || location.pathname})`
+                  : `Observed on current screen (${step.screen || location.pathname})`
                 : isUr
-                ? `📘 مشروط مرحلہ — اسکرین: ${step.screen} (v${PRODUCT_VERSION})`
-                : `📘 Conditional — Requires ${step.screen} (v${PRODUCT_VERSION})`}
+                ? `مشروط مرحلہ — اسکرین: ${step.screen} (v${PRODUCT_VERSION})`
+                : `Conditional — Requires ${step.screen} (v${PRODUCT_VERSION})`}
             </span>
           </span>
 
@@ -4086,7 +4080,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               onClick={() => highlightElementOnScreen(step.target || step.targetSelector, step)}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 transition-colors cursor-pointer"
             >
-              <span>🎯</span>
               <span>{isUr ? "اسکرین پر نمایاں کریں" : "Highlight on Screen"}</span>
             </button>
           ) : (
@@ -4104,15 +4097,15 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         {highlightStatus === "found" && (
           <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
             {isUr
-              ? "✓ متعلقہ بٹن/فیلڈ کو اسکرین پر ہائی لائٹ کر دیا گیا ہے!"
-              : "✓ Highlighted target area on your active screen!"}
+              ? "متعلقہ بٹن/فیلڈ کو اسکرین پر ہائی لائٹ کر دیا گیا ہے!"
+              : "Highlighted target area on your active screen!"}
           </p>
         )}
         {highlightStatus === "not_found" && (
           <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
             {isUr
-              ? "ℹ️ یہ فیلڈ فارم کھولنے یا اگلے مرحلے میں نظر آئے گی۔"
-              : "ℹ️ This control appears once the form/modal is open on screen."}
+              ? "یہ فیلڈ فارم کھولنے یا اگلے مرحلے میں نظر آئے گی۔"
+              : "This control appears once the form/modal is open on screen."}
           </p>
         )}
 
@@ -4255,8 +4248,8 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 }}
                 title={
                   isUr
-                    ? "اگلا کرتب دیکھنے کے لیے کلک کریں (روبکس کیوب 🧩 / ہیڈ فون 🎧 / فلپ 🤸)"
-                    : "Click Cube for next trick (Rubik's Cube 🧩 / Headphones 🎧 / 360° Flip 🤸)"
+                    ? "اگلا کرتب دیکھنے کے لیے کلک کریں (روبکس کیوب / ہیڈ فون / فلپ)"
+                    : "Click Cube for next trick (Rubik's Cube / Headphones / 360° Flip)"
                 }
                 className={`group relative shrink-0 flex items-center justify-center w-10 h-11 rounded-2xl border cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-hidden ${
                   isDark
@@ -4434,7 +4427,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   : "text-slate-600 hover:bg-white hover:text-slate-900"
               } ${isUr ? "guide-bot-urdu-inline" : ""}`}
             >
-              <span aria-hidden="true">💬</span>
+              <ChatBubbleLeftRightIcon className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">{isUr ? "اے آئی چیٹ" : "AI Chat"}</span>
             </button>
 
@@ -4454,7 +4447,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   : "text-slate-600 hover:bg-white hover:text-slate-900"
               } ${isUr ? "guide-bot-urdu-inline" : ""}`}
             >
-              <span aria-hidden="true">📘</span>
+              <BookOpenIcon className="w-3.5 h-3.5 shrink-0" />
               <span className="truncate">{isUr ? "اسکرین گائیڈ" : "Screen Guide"}</span>
             </button>
 
@@ -4474,10 +4467,8 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   : "text-slate-600 hover:bg-white hover:text-slate-900"
               } ${isUr ? "guide-bot-urdu-inline" : ""}`}
             >
-              {bgTask?.running ? (
+              {bgTask?.running && (
                 <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
-              ) : (
-                <span aria-hidden="true">⚡</span>
               )}
               <span className="truncate">
                 {isUr ? "بیک گراؤنڈ ٹاسکس" : "Tasks"}
@@ -4636,7 +4627,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-0.5">
                   <div className="inline-flex items-center gap-1.5 text-xs font-extrabold text-indigo-600 dark:text-indigo-400">
-                    <SparklesIcon className="w-4 h-4 shrink-0" />
                     <span>
                       {isUr
                         ? "خودکار فارمولیشن ٹاسک (100% تصدیق شدہ)"
@@ -4691,7 +4681,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 >
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <p className="text-xs font-extrabold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
-                      <span aria-hidden="true">🛡️</span>
                       <span>
                         {isUr
                           ? "ڈیٹا بیس میں محفوظ کرنے سے پہلے نتیجہ چیک کریں اور اجازت دیں"
@@ -4705,7 +4694,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
 
                   {bgPreviewLoading ? (
                     <div className="p-2.5 rounded-xl border border-amber-400/30 bg-white/60 dark:bg-slate-900/60 flex items-center gap-2 text-xs font-bold">
-                      <SparklesIcon className="w-4 h-4 text-amber-500 animate-spin shrink-0" />
                       <span>
                         {isUr
                           ? "پروڈکٹس کا پری ویو نتیجہ تیار کیا جا رہا ہے (ڈیٹا بیس میں کچھ محفوظ نہیں کیا جا رہا)..."
@@ -4788,13 +4776,12 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                         setBgPreviewData(null);
                         startBackgroundFormulationTask();
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
+                      className="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
                     >
-                      <CheckCircleIcon className="w-4 h-4 shrink-0" />
                       <span>
                         {isUr
-                          ? "✅ اجازت دیں اور ڈیٹا بیس میں پوسٹ کریں"
-                          : "✅ Approve & Post to Database"}
+                          ? "اجازت دیں اور ڈیٹا بیس میں پوسٹ کریں"
+                          : "Approve & Post to Database"}
                       </span>
                     </button>
                     <button
@@ -4803,10 +4790,9 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                         setBgTaskAwaitingPermission(false);
                         setBgPreviewData(null);
                       }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 border border-rose-500/30 transition-all cursor-pointer"
+                      className="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 border border-rose-500/30 transition-all cursor-pointer"
                     >
-                      <XMarkIcon className="w-3.5 h-3.5 shrink-0" />
-                      <span>{isUr ? "✕ منسوخ کریں (Do Not Post)" : "✕ Deny & Do Not Post"}</span>
+                      <span>{isUr ? "منسوخ کریں (Do Not Post)" : "Deny & Do Not Post"}</span>
                     </button>
                   </div>
                 </div>
@@ -4817,9 +4803,8 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   <button
                     type="button"
                     onClick={previewBackgroundFormulationTask}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
+                    className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
                   >
-                    <span aria-hidden="true">🔍</span>
                     <span>
                       {isUr
                         ? "نتیجہ چیک کریں اور فارمولیشن ٹاسک شروع کریں"
@@ -4830,9 +4815,8 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   <button
                     type="button"
                     onClick={stopBackgroundTask}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
+                    className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
                   >
-                    <span aria-hidden="true">⏹️</span>
                     <span>
                       {isUr ? "بیک گراؤنڈ ٹاسک روکیں" : "Stop Background Task"}
                     </span>
@@ -4842,13 +4826,12 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 <button
                   type="button"
                   onClick={() => setIsBgTaskDetailPopupOpen(true)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold border transition-colors cursor-pointer ${
+                  className={`inline-flex items-center px-3 py-2 rounded-xl text-xs font-extrabold border transition-colors cursor-pointer ${
                     isDark
                       ? "bg-indigo-950/60 hover:bg-indigo-900/70 border-indigo-500/40 text-indigo-200"
                       : "bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700"
                   }`}
                 >
-                  <ArrowsPointingOutIcon className="w-3.5 h-3.5 shrink-0" />
                   <span>
                     {isUr ? "تفصیلی پاپ اپ ونڈو" : "Open Detailed Popup"}
                   </span>
@@ -4857,7 +4840,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 <button
                   type="button"
                   onClick={() => handleNavigateToRoute("/background-tasks")}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold border transition-colors cursor-pointer ${
+                  className={`inline-flex items-center px-3 py-2 rounded-xl text-xs font-extrabold border transition-colors cursor-pointer ${
                     isDark
                       ? "bg-emerald-950/60 hover:bg-emerald-900/70 border-emerald-500/40 text-emerald-200"
                       : "bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700"
@@ -4866,20 +4849,18 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   <span>
                     {isUr ? "الگ صفحے میں کھولیں" : "Open Separate Page"}
                   </span>
-                  <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5 shrink-0" />
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleNavigateToRoute("/products")}
-                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                  className={`inline-flex items-center px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
                     isDark
                       ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
                       : "bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700"
                   }`}
                 >
                   <span>{isUr ? "پروڈکٹس لسٹ کھولیں" : "Open Products"}</span>
-                  <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5 shrink-0" />
                 </button>
               </div>
             </div>
@@ -4895,31 +4876,30 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400">
                   {isUr
-                    ? "⚡ دیگر اے آئی ٹاسکس (پری ویو اور اجازت کے ساتھ):"
-                    : "⚡ Quick AI Tasks (Staged Preview + Permission Before DB Post):"}
+                    ? "دیگر اے آئی ٹاسکس (پری ویو اور اجازت کے ساتھ):"
+                    : "Quick AI Tasks (Staged Preview + Permission Before DB Post):"}
                 </span>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  { icon: "➕", en: "Add Product", ur: "نئی پروڈکٹ", cmd: "Add a new product" },
-                  { icon: "✏️", en: "Edit Product", ur: "پروڈکٹ ایڈٹ", cmd: "Edit a product" },
-                  { icon: "🏷️", en: "Add Brand", ur: "نیا برانڈ", cmd: "Add a new brand" },
-                  { icon: "📂", en: "Add Category", ur: "نئی کیٹیگری", cmd: "Add a new category" },
-                  { icon: "🚚", en: "Add Supplier", ur: "نیا سپلائر", cmd: "Add a new supplier" },
-                  { icon: "👤", en: "Add Customer", ur: "نیا کسٹمر", cmd: "Add a new customer" },
-                  { icon: "📋", en: "Log Demand", ur: "کسٹمر ڈیمانڈ", cmd: "Add a new user demand" },
+                  { en: "Add Product", ur: "نئی پروڈکٹ", cmd: "Add a new product" },
+                  { en: "Edit Product", ur: "پروڈکٹ ایڈٹ", cmd: "Edit a product" },
+                  { en: "Add Brand", ur: "نیا برانڈ", cmd: "Add a new brand" },
+                  { en: "Add Category", ur: "نئی کیٹیگری", cmd: "Add a new category" },
+                  { en: "Add Supplier", ur: "نیا سپلائر", cmd: "Add a new supplier" },
+                  { en: "Add Customer", ur: "نیا کسٹمر", cmd: "Add a new customer" },
+                  { en: "Log Demand", ur: "کسٹمر ڈیمانڈ", cmd: "Add a new user demand" },
                 ].map((tsk) => (
                   <button
                     key={tsk.cmd}
                     type="button"
                     onClick={() => handleAskSubmit(null, tsk.cmd, true)}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer active:scale-95 ${
+                    className={`inline-flex items-center px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-all cursor-pointer active:scale-95 ${
                       isDark
                         ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
                         : "bg-slate-50 hover:bg-blue-50 border-slate-200 text-slate-700"
                     }`}
                   >
-                    <span aria-hidden="true">{tsk.icon}</span>
                     <span>{isUr ? tsk.ur : tsk.en}</span>
                   </button>
                 ))}
@@ -4937,11 +4917,13 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               >
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex items-center gap-2">
-                    {bgTask.running ? (
-                      <SparklesIcon className="w-4 h-4 text-indigo-500 animate-spin shrink-0" />
-                    ) : (
-                      <CheckCircleIcon className="w-4 h-4 text-emerald-500 shrink-0" />
-                    )}
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                        bgTask.running
+                          ? "bg-indigo-500 animate-pulse"
+                          : "bg-emerald-500"
+                      }`}
+                    />
                     <span className="text-xs font-extrabold">
                       {bgTask.running
                         ? isUr
@@ -5179,7 +5161,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                           : "bg-white hover:bg-blue-50/60 border-slate-200/90 text-slate-700 hover:border-blue-300 shadow-2xs"
                       } ${isUr ? "guide-bot-urdu-inline" : ""}`}
                     >
-                      <span aria-hidden="true">{chip.icon}</span>
                       <span>{isUr ? chip.ur : chip.en}</span>
                     </button>
                   ))}
@@ -5235,7 +5216,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 className="px-3 py-2 rounded-xl border bg-indigo-500/10 border-indigo-500/30 text-indigo-950 dark:text-indigo-200 flex items-center justify-between gap-2 text-xs font-bold"
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <SparklesIcon className="w-3.5 h-3.5 shrink-0 text-indigo-500 animate-spin" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse shrink-0" />
                   <span className="truncate">
                     {isUr
                       ? `بیک گراؤنڈ ٹاسک جاری (${bgTask.updatedCount} اپڈیٹ)...`
@@ -5342,8 +5323,9 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                               ? "السلام علیکم! میں کیوب اے آئی ہوں"
                               : "How can I help you today?"}
                           </span>
-                          <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/25">
-                            {isUr ? "🛡️ پری ویو گارڈ" : "🛡️ Pre-DB Preview Guard"}
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/25">
+                            <ShieldCheckIcon className="w-3 h-3 shrink-0" />
+                            <span>{isUr ? "پری ویو گارڈ" : "Pre-DB Preview Guard"}</span>
                           </span>
                         </div>
                         <p className="text-[11.5px] leading-relaxed text-slate-600 dark:text-slate-300">
@@ -5359,7 +5341,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                       {[
                         {
                           id: "bento-explain",
-                          icon: "📘",
                           accent: isDark
                             ? "from-blue-500/15 to-cyan-500/5 border-blue-500/30 hover:border-blue-400"
                             : "from-blue-50/90 to-white border-blue-200/90 hover:border-blue-400",
@@ -5380,7 +5361,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                         },
                         {
                           id: "bento-product",
-                          icon: "➕",
                           accent: isDark
                             ? "from-emerald-500/15 to-teal-500/5 border-emerald-500/30 hover:border-emerald-400"
                             : "from-emerald-50/90 to-white border-emerald-200/90 hover:border-emerald-400",
@@ -5395,7 +5375,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                         },
                         {
                           id: "bento-autofill",
-                          icon: "🧪",
                           accent: isDark
                             ? "from-indigo-500/15 to-purple-500/5 border-indigo-500/30 hover:border-indigo-400"
                             : "from-indigo-50/90 to-white border-indigo-200/90 hover:border-indigo-400",
@@ -5414,7 +5393,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                         },
                         {
                           id: "bento-tour",
-                          icon: "🎯",
                           accent: isDark
                             ? "from-amber-500/15 to-orange-500/5 border-amber-500/30 hover:border-amber-400"
                             : "from-amber-50/90 to-white border-amber-200/90 hover:border-amber-400",
@@ -5439,9 +5417,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                           className={`guide-bot-bento-card p-3 rounded-2xl border bg-gradient-to-br text-left flex flex-col justify-between gap-1.5 shadow-2xs cursor-pointer ${card.accent}`}
                         >
                           <div className="flex items-center justify-between gap-1.5 w-full">
-                            <span className="text-base leading-none" aria-hidden="true">
-                              {card.icon}
-                            </span>
                             <span className="px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider bg-slate-900/5 dark:bg-white/10 text-slate-600 dark:text-slate-300">
                               {isUr ? card.badgeUr : card.badgeEn}
                             </span>
@@ -5469,25 +5444,25 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
                           {isUr
-                            ? "⚡ ون کلک ٹاسکس (یا نیچے / ٹائپ کریں)"
-                            : "⚡ Quick ERP Tasks (or type / below)"}
+                            ? "ون کلک ٹاسکس (یا نیچے / ٹائپ کریں)"
+                            : "Quick ERP Tasks (or type / below)"}
                         </span>
                         <button
                           type="button"
                           onClick={() => setIsBgTaskDetailPopupOpen(true)}
                           className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
                         >
-                          {isUr ? "📊 ٹاسک رپورٹ پاپ اپ" : "📊 Task Report Popup →"}
+                          {isUr ? "ٹاسک رپورٹ پاپ اپ" : "Task Report Popup →"}
                         </button>
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {[
-                          { icon: "✏️", en: "Edit Product", ur: "پروڈکٹ ایڈٹ", cmd: "Edit a product" },
-                          { icon: "🏷️", en: "Add Brand", ur: "نیا برانڈ", cmd: "Add a new brand" },
-                          { icon: "📂", en: "Add Category", ur: "نئی کیٹیگری", cmd: "Add a new category" },
-                          { icon: "🚚", en: "Add Supplier", ur: "نیا سپلائر", cmd: "Add a new supplier" },
-                          { icon: "👤", en: "Add Customer", ur: "نیا کسٹمر", cmd: "Add a new customer" },
-                          { icon: "📋", en: "Log Demand", ur: "ڈیمانڈ درج کریں", cmd: "Add a new user demand" },
+                          { en: "Edit Product", ur: "پروڈکٹ ایڈٹ", cmd: "Edit a product" },
+                          { en: "Add Brand", ur: "نیا برانڈ", cmd: "Add a new brand" },
+                          { en: "Add Category", ur: "نئی کیٹیگری", cmd: "Add a new category" },
+                          { en: "Add Supplier", ur: "نیا سپلائر", cmd: "Add a new supplier" },
+                          { en: "Add Customer", ur: "نیا کسٹمر", cmd: "Add a new customer" },
+                          { en: "Log Demand", ur: "ڈیمانڈ درج کریں", cmd: "Add a new user demand" },
                         ].map((chip) => (
                           <button
                             key={chip.cmd}
@@ -5499,7 +5474,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                                 : "bg-slate-50 hover:bg-blue-50/80 border-slate-200 text-slate-700"
                             }`}
                           >
-                            <span aria-hidden="true">{chip.icon}</span>
                             <span>{isUr ? chip.ur : chip.en}</span>
                           </button>
                         ))}
@@ -5552,20 +5526,20 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="inline-flex items-center justify-center w-5 h-5 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-[11px] font-black shrink-0 animate-pulse">
-                        🤖
+                        <SparklesIcon className="w-3 h-3" />
                       </span>
                       <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400 truncate">
                         {thinkingStageIdx === 0
                           ? isUr
-                            ? "🧠 آپ کی بات اور ٹاسک کو سمجھا جا رہا ہے..."
-                            : "🧠 Understanding your request & intent..."
+                            ? "آپ کی بات اور ٹاسک کو سمجھا جا رہا ہے..."
+                            : "Understanding your request & intent..."
                           : thinkingStageIdx === 1
                           ? isUr
-                            ? "🔍 کاروبار ای آر پی سیاق و سباق اور پری ویو چیک ہو رہا ہے..."
-                            : "🔍 Checking Karobar ERP context & staging preview..."
+                            ? "کاروبار ای آر پی سیاق و سباق اور پری ویو چیک ہو رہا ہے..."
+                            : "Checking Karobar ERP context & staging preview..."
                           : isUr
-                          ? "✨ لائیو اے آئی جواب تیار کیا جا رہا ہے..."
-                          : "✨ Generating live AI response..."}
+                          ? "لائیو اے آئی جواب تیار کیا جا رہا ہے..."
+                          : "Generating live AI response..."}
                       </span>
                     </div>
                     <button
@@ -5630,10 +5604,10 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 >
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {[
-                      { icon: "➕", en: "Add Product", ur: "نئی پروڈکٹ", cmd: "Add a new product" },
-                      { icon: "✏️", en: "Edit Product", ur: "پروڈکٹ ایڈٹ", cmd: "Edit a product" },
-                      { icon: "🧪", en: "Auto-Fill Salts", ur: "فارمولیشن", cmd: "Auto-fill missing formulations for my products" },
-                      { icon: "🏷️", en: "Add Brand", ur: "نیا برانڈ", cmd: "Add a new brand" },
+                      { en: "Add Product", ur: "نئی پروڈکٹ", cmd: "Add a new product" },
+                      { en: "Edit Product", ur: "پروڈکٹ ایڈٹ", cmd: "Edit a product" },
+                      { en: "Auto-Fill Salts", ur: "فارمولیشن", cmd: "Auto-fill missing formulations for my products" },
+                      { en: "Add Brand", ur: "نیا برانڈ", cmd: "Add a new brand" },
                     ].map((quick) => (
                       <button
                         key={quick.cmd}
@@ -5645,7 +5619,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                             : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
                         }`}
                       >
-                        <span aria-hidden="true">{quick.icon}</span>
                         <span>{isUr ? quick.ur : quick.en}</span>
                       </button>
                     ))}
@@ -5715,8 +5688,8 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 >
                   <span>
                     {isUr
-                      ? "⚡ کوپائلٹ کمانڈز (منتخب کرنے کے لیے کلک یا Enter دبائیں)"
-                      : "⚡ Copilot Slash Commands (↑↓ Navigate · Enter Select)"}
+                      ? "کوپائلٹ کمانڈز (منتخب کرنے کے لیے کلک یا Enter دبائیں)"
+                      : "Copilot Slash Commands (↑↓ Navigate · Enter Select)"}
                   </span>
                   <button
                     type="button"
@@ -5747,9 +5720,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="text-sm shrink-0" aria-hidden="true">
-                            {cmdItem.icon}
-                          </span>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="text-xs font-extrabold text-slate-900 dark:text-white">
@@ -5796,7 +5766,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   }`}
                   title={isUr ? displayedGuide.title.ur : displayedGuide.title.en}
                 >
-                  <span aria-hidden="true">📍</span>
+                  <MapPinIcon className="w-3 h-3 shrink-0 text-blue-500" />
                   <span className="truncate">
                     {isUr ? displayedGuide.title.ur : displayedGuide.title.en}
                   </span>
@@ -5956,7 +5926,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                     title={isUr ? "لائیو اسٹریمنگ روکیں" : "Stop streaming"}
                     className="h-8 px-2.5 rounded-xl text-[11px] font-extrabold bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-500/30 cursor-pointer"
                   >
-                    ⏹
+                    Stop
                   </button>
                 )}
                 <button

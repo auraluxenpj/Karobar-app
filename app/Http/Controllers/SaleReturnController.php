@@ -146,7 +146,7 @@ class SaleReturnController extends Controller
 
     // ===== CRUD =====
 
-    // 🔒 SaleReturnController@index
+    // SaleReturnController@index
     public function index(Request $request)
     {
         $this->authorize('viewAny', SaleReturn::class);
@@ -175,7 +175,7 @@ class SaleReturnController extends Controller
 
     public function show(SaleReturn $saleReturn)
     {
-        // 🔒 view
+        // view
         $this->authorize('view', $saleReturn);
 
         return $saleReturn->load(['customer', 'saleInvoice', 'items.product', 'account']);
@@ -183,7 +183,7 @@ class SaleReturnController extends Controller
 
     public function store(Request $request)
     {
-        // 🔒 create
+        // create
         $this->authorize('create', SaleReturn::class);
 
         $data = $request->validate([
@@ -218,7 +218,7 @@ class SaleReturnController extends Controller
             abort(401, 'Unauthenticated: user_id is required');
         }
 
-        // 🛡️ Server-Authoritative Sale Return Totals
+        // Server-Authoritative Sale Return Totals
         $calculated = app(\App\Services\InvoiceCalculationService::class)->calculateAndValidateSaleReturn($data, Auth::user());
         $data['items']               = $calculated['items'];
         $data['gross_total']         = $calculated['gross_total'];
@@ -271,7 +271,7 @@ class SaleReturnController extends Controller
 
     public function update(Request $request, SaleReturn $saleReturn)
     {
-        // 🔒 update
+        // update
         $this->authorize('update', $saleReturn);
 
         $data = $request->validate([
@@ -307,7 +307,7 @@ class SaleReturnController extends Controller
             abort(401, 'Unauthenticated: user_id is required');
         }
 
-        // 🛡️ Server-Authoritative Sale Return Totals
+        // Server-Authoritative Sale Return Totals
         $calculated = app(\App\Services\InvoiceCalculationService::class)->calculateAndValidateSaleReturn($data, Auth::user());
         $data['items']               = $calculated['items'];
         $data['gross_total']         = $calculated['gross_total'];
@@ -383,7 +383,7 @@ class SaleReturnController extends Controller
 
     public function destroy(SaleReturn $saleReturn)
     {
-        // 🔒 delete
+        // delete
         $this->authorize('delete', $saleReturn);
 
         return DB::transaction(function () use ($saleReturn) {
@@ -400,7 +400,7 @@ class SaleReturnController extends Controller
 
     public function generateNewCode()
     {
-        // 🔒 usually tied to create permission
+        // usually tied to create permission
         $this->authorize('create', SaleReturn::class);
 
         $last = SaleReturn::orderBy('id', 'desc')->first();

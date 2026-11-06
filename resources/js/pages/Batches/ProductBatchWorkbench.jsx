@@ -877,7 +877,7 @@ export default function ProductBatchWorkbench() {
                     }
                     className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 cursor-pointer"
                   >
-                    Open Product Edit ↗
+                    Open Product Edit
                   </button>
                 )}
               </div>
@@ -1741,11 +1741,11 @@ export default function ProductBatchWorkbench() {
           {/* Status Filter Pills */}
           <div className="flex items-center flex-wrap gap-1.5">
             {[
-              { id: "all", label: "All", count: globalSummary.total_batches_tracked },
-              { id: "expired", label: "🔴 Expired", count: globalSummary.total_expired_batches },
-              { id: "critical", label: "🟠 Critical ≤30d", count: globalSummary.total_critical_batches },
-              { id: "warning", label: "🟡 Warning", count: globalSummary.total_warning_batches },
-              { id: "safe", label: "🟢 Safe", count: Math.max(0, globalSummary.total_batches_tracked - globalSummary.total_warning_batches) },
+              { id: "all", label: "All", count: globalSummary.total_batches_tracked, dot: null },
+              { id: "expired", label: "Expired", count: globalSummary.total_expired_batches, dot: "bg-red-500" },
+              { id: "critical", label: "Critical ≤30d", count: globalSummary.total_critical_batches, dot: "bg-orange-500" },
+              { id: "warning", label: "Warning", count: globalSummary.total_warning_batches, dot: "bg-amber-400" },
+              { id: "safe", label: "Safe", count: Math.max(0, globalSummary.total_batches_tracked - globalSummary.total_warning_batches), dot: "bg-emerald-500" },
             ].map((tab) => {
               const active = globalStatus === tab.id;
               return (
@@ -1756,12 +1756,13 @@ export default function ProductBatchWorkbench() {
                     setGlobalStatus(tab.id);
                     setGlobalPage(1);
                   }}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                     active
                       ? "bg-blue-600 text-white shadow-xs"
                       : "bg-slate-100 dark:bg-slate-700/70 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
                   }`}
                 >
+                  {tab.dot && <span className={`w-2 h-2 rounded-full shrink-0 ${tab.dot}`} />}
                   <span>{tab.label}</span>
                   <span className="ml-1.5 opacity-80 font-mono">({tab.count || 0})</span>
                 </button>

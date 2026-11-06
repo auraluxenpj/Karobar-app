@@ -1011,9 +1011,11 @@ class CubeTaskExecutorService
      */
     protected function isCancelCommand(string $lower): bool
     {
+        $clean = trim((string) preg_replace('/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u', '', $lower), " \t\n\r\0\x0B.!?,");
+
         return (bool) preg_match(
             '/^(?:please\s+|cube\s+)?(?:no|n|nope|cancel|cancel\s+task|deny|denied|reject|stop|abort|never\s*mind|forget\s+it|skip|don\'?t|do\s+not|nahi|na|mat\s+karo|rahne\s+do|rehne\s+do|choro|نہیں|منسوخ|کینسل|رہنے\s+دو|مت\s+کریں)$/iu',
-            trim($lower, " \t\n\r\0\x0B.!?,✕❌")
+            $clean
         );
     }
 
@@ -1022,7 +1024,7 @@ class CubeTaskExecutorService
      */
     protected function isConfirmCommand(string $lower): bool
     {
-        $clean = trim($lower, " \t\n\r\0\x0B.!?,✅👍🔒");
+        $clean = trim((string) preg_replace('/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u', '', $lower), " \t\n\r\0\x0B.!?,");
 
         return (bool) preg_match(
             '/^(?:please\s+|cube\s+)?(?:yes|y|yeah|yep|sure|ok|okay|confirm|confirmed|approve|approved|approve\s+and\s+execute|approve\s+and\s+post|approve\s+&\s+post|post\s+to\s+database|allow|allowed|grant\s+permission|give\s+permission|permission\s+granted|proceed|execute|execute\s+task|run\s+task|do\s+it|go\s+ahead|save|save\s+it|create\s+it|update\s+it|apply|apply\s+changes|haan|han|ji|ji\s+haan|jee|jee\s+haan|theek\s+hai|thik\s+hai|kar\s+do|kar\s+dein|ijazat\s+hai|manzoor|ہاں|جی|جی\s+ہاں|منظور|منظور\s+ہے|اجازت\s+ہے|ٹھیک\s+ہے|کر\s+دیں|چلائیں|محفوظ\s+کریں)(?:\s+(?:please|cube|now|task|it|to\s+database|and\s+execute|and\s+execute\s+task|and\s+post|and\s+post\s+to\s+database))?$/iu',
@@ -2029,10 +2031,10 @@ SYSTEM;
                 $this->clearPendingTask($user);
 
                 return $this->formatTaskResponse(
-                    titleEn: "✅ Selected Existing Product from Database: {$existingProd->name}",
-                    titleUr: "✅ ڈیٹا بیس سے موجودہ پروڈکٹ منتخب کر لی گئی: {$existingProd->name}",
-                    answerEn: "✅ **Selected Existing Product (No Duplicate Created):**\n- **{$existingProd->name}** (`{$existingProd->product_code}`) • Stock: `{$existingProd->quantity}` • Pack Sale: `Rs. {$existingProd->pack_sale_price}`",
-                    answerUr: "✅ **موجودہ پروڈکٹ منتخب کر لی گئی (نئی ڈپلیکیٹ پروڈکٹ نہیں بنائی گئی):**\n- **{$existingProd->name}** (`{$existingProd->product_code}`)",
+                    titleEn: "Selected Existing Product from Database: {$existingProd->name}",
+                    titleUr: "ڈیٹا بیس سے موجودہ پروڈکٹ منتخب کر لی گئی: {$existingProd->name}",
+                    answerEn: "**Selected Existing Product (No Duplicate Created):**\n- **{$existingProd->name}** (`{$existingProd->product_code}`) • Stock: `{$existingProd->quantity}` • Pack Sale: `Rs. {$existingProd->pack_sale_price}`",
+                    answerUr: "**موجودہ پروڈکٹ منتخب کر لی گئی (نئی ڈپلیکیٹ پروڈکٹ نہیں بنائی گئی):**\n- **{$existingProd->name}** (`{$existingProd->product_code}`)",
                     links: [
                         ['path' => '/products/'.$existingProd->id.'/edit', 'en' => 'Open '.$existingProd->name, 'ur' => $existingProd->name.' کھولیں'],
                         ['path' => '/products', 'en' => 'Open Products Catalog', 'ur' => 'پروڈکٹس لسٹ کھولیں'],
@@ -2274,8 +2276,8 @@ SYSTEM;
         $linesUr = [];
 
         if (! empty($created)) {
-            $linesEn[] = '✅ **Cube AI Task Completed — Created '.count($created).' Product(s):**';
-            $linesUr[] = '✅ **کیوب اے آئی نے '.count($created).' نئی پروڈکٹ(س) کامیابی سے شامل کر دیں:**';
+            $linesEn[] = '**Cube AI Task Completed — Created '.count($created).' Product(s):**';
+            $linesUr[] = '**کیوب اے آئی نے '.count($created).' نئی پروڈکٹ(س) کامیابی سے شامل کر دیں:**';
 
             foreach ($created as $idx => $c) {
                 $num = $idx + 1;
@@ -2287,8 +2289,8 @@ SYSTEM;
 
         if (! empty($alreadyExisted)) {
             $names = implode(', ', array_map(fn ($e) => "**{$e['name']}** (`{$e['product_code']}`)", $alreadyExisted));
-            $linesEn[] = "ℹ️ Already in catalog (skipped duplicate creation): {$names}";
-            $linesUr[] = "ℹ️ یہ پروڈکٹس پہلے سے موجود ہیں: {$names}";
+            $linesEn[] = "Already in catalog (skipped duplicate creation): {$names}";
+            $linesUr[] = "یہ پروڈکٹس پہلے سے موجود ہیں: {$names}";
         }
 
         $links = [
@@ -2443,17 +2445,17 @@ SYSTEM;
 
         $firstCollected = $proposedProducts[0] ?? [];
 
-        $answerEn = "🔒 **User Permission Required — Review Result Before Posting to Database**\n\n"
+        $answerEn = "**User Permission Required — Review Result Before Posting to Database**\n\n"
             ."Cube AI has prepared the following **Add Product** result preview (**nothing has been posted to the database yet**):\n\n"
             .implode("\n", $previewLinesEn)."\n\n"
             ."**Do you grant permission to post this record to the database?**\n"
-            ."Click **\"✅ Approve & Post to Database\"** below (or reply `yes` / `confirm` to proceed, or `cancel` to abort).";
+            ."Click **\"Approve & Post to Database\"** below (or reply `yes` / `confirm` to proceed, or `cancel` to abort).";
 
-        $answerUr = "🔒 **ڈیٹا بیس میں محفوظ کرنے سے پہلے نتیجہ چیک کریں اور اجازت (Permission) دیں**\n\n"
+        $answerUr = "**ڈیٹا بیس میں محفوظ کرنے سے پہلے نتیجہ چیک کریں اور اجازت (Permission) دیں**\n\n"
             ."کیوب اے آئی نے **نئی پروڈکٹ شامل کرنے** کا نتیجہ تیار کر لیا ہے (**ابھی ڈیٹا بیس میں پوسٹ نہیں کیا گیا**):\n\n"
             .implode("\n", $previewLinesUr)."\n\n"
             ."**کیا آپ اس نتیجے کو ڈیٹا بیس میں پوسٹ کرنے کی اجازت دیتے ہیں؟**\n"
-            ."نیچے **\"✅ اجازت دیں اور ڈیٹا بیس میں محفوظ کریں\"** بٹن پر کلک کریں (یا تصدیق کے لیے `yes` لکھیں، اور منسوخ کرنے کے لیے `cancel` لکھیں)۔";
+            ."نیچے **\"اجازت دیں اور ڈیٹا بیس میں محفوظ کریں\"** بٹن پر کلک کریں (یا تصدیق کے لیے `yes` لکھیں، اور منسوخ کرنے کے لیے `cancel` لکھیں)۔";
 
         return $this->formatTaskResponse(
             titleEn: 'Permission Required: Confirm Adding '.count($proposedProducts).' Product(s)',
@@ -2520,8 +2522,8 @@ SYSTEM;
                     'variant' => 'primary',
                 ];
                 $stepChoices[] = [
-                    'label_en' => "✏️ Edit Existing: {$m['name']}",
-                    'label_ur' => "✏️ موجودہ ایڈٹ کریں: {$m['name']}",
+                    'label_en' => "Edit Existing: {$m['name']}",
+                    'label_ur' => "موجودہ ایڈٹ کریں: {$m['name']}",
                     'reply' => "Edit existing #{$m['id']}: {$m['name']}",
                     'variant' => 'secondary',
                 ];
@@ -2529,29 +2531,29 @@ SYSTEM;
         }
 
         $stepChoices[] = [
-            'label_en' => "➕ Create \"{$name}\" as New Product Anyway",
-            'label_ur' => "➕ \"{$name}\" نئی پروڈکٹ کے طور پر شامل کریں",
+            'label_en' => "Create \"{$name}\" as New Product Anyway",
+            'label_ur' => "\"{$name}\" نئی پروڈکٹ کے طور پر شامل کریں",
             'reply' => 'Create as new product anyway',
             'variant' => 'accent',
         ];
 
-        $answerEn = "🔍 **Step 1 — Database Search Result for `\"{$name}\"`**\n\n"
+        $answerEn = "**Step 1 — Database Search Result for `\"{$name}\"`**\n\n"
             ."Before creating a new product, I searched your database and found **".count($dbMatches)." matching product(s)** already in your catalog:\n\n"
             .implode("\n", $matchLinesEn)."\n\n"
             ."**What would you like to do next?**\n"
-            ."- Click **\"✓ Select Existing\"** or **\"✏️ Edit Existing\"** below to use a product already in your database, OR\n"
-            ."- Click **\"➕ Create as New Product Anyway\"** (or reply with the remaining product details) if this is a brand-new item.";
+            ."- Click **\"✓ Select Existing\"** or **\"Edit Existing\"** below to use a product already in your database, OR\n"
+            ."- Click **\"Create as New Product Anyway\"** (or reply with the remaining product details) if this is a brand-new item.";
 
-        $answerUr = "🔍 **مرحلہ 1 — ڈیٹا بیس میں `\"{$name}\"` کی تلاش کا نتیجہ**\n\n"
+        $answerUr = "**مرحلہ 1 — ڈیٹا بیس میں `\"{$name}\"` کی تلاش کا نتیجہ**\n\n"
             ."نئی پروڈکٹ بنانے سے پہلے ڈیٹا بیس میں تلاش کرنے پر **".count($dbMatches)." ملتی جلتی پروڈکٹ(س)** پہلے سے موجود ملیں:\n\n"
             .implode("\n", $matchLinesUr)."\n\n"
             ."**آپ کیا کرنا چاہیں گے؟**\n"
             ."- پہلے سے موجود پروڈکٹ استعمال یا ایڈٹ کرنے کے لیے نیچے بٹن پر کلک کریں، یا\n"
-            ."- اگر واقعی نئی پروڈکٹ بنانی ہے تو **\"➕ نئی پروڈکٹ کے طور پر شامل کریں\"** پر کلک کریں۔";
+            ."- اگر واقعی نئی پروڈکٹ بنانی ہے تو **\"نئی پروڈکٹ کے طور پر شامل کریں\"** پر کلک کریں۔";
 
         return $this->formatTaskResponse(
-            titleEn: "🔍 Matching Product(s) Found in Database for \"{$name}\"",
-            titleUr: "🔍 ڈیٹا بیس میں \"{$name}\" سے ملتی جلتی پروڈکٹ موجود ہے",
+            titleEn: "Matching Product(s) Found in Database for \"{$name}\"",
+            titleUr: "ڈیٹا بیس میں \"{$name}\" سے ملتی جلتی پروڈکٹ موجود ہے",
             answerEn: $answerEn,
             answerUr: $answerUr,
             links: [['path' => '/products', 'en' => 'Open Products Catalog', 'ur' => 'پروڈکٹس لسٹ کھولیں']],
@@ -2710,8 +2712,8 @@ SYSTEM;
                     $catalogHintEn = " — Choose an existing Brand from your catalog: {$list}";
                     $catalogHintUr = " — موجودہ برانڈز میں سے منتخب کریں: {$list}";
                 } else {
-                    $catalogHintEn = ' — ⚠️ No brands exist in your catalog yet. Please add a brand in **Brands** (`/brands`) first.';
-                    $catalogHintUr = ' — ⚠️ ابھی کوئی برانڈ موجود نہیں ہے۔ پہلے **Brands** پیج پر برانڈ شامل کریں۔';
+                    $catalogHintEn = ' — No brands exist in your catalog yet. Please add a brand in **Brands** (`/brands`) first.';
+                    $catalogHintUr = ' — ابھی کوئی برانڈ موجود نہیں ہے۔ پہلے **Brands** پیج پر برانڈ شامل کریں۔';
                 }
             } elseif ($fieldKey === 'supplier') {
                 if (! empty($existingSuppliers)) {
@@ -2719,8 +2721,8 @@ SYSTEM;
                     $catalogHintEn = " — Choose an existing Supplier from your catalog: {$list}";
                     $catalogHintUr = " — موجودہ سپلائرز میں سے منتخب کریں: {$list}";
                 } else {
-                    $catalogHintEn = ' — ⚠️ No suppliers exist in your catalog yet. Please add a supplier in **Suppliers** (`/suppliers`) first.';
-                    $catalogHintUr = ' — ⚠️ ابھی کوئی سپلائر موجود نہیں ہے۔ پہلے **Suppliers** پیج پر سپلائر شامل کریں۔';
+                    $catalogHintEn = ' — No suppliers exist in your catalog yet. Please add a supplier in **Suppliers** (`/suppliers`) first.';
+                    $catalogHintUr = ' — ابھی کوئی سپلائر موجود نہیں ہے۔ پہلے **Suppliers** پیج پر سپلائر شامل کریں۔';
                 }
             }
 
@@ -2748,31 +2750,31 @@ SYSTEM;
                 $brandListText = ! empty($existingBrands)
                     ? implode(', ', array_map(fn ($b) => "`{$b}`", $existingBrands))
                     : '*(no brands in catalog yet — please create one in `/brands` first)*';
-                $linesEn[] = "⚠️ **Brand Not Found (`{$invalidBrand}`):** Cube **never creates a new Brand** when adding a product. Please choose an **existing Brand** from your database: {$brandListText}";
-                $linesUr[] = "⚠️ **برانڈ موجود نہیں ہے (`{$invalidBrand}`):** کیوب پروڈکٹ شامل کرتے وقت **نیا برانڈ خود نہیں بناتا**۔ براہِ کرم پہلے سے موجود برانڈ منتخب کریں: {$brandListText}";
+                $linesEn[] = "**Brand Not Found (`{$invalidBrand}`):** Cube **never creates a new Brand** when adding a product. Please choose an **existing Brand** from your database: {$brandListText}";
+                $linesUr[] = "**برانڈ موجود نہیں ہے (`{$invalidBrand}`):** کیوب پروڈکٹ شامل کرتے وقت **نیا برانڈ خود نہیں بناتا**۔ براہِ کرم پہلے سے موجود برانڈ منتخب کریں: {$brandListText}";
             }
             if ($invalidSupplier !== '') {
                 $supplierListText = ! empty($existingSuppliers)
                     ? implode(', ', array_map(fn ($s) => "`{$s}`", $existingSuppliers))
                     : '*(no suppliers in catalog yet — please create one in `/suppliers` first)*';
-                $linesEn[] = "⚠️ **Supplier Not Found (`{$invalidSupplier}`):** Cube **never creates a new Supplier** when adding a product. Please choose an **existing Supplier** from your database: {$supplierListText}";
-                $linesUr[] = "⚠️ **سپلائر موجود نہیں ہے (`{$invalidSupplier}`):** کیوب پروڈکٹ شامل کرتے وقت **نیا سپلائر خود نہیں بناتا**۔ براہِ کرم پہلے سے موجود سپلائر منتخب کریں: {$supplierListText}";
+                $linesEn[] = "**Supplier Not Found (`{$invalidSupplier}`):** Cube **never creates a new Supplier** when adding a product. Please choose an **existing Supplier** from your database: {$supplierListText}";
+                $linesUr[] = "**سپلائر موجود نہیں ہے (`{$invalidSupplier}`):** کیوب پروڈکٹ شامل کرتے وقت **نیا سپلائر خود نہیں بناتا**۔ براہِ کرم پہلے سے موجود سپلائر منتخب کریں: {$supplierListText}";
             }
         } elseif (in_array('name', $missingFields, true)) {
-            $linesEn[] = "🪜 **{$stepInfo['label_en']}**\nFirst, please tell me the **Product / Medicine Name** you want to add. I will search your database first to check if a matching product already exists before asking for the next details.";
-            $linesUr[] = "🪜 **{$stepInfo['label_ur']}**\nسب سے پہلے **پروڈکٹ کا نام** بتائیں۔ میں پہلے ڈیٹا بیس میں چیک کروں گا کہ یہ پروڈکٹ پہلے سے موجود ہے یا نہیں۔";
+            $linesEn[] = "**{$stepInfo['label_en']}**\nFirst, please tell me the **Product / Medicine Name** you want to add. I will search your database first to check if a matching product already exists before asking for the next details.";
+            $linesUr[] = "**{$stepInfo['label_ur']}**\nسب سے پہلے **پروڈکٹ کا نام** بتائیں۔ میں پہلے ڈیٹا بیس میں چیک کروں گا کہ یہ پروڈکٹ پہلے سے موجود ہے یا نہیں۔";
         } else {
-            $linesEn[] = "🪜 **{$stepInfo['label_en']}**\n✅ Checked database: No duplicate product matched {$productHeadingEn}. Please provide the next required details (**Cube never assumes missing fields** and **only uses existing Brands & Suppliers**):";
-            $linesUr[] = "🪜 **{$stepInfo['label_ur']}**\n✅ ڈیٹا بیس چیک کر لیا گیا۔ براہِ کرم {$productHeadingUr} مکمّل کرنے کے لیے درج ذیل معلومات بتائیں:";
+            $linesEn[] = "**{$stepInfo['label_en']}**\nChecked database: No duplicate product matched {$productHeadingEn}. Please provide the next required details (**Cube never assumes missing fields** and **only uses existing Brands & Suppliers**):";
+            $linesUr[] = "**{$stepInfo['label_ur']}**\nڈیٹا بیس چیک کر لیا گیا۔ براہِ کرم {$productHeadingUr} مکمّل کرنے کے لیے درج ذیل معلومات بتائیں:";
         }
 
         if (! empty($collectedEn)) {
-            $linesEn[] = "✅ **Details Already Recorded:**\n".implode("\n", $collectedEn);
-            $linesUr[] = "✅ **موصول شدہ معلومات:**\n".implode("\n", $collectedUr);
+            $linesEn[] = "**Details Already Recorded:**\n".implode("\n", $collectedEn);
+            $linesUr[] = "**موصول شدہ معلومات:**\n".implode("\n", $collectedUr);
         }
 
-        $linesEn[] = "❓ **Required Details Needed to Complete the Task:**\n".implode("\n", $questionsEn);
-        $linesUr[] = "❓ **مطلوبہ معلومات (براہِ کرم جواب میں لکھیں):**\n".implode("\n", $questionsUr);
+        $linesEn[] = "**Required Details Needed to Complete the Task:**\n".implode("\n", $questionsEn);
+        $linesUr[] = "**مطلوبہ معلومات (براہِ کرم جواب میں لکھیں):**\n".implode("\n", $questionsUr);
 
         $linesEn[] = "*(Optional: You can also include `formulation`, `pack purchase price`, `pack sale price`, or `rack`.)*\n\n"
             ."**Reply example:**\n`".implode(', ', $exampleParts)."`\n*(Or type `cancel` to abort this task.)*";
@@ -2981,8 +2983,8 @@ SYSTEM;
                     $product->brand_id = $br->id;
                     $changes[] = "Brand → **{$br->name}**";
                 } else {
-                    $catalogWarningsEn[] = "⚠️ Brand **`{$item['brand']}`** does not exist in your catalog (Cube never creates new brands).";
-                    $catalogWarningsUr[] = "⚠️ برانڈ **`{$item['brand']}`** کیٹلاگ میں موجود نہیں ہے (کیوب نیا برانڈ نہیں بناتا)۔";
+                    $catalogWarningsEn[] = "Brand **`{$item['brand']}`** does not exist in your catalog (Cube never creates new brands).";
+                    $catalogWarningsUr[] = "برانڈ **`{$item['brand']}`** کیٹلاگ میں موجود نہیں ہے (کیوب نیا برانڈ نہیں بناتا)۔";
                 }
             }
 
@@ -2992,8 +2994,8 @@ SYSTEM;
                     $product->supplier_id = $sup->id;
                     $changes[] = "Supplier → **{$sup->name}**";
                 } else {
-                    $catalogWarningsEn[] = "⚠️ Supplier **`{$item['supplier']}`** does not exist in your catalog (Cube never creates new suppliers).";
-                    $catalogWarningsUr[] = "⚠️ سپلائر **`{$item['supplier']}`** کیٹلاگ میں موجود نہیں ہے (کیوب نیا سپلائر نہیں بناتا)۔";
+                    $catalogWarningsEn[] = "Supplier **`{$item['supplier']}`** does not exist in your catalog (Cube never creates new suppliers).";
+                    $catalogWarningsUr[] = "سپلائر **`{$item['supplier']}`** کیٹلاگ میں موجود نہیں ہے (کیوب نیا سپلائر نہیں بناتا)۔";
                 }
             }
 
@@ -3037,8 +3039,8 @@ SYSTEM;
         $linesUr = [];
 
         if (! empty($updatedRecords)) {
-            $linesEn[] = '✅ **Cube AI Task Completed — Updated '.count($updatedRecords).' Product(s):**';
-            $linesUr[] = '✅ **کیوب اے آئی نے '.count($updatedRecords).' پروڈکٹ(س) کامیابی سے اپڈیٹ کر دیں:**';
+            $linesEn[] = '**Cube AI Task Completed — Updated '.count($updatedRecords).' Product(s):**';
+            $linesUr[] = '**کیوب اے آئی نے '.count($updatedRecords).' پروڈکٹ(س) کامیابی سے اپڈیٹ کر دیں:**';
 
             foreach ($updatedRecords as $idx => $rec) {
                 $num = $idx + 1;
@@ -3055,8 +3057,8 @@ SYSTEM;
 
         if (! empty($notFoundTargets)) {
             $missingStr = implode(', ', array_map(fn ($t) => "**{$t}**", $notFoundTargets));
-            $linesEn[] = "⚠️ Could not find product(s) matching: {$missingStr}";
-            $linesUr[] = "⚠️ یہ پروڈکٹ کیٹلاگ میں نہیں ملی: {$missingStr}";
+            $linesEn[] = "Could not find product(s) matching: {$missingStr}";
+            $linesUr[] = "یہ پروڈکٹ کیٹلاگ میں نہیں ملی: {$missingStr}";
         }
 
         $links = [
@@ -3239,17 +3241,17 @@ SYSTEM;
             $previewLinesUr[] = "{$num}. {$displayTarget}: {$changeText}";
         }
 
-        $answerEn = "🔒 **User Permission Required — Review Result Before Posting to Database**\n\n"
+        $answerEn = "**User Permission Required — Review Result Before Posting to Database**\n\n"
             ."Cube AI has prepared the following **Edit Product** result preview (**nothing has been posted to the database yet**):\n\n"
             .implode("\n", $previewLinesEn)."\n\n"
             ."**Do you grant permission to post these changes to the database?**\n"
-            ."Click **\"✅ Approve & Post to Database\"** below (or reply `yes` / `confirm` to proceed, or `cancel` to abort).";
+            ."Click **\"Approve & Post to Database\"** below (or reply `yes` / `confirm` to proceed, or `cancel` to abort).";
 
-        $answerUr = "🔒 **ڈیٹا بیس میں محفوظ کرنے سے پہلے نتیجہ چیک کریں اور اجازت (Permission) دیں**\n\n"
+        $answerUr = "**ڈیٹا بیس میں محفوظ کرنے سے پہلے نتیجہ چیک کریں اور اجازت (Permission) دیں**\n\n"
             ."کیوب اے آئی نے **پروڈکٹ اپڈیٹ کرنے** کا متوقع نتیجہ تیار کر لیا ہے (**ابھی ڈیٹا بیس میں پوسٹ نہیں کیا گیا**):\n\n"
             .implode("\n", $previewLinesUr)."\n\n"
             ."**کیا آپ یہ تبدیلیاں ڈیٹا بیس میں پوسٹ کرنے کی اجازت دیتے ہیں؟**\n"
-            ."نیچے **\"✅ اجازت دیں اور ڈیٹا بیس میں محفوظ کریں\"** بٹن پر کلک کریں (یا تصدیق کے لیے `yes` لکھیں، اور منسوخ کرنے کے لیے `cancel` لکھیں)۔";
+            ."نیچے **\"اجازت دیں اور ڈیٹا بیس میں محفوظ کریں\"** بٹن پر کلک کریں (یا تصدیق کے لیے `yes` لکھیں، اور منسوخ کرنے کے لیے `cancel` لکھیں)۔";
 
         return $this->formatTaskResponse(
             titleEn: 'Permission Required: Confirm Updating '.count($proposedUpdates).' Product(s)',
@@ -3322,11 +3324,11 @@ SYSTEM;
                     }
                 }
 
-                $answerEn = "🔍 **Step 1 of 2 — Multiple Matching Products Found in Database for `\"{$target}\"`**\n\n"
+                $answerEn = "**Step 1 of 2 — Multiple Matching Products Found in Database for `\"{$target}\"`**\n\n"
                     ."I found **".count($dbMatches)." matching products** in your database:\n\n"
                     .implode("\n", $matchLinesEn)."\n\n"
                     ."Please click/select which product you want to update, or reply with the field(s) and new value(s) to change.";
-                $answerUr = "🔍 **مرحلہ 1 از 2 — ڈیٹا بیس میں `\"{$target}\"` سے ملتی جلتی متعدد پروڈکٹس ملیں**\n\n"
+                $answerUr = "**مرحلہ 1 از 2 — ڈیٹا بیس میں `\"{$target}\"` سے ملتی جلتی متعدد پروڈکٹس ملیں**\n\n"
                     .implode("\n", $matchLinesUr)."\n\n"
                     ."براہِ کرم مطلوبہ پروڈکٹ منتخب کریں۔";
                 $stepInfo = [
@@ -3336,7 +3338,7 @@ SYSTEM;
                     'label_ur' => 'مرحلہ 1 از 2: ڈیٹا بیس سے مطلوبہ پروڈکٹ منتخب کریں',
                 ];
             } else {
-                $answerEn = "🪜 **Step 2 of 2 — Specify Field(s) & New Value(s) to Update**\n"
+                $answerEn = "**Step 2 of 2 — Specify Field(s) & New Value(s) to Update**\n"
                     ."To update **{$target}** without making any assumptions, please tell me **which field(s) and new value(s)** you want to change:\n\n"
                     ."- **Pack Sale Price / Pack Purchase Price** (e.g., `pack sale price 650, pack purchase price 540`)\n"
                     ."- **Pack Size** (e.g., `pack size 200`)\n"
@@ -3344,7 +3346,7 @@ SYSTEM;
                     ."- **Category / Brand / Supplier** (e.g., `category Tablets, brand GSK, supplier Ali Gohar`)\n"
                     ."- **Rack** (e.g., `rack R-12`)\n\n"
                     ."*(Reply with the changes, or type `cancel` to abort.)*";
-                $answerUr = "🪜 **مرحلہ 2 از 2 — تبدیلی کی تفصیل لکھیں**\n"
+                $answerUr = "**مرحلہ 2 از 2 — تبدیلی کی تفصیل لکھیں**\n"
                     ."**{$target}** کو اپڈیٹ کرنے کے لیے براہِ کرم بتائیں کہ آپ **کون سی فیلڈ اور نئی ویلیو** تبدیل کرنا چاہتے ہیں:\n\n"
                     ."- **Pack Sale Price / Pack Purchase Price** (مثلاً `pack sale price 650`)\n"
                     ."- **Pack Size** (مثلاً `pack size 200`)\n"
@@ -3358,9 +3360,9 @@ SYSTEM;
                 ];
             }
         } else {
-            $answerEn = "🪜 **Step 1 of 2 — Which Product Should I Search in Your Database?**\n"
+            $answerEn = "**Step 1 of 2 — Which Product Should I Search in Your Database?**\n"
                 ."Please reply with the **Product Name** or **`PRD-XXXX` code** you want to edit first (or include the field and new value directly).\n\n**Example:**\n`Update product Panadol 500mg Tablet pack sale price to 650 and rack to R-12`";
-            $answerUr = "🪜 **مرحلہ 1 از 2 — کس پروڈکٹ کو اپڈیٹ کرنا ہے؟**\n"
+            $answerUr = "**مرحلہ 1 از 2 — کس پروڈکٹ کو اپڈیٹ کرنا ہے؟**\n"
                 ."براہِ کرم پہلے **پروڈکٹ کا نام یا کوڈ** بتائیں تاکہ میں ڈیٹا بیس میں تلاش کروں۔\n\n**مثال:**\n`Update product Panadol 500mg Tablet pack sale price to 650 and rack to R-12`";
             $stepInfo = [
                 'current' => 1,
@@ -3520,8 +3522,8 @@ SYSTEM;
         $linesUr = [];
 
         if (! empty($updatedProducts)) {
-            $linesEn[] = '✅ **Assigned Formulations to '.count($updatedProducts).' Product(s):**';
-            $linesUr[] = '✅ **'.count($updatedProducts).' پروڈکٹ(س) میں فارمولیشن (Generic Salt) شامل کر دی گئی:**';
+            $linesEn[] = '**Assigned Formulations to '.count($updatedProducts).' Product(s):**';
+            $linesUr[] = '**'.count($updatedProducts).' پروڈکٹ(س) میں فارمولیشن (Generic Salt) شامل کر دی گئی:**';
             foreach ($updatedProducts as $idx => $up) {
                 $num = $idx + 1;
                 $linesEn[] = "{$num}. **{$up['name']}** (`{$up['product_code']}`) → **{$up['formulation']}**";
@@ -3531,8 +3533,8 @@ SYSTEM;
 
         if (! empty($registeredFormulations)) {
             $listStr = implode(', ', array_map(fn ($f) => "**{$f}**", array_unique($registeredFormulations)));
-            $linesEn[] = "✅ **Registered Canonical Formulation(s):** {$listStr}";
-            $linesUr[] = "✅ **نئی فارمولیشنز محفوظ کر دی گئیں:** {$listStr}";
+            $linesEn[] = "**Registered Canonical Formulation(s):** {$listStr}";
+            $linesUr[] = "**نئی فارمولیشنز محفوظ کر دی گئیں:** {$listStr}";
         }
 
         return $this->formatTaskResponse(
@@ -3656,17 +3658,17 @@ SYSTEM;
             }
         }
 
-        $answerEn = "🔒 **User Permission Required — Review Result Before Posting to Database**\n\n"
+        $answerEn = "**User Permission Required — Review Result Before Posting to Database**\n\n"
             ."Cube AI has prepared the following **Formulation Assignment** result preview (**nothing has been posted to the database yet**):\n\n"
             .implode("\n", $previewLinesEn)."\n\n"
             ."**Do you grant permission to post this result to the database?**\n"
-            ."Click **\"✅ Approve & Post to Database\"** below (or reply `yes` / `confirm` to proceed, or `cancel` to abort).";
+            ."Click **\"Approve & Post to Database\"** below (or reply `yes` / `confirm` to proceed, or `cancel` to abort).";
 
-        $answerUr = "🔒 **ڈیٹا بیس میں محفوظ کرنے سے پہلے نتیجہ چیک کریں اور اجازت (Permission) دیں**\n\n"
+        $answerUr = "**ڈیٹا بیس میں محفوظ کرنے سے پہلے نتیجہ چیک کریں اور اجازت (Permission) دیں**\n\n"
             ."کیوب اے آئی نے **فارمولیشن تفویض کرنے** کا متوقع نتیجہ تیار کر لیا ہے (**ابھی ڈیٹا بیس میں پوسٹ نہیں کیا گیا**):\n\n"
             .implode("\n", $previewLinesUr)."\n\n"
             ."**کیا آپ یہ نتیجہ ڈیٹا بیس میں پوسٹ کرنے کی اجازت دیتے ہیں؟**\n"
-            ."نیچے **\"✅ اجازت دیں اور ڈیٹا بیس میں محفوظ کریں\"** بٹن پر کلک کریں (یا تصدیق کے لیے `yes` لکھیں، اور منسوخ کرنے کے لیے `cancel` لکھیں)۔";
+            ."نیچے **\"اجازت دیں اور ڈیٹا بیس میں محفوظ کریں\"** بٹن پر کلک کریں (یا تصدیق کے لیے `yes` لکھیں، اور منسوخ کرنے کے لیے `cancel` لکھیں)۔";
 
         return $this->formatTaskResponse(
             titleEn: 'Permission Required: Confirm Formulation Assignment',
@@ -3751,8 +3753,8 @@ SYSTEM;
                     'title' => $prod->name,
                     'code' => $prod->product_code,
                     'code_preview' => $prod->product_code,
-                    'badge_en' => '🔍 '.$sourceEn,
-                    'badge_ur' => '🔍 '.$sourceUr,
+                    'badge_en' => $sourceEn,
+                    'badge_ur' => $sourceUr,
                     'fields' => [
                         [
                             'field' => 'Formulation (Generic Salt)',
@@ -3764,8 +3766,8 @@ SYSTEM;
                 ];
                 if (count($previewLinesEn) < 10) {
                     $num = count($previewLinesEn) + 1;
-                    $previewLinesEn[] = "{$num}. **{$prod->name}** (`{$prod->product_code}`) → **`{$salt}`** *(🔍 {$sourceEn})*";
-                    $previewLinesUr[] = "{$num}. **{$prod->name}** (`{$prod->product_code}`) ← **`{$salt}`** *(🔍 {$sourceUr})*";
+                    $previewLinesEn[] = "{$num}. **{$prod->name}** (`{$prod->product_code}`) → **`{$salt}`** *({$sourceEn})*";
+                    $previewLinesUr[] = "{$num}. **{$prod->name}** (`{$prod->product_code}`) ← **`{$salt}`** *({$sourceUr})*";
                 }
             } else {
                 $skipInfo = $skippedPreviewMap[$prod->id] ?? [];
@@ -3806,21 +3808,21 @@ SYSTEM;
             $sampleBlockUr .= "\n\n**پہلے مرحلے میں چھوڑی جانے والی پروڈکٹس (Skipped):**\n".implode("\n", $skippedPreviewLinesUr);
         }
 
-        $answerEn = "🔒 **User Permission Required — Review Google Search Preview Before Posting to Database**\n\n"
+        $answerEn = "**User Permission Required — Review Google Search Preview Before Posting to Database**\n\n"
             ."Cube AI has prepared a dry-run preview for **Google-Backed Formulation Auto-Fill** (**nothing has been posted to the database yet**):\n"
             ."- **Target Products Missing Formulation:** `{$missingCount}` product(s){$filterNoteEn}\n"
             ."- **Iron-Clad Workflow:** Cube first searches each product on Google + verified pharmacopoeia to find its generic salt/formulation. If a verified formulation is found, it fills the product; if nothing is found, it strictly skips the product and generates a **Detailed Report** after running."
             .$sampleBlockEn."\n\n"
             ."**Do you grant permission to post these formulations to the database?**\n"
-            ."Click **\"✅ Approve & Post to Database\"** below (or reply `yes` / `confirm` to proceed, or `cancel` to abort).";
+            ."Click **\"Approve & Post to Database\"** below (or reply `yes` / `confirm` to proceed, or `cancel` to abort).";
 
-        $answerUr = "🔒 **ڈیٹا بیس میں محفوظ کرنے سے پہلے گوگل سرچ پری ویو چیک کریں اور اجازت (Permission) دیں**\n\n"
+        $answerUr = "**ڈیٹا بیس میں محفوظ کرنے سے پہلے گوگل سرچ پری ویو چیک کریں اور اجازت (Permission) دیں**\n\n"
             ."کیوب اے آئی نے **گوگل سرچ فارمولیشن آٹو فل** کا پری ویو تیار کر لیا ہے (**ابھی ڈیٹا بیس میں پوسٹ نہیں کیا گیا**):\n"
             ."- **خالی فارمولیشن والی پروڈکٹس:** `{$missingCount}` پروڈکٹ(س){$filterNoteUr}\n"
             ."- **حفاظتی اصول:** ہر پروڈکٹ کو پہلے گوگل پر سرچ کیا جائے گا، نتیجہ ملنے پر فارمولیشن لگائی جائے گی، نہ ملنے پر اس پروڈکٹ کو چھوڑ (Skip) دیا جائے گا اور مکمل ہونے پر تفصیلی رپورٹ دکھائی جائے گی۔"
             .$sampleBlockUr."\n\n"
             ."**کیا آپ یہ تبدیلیاں ڈیٹا بیس میں پوسٹ کرنے کی اجازت دیتے ہیں؟**\n"
-            ."نیچے **\"✅ اجازت دیں اور ڈیٹا بیس میں محفوظ کریں\"** بٹن پر کلک کریں (یا تصدیق کے لیے `yes` لکھیں، اور منسوخ کرنے کے لیے `cancel` لکھیں)۔";
+            ."نیچے **\"اجازت دیں اور ڈیٹا بیس میں محفوظ کریں\"** بٹن پر کلک کریں (یا تصدیق کے لیے `yes` لکھیں، اور منسوخ کرنے کے لیے `cancel` لکھیں)۔";
 
         return $this->formatTaskResponse(
             titleEn: 'Permission Required: Confirm Auto-Filling Missing Formulations',
@@ -3905,8 +3907,8 @@ SYSTEM;
         return $this->formatTaskResponse(
             titleEn: 'Pending Task Cancelled',
             titleUr: 'زیرِ التواء ٹاسک منسوخ کر دیا گیا',
-            answerEn: '✅ The pending task has been cancelled and no changes were saved. Let me know whenever you want to start a new task or ask a question!',
-            answerUr: '✅ زیرِ التواء ٹاسک منسوخ کر دیا گیا ہے اور کوئی تبدیلی محفوظ نہیں کی گئی۔',
+            answerEn: 'The pending task has been cancelled and no changes were saved. Let me know whenever you want to start a new task or ask a question!',
+            answerUr: 'زیرِ التواء ٹاسک منسوخ کر دیا گیا ہے اور کوئی تبدیلی محفوظ نہیں کی گئی۔',
             links: [],
             taskMeta: [
                 'action' => 'task_cancelled',
@@ -3964,11 +3966,11 @@ SYSTEM;
                 titleEn: 'All Products Have Formulations',
                 titleUr: 'تمام پروڈکٹس میں فارمولیشن پہلے سے موجود ہے',
                 answerEn: $totalMissingBefore === 0
-                    ? "✅ **All products in your catalog already have a formulation assigned!**\n\nYou can also assign or update specific formulations anytime by typing:\n`Set formulation Paracetamol for Panadol and Calpol`"
-                    : '✅ **Background formulation enrichment batch finished!**',
+                    ? "**All products in your catalog already have a formulation assigned!**\n\nYou can also assign or update specific formulations anytime by typing:\n`Set formulation Paracetamol for Panadol and Calpol`"
+                    : '**Background formulation enrichment batch finished!**',
                 answerUr: $totalMissingBefore === 0
-                    ? "✅ **آپ کے کیٹلاگ کی تمام پروڈکٹس میں فارمولیشن (Generic Salt) پہلے سے موجود ہے!**\n\nاگر آپ کسی مخصوص پروڈکٹ کی فارمولیشن تبدیل کرنا چاہتے ہیں تو لکھیں:\n`Set formulation Paracetamol for Panadol`"
-                    : '✅ **پروڈکٹس میں فارمولیشن شامل کرنے کا مرحلہ مکمل ہو گیا!**',
+                    ? "**آپ کے کیٹلاگ کی تمام پروڈکٹس میں فارمولیشن (Generic Salt) پہلے سے موجود ہے!**\n\nاگر آپ کسی مخصوص پروڈکٹ کی فارمولیشن تبدیل کرنا چاہتے ہیں تو لکھیں:\n`Set formulation Paracetamol for Panadol`"
+                    : '**پروڈکٹس میں فارمولیشن شامل کرنے کا مرحلہ مکمل ہو گیا!**',
                 links: [['path' => '/products', 'en' => 'Open Products Catalog', 'ur' => 'پروڈکٹس لسٹ کھولیں']],
                 taskMeta: [
                     'action' => 'bulk_autofill_missing_formulations',
@@ -4057,17 +4059,17 @@ SYSTEM;
         $linesEn = [];
         $linesUr = [];
 
-        $linesEn[] = "📊 **Google Search Auto-Fill Report (This Batch):** Scanned **`{$scannedCount}`** product(s) • Filled **`{$filledCount}`** • Skipped **`{$skippedCount}`**";
-        $linesUr[] = "📊 **گوگل سرچ آٹو فل رپورٹ (موجودہ مرحلہ):** چیک کی گئیں **`{$scannedCount}`** • فارمولیشن لگائی گئی **`{$filledCount}`** • چھوڑی گئیں (Skipped) **`{$skippedCount}`**";
+        $linesEn[] = "**Google Search Auto-Fill Report (This Batch):** Scanned **`{$scannedCount}`** product(s) • Filled **`{$filledCount}`** • Skipped **`{$skippedCount}`**";
+        $linesUr[] = "**گوگل سرچ آٹو فل رپورٹ (موجودہ مرحلہ):** چیک کی گئیں **`{$scannedCount}`** • فارمولیشن لگائی گئی **`{$filledCount}`** • چھوڑی گئیں (Skipped) **`{$skippedCount}`**";
 
         if (! empty($updatedItems)) {
-            $linesEn[] = '✅ **Filled Formulations (Found via Google Search & Pharmacopoeia):**';
-            $linesUr[] = '✅ **پروڈکٹس جن کی فارمولیشن گوگل سرچ سے مل کر محفوظ ہو گئی:**';
+            $linesEn[] = '**Filled Formulations (Found via Google Search & Pharmacopoeia):**';
+            $linesUr[] = '**پروڈکٹس جن کی فارمولیشن گوگل سرچ سے مل کر محفوظ ہو گئی:**';
 
             foreach (array_slice($updatedItems, 0, 15) as $idx => $up) {
                 $num = $idx + 1;
-                $linesEn[] = "{$num}. **{$up['name']}** (`{$up['product_code']}`) → **`{$up['formulation']}`** *(🔍 {$up['source_en']})*";
-                $linesUr[] = "{$num}. **{$up['name']}** (`{$up['product_code']}`) ← **`{$up['formulation']}`** *(🔍 {$up['source_ur']})*";
+                $linesEn[] = "{$num}. **{$up['name']}** (`{$up['product_code']}`) → **`{$up['formulation']}`** *({$up['source_en']})*";
+                $linesUr[] = "{$num}. **{$up['name']}** (`{$up['product_code']}`) ← **`{$up['formulation']}`** *({$up['source_ur']})*";
             }
 
             if ($filledCount > 15) {
@@ -4078,8 +4080,8 @@ SYSTEM;
         }
 
         if (! empty($skippedItems)) {
-            $linesEn[] = '⏭️ **Skipped Products (Nothing Found on Google Search / Non-Medicine):**';
-            $linesUr[] = '⏭️ **چھوڑی گئی پروڈکٹس (جن کا نتیجہ گوگل سرچ پر نہیں ملا یا غیر طبی آئٹم ہیں):**';
+            $linesEn[] = '**Skipped Products (Nothing Found on Google Search / Non-Medicine):**';
+            $linesUr[] = '**چھوڑی گئی پروڈکٹس (جن کا نتیجہ گوگل سرچ پر نہیں ملا یا غیر طبی آئٹم ہیں):**';
 
             foreach (array_slice($skippedItems, 0, 10) as $idx => $sk) {
                 $num = $idx + 1;
@@ -4095,11 +4097,11 @@ SYSTEM;
         }
 
         if ($hasMore) {
-            $linesEn[] = "⏳ **Background Progress:** `{$remainingAfterBatch}` more product(s) without formulation remaining — Cube is searching Google and continuing in the background automatically...";
-            $linesUr[] = "⏳ **بیک گراؤنڈ پراگریس:** مزید `{$remainingAfterBatch}` پروڈکٹس باقی ہیں — کیوب بیک گراؤنڈ میں گوگل سرچ کے ذریعے کام جاری رکھے ہوئے ہے...";
+            $linesEn[] = "**Background Progress:** `{$remainingAfterBatch}` more product(s) without formulation remaining — Cube is searching Google and continuing in the background automatically...";
+            $linesUr[] = "**بیک گراؤنڈ پراگریس:** مزید `{$remainingAfterBatch}` پروڈکٹس باقی ہیں — کیوب بیک گراؤنڈ میں گوگل سرچ کے ذریعے کام جاری رکھے ہوئے ہے...";
         } else {
-            $linesEn[] = '🎉 **All batches completed!** Review the full **Detailed Auto-Fill Report** below (showing all Filled and Skipped products).';
-            $linesUr[] = '🎉 **تمام مراحل مکمل ہو گئے!** نیچے مکمل **تفصیلی آٹو فل رپورٹ (Detailed Report)** میں تمام اپڈیٹ شدہ اور چھوڑی گئی (Skipped) پروڈکٹس دیکھیں۔';
+            $linesEn[] = '**All batches completed!** Review the full **Detailed Auto-Fill Report** below (showing all Filled and Skipped products).';
+            $linesUr[] = '**تمام مراحل مکمل ہو گئے!** نیچے مکمل **تفصیلی آٹو فل رپورٹ (Detailed Report)** میں تمام اپڈیٹ شدہ اور چھوڑی گئی (Skipped) پروڈکٹس دیکھیں۔';
         }
 
         return $this->formatTaskResponse(
@@ -5161,18 +5163,18 @@ SYSTEM;
     protected function buildDeleteBlockedResponse(string $productVersion): array
     {
         return $this->formatTaskResponse(
-            titleEn: '🔒 Safety Policy: Deleting Records Is Disabled in Cube',
-            titleUr: '🔒 حفاظتی اصول: کیوب (Cube) میں ریکارڈ ڈیلیٹ کرنا ممنوع ہے',
+            titleEn: 'Safety Policy: Deleting Records Is Disabled in Cube',
+            titleUr: 'حفاظتی اصول: کیوب (Cube) میں ریکارڈ ڈیلیٹ کرنا ممنوع ہے',
             answerEn: "For your business data protection, **Cube is hardcoded to never delete any records** (products, formulations, categories, brands, invoices, or ledgers).\n\n"
                 ."**What Cube CAN do for you automatically:**\n"
-                ."1. **➕ Add Products:** e.g. *\"Add product Panadol 500mg, formulation Paracetamol, pack size 200, pack sale price 600\"*\n"
-                ."2. **✏️ Edit Products:** e.g. *\"Update product Panadol pack sale price to 650 and rack to R-12\"*\n"
-                ."3. **🧪 Auto-Fill Formulations in Background:** e.g. *\"Add formulations to all products missing formulation\"*",
+                ."1. **Add Products:** e.g. *\"Add product Panadol 500mg, formulation Paracetamol, pack size 200, pack sale price 600\"*\n"
+                ."2. **Edit Products:** e.g. *\"Update product Panadol pack sale price to 650 and rack to R-12\"*\n"
+                ."3. **Auto-Fill Formulations in Background:** e.g. *\"Add formulations to all products missing formulation\"*",
             answerUr: "آپ کے کاروباری ڈیٹا کے تحفظ کے لیے **کیوب (Cube) میں کسی بھی قسم کا ریکارڈ ڈیلیٹ کرنا سختی سے بند (Hardcoded Block) ہے**۔\n\n"
                 ."**کیوب آپ کی آسانی کے لیے یہ کام خودکار طور پر کر سکتا ہے:**\n"
-                ."1. **➕ نئی پروڈکٹ شامل کرنا:** مثلاً *\"Add product Panadol 500mg, pack size 200, pack sale price 600\"*\n"
-                ."2. **✏️ پروڈکٹ ایڈٹ کرنا:** مثلاً *\"Update product Panadol pack sale price to 650 and rack to R-12\"*\n"
-                ."3. **🧪 بیک گراؤنڈ میں متعدد پروڈکٹس کی فارمولیشن لگانا:** مثلاً *\"Auto-fill missing formulations for my products\"*",
+                ."1. **نئی پروڈکٹ شامل کرنا:** مثلاً *\"Add product Panadol 500mg, pack size 200, pack sale price 600\"*\n"
+                ."2. **پروڈکٹ ایڈٹ کرنا:** مثلاً *\"Update product Panadol pack sale price to 650 and rack to R-12\"*\n"
+                ."3. **بیک گراؤنڈ میں متعدد پروڈکٹس کی فارمولیشن لگانا:** مثلاً *\"Auto-fill missing formulations for my products\"*",
             links: [['path' => '/products', 'en' => 'Open Products Catalog', 'ur' => 'پروڈکٹس لسٹ کھولیں']],
             taskMeta: [
                 'action' => 'delete_blocked',
@@ -5603,10 +5605,10 @@ SYSTEM;
                 ]);
 
                 return $this->formatTaskResponse(
-                    titleEn: "✏️ Step 1 of 3 — Update {$labelEn}: Which {$labelEn} Should I Search in Database?",
-                    titleUr: "✏️ مرحلہ 1 از 3 — {$labelUr} اپڈیٹ: کس ریکارڈ کو ڈیٹا بیس میں تلاش کرنا ہے؟",
-                    answerEn: "🪜 **Step 1 of 3 — Enter {$labelEn} Name**\nPlease tell me the **{$labelEn} name** you want to update. I will search your database first and show matching records.\n\n*Cancel anytime by typing `cancel`.*",
-                    answerUr: "🪜 **مرحلہ 1 از 3 — {$labelUr} کا نام لکھیں**\nبراہِ کرم اس **{$labelUr}** کا نام لکھیں جسے آپ اپڈیٹ کرنا چاہتے ہیں۔ میں پہلے ڈیٹا بیس میں تلاش کروں گا۔",
+                    titleEn: "Step 1 of 3 — Update {$labelEn}: Which {$labelEn} Should I Search in Database?",
+                    titleUr: "مرحلہ 1 از 3 — {$labelUr} اپڈیٹ: کس ریکارڈ کو ڈیٹا بیس میں تلاش کرنا ہے؟",
+                    answerEn: "**Step 1 of 3 — Enter {$labelEn} Name**\nPlease tell me the **{$labelEn} name** you want to update. I will search your database first and show matching records.\n\n*Cancel anytime by typing `cancel`.*",
+                    answerUr: "**مرحلہ 1 از 3 — {$labelUr} کا نام لکھیں**\nبراہِ کرم اس **{$labelUr}** کا نام لکھیں جسے آپ اپڈیٹ کرنا چاہتے ہیں۔ میں پہلے ڈیٹا بیس میں تلاش کروں گا۔",
                     links: [$link],
                     taskMeta: [
                         'action' => $action,
@@ -5660,12 +5662,12 @@ SYSTEM;
                         }
 
                         return $this->formatTaskResponse(
-                            titleEn: "🔍 Step 2 of 3 — Multiple Matching {$labelEn}s Found in Database",
-                            titleUr: "🔍 مرحلہ 2 از 3 — ڈیٹا بیس میں ایک سے زیادہ ملتے جلتے {$labelUr} ملے",
-                            answerEn: "🔍 I searched your database for **`\"{$targetName}\"`** and found **".count($dbMatches)." matching {$labelEn}s**:\n\n"
+                            titleEn: "Step 2 of 3 — Multiple Matching {$labelEn}s Found in Database",
+                            titleUr: "مرحلہ 2 از 3 — ڈیٹا بیس میں ایک سے زیادہ ملتے جلتے {$labelUr} ملے",
+                            answerEn: "I searched your database for **`\"{$targetName}\"`** and found **".count($dbMatches)." matching {$labelEn}s**:\n\n"
                                 .implode("\n", $matchLinesEn)."\n\n"
                                 ."Please select which **{$labelEn}** you want to update:",
-                            answerUr: "🔍 ڈیٹا بیس میں **`\"{$targetName}\"`** تلاش کرنے پر **".count($dbMatches)." ملتے جلتے ریکارڈز** ملے:\n\n"
+                            answerUr: "ڈیٹا بیس میں **`\"{$targetName}\"`** تلاش کرنے پر **".count($dbMatches)." ملتے جلتے ریکارڈز** ملے:\n\n"
                                 .implode("\n", $matchLinesUr)."\n\n"
                                 ."براہِ کرم منتخب کریں کہ کس ریکارڈ کو اپڈیٹ کرنا ہے:",
                             links: [$link],
@@ -5712,8 +5714,8 @@ SYSTEM;
                 $this->clearPendingTask($user);
 
                 return $this->formatTaskResponse(
-                    titleEn: "⚠️ {$labelEn} Not Found",
-                    titleUr: "⚠️ {$labelUr} نہیں ملا",
+                    titleEn: "{$labelEn} Not Found",
+                    titleUr: "{$labelUr} نہیں ملا",
                     answerEn: "I could not find an existing **{$labelEn}** matching `\"{$targetName}\"` in your database.",
                     answerUr: "ڈیٹا بیس میں `\"{$targetName}\"` کے نام سے کوئی **{$labelUr}** نہیں ملا۔",
                     links: [$link],
@@ -5763,10 +5765,10 @@ SYSTEM;
                 ]);
 
                 return $this->formatTaskResponse(
-                    titleEn: "✏️ Step 2 of 3 — Update {$labelEn}: What Should I Change on {$existing->name}?",
-                    titleUr: "✏️ مرحلہ 2 از 3 — {$existing->name} میں کیا تبدیلی کرنی ہے؟",
-                    answerEn: "🪜 **Step 2 of 3 — Specify Changes**\nI selected **{$existing->name}** (ID `#{$existing->id}`) from your database. Please tell me what field you want to update (e.g., `rename to NewName`, `phone 03001234567`, `address Lahore`, `credit limit 50000`).",
-                    answerUr: "🪜 **مرحلہ 2 از 3 — تبدیلی کی تفصیل لکھیں**\nڈیٹا بیس سے **{$existing->name}** منتخب کر لیا گیا۔ براہِ کرم بتائیں کہ اس میں کیا تبدیلی کرنی ہے؟",
+                    titleEn: "Step 2 of 3 — Update {$labelEn}: What Should I Change on {$existing->name}?",
+                    titleUr: "مرحلہ 2 از 3 — {$existing->name} میں کیا تبدیلی کرنی ہے؟",
+                    answerEn: "**Step 2 of 3 — Specify Changes**\nI selected **{$existing->name}** (ID `#{$existing->id}`) from your database. Please tell me what field you want to update (e.g., `rename to NewName`, `phone 03001234567`, `address Lahore`, `credit limit 50000`).",
+                    answerUr: "**مرحلہ 2 از 3 — تبدیلی کی تفصیل لکھیں**\nڈیٹا بیس سے **{$existing->name}** منتخب کر لیا گیا۔ براہِ کرم بتائیں کہ اس میں کیا تبدیلی کرنی ہے؟",
                     links: [$link],
                     taskMeta: [
                         'action' => $action,
@@ -5790,22 +5792,22 @@ SYSTEM;
                     'payload' => array_merge($taskData, ['target_name' => $existing->name, 'selected_existing_id' => $existing->id]),
                 ]);
 
-                $previewLinesEn = ["### ✏️ {$labelEn}: **{$existing->name}** (ID `#{$existing->id}`)"];
-                $previewLinesUr = ["### ✏️ {$labelUr}: **{$existing->name}** (ID `#{$existing->id}`)"];
+                $previewLinesEn = ["### {$labelEn}: **{$existing->name}** (ID `#{$existing->id}`)"];
+                $previewLinesUr = ["### {$labelUr}: **{$existing->name}** (ID `#{$existing->id}`)"];
                 foreach ($fieldsPreview as $fp) {
                     $previewLinesEn[] = "- **{$fp['field']}:** `{$fp['before']}` → **`{$fp['after']}`**";
                     $previewLinesUr[] = "- **{$fp['field']}:** `{$fp['before']}` ← **`{$fp['after']}`**";
                 }
 
                 return $this->formatTaskResponse(
-                    titleEn: "🔐 Permission Required: Preview {$labelEn} Update Before Saving",
-                    titleUr: "🔐 اجازت درکار ہے: {$labelUr} اپڈیٹ کرنے سے پہلے تصدیق کریں",
+                    titleEn: "Permission Required: Preview {$labelEn} Update Before Saving",
+                    titleUr: "اجازت درکار ہے: {$labelUr} اپڈیٹ کرنے سے پہلے تصدیق کریں",
                     answerEn: "Here is the exact **staged database result preview** for **{$existing->name}** (**not posted to the database yet**):\n\n"
                         .implode("\n", $previewLinesEn)
-                        ."\n\n---\n⚠️ **Do you grant permission to post this update to the database?**\nClick **Approve & Post to Database** below (or reply `yes`) to commit, or `cancel` to abort.",
+                        ."\n\n---\n**Do you grant permission to post this update to the database?**\nClick **Approve & Post to Database** below (or reply `yes`) to commit, or `cancel` to abort.",
                     answerUr: "**{$existing->name}** میں درج ذیل تبدیلی ڈیٹا بیس میں محفوظ کرنے سے پہلے چیک کریں:\n\n"
                         .implode("\n", $previewLinesUr)
-                        ."\n\n---\n⚠️ **کیا آپ یہ تبدیلی ڈیٹا بیس میں محفوظ کرنے کی اجازت دیتے ہیں؟**",
+                        ."\n\n---\n**کیا آپ یہ تبدیلی ڈیٹا بیس میں محفوظ کرنے کی اجازت دیتے ہیں؟**",
                     links: [$link],
                     taskMeta: [
                         'action' => $action,
@@ -5859,10 +5861,10 @@ SYSTEM;
             $this->clearPendingTask($user);
 
             return $this->formatTaskResponse(
-                titleEn: "✅ {$labelEn} Updated in Database",
-                titleUr: "✅ {$labelUr} کامیابی سے اپڈیٹ ہو گیا",
-                answerEn: "✅ **Updated {$labelEn} in Database:** **{$existing->name}** (ID `#{$existing->id}`)",
-                answerUr: "✅ **{$labelUr} اپڈیٹ ہو گیا:** **{$existing->name}** (ID `#{$existing->id}`)",
+                titleEn: "{$labelEn} Updated in Database",
+                titleUr: "{$labelUr} کامیابی سے اپڈیٹ ہو گیا",
+                answerEn: "**Updated {$labelEn} in Database:** **{$existing->name}** (ID `#{$existing->id}`)",
+                answerUr: "**{$labelUr} اپڈیٹ ہو گیا:** **{$existing->name}** (ID `#{$existing->id}`)",
                 links: [$link],
                 taskMeta: [
                     'action' => $action,
@@ -5902,13 +5904,13 @@ SYSTEM;
 
             if ($action === 'create_user_demands') {
                 return $this->formatTaskResponse(
-                    titleEn: '📝 Step 1 of 3 — Create User Demand: Which Product Does the Customer Need?',
-                    titleUr: '📝 مرحلہ 1 از 3 — کسٹمر ڈیمانڈ: کس پروڈکٹ یا دوا کی ضرورت ہے؟',
-                    answerEn: "🪜 **Step 1 of 3 — Enter Product / Medicine Name**\n"
+                    titleEn: 'Step 1 of 3 — Create User Demand: Which Product Does the Customer Need?',
+                    titleUr: 'مرحلہ 1 از 3 — کسٹمر ڈیمانڈ: کس پروڈکٹ یا دوا کی ضرورت ہے؟',
+                    answerEn: "**Step 1 of 3 — Enter Product / Medicine Name**\n"
                         ."Which **product or medicine** does the customer need?\n\n"
                         ."Please reply with the **product name** first — I will **search your database first** and show any matching products so you can select an existing item or record a new unlisted demand item.\n\n"
                         ."*Cancel anytime by typing `cancel`.*",
-                    answerUr: "🪜 **مرحلہ 1 از 3 — پروڈکٹ یا دوا کا نام لکھیں**\n"
+                    answerUr: "**مرحلہ 1 از 3 — پروڈکٹ یا دوا کا نام لکھیں**\n"
                         ."کسٹمر کو کون سی **پروڈکٹ یا دوا** درکار ہے؟\n\n"
                         ."براہِ کرم پہلے **پروڈکٹ کا نام** لکھیں — میں پہلے **ڈیٹا بیس میں تلاش کروں گا** اور ملتی جلتی پروڈکٹس دکھاؤں گا تاکہ آپ موجودہ پروڈکٹ منتخب کر سکیں یا نئی آئٹم درج کر سکیں۔",
                     links: [$link],
@@ -5928,12 +5930,12 @@ SYSTEM;
             }
 
             return $this->formatTaskResponse(
-                titleEn: "➕ Step 1 — Add New {$labelEn}: Enter {$labelEn} Name",
-                titleUr: "➕ مرحلہ 1 — نیا {$labelUr}: نام درج کریں",
-                answerEn: "🪜 **Step 1 — Enter {$labelEn} Name**\n"
+                titleEn: "Step 1 — Add New {$labelEn}: Enter {$labelEn} Name",
+                titleUr: "مرحلہ 1 — نیا {$labelUr}: نام درج کریں",
+                answerEn: "**Step 1 — Enter {$labelEn} Name**\n"
                     ."Please reply with the **{$labelEn} name** first. I will **search your database first** to make sure a matching {$labelEn} does not already exist before creating a new one.\n\n"
                     ."*Cancel anytime by typing `cancel`.*",
-                answerUr: "🪜 **مرحلہ 1 — {$labelUr} کا نام لکھیں**\n"
+                answerUr: "**مرحلہ 1 — {$labelUr} کا نام لکھیں**\n"
                     ."براہِ کرم پہلے **{$labelUr}** کا نام لکھیں۔ نیا ریکارڈ بنانے سے پہلے میں **ڈیٹا بیس میں چیک کروں گا** کہ یہ پہلے سے موجود تو نہیں۔",
                 links: [$link],
                 taskMeta: [
@@ -5991,29 +5993,29 @@ SYSTEM;
                     }
 
                     $stepChoices[] = [
-                        'label_en' => "➕ Record \"{$name}\" as New Unlisted Item",
-                        'label_ur' => "➕ \"{$name}\" نئی آئٹم کے طور پر درج کریں",
+                        'label_en' => "Record \"{$name}\" as New Unlisted Item",
+                        'label_ur' => "\"{$name}\" نئی آئٹم کے طور پر درج کریں",
                         'reply' => 'Create new unlisted demand item',
                         'variant' => 'accent',
                     ];
 
-                    $answerEn = "🔍 **Step 2 of 3 — Database Search Results for `\"{$name}\"`**\n\n"
+                    $answerEn = "**Step 2 of 3 — Database Search Results for `\"{$name}\"`**\n\n"
                         ."I searched your `products` database first and found **".count($dbMatches)." matching product(s)**:\n\n"
                         .implode("\n", $matchLinesEn)."\n\n"
                         ."**Would you like to select an existing product from your database or record a new unlisted item?**\n"
                         ."- Click **\"✓ Select\"** on any matching database product below (or reply `1`, `2`, etc.), OR\n"
-                        ."- Click **\"➕ Record as New Unlisted Item\"** if the customer is asking for a different unlisted item.";
+                        ."- Click **\"Record as New Unlisted Item\"** if the customer is asking for a different unlisted item.";
 
-                    $answerUr = "🔍 **مرحلہ 2 از 3 — ڈیٹا بیس میں `\"{$name}\"` کی تلاش کا نتیجہ**\n\n"
+                    $answerUr = "**مرحلہ 2 از 3 — ڈیٹا بیس میں `\"{$name}\"` کی تلاش کا نتیجہ**\n\n"
                         ."ڈیٹا بیس میں تلاش کرنے پر **".count($dbMatches)." ملتی جلتی پروڈکٹ(س)** پہلے سے موجود ملیں:\n\n"
                         .implode("\n", $matchLinesUr)."\n\n"
                         ."**کیا آپ ڈیٹا بیس سے موجودہ پروڈکٹ منتخب کرنا چاہتے ہیں یا نئی آئٹم درج کرنا چاہتے ہیں؟**\n"
                         ."- موجودہ پروڈکٹ منتخب کرنے کے لیے **\"✓ منتخب کریں\"** پر کلک کریں (یا `1`, `2` لکھیں)، یا\n"
-                        ."- نئی آئٹم کے لیے **\"➕ نئی آئٹم کے طور پر درج کریں\"** پر کلک کریں۔";
+                        ."- نئی آئٹم کے لیے **\"نئی آئٹم کے طور پر درج کریں\"** پر کلک کریں۔";
 
                     return $this->formatTaskResponse(
-                        titleEn: "🔍 Step 2 of 3 — Matching Product(s) Found in Database for \"{$name}\"",
-                        titleUr: "🔍 مرحلہ 2 از 3 — ڈیٹا بیس میں \"{$name}\" سے ملتی جلتی پروڈکٹس ملیں",
+                        titleEn: "Step 2 of 3 — Matching Product(s) Found in Database for \"{$name}\"",
+                        titleUr: "مرحلہ 2 از 3 — ڈیٹا بیس میں \"{$name}\" سے ملتی جلتی پروڈکٹس ملیں",
                         answerEn: $answerEn,
                         answerUr: $answerUr,
                         links: [$link],
@@ -6045,28 +6047,28 @@ SYSTEM;
 
                 $stepChoices = [
                     [
-                        'label_en' => "➕ Record \"{$name}\" as New Unlisted Demand Item",
-                        'label_ur' => "➕ \"{$name}\" نئی آئٹم کے طور پر ڈیمانڈ میں درج کریں",
+                        'label_en' => "Record \"{$name}\" as New Unlisted Demand Item",
+                        'label_ur' => "\"{$name}\" نئی آئٹم کے طور پر ڈیمانڈ میں درج کریں",
                         'reply' => 'Create new unlisted demand item',
                         'variant' => 'primary',
                     ],
                 ];
 
-                $answerEn = "🔍 **Step 2 of 3 — Database Search Result for `\"{$name}\"`**\n\n"
+                $answerEn = "**Step 2 of 3 — Database Search Result for `\"{$name}\"`**\n\n"
                     ."I searched your `products` database first and found **no existing product matching `\"{$name}\"`**.\n\n"
                     ."**What would you like to do?**\n"
-                    ."1. Click **\"➕ Record `{$name}` as New Unlisted Demand Item\"** below (or reply `create new` / `yes`) to log it as an unlisted customer demand without creating a duplicate catalog product, OR\n"
+                    ."1. Click **\"Record `{$name}` as New Unlisted Demand Item\"** below (or reply `create new` / `yes`) to log it as an unlisted customer demand without creating a duplicate catalog product, OR\n"
                     ."2. Type a **different product name** if you want me to search your database again.";
 
-                $answerUr = "🔍 **مرحلہ 2 از 3 — ڈیٹا بیس میں `\"{$name}\"` کی تلاش کا نتیجہ**\n\n"
+                $answerUr = "**مرحلہ 2 از 3 — ڈیٹا بیس میں `\"{$name}\"` کی تلاش کا نتیجہ**\n\n"
                     ."ڈیٹا بیس میں **`\"{$name}\"`** کے نام سے کوئی موجودہ پروڈکٹ نہیں ملی۔\n\n"
                     ."**آپ کیا کرنا چاہیں گے؟**\n"
-                    ."1. اسے نئی ڈیمانڈ آئٹم کے طور پر درج کرنے کے لیے نیچے **\"➕ نئی آئٹم کے طور پر ڈیمانڈ میں درج کریں\"** پر کلک کریں، یا\n"
+                    ."1. اسے نئی ڈیمانڈ آئٹم کے طور پر درج کرنے کے لیے نیچے **\"نئی آئٹم کے طور پر ڈیمانڈ میں درج کریں\"** پر کلک کریں، یا\n"
                     ."2. دوبارہ ڈیٹا بیس میں تلاش کرنے کے لیے **پروڈکٹ کا دوسرا نام** لکھیں۔";
 
                 return $this->formatTaskResponse(
-                    titleEn: "🔍 Step 2 of 3 — No Existing Product Matched \"{$name}\" in Database",
-                    titleUr: "🔍 مرحلہ 2 از 3 — ڈیٹا بیس میں \"{$name}\" موجود نہیں ہے",
+                    titleEn: "Step 2 of 3 — No Existing Product Matched \"{$name}\" in Database",
+                    titleUr: "مرحلہ 2 از 3 — ڈیٹا بیس میں \"{$name}\" موجود نہیں ہے",
                     answerEn: $answerEn,
                     answerUr: $answerUr,
                     links: [$link],
@@ -6097,11 +6099,11 @@ SYSTEM;
                 ]);
 
                 $selectedBadgeEn = $hasSelectedDbProduct
-                    ? "✅ **Selected from Database:** **{$name}** (`".($taskData['selected_product_code'] ?? ('#'.$taskData['selected_product_id']))."`)"
-                    : "➕ **Unlisted Demand Item:** **{$name}** *(No new product created in catalog)*";
+                    ? "**Selected from Database:** **{$name}** (`".($taskData['selected_product_code'] ?? ('#'.$taskData['selected_product_id']))."`)"
+                    : "**Unlisted Demand Item:** **{$name}** *(No new product created in catalog)*";
                 $selectedBadgeUr = $hasSelectedDbProduct
-                    ? "✅ **ڈیٹا بیس سے منتخب شدہ:** **{$name}** (`".($taskData['selected_product_code'] ?? ('#'.$taskData['selected_product_id']))."`)"
-                    : "➕ **نئی ڈیمانڈ آئٹم:** **{$name}**";
+                    ? "**ڈیٹا بیس سے منتخب شدہ:** **{$name}** (`".($taskData['selected_product_code'] ?? ('#'.$taskData['selected_product_id']))."`)"
+                    : "**نئی ڈیمانڈ آئٹم:** **{$name}**";
 
                 $stepChoices = [
                     ['label_en' => 'Quantity: 1', 'label_ur' => 'تعداد: 1', 'reply' => 'quantity 1', 'variant' => 'primary'],
@@ -6111,12 +6113,12 @@ SYSTEM;
                 ];
 
                 return $this->formatTaskResponse(
-                    titleEn: "🔢 Step 3 of 3 — How Many Units/Packs of \"{$name}\" Are Needed?",
-                    titleUr: "🔢 مرحلہ 3 از 3 — \"{$name}\" کی کتنی تعداد (Quantity) درکار ہے؟",
-                    answerEn: "🪜 **Step 3 of 3 — Enter Requested Quantity**\n"
+                    titleEn: "Step 3 of 3 — How Many Units/Packs of \"{$name}\" Are Needed?",
+                    titleUr: "مرحلہ 3 از 3 — \"{$name}\" کی کتنی تعداد (Quantity) درکار ہے؟",
+                    answerEn: "**Step 3 of 3 — Enter Requested Quantity**\n"
                         ."{$selectedBadgeEn}\n\n"
                         ."How many **packs/units** does the customer need? Click a quantity below or type the number (you can also include optional notes, e.g. `quantity 3, notes urgent`):",
-                    answerUr: "🪜 **مرحلہ 3 از 3 — مطلوبہ تعداد (Quantity) بتائیں**\n"
+                    answerUr: "**مرحلہ 3 از 3 — مطلوبہ تعداد (Quantity) بتائیں**\n"
                         ."{$selectedBadgeUr}\n\n"
                         ."کسٹمر کو کتنے **پیک/یونٹس** درکار ہیں؟ نیچے بٹن پر کلک کریں یا تعداد لکھیں:",
                     links: [$link],
@@ -6149,10 +6151,10 @@ SYSTEM;
                 $this->clearPendingTask($user);
 
                 return $this->formatTaskResponse(
-                    titleEn: "✅ Selected Existing {$labelEn} from Database: {$selName}",
-                    titleUr: "✅ ڈیٹا بیس سے موجودہ {$labelUr} منتخب کر لیا گیا: {$selName}",
-                    answerEn: "✅ **Selected Existing {$labelEn} from Database (No Duplicate Created):**\n- **{$selName}** (ID `#{$selId}` in `{$table}`)",
-                    answerUr: "✅ **ڈیٹا بیس سے موجودہ {$labelUr} منتخب کر لیا گیا (نیا ڈپلیکیٹ ریکارڈ نہیں بنایا گیا):**\n- **{$selName}** (ID `#{$selId}`)",
+                    titleEn: "Selected Existing {$labelEn} from Database: {$selName}",
+                    titleUr: "ڈیٹا بیس سے موجودہ {$labelUr} منتخب کر لیا گیا: {$selName}",
+                    answerEn: "**Selected Existing {$labelEn} from Database (No Duplicate Created):**\n- **{$selName}** (ID `#{$selId}` in `{$table}`)",
+                    answerUr: "**ڈیٹا بیس سے موجودہ {$labelUr} منتخب کر لیا گیا (نیا ڈپلیکیٹ ریکارڈ نہیں بنایا گیا):**\n- **{$selName}** (ID `#{$selId}`)",
                     links: [$link],
                     taskMeta: [
                         'action' => $action,
@@ -6168,7 +6170,7 @@ SYSTEM;
                 );
             }
 
-            // Handle if the user chose "✏️ Edit Existing" from the DB matches step
+            // Handle if the user chose "Edit Existing" from the DB matches step
             if (! empty($taskData['switch_to_update_id'])) {
                 $updateAction = str_replace('create_', 'update_', $action);
                 if (in_array($updateAction, ['update_brands', 'update_categories', 'update_suppliers', 'update_customers'], true)) {
@@ -6210,8 +6212,8 @@ SYSTEM;
                             ];
                             if ($canUpdateEntity) {
                                 $stepChoices[] = [
-                                    'label_en' => "✏️ Edit Existing: {$m['name']}",
-                                    'label_ur' => "✏️ موجودہ ایڈٹ کریں: {$m['name']}",
+                                    'label_en' => "Edit Existing: {$m['name']}",
+                                    'label_ur' => "موجودہ ایڈٹ کریں: {$m['name']}",
                                     'reply' => $m['edit_reply'],
                                     'variant' => 'secondary',
                                 ];
@@ -6220,29 +6222,29 @@ SYSTEM;
                     }
 
                     $stepChoices[] = [
-                        'label_en' => "➕ Create \"{$name}\" as New {$labelEn} Anyway",
-                        'label_ur' => "➕ \"{$name}\" نیا {$labelUr} بنائیں",
+                        'label_en' => "Create \"{$name}\" as New {$labelEn} Anyway",
+                        'label_ur' => "\"{$name}\" نیا {$labelUr} بنائیں",
                         'reply' => 'Create new anyway',
                         'variant' => 'accent',
                     ];
 
-                    $answerEn = "🔍 **Step 2 — Matching {$labelEn}(s) Found in Database for `\"{$name}\"`**\n\n"
+                    $answerEn = "**Step 2 — Matching {$labelEn}(s) Found in Database for `\"{$name}\"`**\n\n"
                         ."Before creating a new {$labelEn}, I searched your `{$table}` database and found **".count($dbMatches)." matching record(s)**:\n\n"
                         .implode("\n", $matchLinesEn)."\n\n"
                         ."**Would you like to select/edit an existing {$labelEn} or create a new one anyway?**\n"
-                        ."- Click **\"✓ Use Existing\"** or **\"✏️ Edit Existing\"** below to avoid creating duplicates, OR\n"
-                        ."- Click **\"➕ Create as New {$labelEn} Anyway\"** if this is a separate record.";
+                        ."- Click **\"✓ Use Existing\"** or **\"Edit Existing\"** below to avoid creating duplicates, OR\n"
+                        ."- Click **\"Create as New {$labelEn} Anyway\"** if this is a separate record.";
 
-                    $answerUr = "🔍 **مرحلہ 2 — ڈیٹا بیس میں `\"{$name}\"` سے ملتا جلتا {$labelUr} موجود ہے**\n\n"
+                    $answerUr = "**مرحلہ 2 — ڈیٹا بیس میں `\"{$name}\"` سے ملتا جلتا {$labelUr} موجود ہے**\n\n"
                         ."نیا ریکارڈ بنانے سے پہلے ڈیٹا بیس (`{$table}`) میں تلاش کرنے پر **".count($dbMatches)." ملتے جلتے ریکارڈ(ز)** ملے:\n\n"
                         .implode("\n", $matchLinesUr)."\n\n"
                         ."**آپ کیا کرنا چاہیں گے؟**\n"
-                        ."- ڈپلیکیٹ سے بچنے کے لیے **\"✓ موجودہ استعمال کریں\"** یا **\"✏️ موجودہ ایڈٹ کریں\"** پر کلک کریں، یا\n"
-                        ."- اگر واقعی نیا ریکارڈ بنانا ہے تو **\"➕ نیا {$labelUr} بنائیں\"** پر کلک کریں۔";
+                        ."- ڈپلیکیٹ سے بچنے کے لیے **\"✓ موجودہ استعمال کریں\"** یا **\"موجودہ ایڈٹ کریں\"** پر کلک کریں، یا\n"
+                        ."- اگر واقعی نیا ریکارڈ بنانا ہے تو **\"نیا {$labelUr} بنائیں\"** پر کلک کریں۔";
 
                     return $this->formatTaskResponse(
-                        titleEn: "🔍 Matching {$labelEn}(s) Found in Database for \"{$name}\"",
-                        titleUr: "🔍 ڈیٹا بیس میں \"{$name}\" سے ملتا جلتا {$labelUr} موجود ہے",
+                        titleEn: "Matching {$labelEn}(s) Found in Database for \"{$name}\"",
+                        titleUr: "ڈیٹا بیس میں \"{$name}\" سے ملتا جلتا {$labelUr} موجود ہے",
                         answerEn: $answerEn,
                         answerUr: $answerUr,
                         links: [$link],
@@ -6283,22 +6285,22 @@ SYSTEM;
 
                 $stepChoices = [
                     [
-                        'label_en' => '⏭️ Skip Optional Details → Preview Result',
-                        'label_ur' => '⏭️ اختیاری تفصیل چھوڑیں ← پری ویو دیکھیں',
+                        'label_en' => 'Skip Optional Details → Preview Result',
+                        'label_ur' => 'اختیاری تفصیل چھوڑیں ← پری ویو دیکھیں',
                         'reply' => 'skip optional details',
                         'variant' => 'secondary',
                     ],
                 ];
 
                 return $this->formatTaskResponse(
-                    titleEn: "📞 Step 2 of 3 — Contact Details for {$labelEn} \"{$name}\"",
-                    titleUr: "📞 مرحلہ 2 از 3 — \"{$name}\" کا فون نمبر اور پتہ (اختیاری)",
-                    answerEn: "🪜 **Step 2 of 3 — Phone Number & Address**\n"
-                        ."✅ Checked database: No existing {$labelEn} matched **`\"{$name}\"`**.\n\n"
-                        ."Please reply with the **Phone Number** and **Address** for **{$name}** (e.g., `phone 03001234567, address Lahore`), or click **\"⏭️ Skip Optional Details\"** below to proceed to the preview:",
-                    answerUr: "🪜 **مرحلہ 2 از 3 — فون نمبر اور پتہ درج کریں**\n"
-                        ."✅ ڈیٹا بیس چیک کر لیا گیا: **`\"{$name}\"`** کے نام سے پہلے کوئی ریکارڈ موجود نہیں ہے۔\n\n"
-                        ."براہِ کرم **فون نمبر** اور **پتہ (Address)** لکھیں (مثلاً `phone 03001234567, address Lahore`)، یا پری ویو دیکھنے کے لیے نیچے **\"⏭️ اختیاری تفصیل چھوڑیں\"** پر کلک کریں:",
+                    titleEn: "Step 2 of 3 — Contact Details for {$labelEn} \"{$name}\"",
+                    titleUr: "مرحلہ 2 از 3 — \"{$name}\" کا فون نمبر اور پتہ (اختیاری)",
+                    answerEn: "**Step 2 of 3 — Phone Number & Address**\n"
+                        ."Checked database: No existing {$labelEn} matched **`\"{$name}\"`**.\n\n"
+                        ."Please reply with the **Phone Number** and **Address** for **{$name}** (e.g., `phone 03001234567, address Lahore`), or click **\"Skip Optional Details\"** below to proceed to the preview:",
+                    answerUr: "**مرحلہ 2 از 3 — فون نمبر اور پتہ درج کریں**\n"
+                        ."ڈیٹا بیس چیک کر لیا گیا: **`\"{$name}\"`** کے نام سے پہلے کوئی ریکارڈ موجود نہیں ہے۔\n\n"
+                        ."براہِ کرم **فون نمبر** اور **پتہ (Address)** لکھیں (مثلاً `phone 03001234567, address Lahore`)، یا پری ویو دیکھنے کے لیے نیچے **\"اختیاری تفصیل چھوڑیں\"** پر کلک کریں:",
                     links: [$link],
                     taskMeta: [
                         'action' => $action,
@@ -6357,22 +6359,22 @@ SYSTEM;
                 'payload' => $taskData,
             ]);
 
-            $previewLinesEn = ["### ➕ New {$labelEn}: **{$name}**"];
-            $previewLinesUr = ["### ➕ نیا {$labelUr}: **{$name}**"];
+            $previewLinesEn = ["### New {$labelEn}: **{$name}**"];
+            $previewLinesUr = ["### نیا {$labelUr}: **{$name}**"];
             foreach ($fieldsPreview as $fp) {
                 $previewLinesEn[] = "- **{$fp['field']}:** `{$fp['after']}`";
                 $previewLinesUr[] = "- **{$fp['field']}:** `{$fp['after']}`";
             }
 
             return $this->formatTaskResponse(
-                titleEn: "🔐 Permission Required: Preview New {$labelEn} Before Saving",
-                titleUr: "🔐 اجازت درکار ہے: نیا {$labelUr} محفوظ کرنے سے پہلے تصدیق کریں",
+                titleEn: "Permission Required: Preview New {$labelEn} Before Saving",
+                titleUr: "اجازت درکار ہے: نیا {$labelUr} محفوظ کرنے سے پہلے تصدیق کریں",
                 answerEn: "Here is the exact **staged database result preview** for your new **{$labelEn}** (**not posted to the database yet**):\n\n"
                     .implode("\n", $previewLinesEn)
-                    ."\n\n---\n⚠️ **Do you grant permission to post this {$labelEn} to the database?**\nClick **Approve & Post to Database** below (or reply `yes`) to commit, or `cancel` to abort.",
+                    ."\n\n---\n**Do you grant permission to post this {$labelEn} to the database?**\nClick **Approve & Post to Database** below (or reply `yes`) to commit, or `cancel` to abort.",
                 answerUr: "نیا **{$labelUr}** ڈیٹا بیس میں شامل کرنے سے پہلے اس کی تفصیلات چیک کریں:\n\n"
                     .implode("\n", $previewLinesUr)
-                    ."\n\n---\n⚠️ **کیا آپ اسے ڈیٹا بیس میں محفوظ کرنے کی اجازت دیتے ہیں؟**",
+                    ."\n\n---\n**کیا آپ اسے ڈیٹا بیس میں محفوظ کرنے کی اجازت دیتے ہیں؟**",
                 links: [$link],
                 taskMeta: [
                     'action' => $action,
@@ -6464,10 +6466,10 @@ SYSTEM;
         $this->clearPendingTask($user);
 
         return $this->formatTaskResponse(
-            titleEn: "✅ {$labelEn} Created & Posted to Database",
-            titleUr: "✅ نیا {$labelUr} کامیابی سے ڈیٹا بیس میں محفوظ ہو گیا",
-            answerEn: "✅ **Posted to Database (`{$table}`):** **{$name}** (ID `#{$createdRecord->id}`)",
-            answerUr: "✅ **ڈیٹا بیس میں محفوظ ہو گیا (`{$table}`):** **{$name}** (ID `#{$createdRecord->id}`)",
+            titleEn: "{$labelEn} Created & Posted to Database",
+            titleUr: "نیا {$labelUr} کامیابی سے ڈیٹا بیس میں محفوظ ہو گیا",
+            answerEn: "**Posted to Database (`{$table}`):** **{$name}** (ID `#{$createdRecord->id}`)",
+            answerUr: "**ڈیٹا بیس میں محفوظ ہو گیا (`{$table}`):** **{$name}** (ID `#{$createdRecord->id}`)",
             links: [$link],
             taskMeta: [
                 'action' => $action,
@@ -6521,8 +6523,8 @@ SYSTEM;
             'source_ids' => ['task:'.($taskMeta['action'] ?? 'cube_automation')],
             'evidence_classification' => 'ai_grounded_docs',
             'evidence_badge' => [
-                'en' => "⚡ Cube AI Task Automation • Non-Destructive (v{$productVersion})",
-                'ur' => "⚡ کیوب اے آئی خودکار ٹاسک • محفوظ موڈ (v{$productVersion})",
+                'en' => "Cube AI Task Automation • Non-Destructive (v{$productVersion})",
+                'ur' => "کیوب اے آئی خودکار ٹاسک • محفوظ موڈ (v{$productVersion})",
             ],
             'provider' => 'cube_task_engine',
             'provider_status' => $providerStatus,

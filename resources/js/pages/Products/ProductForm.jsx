@@ -33,17 +33,17 @@ import FilePondPluginFileValidateType from "filepond-plugin-file-validate-type";
 import "filepond/dist/filepond.min.css";
 import "filepond-plugin-image-preview/dist/filepond-plugin-image-preview.css";
 
-// 🧊 glass primitives
+// glass primitives
 import { GlassCard, GlassInput, GlassBtn } from "@/components/Glass.jsx";
 import { useTheme } from "@/context/ThemeContext";
 import { useSaleSystem } from "@/context/SaleSystemContext.jsx";
 
 registerPlugin(FilePondPluginImagePreview, FilePondPluginFileValidateType);
 
-// 👉 Normalize Laravel paginate payloads (or plain arrays) to a simple array
+// Normalize Laravel paginate payloads (or plain arrays) to a simple array
 const asList = (payload) => (Array.isArray(payload) ? payload : (payload?.data ?? payload?.items ?? []));
 
-// 👉 Normalize formulation text (trim and collapse extra whitespace)
+// Normalize formulation text (trim and collapse extra whitespace)
 const normalizeFormulation = (val) => String(val ?? "").trim().replace(/\s+/g, " ");
 
 // Helper to determine text color based on background brightness
@@ -1253,7 +1253,7 @@ export default function ProductForm({ initialData = null, onSubmitSuccess }) {
         if (data?.formulation) {
           setForm((prev) => ({ ...prev, formulation: data.formulation }));
         }
-        toast.success("✅ Product updated!");
+        toast.success("Product updated!");
       } else {
         const { data } = await axios.post("/api/products", formData, {
           headers: { "Content-Type": "multipart/form-data" },
@@ -1268,7 +1268,7 @@ export default function ProductForm({ initialData = null, onSubmitSuccess }) {
             return [...prev, { name: clean }];
           });
         }
-        toast.success("✅ Product added!");
+        toast.success("Product added!");
         setForm({ narcotic: "no" });
         setFiles([]);
         await fetchNewCodes();
@@ -1284,7 +1284,7 @@ export default function ProductForm({ initialData = null, onSubmitSuccess }) {
           messages.forEach((msg) => toast.error(msg));
         });
       } else {
-        toast.error("❌ Something went wrong. Please try again.");
+        toast.error("Something went wrong. Please try again.");
       }
     }
   };

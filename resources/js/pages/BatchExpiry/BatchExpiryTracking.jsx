@@ -559,7 +559,7 @@ export default function BatchExpiryTracking() {
             title="Open Keyboard-Driven Quick Batch Workbench to Add or Edit Batches"
           >
             <PencilSquareIcon className="w-4 h-4" />
-            <span>⚡ Quick Add / Edit Batches</span>
+            <span>Quick Add / Edit Batches</span>
           </button>
 
           <button
@@ -695,11 +695,11 @@ export default function BatchExpiryTracking() {
         {/* Status Filter Tabs styled as Theme Buttons */}
         <div className={`flex overflow-x-auto whitespace-nowrap no-scrollbar sm:flex-wrap items-center gap-2 p-3.5 pb-2.5 sm:pb-3.5 border-b text-xs font-semibold ${isDark ? "border-slate-700 bg-slate-800/60" : "border-slate-200 bg-slate-50/70"}`}>
           {[
-            { id: "all", label: "All Active Batches", count: summary.total_batches_tracked },
-            { id: "expired", label: "🔴 Expired", count: summary.total_expired_batches },
-            { id: "critical", label: "🟠 Critical (≤30 Days)", count: summary.total_critical_batches },
-            { id: "warning", label: "🟡 In Warning Window", count: summary.total_warning_batches },
-            { id: "safe", label: "🟢 Safe Shelf-Life", count: Math.max(0, summary.total_batches_tracked - summary.total_warning_batches) },
+            { id: "all", label: "All Active Batches", count: summary.total_batches_tracked, dot: null },
+            { id: "expired", label: "Expired", count: summary.total_expired_batches, dot: "bg-red-500" },
+            { id: "critical", label: "Critical (≤30 Days)", count: summary.total_critical_batches, dot: "bg-orange-500" },
+            { id: "warning", label: "In Warning Window", count: summary.total_warning_batches, dot: "bg-amber-400" },
+            { id: "safe", label: "Safe Shelf-Life", count: Math.max(0, summary.total_batches_tracked - summary.total_warning_batches), dot: "bg-emerald-500" },
           ].map((tab) => {
             const isActive = statusFilter === tab.id;
             return (
@@ -717,6 +717,7 @@ export default function BatchExpiryTracking() {
                 }`}
                 style={isActive ? btnPrimary.style : btnSecondary.style}
               >
+                {tab.dot && <span className={`w-2 h-2 rounded-full shrink-0 ${tab.dot}`} />}
                 <span>{tab.label}</span>
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${

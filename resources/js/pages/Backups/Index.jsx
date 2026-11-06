@@ -876,7 +876,7 @@ export default function BackupsIndex() {
                     Generate an instant snapshot of your database and application assets.
                     {isCustomFolderActive && (
                       <span className="block text-emerald-600 dark:text-emerald-400 font-medium mt-1">
-                        📁 Will also copy to: {scheduleForm.custom_backup_path}
+                        Will also copy to: {scheduleForm.custom_backup_path}
                       </span>
                     )}
                   </p>

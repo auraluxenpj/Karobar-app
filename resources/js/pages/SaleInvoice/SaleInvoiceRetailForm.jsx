@@ -475,7 +475,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
     }),
   }), [isDark, themeColors]);
 
-  // 🎨 Dynamic Button styles using theme colors
+  // Dynamic Button styles using theme colors
   const buttonStyle = theme?.button_style || 'modern';
   
   const getButtonClasses = useMemo(
@@ -618,9 +618,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
           customer_id: customer.id,
           patient_name: customer.name || prev.patient_name || "",
         }));
-        toast("Customer selected, but no regular products are attached to their profile.", {
-          icon: "ℹ️",
-        });
+        toast("Customer selected, but no regular products are attached to their profile.");
         return;
       }
 
@@ -1988,7 +1986,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                 className="px-3 py-1.5 text-[11px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 transition-colors"
               >
                 <QrCodeIcon className="w-4 h-4" />
-                <span>⚡ Barcode POS</span>
+                <span>Barcode POS</span>
               </Link>
             )}
 

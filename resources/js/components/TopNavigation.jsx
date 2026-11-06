@@ -105,7 +105,7 @@ export default function TopNavigation() {
       key: "invoices",
       icon: <DocumentTextIcon className="w-5 h-5" />,
       items: [
-        { name: "⚡ Barcode POS", path: "/sale-invoices/pos", icon: <QrCodeIcon className="w-5 h-5" />, permAny: ["barcode-pos.view", "barcode-pos.create"] },
+        { name: "Barcode POS", path: "/sale-invoices/pos", icon: <QrCodeIcon className="w-5 h-5" />, permAny: ["barcode-pos.view", "barcode-pos.create"] },
         { name: "Sale Invoices", path: "/sale-invoices", icon: <DocumentCurrencyDollarIcon className="w-5 h-5" />, perm: "sale-invoice.view" },
         ...(hasWholesale
           ? [{ name: "Wholesale Invoices", path: "/wholesale-invoices", icon: <BuildingStorefrontIcon className="w-5 h-5" />, perm: "sale-invoice.view" }]

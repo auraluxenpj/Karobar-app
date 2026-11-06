@@ -19,6 +19,10 @@ import {
   ArrowUturnLeftIcon,
   QrCodeIcon,
   ShareIcon,
+  ChevronDoubleLeftIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronDoubleRightIcon,
 } from "@heroicons/react/24/solid";
 import InvoiceDraftsModal from "@/components/InvoiceDraftsModal.jsx";
 import DocumentHistoryModal from "@/components/DocumentHistoryModal.jsx";
@@ -201,7 +205,7 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
   const controllerRef = useRef(null);
   const debounceRef = useRef(null);
 
-  // 🔒 permissions
+  // permissions
   const { loading: permsLoading, canFor, has } = usePermissions();
   const can = useMemo(
     () => ({
@@ -213,7 +217,7 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
     [canFor, permsLoading, has]
   );
 
-  // 🎨 Modern button palette (matching sidebar design language)
+  // Modern button palette (matching sidebar design language)
   // Get theme colors
   const { theme } = useTheme();
 
@@ -280,7 +284,7 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
   // Get sale system setting
   const { hasWholesale, loading: saleSystemLoading } = useSaleSystem();
 
-  // 🎨 Dynamic Button styles using theme colors
+  // Dynamic Button styles using theme colors
   const buttonStyle = theme?.button_style || 'modern';
 
   const getButtonClasses = useMemo(
@@ -544,7 +548,7 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
     return `${day} ${month} ${year}`;
   };
 
-  // 🔒 permissions gates
+  // permissions gates
   if (permsLoading) return <div className="p-6">Loading…</div>;
   if (!can.view) return <div className="p-6 text-sm text-gray-700">You don't have permission to view sale invoices.</div>;
 
@@ -648,7 +652,7 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
                 className="products-action theme-btn-secondary"
               >
                 <QrCodeIcon className="w-4 h-4 text-emerald-500" />
-                <span>⚡ Barcode POS</span>
+                <span>Barcode POS</span>
               </Link>
             </Guard>
 
@@ -996,14 +1000,14 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
               disabled={page === 1}
               className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === 1 ? 'opacity-40' : ''}`}
             >
-              ⏮
+              <ChevronDoubleLeftIcon className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
               className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === 1 ? 'opacity-40' : ''}`}
             >
-              ◀
+              <ChevronLeftIcon className="w-3.5 h-3.5" />
             </button>
 
             {/* Page numbers */}
@@ -1043,14 +1047,14 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
               disabled={page === lastPage}
               className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === lastPage ? 'opacity-40' : ''}`}
             >
-              ▶
+              <ChevronRightIcon className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setPage(lastPage)}
               disabled={page === lastPage}
               className={`p-1.5 rounded-sm hover:bg-gray-200 dark:hover:bg-slate-700 ${page === lastPage ? 'opacity-40' : ''}`}
             >
-              ⏭
+              <ChevronDoubleRightIcon className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>

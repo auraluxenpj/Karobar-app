@@ -32,7 +32,7 @@ const BatchSearchInput = forwardRef(
     const wrapperRef = useRef(null);
     const inputRef = useRef(null);
 
-    // ✅ Expose API to parent
+    // Expose API to parent
     useImperativeHandle(ref, () => ({
       focus: () => inputRef.current?.focus(),
       select: () => inputRef.current?.select?.(),

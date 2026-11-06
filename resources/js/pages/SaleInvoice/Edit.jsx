@@ -11,7 +11,7 @@ export default function EditSaleInvoice() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  // 🔒 permissions
+  // permissions
   const { loading: permsLoading, canFor } = usePermissions();
   const can = useMemo(
     () => (typeof canFor === "function" ? canFor("sale-invoice") : {

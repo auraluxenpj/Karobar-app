@@ -2,16 +2,14 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import {
-  SparklesIcon,
-  CheckCircleIcon,
-  XMarkIcon,
-  ArrowTopRightOnSquareIcon,
-  MagnifyingGlassIcon,
-  ArrowPathIcon,
-  ExclamationTriangleIcon,
-} from "@heroicons/react/24/outline";
 import { useTheme } from "@/context/ThemeContext.jsx";
+
+function stripLeadingEmoji(text) {
+  if (!text) return "";
+  return String(text)
+    .replace(/^[\p{Emoji_Presentation}\p{Extended_Pictographic}\uFE0F\s]+/u, "")
+    .trim();
+}
 
 export const BG_TASK_STORAGE_KEY = "karobar_cube_bg_task_state_v1";
 const LANG_STORAGE_KEY = "karobar_guide_bot_lang";
@@ -233,23 +231,16 @@ export function BackgroundTaskDetailView({
       >
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="space-y-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 text-white text-base font-black shadow-xs">
-                🧪
-              </span>
-              <div>
-                <h2 className="text-sm sm:text-base font-black tracking-tight text-slate-900 dark:text-white">
-                  {isUr
-                    ? "بیک گراؤنڈ آٹو فل فارمولیشن — تفصیلی مانیٹر اور رپورٹ"
-                    : "Background Formulation Auto-Fill — Detailed Monitor & Report"}
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {isUr
-                    ? "گوگل سرچ + ڈریپ فارماکوپیا تصدیق: نتیجہ ملنے پر فارمولیشن لگتی ہے، نہ ملنے پر پروڈکٹ محفوظ طریقے سے چھوڑی (Skip) جاتی ہے۔"
-                    : "Iron-Clad Google Search + DRAP Pharmacopoeia Pipeline: Searches Google first, fills verified salts, and safely skips unfound or non-medicine items."}
-                </p>
-              </div>
-            </div>
+            <h2 className="text-sm sm:text-base font-black tracking-tight text-slate-900 dark:text-white">
+              {isUr
+                ? "بیک گراؤنڈ آٹو فل فارمولیشن — تفصیلی مانیٹر اور رپورٹ"
+                : "Background Formulation Auto-Fill — Detailed Monitor & Report"}
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {isUr
+                ? "گوگل سرچ + ڈریپ فارماکوپیا تصدیق: نتیجہ ملنے پر فارمولیشن لگتی ہے، نہ ملنے پر پروڈکٹ محفوظ طریقے سے چھوڑی (Skip) جاتی ہے۔"
+                : "Iron-Clad Google Search + DRAP Pharmacopoeia Pipeline: Searches Google first, fills verified salts, and safely skips unfound or non-medicine items."}
+            </p>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
@@ -257,7 +248,7 @@ export function BackgroundTaskDetailView({
               <button
                 type="button"
                 onClick={onOpenSeparatePage}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ${
+                className={`inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all cursor-pointer ${
                   isDark
                     ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-indigo-300"
                     : "bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700"
@@ -266,7 +257,6 @@ export function BackgroundTaskDetailView({
                 <span>
                   {isUr ? "الگ صفحے میں کھولیں" : "Open Separate Page"}
                 </span>
-                <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5 shrink-0" />
               </button>
             )}
 
@@ -274,9 +264,8 @@ export function BackgroundTaskDetailView({
               <button
                 type="button"
                 onClick={() => exportBgTaskReportCsv(bgTask)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs transition-all cursor-pointer"
+                className="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs transition-all cursor-pointer"
               >
-                <span aria-hidden="true">📥</span>
                 <span>
                   {isUr ? "مکمل رپورٹ ڈاؤن لوڈ (CSV)" : "Export Full Report (CSV)"}
                 </span>
@@ -287,13 +276,12 @@ export function BackgroundTaskDetailView({
               <button
                 type="button"
                 onClick={onClosePopup}
-                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                className={`inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
                   isDark
                     ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"
                     : "bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700"
                 }`}
               >
-                <XMarkIcon className="w-4 h-4" />
                 <span>{isUr ? "بند کریں" : "Close"}</span>
               </button>
             )}
@@ -329,9 +317,8 @@ export function BackgroundTaskDetailView({
                     type="button"
                     onClick={onPreviewStart}
                     disabled={previewLoading}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
+                    className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
                   >
-                    <span aria-hidden="true">🔍</span>
                     <span>
                       {isUr
                         ? "گوگل پری ویو چیک کریں اور شروع کریں"
@@ -343,9 +330,8 @@ export function BackgroundTaskDetailView({
                   <button
                     type="button"
                     onClick={onDirectStart}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
+                    className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
                   >
-                    <span aria-hidden="true">⚡</span>
                     <span>
                       {isUr
                         ? "ابھی آٹو فل شروع کریں"
@@ -359,9 +345,8 @@ export function BackgroundTaskDetailView({
                 <button
                   type="button"
                   onClick={onStopTask}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
+                  className="inline-flex items-center px-3.5 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow-2xs transition-all cursor-pointer active:scale-95"
                 >
-                  <span aria-hidden="true">⏹️</span>
                   <span>
                     {isUr ? "بیک گراؤنڈ ٹاسک روکیں" : "Stop Background Task"}
                   </span>
@@ -373,13 +358,12 @@ export function BackgroundTaskDetailView({
               <button
                 type="button"
                 onClick={onClearReport}
-                className={`inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                className={`inline-flex items-center px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
                   isDark
                     ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300"
                     : "bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-600"
                 }`}
               >
-                <ArrowPathIcon className="w-3.5 h-3.5" />
                 <span>{isUr ? "ری سیٹ" : "Reset Report"}</span>
               </button>
             )}
@@ -397,11 +381,10 @@ export function BackgroundTaskDetailView({
           >
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-1.5">
-                <ExclamationTriangleIcon className="w-4 h-4 text-amber-500 shrink-0" />
                 <span className="text-xs font-extrabold text-amber-700 dark:text-amber-300">
                   {isUr
-                    ? "🔒 ڈیٹا بیس میں محفوظ کرنے سے پہلے گوگل سرچ پری ویو چیک کریں"
-                    : "🔒 Review Google Search Preview Before Posting to Database"}
+                    ? "ڈیٹا بیس میں محفوظ کرنے سے پہلے گوگل سرچ پری ویو چیک کریں"
+                    : "Review Google Search Preview Before Posting to Database"}
                 </span>
               </div>
               <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-amber-500/20 text-amber-700 dark:text-amber-300">
@@ -411,7 +394,6 @@ export function BackgroundTaskDetailView({
 
             {previewLoading ? (
               <div className="py-2 flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-300">
-                <SparklesIcon className="w-4 h-4 animate-spin shrink-0" />
                 <span>
                   {isUr
                     ? "گوگل پر پروڈکٹس کی فارمولیشن تلاش کی جا رہی ہے..."
@@ -466,21 +448,19 @@ export function BackgroundTaskDetailView({
                 type="button"
                 disabled={previewLoading}
                 onClick={onConfirmPermission}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white cursor-pointer"
+                className="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white cursor-pointer"
               >
-                <CheckCircleIcon className="w-4 h-4" />
                 <span>
                   {isUr
-                    ? "✅ اجازت دیں اور آٹو فل شروع کریں"
-                    : "✅ Approve & Start Auto-Fill"}
+                    ? "اجازت دیں اور آٹو فل شروع کریں"
+                    : "Approve & Start Auto-Fill"}
                 </span>
               </button>
               <button
                 type="button"
                 onClick={onCancelPermission}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 border border-rose-500/30 cursor-pointer"
+                className="inline-flex items-center px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-500/15 hover:bg-rose-500/25 text-rose-700 dark:text-rose-300 border border-rose-500/30 cursor-pointer"
               >
-                <XMarkIcon className="w-3.5 h-3.5" />
                 <span>{isUr ? "منسوخ کریں" : "Cancel"}</span>
               </button>
             </div>
@@ -498,13 +478,15 @@ export function BackgroundTaskDetailView({
       >
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
-            {isRunning ? (
-              <SparklesIcon className="w-5 h-5 text-indigo-500 animate-spin shrink-0" />
-            ) : bgTask ? (
-              <CheckCircleIcon className="w-5 h-5 text-emerald-500 shrink-0" />
-            ) : (
-              <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
-            )}
+            <span
+              className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                isRunning
+                  ? "bg-indigo-500 animate-pulse"
+                  : bgTask
+                  ? "bg-emerald-500"
+                  : "bg-slate-400"
+              }`}
+            />
             <span className="text-xs sm:text-sm font-extrabold">
               {isRunning
                 ? isUr
@@ -573,7 +555,7 @@ export function BackgroundTaskDetailView({
             }`}
           >
             <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">
-              {isUr ? "✅ فارمولیشن لگائی گئی" : "✅ Filled (Google Verified)"}
+              {isUr ? "فارمولیشن لگائی گئی" : "Filled (Google Verified)"}
             </p>
             <p className="text-xl font-black text-emerald-700 dark:text-emerald-300 mt-0.5">
               {updatedCount.toLocaleString()}
@@ -589,8 +571,8 @@ export function BackgroundTaskDetailView({
           >
             <p className="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase">
               {isUr
-                ? "⏭️ چھوڑی گئیں (Skipped)"
-                : "⏭️ Skipped (Unfound / Non-Med)"}
+                ? "چھوڑی گئیں (Skipped)"
+                : "Skipped (Unfound / Non-Med)"}
             </p>
             <p className="text-xl font-black text-amber-700 dark:text-amber-300 mt-0.5">
               {skippedCount.toLocaleString()}
@@ -605,7 +587,7 @@ export function BackgroundTaskDetailView({
             }`}
           >
             <p className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase">
-              {isUr ? "⏳ باقی پروڈکٹس" : "⏳ Remaining in Queue"}
+              {isUr ? "باقی پروڈکٹس" : "Remaining in Queue"}
             </p>
             <p className="text-xl font-black text-indigo-700 dark:text-indigo-300 mt-0.5">
               {remainingCount.toLocaleString()}
@@ -628,18 +610,18 @@ export function BackgroundTaskDetailView({
             {[
               {
                 id: "all",
-                en: `📋 All Scanned (${filledList.length + skippedList.length})`,
-                ur: `📋 تمام چیک شدہ (${filledList.length + skippedList.length})`,
+                en: `All Scanned (${filledList.length + skippedList.length})`,
+                ur: `تمام چیک شدہ (${filledList.length + skippedList.length})`,
               },
               {
                 id: "filled",
-                en: `✅ Filled Formulations (${filledList.length})`,
-                ur: `✅ فارمولیشن لگائی گئی (${filledList.length})`,
+                en: `Filled Formulations (${filledList.length})`,
+                ur: `فارمولیشن لگائی گئی (${filledList.length})`,
               },
               {
                 id: "skipped",
-                en: `⏭️ Skipped Products (${skippedList.length})`,
-                ur: `⏭️ چھوڑی گئی پروڈکٹس (${skippedList.length})`,
+                en: `Skipped Products (${skippedList.length})`,
+                ur: `چھوڑی گئی پروڈکٹس (${skippedList.length})`,
               },
             ].map((tab) => {
               const active = activeTab === tab.id;
@@ -664,7 +646,6 @@ export function BackgroundTaskDetailView({
 
           {/* Search inside Report */}
           <div className="relative w-full sm:w-72">
-            <MagnifyingGlassIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchTerm}
@@ -674,7 +655,7 @@ export function BackgroundTaskDetailView({
                   ? "پروڈکٹ، کوڈ، سالٹ یا وجہ تلاش کریں..."
                   : "Search product, code, salt, or reason..."
               }
-              className={`w-full pl-9 pr-3 py-1.5 rounded-xl text-xs font-semibold border outline-hidden ${
+              className={`w-full px-3 py-1.5 rounded-xl text-xs font-semibold border outline-hidden ${
                 isDark
                   ? "bg-slate-950 border-slate-700 text-slate-100 placeholder:text-slate-500 focus:border-indigo-500"
                   : "bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400 focus:border-indigo-500"
@@ -759,11 +740,11 @@ export function BackgroundTaskDetailView({
                           >
                             {isFilled
                               ? isUr
-                                ? "✅ اپڈیٹ شدہ"
-                                : "✅ Filled"
+                                ? "اپڈیٹ شدہ"
+                                : "Filled"
                               : isUr
-                              ? "⏭️ چھوڑی گئی"
-                              : "⏭️ Skipped"}
+                              ? "چھوڑی گئی"
+                              : "Skipped"}
                           </span>
                         </div>
                       </td>
@@ -795,20 +776,23 @@ export function BackgroundTaskDetailView({
                       <td className="py-2.5 px-3">
                         {isFilled ? (
                           <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-300">
-                            🔍{" "}
-                            {isUr
-                              ? row.source_ur ||
-                                "گوگل سرچ اور فارماکوپیا سے تصدیق شدہ"
-                              : row.source_en ||
-                                "Google Search & DRAP Pharmacopoeia Verified"}
+                            {stripLeadingEmoji(
+                              isUr
+                                ? row.source_ur ||
+                                    "گوگل سرچ اور فارماکوپیا سے تصدیق شدہ"
+                                : row.source_en ||
+                                    "Google Search & DRAP Pharmacopoeia Verified"
+                            )}
                           </span>
                         ) : (
                           <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">
-                            {isUr
-                              ? row.reason_ur ||
-                                "گوگل سرچ پر کوئی تصدیق شدہ فارمولیشن نہیں ملی — چھوڑ دیا گیا"
-                              : row.reason_en ||
-                                "No verified formulation found on Google Search — skipped"}
+                            {stripLeadingEmoji(
+                              isUr
+                                ? row.reason_ur ||
+                                    "گوگل سرچ پر کوئی تصدیق شدہ فارمولیشن نہیں ملی — چھوڑ دیا گیا"
+                                : row.reason_en ||
+                                    "No verified formulation found on Google Search — skipped"
+                            )}
                           </span>
                         )}
                       </td>
@@ -818,11 +802,10 @@ export function BackgroundTaskDetailView({
                           href={googleUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline max-w-[220px] truncate"
+                          className="inline-flex items-center text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline max-w-[220px] truncate"
                           title={`Check on Google: ${googleQuery}`}
                         >
                           <span className="truncate">{googleQuery}</span>
-                          <ArrowTopRightOnSquareIcon className="w-3 h-3 shrink-0" />
                         </a>
                       </td>
 

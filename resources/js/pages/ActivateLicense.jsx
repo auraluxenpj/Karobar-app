@@ -39,8 +39,8 @@ export default function ActivateLicense() {
       if (data?.ok) {
         const destination = getLastVisitedPath();
         setMsg("License activated successfully.");
-        await refresh();                     // ✅ refresh context so guards allow
-        nav(destination, { replace: true }); // ✅ go to last visited page or dashboard
+        await refresh();                     // refresh context so guards allow
+        nav(destination, { replace: true }); // go to last visited page or dashboard
         setTimeout(() => window.location.assign(destination), 50); // hard fallback
       } else {
         setErr(data?.reason || "Activation failed");

@@ -260,7 +260,7 @@ export default function CurrentStockReport() {
       };
 
       setData({ rows, summary });
-      if (!rows.length) toast("No stock items found with quantity > 0.", { icon: "ℹ️" });
+      if (!rows.length) toast("No stock items found with quantity > 0.");
     } catch (err) {
       console.error(err);
       toast.error("Failed to fetch Current Stock report");

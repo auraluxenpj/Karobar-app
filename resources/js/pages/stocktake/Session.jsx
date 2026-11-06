@@ -182,7 +182,7 @@ export default function StocktakeSession() {
             if (el) {
               el.focus();
               el.select();
-              toast(`→ ${match.product?.name}`, { icon: "📦", duration: 1500 });
+              toast.success(`${match.product?.name}`, { duration: 1500 });
             }
           } else {
             toast.error(`No item found for barcode: ${barcode}`);

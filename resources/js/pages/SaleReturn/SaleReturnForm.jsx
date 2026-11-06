@@ -1007,7 +1007,7 @@ const handleSelectChange = async (field, value) => {
     const v = raw === "" ? "" : Number(raw);
     const newItems = [...form.items];
 
-    // ✅ Only enforce cap in invoice-based returns
+    // Only enforce cap in invoice-based returns
     if (field === "unit_return_quantity" && form.sale_invoice_id) {
       const allowed = toNum(newItems[row].unit_sale_quantity);
       const prevQty = toNum(newItems[row].unit_return_quantity);

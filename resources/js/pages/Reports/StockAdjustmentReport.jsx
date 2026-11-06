@@ -124,7 +124,7 @@ export default function StockAdjustmentReport() {
       const summary = responseData.summary || {};
 
       setData({ rows, summary });
-      if (!rows.length) toast("No stock adjustments found for the selected date range.", { icon: "ℹ️" });
+      if (!rows.length) toast("No stock adjustments found for the selected date range.");
     } catch (err) {
       console.error(err);
       toast.error("Failed to fetch Stock Adjustment report");

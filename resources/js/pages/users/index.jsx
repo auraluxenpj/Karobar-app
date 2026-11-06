@@ -15,7 +15,7 @@ import {
 } from "@heroicons/react/24/solid";
 import DocumentHistoryModal from "@/components/DocumentHistoryModal.jsx";
 
-// 🔒 permissions
+// permissions
 import { usePermissions, Guard } from "@/api/usePermissions.js";
 
 // Reusable components
@@ -63,7 +63,7 @@ export default function UsersIndex() {
   const controllerRef = useRef(null);
   const debounceRef = useRef(null);
 
-  // 🔒 permissions
+  // permissions
   const { loading: permsLoading, canFor } = usePermissions();
   const can = useMemo(
     () =>
@@ -73,7 +73,7 @@ export default function UsersIndex() {
     [canFor]
   );
 
-  // 🎨 theme accent used for the primary action and the active page chip
+  // theme accent used for the primary action and the active page chip
   const { theme } = useTheme();
   const primaryColor = theme?.primary_color || '#3b82f6';
   const primaryTextColor = getContrastText(primaryColor);

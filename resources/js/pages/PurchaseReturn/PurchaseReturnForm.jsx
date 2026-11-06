@@ -1184,7 +1184,7 @@ const handleSelectChange = async (field, value) => {
           is_unbatched: false,
           pack_size: toNum(firstDefined(matched.pack_size, upd[index].pack_size)),
           pack_purchased_quantity: toNum(matched.pack_quantity),
-          available_units: toNum(avail), // ✅ units purchased (qty + bonus) for that batch
+          available_units: toNum(avail), // units purchased (qty + bonus) for that batch
           pack_purchase_price: toNum(firstDefined(matched.pack_purchase_price, upd[index].pack_purchase_price)),
           unit_purchase_price: toNum(firstDefined(matched.unit_purchase_price, upd[index].unit_purchase_price)),
           item_discount_percentage: toNum(firstDefined(matched.item_discount_percentage, 0)),
@@ -1522,7 +1522,7 @@ const handleSelectChange = async (field, value) => {
     if (it.returnable_quantity != null) return toNum(it.returnable_quantity);
     const uq = toNum(firstDefined(it?.unit_quantity, it?.unit_qty, it?.units, it?.quantity_units, 0));
     const ub = toNum(firstDefined(it?.unit_bonus, it?.bonus_units, it?.free_units, 0));
-    return uq + ub; // ✅ units purchased on that invoice line (qty + bonus)
+    return uq + ub; // units purchased on that invoice line (qty + bonus)
   };
 
   const unitsOnInvoiceForProduct = (productId) => {

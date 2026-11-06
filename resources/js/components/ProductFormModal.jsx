@@ -19,10 +19,10 @@ const getContrastText = (hexColor) => {
   return luminance > 0.5 ? '#1f2937' : '#ffffff';
 };
 
-// 👉 Normalize Laravel paginate payloads (or plain arrays) to a simple array
+// Normalize Laravel paginate payloads (or plain arrays) to a simple array
 const asList = (payload) => (Array.isArray(payload) ? payload : (payload?.data ?? payload?.items ?? []));
 
-// 👉 Normalize formulation text (trim and collapse extra whitespace)
+// Normalize formulation text (trim and collapse extra whitespace)
 const normalizeFormulation = (val) => String(val ?? "").trim().replace(/\s+/g, " ");
 
 const ProductFormModal = forwardRef(({ open, onClose, onProductCreated }, ref) => {

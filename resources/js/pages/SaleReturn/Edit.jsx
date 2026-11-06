@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { usePermissions, Guard } from "@/api/usePermissions.js"; // 🔒
+import { usePermissions, Guard } from "@/api/usePermissions.js";
 import SaleReturnForm from "./SaleReturnForm";
 import PageSkeleton from "@/components/PageSkeleton.jsx";
 
@@ -13,7 +13,7 @@ export default function EditSaleReturn() {
   const [loading, setLoading] = useState(true);
   const [fetchErr, setFetchErr] = useState(null);
 
-  // 🔒 permissions
+  // permissions
   const { loading: permsLoading, canFor } = usePermissions();
   const can = useMemo(
     () => (typeof canFor === "function" ? canFor("sale-return") : {
@@ -23,7 +23,7 @@ export default function EditSaleReturn() {
   );
 
   useEffect(() => {
-    if (permsLoading || !can.view) return; // 🔒 only fetch when can.view
+    if (permsLoading || !can.view) return; // only fetch when can.view
     const fetchReturn = async () => {
       try {
         setLoading(true);
@@ -46,8 +46,8 @@ export default function EditSaleReturn() {
     navigate("/sale-returns");
   };
 
-  if (permsLoading) return <PageSkeleton />;              // 🔒
-  if (!can.view) return <div className="p-6 text-sm text-gray-700">You don’t have permission to view sale returns.</div>; // 🔒
+  if (permsLoading) return <PageSkeleton />;
+  if (!can.view) return <div className="p-6 text-sm text-gray-700">You don’t have permission to view sale returns.</div>;
   if (loading) return <PageSkeleton />;
   if (fetchErr) return <div className="p-6 text-red-600">{fetchErr}</div>;
 

@@ -460,7 +460,7 @@ export const SCREEN_BLUEPRINTS = {
         ur: "یہ اکاؤنٹ آپ کے فعال کیش ڈراور کے بیلنس کے ساتھ خودکار طور پر منسلک رہتا ہے۔",
       },
       {
-        term: { en: "Inter-Account Transfer (Drawer ↔ Bank / Safe)", ur: "اکاؤنٹ ٹرانسفر (ڈراور سے بینک یا سیف میں منتقلی)" },
+        term: { en: "Inter-Account Transfer (Drawer to Bank / Safe)", ur: "اکاؤنٹ ٹرانسفر (ڈراور سے بینک یا سیف میں منتقلی)" },
         type: "Button",
         en: "Moves money between two treasury accounts (e.g. depositing Rs. 50,000 from Cash Drawer into HBL Bank). Automatically logs the matching `cash_out` / `cash_in` in your open Cash Drawer shift!",
         ur: "ایک اکاؤنٹ سے دوسرے اکاؤنٹ میں رقم منتقل کرتا ہے (مثلاً گلے سے بینک میں پیسے جمع کروانا)۔",
@@ -1007,9 +1007,9 @@ export const UNIVERSAL_CONTROL_DICTIONARY = [
     ur: "**یہ خانہ کیا دکھاتا ہے:** سسٹم کی طرف سے دیا جانے والا منفرد بل نمبر جو بل محفوظ کرتے وقت (`Alt+S`) خودکار طور پر جاری ہوتا ہے۔",
   },
   {
-    keywords: ["relink paid to total", "🔗"],
-    exactTokens: ["🔗"],
-    title: { en: "Relink Paid Amount to Total Amount (🔗)", ur: "ادا شدہ رقم کو کل رقم کے برابر کرنے کا بٹن (🔗)" },
+    keywords: ["relink paid to total", "relink"],
+    exactTokens: ["relink"],
+    title: { en: "Relink Paid Amount to Total Amount", ur: "ادا شدہ رقم کو کل رقم کے برابر کرنے کا بٹن" },
     en: "**What this button does:** Resets `Total Paid` back to match the full `Total Amount` and re-enables automatic syncing if you previously edited `Total Paid` manually.",
     ur: "**یہ بٹن کیا کرتا ہے:** ایک کلک سے `Total Paid` (ادا شدہ رقم) کو دوبارہ بل کی کل رقم (`Total Amount`) کے برابر کر دیتا ہے۔",
   },
@@ -1023,7 +1023,7 @@ export const UNIVERSAL_CONTROL_DICTIONARY = [
     keywords: ["debit"],
     exactTokens: ["debit"],
     shortcut: {
-      keys: "Alt + D (Select Debit) · Alt + T (Toggle Debit ↔ Credit)",
+      keys: "Alt + D (Select Debit) · Alt + T (Toggle Debit / Credit)",
       en: "Press `Alt + D` to switch directly to **Debit (Cash)** mode, or `Alt + T` to toggle between Debit and Credit",
       ur: "`Alt + D` دبا کر فوری نقد (Debit) موڈ منتخب کریں، یا `Alt + T` سے موڈ تبدیل کریں",
     },

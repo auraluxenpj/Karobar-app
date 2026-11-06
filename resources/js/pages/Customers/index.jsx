@@ -22,6 +22,10 @@ import {
   PaperAirplaneIcon,
   EyeIcon,
   ShoppingCartIcon,
+  ChevronDoubleLeftIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronDoubleRightIcon,
 } from "@heroicons/react/24/solid";
 import CustomerImportModal from "@/components/CustomerImportModal.jsx";
 import ProductSearchInput from "@/components/ProductSearchInput.jsx";
@@ -963,7 +967,7 @@ export default function CustomersIndex() {
                   currentPage === 1 ? "opacity-40" : ""
                 }`}
               >
-                ⏮
+                <ChevronDoubleLeftIcon className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -972,7 +976,7 @@ export default function CustomersIndex() {
                   currentPage === 1 ? "opacity-40" : ""
                 }`}
               >
-                ◀
+                <ChevronLeftIcon className="w-3.5 h-3.5" />
               </button>
               <span className="mx-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 font-medium">
                 {currentPage}
@@ -984,7 +988,7 @@ export default function CustomersIndex() {
                   currentPage === pageCount ? "opacity-40" : ""
                 }`}
               >
-                ▶
+                <ChevronRightIcon className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setPage(pageCount)}
@@ -993,7 +997,7 @@ export default function CustomersIndex() {
                   currentPage === pageCount ? "opacity-40" : ""
                 }`}
               >
-                ⏭
+                <ChevronDoubleRightIcon className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>

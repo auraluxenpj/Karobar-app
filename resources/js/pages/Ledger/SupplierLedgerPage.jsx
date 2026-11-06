@@ -11,7 +11,7 @@ import { useTheme } from "@/context/ThemeContext.jsx";
 import { getThemeButtonClasses } from "@/utils/buttonStyles";
 import { printUrlViaIframe } from "@/utils/printHelper.js";
 
-// 🧊 glass primitives
+// glass primitives
 import { GlassCard, GlassSectionHeader, GlassInput } from "@/components/Glass.jsx";
 
 import {
@@ -95,7 +95,7 @@ const [suppliers, setSuppliers] = useState([]);
     [suppliers, supplierId]
   );
 
-  // 🔒 permissions
+  // permissions
   const { loading: permsLoading, canFor } = usePermissions();
   const can = useMemo(
     () =>
@@ -108,7 +108,7 @@ const [suppliers, setSuppliers] = useState([]);
   // theme
   const { isDark, theme } = useTheme();
 
-  // 🎨 Icon button styling used by the modals
+  // Icon button styling used by the modals
   const tintIconBtn = useMemo(() => `
     bg-white/60 dark:bg-slate-700/60 backdrop-blur-xs ring-1 ring-gray-200/60 dark:ring-white/10
     hover:bg-white dark:hover:bg-slate-600/80 hover:shadow-md hover:scale-[1.05] active:scale-[0.95] transition-all duration-200
@@ -657,7 +657,7 @@ const [suppliers, setSuppliers] = useState([]);
         try { localStorage.setItem("cash_drawer_sync", String(Date.now())); } catch {}
         try { localStorage.setItem("accounts_sync", String(Date.now())); } catch {}
       } else {
-        toast("Invoice was already fully paid", { icon: "✅" });
+        toast.success("Invoice was already fully paid");
       }
       setSettleTarget(null);
       await fetchData();

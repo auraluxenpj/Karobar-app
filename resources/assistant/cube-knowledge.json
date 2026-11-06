@@ -6232,7 +6232,7 @@
         },
         {
           "term": {
-            "en": "Inter-Account Transfer (Drawer ↔ Bank / Safe)",
+            "en": "Inter-Account Transfer (Drawer to Bank / Safe)",
             "ur": "اکاؤنٹ ٹرانسفر (ڈراور سے بینک یا سیف میں منتقلی)"
           },
           "type": "Button",
@@ -10839,7 +10839,7 @@
       ],
       "negativePhrases": [],
       "title": {
-        "en": "How to Manage Bank / Wallet Accounts & Transfer Funds (Cash ↔ Bank)",
+        "en": "How to Manage Bank / Wallet Accounts & Transfer Funds (Cash / Bank)",
         "ur": "بینک / والٹ اکاؤنٹس بنانے اور کیش سے بینک میں رقم منتقل کرنے کا طریقہ"
       },
       "en": "To manage your **Bank Accounts**, **Mobile Wallets (JazzCash / EasyPaisa)**, and **Cash Drawer** balances:\n\n1. Open **Financial Accounts** (`/accounts`) or press **`Alt + A`** from anywhere.\n2. **Add a Bank or Wallet:** Click **+ Add Account**, choose the type (`Bank`, `Mobile Wallet`, or `Cash`), enter the Account Title/Number and Opening Balance, and click **Save**.\n3. **Transfer Money (e.g., Cash Drawer → Bank Deposit):** Click **Transfer Funds**, select **From Account** (e.g., Cash Drawer) and **To Account** (e.g., Meezan Bank), enter the **Amount**, and click **Transfer**.",
@@ -12108,7 +12108,7 @@
         "en": "Cube — Capabilities & Safety Boundaries",
         "ur": "کیوب (Cube) کی صلاحیتیں اور حفاظتی حدود"
       },
-      "en": "**Cube** is your AI software assistant and interactive demonstrator built for **Karobar App ERP v2** (not a human operator):\n\n• **What Cube does:** Answers your questions concisely, diagnoses issues, explains how screens work, and runs grounded, step-by-step interactive walkthroughs.\n• **Safety Boundaries:**\n  1. **No Silent Destructive Actions:** Cube will never silently delete customers, void invoices, or post ledger entries without your explicit action on the screen.\n  2. **Observed vs. Documented Truth:** Cube clearly badges whether an instruction is **🟢 Observed on your current screen** or **📘 Documented for Karobar v2026.10**.",
+      "en": "**Cube** is your AI software assistant and interactive demonstrator built for **Karobar App ERP v2** (not a human operator):\n\n• **What Cube does:** Answers your questions concisely, diagnoses issues, explains how screens work, and runs grounded, step-by-step interactive walkthroughs.\n• **Safety Boundaries:**\n  1. **No Silent Destructive Actions:** Cube will never silently delete customers, void invoices, or post ledger entries without your explicit action on the screen.\n  2. **Observed vs. Documented Truth:** Cube clearly badges whether an instruction is **Observed on your current screen** or **Documented for Karobar v2026.10**.",
       "ur": "**کیوب (Cube)** کاروبار ایپ کا مخصوص اے آئی اسسٹنٹ اور انٹرایکٹو گائیڈ ہے:\n\n• **Cube کا کام:** آپ کے سوالات کو سمجھنا، مسائل کی تشخیص کرنا، سافٹ ویئر کے فیچرز کی وضاحت کرنا اور مرحلہ وار عملی ڈیمو (Walkthrough) دکھانا۔\n• **حفاظتی اصول:** اسسٹنٹ کبھی بھی آپ کی اجازت کے بغیر کوئی بل، گاہک یا کھاتہ خودکار طور پر ڈیلیٹ یا تبدیل نہیں کرتا، اور ہمیشہ واضح بتاتا ہے کہ معلومات آپ کی موجودہ اسکرین سے دیکھی گئی ہیں یا دستاویزات سے۔",
       "links": [
         {
@@ -12156,8 +12156,8 @@
       "keywords": [],
       "negativePhrases": [],
       "title": {
-        "en": "🛡️ Safety Guardrail: Destructive Action vs. Non-Destructive Guide",
-        "ur": "🛡️ حفاظتی وارننگ: ریکارڈ ڈیلیٹ کرنے کے اثرات اور محفوظ طریقہ"
+        "en": "Safety Guardrail: Destructive Action vs. Non-Destructive Guide",
+        "ur": "حفاظتی وارننگ: ریکارڈ ڈیلیٹ کرنے کے اثرات اور محفوظ طریقہ"
       },
       "en": "Deleting a master record (such as a **Customer**, **Supplier**, or **Product**) affects historical invoices and ledger statements, so **I do not execute deletions automatically**.\n\n**What will be affected if you delete a record:**\n• If a Customer or Supplier already has posted invoices or ledger transactions, the system protects accounting integrity by preventing orphan ledger entries.\n• **How to perform it safely yourself:** Open **Customers (`/customers`)** or **Suppliers (`/suppliers`)**, locate the unused record, and click the **Delete** icon—the app will ask for your confirmation first.",
       "ur": "کسی گاہک، سپلائر یا پروڈکٹ کو ڈیلیٹ کرنے سے کھاتوں اور پرانے بلوں پر اثر پڑتا ہے، اس لیے **اسسٹنٹ خودکار طور پر کوئی ریکارڈ ڈیلیٹ نہیں کرتا**۔\n\n**محفوظ طریقہ کار:**\n• اگر کسی گاہک یا سپلائر کے کھاتے میں لین دین موجود ہو تو سسٹم اکاؤنٹنگ کو محفوظ رکھنے کے لیے اسے غلطی سے ڈیلیٹ ہونے سے روکتا ہے۔\n• غیر استعمال شدہ ریکارڈ ہٹانے کے لیے متعلقہ صفحہ (`/customers` یا `/suppliers`) کھول کر خود تصدیق (Confirm) کے بعد ڈیلیٹ کریں۔",
@@ -13130,11 +13130,11 @@
       "id": "control:18",
       "keywords": [
         "relink paid to total",
-        "🔗"
+        "relink"
       ],
       "title": {
-        "en": "Relink Paid Amount to Total Amount (🔗)",
-        "ur": "ادا شدہ رقم کو کل رقم کے برابر کرنے کا بٹن (🔗)"
+        "en": "Relink Paid Amount to Total Amount",
+        "ur": "ادا شدہ رقم کو کل رقم کے برابر کرنے کا بٹن"
       },
       "en": "**What this button does:** Resets `Total Paid` back to match the full `Total Amount` and re-enables automatic syncing if you previously edited `Total Paid` manually.",
       "ur": "**یہ بٹن کیا کرتا ہے:** ایک کلک سے `Total Paid` (ادا شدہ رقم) کو دوبارہ بل کی کل رقم (`Total Amount`) کے برابر کر دیتا ہے۔"

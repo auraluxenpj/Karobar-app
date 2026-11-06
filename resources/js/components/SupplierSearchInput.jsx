@@ -17,14 +17,14 @@ const SupplierSearchInput = forwardRef(
     const wrapperRef = useRef(null);
     const inputRef = useRef(null);
 
-    // ✅ Expose functions to parent
+    // Expose functions to parent
     useImperativeHandle(ref, () => ({
       focus: () => inputRef.current?.focus(),
       openMenu: () => setShowDropdown(true),
       closeMenu: () => setShowDropdown(false),
     }));
 
-    // ✅ Parent-controlled autofocus
+    // Parent-controlled autofocus
     useEffect(() => {
       if (autoFocus) inputRef.current?.focus();
     }, [autoFocus]);

@@ -15,7 +15,7 @@ export default function MascotCharacter({ direction = "to-dark" }) {
     <div className={`mascot-character mascot-character-${direction}`} aria-hidden="true">
       {/* Friendly floating wave badge */}
       <div className="mascot-wave-bubble">
-        <span className="mascot-wave-text">{isToDark ? "Nighty night! 👋" : "Rise & shine! 👋"}</span>
+        <span className="mascot-wave-text">{isToDark ? "Nighty night!" : "Rise & shine!"}</span>
       </div>
 
       <svg

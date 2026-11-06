@@ -25,6 +25,7 @@ import {
   XMarkIcon,
   ShareIcon,
   ArrowsRightLeftIcon,
+  ScaleIcon,
 } from "@heroicons/react/24/solid";
 import { useTheme } from "@/context/ThemeContext";
 import { useCurrency } from "@/context/CurrencyContext";
@@ -304,8 +305,7 @@ export default function BarcodePos() {
         : 1;
 
     if ((Number(product.quantity) || 0) <= 0) {
-      toast(`"${product.name}" has 0 stock — click ⇄ Substitutes on the row to swap with an in-stock alternative`, {
-        icon: "⚠️",
+      toast.error(`"${product.name}" has 0 stock — click Substitutes on the row to swap with an in-stock alternative`, {
         duration: 4000,
       });
     }
@@ -489,7 +489,7 @@ export default function BarcodePos() {
 
   const handleRemoveItem = (uid) => {
     setItems((prev) => prev.filter((it) => it.uid !== uid));
-    toast("Item removed", { icon: "🗑️" });
+    toast("Item removed");
   };
 
   const handleClearCart = () => {
@@ -503,7 +503,7 @@ export default function BarcodePos() {
       setDiscountAmount(0);
       setRemarks("");
       setLastScanned(null);
-      toast("Cart cleared", { icon: "🧹" });
+      toast("Cart cleared");
     }
   };
 
@@ -1265,8 +1265,9 @@ export default function BarcodePos() {
                                 </span>
                               )}
                               {it.is_weight_barcode && (
-                                <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-500/20 text-amber-600 dark:text-amber-400 tracking-wide">
-                                  ⚖️ Scale Weight
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-black bg-amber-500/20 text-amber-600 dark:text-amber-400 tracking-wide">
+                                  <ScaleIcon className="w-3 h-3 shrink-0" />
+                                  <span>Scale Weight</span>
                                 </span>
                               )}
                               <button

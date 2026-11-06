@@ -146,7 +146,7 @@ class PurchaseInvoiceController extends Controller
             'items.*.quantity'                     => 'required|integer',
         ]);
 
-        // 🛡️ Server-Authoritative Totals Recalculation
+        // Server-Authoritative Totals Recalculation
         $calculated = app(\App\Services\InvoiceCalculationService::class)->calculateAndValidatePurchase($data, $request->user());
         $data['invoice_amount']      = $calculated['invoice_amount'];
         $data['discount_percentage'] = $calculated['discount_percentage'];
@@ -395,7 +395,7 @@ class PurchaseInvoiceController extends Controller
             'items.*.quantity'                     => 'required|integer',
         ]);
 
-        // 🛡️ Server-Authoritative Totals Recalculation
+        // Server-Authoritative Totals Recalculation
         $calculated = app(\App\Services\InvoiceCalculationService::class)->calculateAndValidatePurchase($data, $request->user());
         $data['invoice_amount']      = $calculated['invoice_amount'];
         $data['discount_percentage'] = $calculated['discount_percentage'];

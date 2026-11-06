@@ -20,7 +20,7 @@ import PaymentAccountSelector from "../../components/PaymentAccountSelector.jsx"
 const ProductFormModal = lazy(() => import("../../components/ProductFormModal.jsx"));
 const InvoiceDraftsModal = lazy(() => import("@/components/InvoiceDraftsModal.jsx"));
 const PreShiftDrawerPromptModal = lazy(() => import("@/components/PreShiftDrawerPromptModal.jsx"));
-import { BuildingStorefrontIcon, TrashIcon, PlusCircleIcon, CheckIcon } from "@heroicons/react/24/solid";
+import { BuildingStorefrontIcon, TrashIcon, PlusCircleIcon, CheckIcon, LinkIcon } from "@heroicons/react/24/solid";
 
 // Six-dot grip shown on drag handles
 const DragGripIcon = () => (
@@ -592,7 +592,7 @@ export default function PurchaseInvoiceForm({ invoiceId, onSuccess, onSubmit, in
   function handleItemChange(index, field, rawValue) {
     let value = rawValue;
 
-    // fields that can have decimals (✅ added pack_quantity and pack_bonus)
+    // fields that can have decimals (added pack_quantity and pack_bonus)
     const allowDecimalFields = [
       "pack_purchase_price",
       "unit_purchase_price",
@@ -1312,7 +1312,7 @@ const contRect = container.getBoundingClientRect();
         return;
       }
 
-      // 🔒 Final guard: keep linked if user never changed it (for debit invoices only)
+      // Final guard: keep linked if user never changed it (for debit invoices only)
       const payload = {
         ...form,
         total_paid: (paidTouched || form.invoice_type === "credit")
@@ -1519,7 +1519,7 @@ const contRect = container.getBoundingClientRect();
     [themeColors.danger, themeColors.dangerHover]
   );
 
-  // 🎨 Dynamic Button styles using theme colors
+  // Dynamic Button styles using theme colors
   const buttonStyle = theme?.button_style || 'modern';
   
   const getButtonClasses = useMemo(
@@ -2621,7 +2621,7 @@ const contRect = container.getBoundingClientRect();
                       color: isDark ? '#94a3b8' : '#64748b'
                     }}
                   >
-                    🔗
+                    <LinkIcon className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>

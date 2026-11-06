@@ -115,7 +115,7 @@ class SaleStockAvailability
                     throw ValidationException::withMessages(["items.$index.batch_number" => "The selected batch for {$product->name} is unavailable or ambiguous. Select a valid batch and expiry."]);
                 }
 
-                // 🛑 FEFO Expired Stock Selling Lock
+                // FEFO Expired Stock Selling Lock
                 if ($batch->is_expired) {
                     if (!$expiredOverride) {
                         throw new \Illuminate\Http\Exceptions\HttpResponseException(response()->json([

@@ -270,7 +270,7 @@ public function index(Request $request)
             'items.*.sub_total'                     => 'nullable|numeric',
         ]);
 
-        // 🛡️ Server-Authoritative Purchase Return Totals
+        // Server-Authoritative Purchase Return Totals
         $calculated = app(\App\Services\InvoiceCalculationService::class)->calculateAndValidatePurchaseReturn($data, $request->user());
         $data['items']               = $calculated['items'];
         $data['gross_total']         = $calculated['gross_total'];
@@ -352,7 +352,7 @@ public function index(Request $request)
             'items.*.sub_total'                     => 'nullable|numeric',
         ]);
 
-        // 🛡️ Server-Authoritative Purchase Return Totals
+        // Server-Authoritative Purchase Return Totals
         $calculated = app(\App\Services\InvoiceCalculationService::class)->calculateAndValidatePurchaseReturn($data, $request->user());
         $data['items']               = $calculated['items'];
         $data['gross_total']         = $calculated['gross_total'];

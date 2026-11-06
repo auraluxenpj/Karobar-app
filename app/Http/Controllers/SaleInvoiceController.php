@@ -389,7 +389,7 @@ class SaleInvoiceController extends Controller
             }
         }
 
-        // ⬇️ posted_number is NOT provided by client anymore (server assigns)
+        // posted_number is NOT provided by client anymore (server assigns)
         $data = $request->validate([
             'draft_id'            => 'nullable|integer|exists:invoice_drafts,id',
             'customer_id'         => 'required|exists:customers,id',
@@ -452,7 +452,7 @@ class SaleInvoiceController extends Controller
             ? round((float) $request->input('total_receive'), 2)
             : null;
 
-        // 🛡️ Server-Authoritative Totals & Discount Controls
+        // Server-Authoritative Totals & Discount Controls
         $calculated = app(\App\Services\InvoiceCalculationService::class)->calculateAndValidateSale(
             $data,
             $request->user(),
@@ -524,7 +524,7 @@ class SaleInvoiceController extends Controller
                 $request->boolean('expired_override'),
                 $request->only(['supervisor_email', 'supervisor_password'])
             );
-            // 🔐 Concurrency-safe numbering: lock last row, compute next
+            // Concurrency-safe numbering: lock last row, compute next
             $last = SaleInvoice::lockForUpdate()->orderByDesc('id')->first();
             $next = $last ? ($last->id + 1) : 1;
             $posted = 'SI-' . str_pad((string)$next, 6, '0', STR_PAD_LEFT);
@@ -834,7 +834,7 @@ class SaleInvoiceController extends Controller
             ? round((float) $request->input('total_receive'), 2)
             : null;
 
-        // 🛡️ Server-Authoritative Totals & Discount Controls
+        // Server-Authoritative Totals & Discount Controls
         $calculated = app(\App\Services\InvoiceCalculationService::class)->calculateAndValidateSale(
             $data,
             $request->user(),
