@@ -304,9 +304,9 @@ class SystemUpdateController extends Controller
         $versionLabel = preg_replace('/[^a-zA-Z0-9._-]/', '', (string) ($request->input('version') ?: 'latest'));
 
         $tempDir = sys_get_temp_dir();
-        $installerPath = $tempDir . DIRECTORY_SEPARATOR . "Karobar-App-Setup-{$versionLabel}.exe";
+        $installerPath = $tempDir . DIRECTORY_SEPARATOR . "Karobar-App-Update-{$versionLabel}.exe";
         if (is_file($installerPath) && !@unlink($installerPath)) {
-            $installerPath = $tempDir . DIRECTORY_SEPARATOR . "Karobar-App-Setup-{$versionLabel}-" . time() . ".exe";
+            $installerPath = $tempDir . DIRECTORY_SEPARATOR . "Karobar-App-Update-{$versionLabel}-" . time() . ".exe";
         }
 
         $this->writeUpdateProgress([
@@ -391,50 +391,16 @@ class SystemUpdateController extends Controller
                 $appExePath = $installDir . DIRECTORY_SEPARATOR . 'Karobar-App.exe';
                 if (!is_file($appExePath)) {
                     $installDir = 'C:\\Program Files\\Karobar-App';
-                    $appExePath = $installDir . '\\Karobar-App.exe';
                 }
 
-                $batPath = $tempDir . DIRECTORY_SEPARATOR . 'karobar-apply-update.bat';
-                $batLines = [
-                    '@echo off',
-                    "title Karobar-App Software Updater (v{$versionLabel})",
-                    'echo ==========================================================================',
-                    "echo   Karobar-App v{$versionLabel} — Zero-Data-Loss Automatic Software Update",
-                    'echo   Closing running Karobar-App processes before applying update...',
-                    'echo ==========================================================================',
-                    'timeout /t 2 /nobreak >nul',
-                    'taskkill /F /IM "Karobar-App.exe" >nul 2>&1',
-                    'taskkill /F /IM "KarobarERP.exe" >nul 2>&1',
-                    'timeout /t 1 /nobreak >nul',
-                    'echo.',
-                    "echo [1/3] Installing Karobar-App v{$versionLabel} update (100%% database & license preserved)...",
-                    "\"{$installerPath}\" /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /UPGRADE=1 \"/DIR={$installDir}\"",
-                    'echo.',
-                    'echo [2/3] Applying database migrations and permission sync...',
-                    "if exist \"{$installDir}\\app\\runtime\\php\\php.exe\" (",
-                    "  pushd \"{$installDir}\\app\"",
-                    "  \"{$installDir}\\app\\runtime\\php\\php.exe\" artisan karobar:install --upgrade-only --cleanup-temp >nul 2>&1",
-                    '  popd',
-                    ')',
-                    'echo.',
-                    'echo [3/3] Relaunching Karobar-App...',
-                    'tasklist /FI "IMAGENAME eq Karobar-App.exe" 2>NUL | find /I /N "Karobar-App.exe">NUL',
-                    'if "%ERRORLEVEL%" neq "0" (',
-                    "  if exist \"{$appExePath}\" (",
-                    "    start \"\" \"{$appExePath}\"",
-                    '  )',
-                    ')',
-                    'exit /b 0',
-                ];
-                @file_put_contents($batPath, implode("\r\n", $batLines));
+                $otaFlagPath = $tempDir . DIRECTORY_SEPARATOR . 'karobar-ota-upgrade.flag';
+                @file_put_contents($otaFlagPath, $installDir);
 
-                $escapedBat = str_replace("'", "''", $batPath);
                 $escapedExe = str_replace("'", "''", $installerPath);
                 $escapedDir = str_replace("'", "''", $installDir);
-                $psCmd = "try { Start-Process -FilePath '{$escapedBat}' -Verb RunAs -WindowStyle Normal -ErrorAction Stop } catch { Start-Process -FilePath '{$escapedExe}' -ArgumentList '/SILENT','/SUPPRESSMSGBOXES','/NORESTART','/CLOSEAPPLICATIONS','/FORCECLOSEAPPLICATIONS','/UPGRADE=1','/DIR={$escapedDir}' }";
+                $psCmd = "Start-Process -FilePath '{$escapedExe}' -ArgumentList '/SILENT','/SUPPRESSMSGBOXES','/NORESTART','/CLOSEAPPLICATIONS','/FORCECLOSEAPPLICATIONS','/UPGRADE=1','/DIR={$escapedDir}' -Verb RunAs";
 
-                $launchCmd = 'start "" /B powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "' . $psCmd . '"';
-                @pclose(@popen($launchCmd, 'r'));
+                @exec('powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "' . $psCmd . '" 2>&1');
             }
 
             return response()->json([

@@ -1013,7 +1013,7 @@ ipcMain.handle("karobar:download-and-install-update", async (_event, payload = {
   const versionLabel = String(payload.version || "latest").replace(/[^a-zA-Z0-9._-]/g, "");
   let tempInstallerPath = path.join(
     os.tmpdir(),
-    `Karobar-App-Setup-${versionLabel}.exe`
+    `Karobar-App-Update-${versionLabel}.exe`
   );
 
   // If a previous file exists at tempInstallerPath and cannot be overwritten, use a unique filename
@@ -1023,7 +1023,7 @@ ipcMain.handle("karobar:download-and-install-update", async (_event, payload = {
     } catch {
       tempInstallerPath = path.join(
         os.tmpdir(),
-        `Karobar-App-Setup-${versionLabel}-${Date.now()}.exe`
+        `Karobar-App-Update-${versionLabel}-${Date.now()}.exe`
       );
     }
   }
@@ -1087,75 +1087,43 @@ ipcMain.handle("karobar:download-and-install-update", async (_event, payload = {
 
     if (process.platform === "win32") {
       const installDir = path.dirname(process.execPath);
-      const appExePath = process.execPath;
-      const updateBatPath = path.join(os.tmpdir(), "karobar-apply-update.bat");
+      const otaFlagPath = path.join(os.tmpdir(), "karobar-ota-upgrade.flag");
 
-      // Write elevated updater batch script that waits for Karobar-App.exe & php.exe to exit,
-      // runs the Inno Setup installer in /SILENT /UPGRADE=1 mode (showing progress bar),
-      // runs karobar:install --upgrade-only, and relaunches Karobar-App.exe
-      const batLines = [
-        "@echo off",
-        `title Karobar-App Software Updater (v${versionLabel})`,
-        "echo ==========================================================================",
-        `echo   Karobar-App v${versionLabel} — Zero-Data-Loss Automatic Software Update`,
-        "echo   Closing running Karobar-App processes before applying update...",
-        "echo ==========================================================================",
-        "timeout /t 2 /nobreak >nul",
-        'taskkill /F /IM "Karobar-App.exe" >nul 2>&1',
-        'taskkill /F /IM "KarobarERP.exe" >nul 2>&1',
-        "timeout /t 1 /nobreak >nul",
-        "echo.",
-        `echo [1/3] Installing Karobar-App v${versionLabel} update (100%% database & license preserved)...`,
-        `"${tempInstallerPath}" /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /UPGRADE=1 "/DIR=${installDir}"`,
-        "echo.",
-        "echo [2/3] Applying database migrations and permission sync...",
-        `if exist "${installDir}\\app\\runtime\\php\\php.exe" (`,
-        `  pushd "${installDir}\\app"`,
-        `  "${installDir}\\app\\runtime\\php\\php.exe" artisan karobar:install --upgrade-only --cleanup-temp >nul 2>&1`,
-        "  popd",
-        ")",
-        "echo.",
-        "echo [3/3] Relaunching Karobar-App...",
-        'tasklist /FI "IMAGENAME eq Karobar-App.exe" 2>NUL | find /I /N "Karobar-App.exe">NUL',
-        'if "%ERRORLEVEL%" neq "0" (',
-        `  if exist "${appExePath}" (`,
-        `    start "" "${appExePath}"`,
-        `  ) else if exist "${installDir}\\Karobar-App.exe" (`,
-        `    start "" "${installDir}\\Karobar-App.exe"`,
-        "  )",
-        ")",
-        "exit /b 0",
-      ];
-      fs.writeFileSync(updateBatPath, batLines.join("\r\n"), "utf8");
+      try {
+        fs.writeFileSync(otaFlagPath, installDir, "utf8");
+      } catch {
+        // ignore flag write error; filename Karobar-App-Update-*.exe also triggers auto-upgrade mode
+      }
 
-      // Stop PHP server & scheduler so no files inside the installation directory are locked
+      // Stop PHP server & scheduler first so no files inside the installation directory are locked
       isQuitting = true;
       stopBackendServices();
 
-      // Use PowerShell Start-Process -Verb RunAs (ShellExecuteEx 'runas') because Windows CreateProcessW
-      // fails with ERROR_ELEVATION_REQUIRED (740) when spawning a requireAdministrator installer directly
-      const escapedBat = updateBatPath.replace(/'/g, "''");
-      const escapedExe = tempInstallerPath.replace(/'/g, "''");
-      const escapedDir = installDir.replace(/'/g, "''");
-      const psScript = `try { Start-Process -FilePath '${escapedBat}' -Verb RunAs -WindowStyle Normal -ErrorAction Stop } catch { Start-Process -FilePath '${escapedExe}' -ArgumentList '/SILENT','/SUPPRESSMSGBOXES','/NORESTART','/CLOSEAPPLICATIONS','/FORCECLOSEAPPLICATIONS','/UPGRADE=1','/DIR=${escapedDir}' }`;
+      // Launch the installer directly via Electron's native Win32 ShellExecuteExW (shell.openPath),
+      // which immediately displays the Windows UAC elevation prompt while the app window is still active
+      // and resolves ONLY AFTER the elevated installer process has started.
+      const openError = await shell.openPath(tempInstallerPath);
 
-      const updaterProc = spawn(
-        "powershell.exe",
-        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", psScript],
-        {
-          detached: true,
-          stdio: "ignore",
-          windowsHide: true,
-        }
-      );
-      updaterProc.on("error", () => {
-        shell.openPath(tempInstallerPath);
-      });
-      updaterProc.unref();
+      if (openError) {
+        // Fallback: synchronous PowerShell Start-Process -Verb RunAs so it completes before app.quit()
+        const escapedExe = tempInstallerPath.replace(/'/g, "''");
+        const escapedDir = installDir.replace(/'/g, "''");
+        execFileSync(
+          "powershell.exe",
+          [
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            `Start-Process -FilePath '${escapedExe}' -ArgumentList '/SILENT','/SUPPRESSMSGBOXES','/NORESTART','/CLOSEAPPLICATIONS','/FORCECLOSEAPPLICATIONS','/UPGRADE=1','/DIR=${escapedDir}' -Verb RunAs`,
+          ],
+          { windowsHide: true, timeout: 60000 }
+        );
+      }
 
       setTimeout(() => {
         app.quit();
-      }, 900);
+      }, 500);
 
       return { ok: true, installing: true };
     } else {

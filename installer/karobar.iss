@@ -169,9 +169,21 @@ var
 
   DetectedMachineId: String;
 
-function IsCliUpgradeMode(): Boolean;
+function OtaUpgradeFlagPath(): String;
 begin
-  Result := WizardSilent() or (ExpandConstant('{param:UPGRADE|0}') = '1');
+  Result := GetEnv('TEMP') + '\karobar-ota-upgrade.flag';
+end;
+
+function IsCliUpgradeMode(): Boolean;
+var
+  SrcExeUpper: String;
+begin
+  SrcExeUpper := UpperCase(ExtractFileName(ExpandConstant('{srcexe}')));
+  Result :=
+    WizardSilent() or
+    (ExpandConstant('{param:UPGRADE|0}') = '1') or
+    (Pos('KAROBAR-APP-UPDATE', SrcExeUpper) > 0) or
+    FileExists(OtaUpgradeFlagPath());
 end;
 
 function ExistingInstallDbPath(): String;
@@ -538,6 +550,9 @@ begin
 end;
 
 procedure InitializeWizard();
+var
+  SavedDirAnsi: AnsiString;
+  SavedDir: String;
 begin
   DetectedMachineId := ComputeInstallerMachineId();
   CreatePrivacyPolicyPage();
@@ -547,6 +562,16 @@ begin
 
   if IsCliUpgradeMode() then
   begin
+    if FileExists(OtaUpgradeFlagPath()) then
+    begin
+      if LoadStringFromFile(OtaUpgradeFlagPath(), SavedDirAnsi) then
+      begin
+        SavedDir := Trim(String(SavedDirAnsi));
+        if SavedDir <> '' then
+          WizardForm.DirEdit.Text := SavedDir;
+      end;
+    end;
+    WizardForm.LicenseAcceptedRadio.Checked := True;
     PrivacyAcceptCheck.Checked := True;
     KeepExistingDbRadio.Checked := True;
     FreshDbRadio.Checked := False;
@@ -559,10 +584,15 @@ begin
   Result := False;
   if IsCliUpgradeMode() then
   begin
-    if (PageID = PrivacyPage.ID) or
+    if (PageID = wpLicense) or
+       (PageID = PrivacyPage.ID) or
+       (PageID = wpSelectDir) or
        (PageID = DatabaseImportPage.ID) or
        (PageID = LicenseKeyPage.ID) or
-       (PageID = AdminAccountPage.ID) then
+       (PageID = AdminAccountPage.ID) or
+       (PageID = wpSelectProgramGroup) or
+       (PageID = wpSelectTasks) or
+       (PageID = wpReady) then
     begin
       Result := True;
       Exit;
@@ -582,6 +612,25 @@ end;
 
 procedure CurPageChanged(CurPageID: Integer);
 begin
+  if IsCliUpgradeMode() and (not WizardSilent()) then
+  begin
+    if (CurPageID = wpWelcome) or (CurPageID = wpLicense) or (CurPageID = wpReady) then
+    begin
+      WizardForm.LicenseAcceptedRadio.Checked := True;
+      PrivacyAcceptCheck.Checked := True;
+      KeepExistingDbRadio.Checked := True;
+      FreshDbRadio.Checked := False;
+      WriteAdminInitJson();
+      PostMessage(WizardForm.NextButton.Handle, $00F5, 0, 0);
+      Exit;
+    end;
+    if CurPageID = wpFinished then
+    begin
+      PostMessage(WizardForm.NextButton.Handle, $00F5, 0, 0);
+      Exit;
+    end;
+  end;
+
   if CurPageID = PrivacyPage.ID then
   begin
     WizardForm.NextButton.Enabled := PrivacyAcceptCheck.Checked;
@@ -727,5 +776,10 @@ begin
   if CurStep = ssInstall then
   begin
     WriteAdminInitJson();
+  end;
+  if CurStep = ssPostInstall then
+  begin
+    if FileExists(OtaUpgradeFlagPath()) then
+      DeleteFile(OtaUpgradeFlagPath());
   end;
 end;
