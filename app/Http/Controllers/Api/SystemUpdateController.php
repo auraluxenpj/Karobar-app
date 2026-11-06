@@ -243,5 +243,217 @@ class SystemUpdateController extends Controller
 
         return false;
     }
+
+    protected function progressFilePath(): string
+    {
+        return storage_path('app/update-progress.json');
+    }
+
+    protected function writeUpdateProgress(array $state): void
+    {
+        try {
+            @file_put_contents(
+                $this->progressFilePath(),
+                json_encode(array_merge(['ok' => true, 'updated_at' => time()], $state), JSON_UNESCAPED_SLASHES)
+            );
+        } catch (\Throwable) {
+            // ignore
+        }
+    }
+
+    /**
+     * Return live download & installation progress for in-app update.
+     */
+    public function updateProgress(): JsonResponse
+    {
+        $path = $this->progressFilePath();
+        if (!is_file($path)) {
+            return response()->json([
+                'ok'           => true,
+                'status'       => 'idle',
+                'percent'      => 0,
+                'downloadedMB' => null,
+                'totalMB'      => null,
+                'message'      => '',
+            ]);
+        }
+
+        $data = json_decode((string) @file_get_contents($path), true);
+        if (!is_array($data)) {
+            return response()->json([
+                'ok'      => true,
+                'status'  => 'idle',
+                'percent' => 0,
+                'message' => '',
+            ]);
+        }
+
+        return response()->json($data);
+    }
+
+    /**
+     * Download Karobar-App-Setup.exe inside the application and launch the elevated silent updater.
+     */
+    public function installUpdate(Request $request): JsonResponse
+    {
+        @set_time_limit(0);
+        @ignore_user_abort(true);
+
+        $downloadUrl = (string) ($request->input('download_url')
+            ?: 'https://github.com/shzdasim/Karobar-App/releases/latest/download/Karobar-App-Setup.exe');
+        $versionLabel = preg_replace('/[^a-zA-Z0-9._-]/', '', (string) ($request->input('version') ?: 'latest'));
+
+        $tempDir = sys_get_temp_dir();
+        $installerPath = $tempDir . DIRECTORY_SEPARATOR . "Karobar-App-Setup-{$versionLabel}.exe";
+        if (is_file($installerPath) && !@unlink($installerPath)) {
+            $installerPath = $tempDir . DIRECTORY_SEPARATOR . "Karobar-App-Setup-{$versionLabel}-" . time() . ".exe";
+        }
+
+        $this->writeUpdateProgress([
+            'status'       => 'starting',
+            'percent'      => 3,
+            'downloadedMB' => '0.0',
+            'totalMB'      => null,
+            'message'      => 'Connecting to GitHub Releases in-app downloader…',
+        ]);
+
+        try {
+            $fp = @fopen($installerPath, 'wb');
+            if (!$fp) {
+                throw new \RuntimeException('Unable to create temporary update installer file.');
+            }
+
+            $lastWriteMs = 0.0;
+            $ch = curl_init($downloadUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_FILE             => $fp,
+                CURLOPT_FOLLOWLOCATION   => true,
+                CURLOPT_MAXREDIRS        => 10,
+                CURLOPT_TIMEOUT          => 900,
+                CURLOPT_CONNECTTIMEOUT   => 20,
+                CURLOPT_SSL_VERIFYPEER   => false,
+                CURLOPT_SSL_VERIFYHOST   => 0,
+                CURLOPT_USERAGENT        => 'Karobar-App-InApp-Updater/2.0',
+                CURLOPT_HTTPHEADER       => ['Accept: application/octet-stream,*/*'],
+                CURLOPT_NOPROGRESS       => false,
+                CURLOPT_PROGRESSFUNCTION => function ($resource, $downloadSize, $downloaded) use (&$lastWriteMs) {
+                    $nowMs = microtime(true) * 1000;
+                    if (($nowMs - $lastWriteMs) < 250 && $downloaded < $downloadSize) {
+                        return 0;
+                    }
+                    $lastWriteMs = $nowMs;
+                    $dlMb = number_format($downloaded / (1024 * 1024), 1, '.', '');
+                    $totMb = $downloadSize > 0 ? number_format($downloadSize / (1024 * 1024), 1, '.', '') : null;
+                    $pct = $downloadSize > 0
+                        ? min(98, max(4, (int) round(($downloaded / $downloadSize) * 100)))
+                        : 50;
+
+                    $this->writeUpdateProgress([
+                        'status'       => 'downloading',
+                        'percent'      => $pct,
+                        'downloadedMB' => $dlMb,
+                        'totalMB'      => $totMb,
+                        'message'      => $totMb
+                            ? "Downloading update in app ({$dlMb} MB / {$totMb} MB)…"
+                            : "Downloading update in app ({$dlMb} MB)…",
+                    ]);
+                    return 0;
+                },
+            ]);
+
+            $ok = curl_exec($ch);
+            $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlErr = curl_error($ch);
+            curl_close($ch);
+            fclose($fp);
+
+            if (!$ok || $httpCode !== 200 || !is_file($installerPath) || filesize($installerPath) < 5 * 1024 * 1024) {
+                // Fallback to Windows curl.exe -L -k
+                $cmd = sprintf(
+                    'curl.exe -L -k --fail --silent --show-error -o %s %s 2>&1',
+                    escapeshellarg($installerPath),
+                    escapeshellarg($downloadUrl)
+                );
+                @exec($cmd, $out, $code);
+                if ($code !== 0 || !is_file($installerPath) || filesize($installerPath) < 5 * 1024 * 1024) {
+                    throw new \RuntimeException($curlErr ?: "Download failed (HTTP {$httpCode}).");
+                }
+            }
+
+            $this->writeUpdateProgress([
+                'status'  => 'installing',
+                'percent' => 100,
+                'message' => 'Launching Karobar-App installer & restarting…',
+            ]);
+
+            if (PHP_OS_FAMILY === 'Windows') {
+                $installDir = dirname(base_path());
+                $appExePath = $installDir . DIRECTORY_SEPARATOR . 'Karobar-App.exe';
+                if (!is_file($appExePath)) {
+                    $installDir = 'C:\\Program Files\\Karobar-App';
+                    $appExePath = $installDir . '\\Karobar-App.exe';
+                }
+
+                $batPath = $tempDir . DIRECTORY_SEPARATOR . 'karobar-apply-update.bat';
+                $batLines = [
+                    '@echo off',
+                    "title Karobar-App Software Updater (v{$versionLabel})",
+                    'echo ==========================================================================',
+                    "echo   Karobar-App v{$versionLabel} — Zero-Data-Loss Automatic Software Update",
+                    'echo   Closing running Karobar-App processes before applying update...',
+                    'echo ==========================================================================',
+                    'timeout /t 2 /nobreak >nul',
+                    'taskkill /F /IM "Karobar-App.exe" >nul 2>&1',
+                    'taskkill /F /IM "KarobarERP.exe" >nul 2>&1',
+                    'timeout /t 1 /nobreak >nul',
+                    'echo.',
+                    "echo [1/3] Installing Karobar-App v{$versionLabel} update (100%% database & license preserved)...",
+                    "\"{$installerPath}\" /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /UPGRADE=1 \"/DIR={$installDir}\"",
+                    'echo.',
+                    'echo [2/3] Applying database migrations and permission sync...',
+                    "if exist \"{$installDir}\\app\\runtime\\php\\php.exe\" (",
+                    "  pushd \"{$installDir}\\app\"",
+                    "  \"{$installDir}\\app\\runtime\\php\\php.exe\" artisan karobar:install --upgrade-only --cleanup-temp >nul 2>&1",
+                    '  popd',
+                    ')',
+                    'echo.',
+                    'echo [3/3] Relaunching Karobar-App...',
+                    'tasklist /FI "IMAGENAME eq Karobar-App.exe" 2>NUL | find /I /N "Karobar-App.exe">NUL',
+                    'if "%ERRORLEVEL%" neq "0" (',
+                    "  if exist \"{$appExePath}\" (",
+                    "    start \"\" \"{$appExePath}\"",
+                    '  )',
+                    ')',
+                    'exit /b 0',
+                ];
+                @file_put_contents($batPath, implode("\r\n", $batLines));
+
+                $escapedBat = str_replace("'", "''", $batPath);
+                $escapedExe = str_replace("'", "''", $installerPath);
+                $escapedDir = str_replace("'", "''", $installDir);
+                $psCmd = "try { Start-Process -FilePath '{$escapedBat}' -Verb RunAs -WindowStyle Normal -ErrorAction Stop } catch { Start-Process -FilePath '{$escapedExe}' -ArgumentList '/SILENT','/SUPPRESSMSGBOXES','/NORESTART','/CLOSEAPPLICATIONS','/FORCECLOSEAPPLICATIONS','/UPGRADE=1','/DIR={$escapedDir}' }";
+
+                $launchCmd = 'start "" /B powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "' . $psCmd . '"';
+                @pclose(@popen($launchCmd, 'r'));
+            }
+
+            return response()->json([
+                'ok'             => true,
+                'installing'     => true,
+                'installer_path' => $installerPath,
+            ]);
+        } catch (\Throwable $e) {
+            $this->writeUpdateProgress([
+                'status'  => 'error',
+                'percent' => 0,
+                'message' => $e->getMessage() ?: 'Failed to download update in app.',
+            ]);
+
+            return response()->json([
+                'ok'      => false,
+                'message' => $e->getMessage() ?: 'Failed to download update in app.',
+            ], 500);
+        }
+    }
 }
 

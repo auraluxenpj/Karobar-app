@@ -266,33 +266,67 @@ export default function AppUpdateNotification() {
       updateInfo.download_url ||
       "https://github.com/shzdasim/Karobar-App/releases/latest/download/Karobar-App-Setup.exe";
 
-    if (desktop?.isDesktop && typeof desktop.downloadAndInstallUpdate === "function") {
-      setIsInstalling(true);
-      setProgress({
-        status: "starting",
-        percent: 3,
-        downloadedMB: null,
-        totalMB: null,
-        message: "Connecting to GitHub Releases…",
-      });
+    setIsInstalling(true);
+    setProgress({
+      status: "starting",
+      percent: 3,
+      downloadedMB: null,
+      totalMB: null,
+      message: "Connecting to GitHub Releases in-app updater…",
+    });
 
-      const res = await desktop.downloadAndInstallUpdate({
-        downloadUrl,
+    // 1. Try Electron IPC in-app downloader & elevated installer first
+    if (desktop?.isDesktop && typeof desktop.downloadAndInstallUpdate === "function") {
+      try {
+        const res = await desktop.downloadAndInstallUpdate({
+          downloadUrl,
+          version: updateInfo.latest_version,
+        });
+        if (res?.ok) {
+          return;
+        }
+      } catch {
+        // Fall through to in-app backend downloader
+      }
+    }
+
+    // 2. Fallback to Laravel in-app downloader & elevated installer (never redirects to browser)
+    let pollTimer = null;
+    try {
+      pollTimer = setInterval(async () => {
+        try {
+          const { data } = await axios.get("/api/system/update-progress", {
+            cache: false,
+            params: { _t: Date.now() },
+          });
+          if (data?.status && data.status !== "idle") {
+            setProgress((prev) => ({
+              ...prev,
+              ...data,
+            }));
+          }
+        } catch {
+          // ignore poll errors
+        }
+      }, 450);
+
+      const { data } = await axios.post("/api/system/install-update", {
+        download_url: downloadUrl,
         version: updateInfo.latest_version,
       });
 
-      if (!res?.ok) {
+      if (!data?.ok) {
         setIsInstalling(false);
-        toast.error(res?.message || "Unable to download update automatically. Opening download link…");
-        if (desktop.openExternalUrl) {
-          desktop.openExternalUrl(downloadUrl);
-        } else {
-          window.open(downloadUrl, "_blank", "noopener,noreferrer");
-        }
+        toast.error(data?.message || "Unable to download and apply update right now. Please try again.");
       }
-    } else {
-      window.open(downloadUrl, "_blank", "noopener,noreferrer");
-      toast.success("Downloading Karobar-App-Setup.exe! Run it to upgrade with zero data loss.");
+    } catch (err) {
+      setIsInstalling(false);
+      toast.error(
+        err?.response?.data?.message ||
+          "Unable to download update in app right now. Please check your internet connection and try again."
+      );
+    } finally {
+      if (pollTimer) clearInterval(pollTimer);
     }
   };
 
@@ -428,25 +462,15 @@ export default function AppUpdateNotification() {
             </p>
           </div>
         ) : (
-          <div className="mt-4 flex items-center gap-2.5">
+          <div className="mt-4 flex items-center">
             <button
               type="button"
               onClick={handleInstallUpdate}
               disabled={isChecking}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-sky-500/25 transition hover:from-sky-400 hover:to-blue-500 active:scale-[0.99]"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-sky-500/25 transition hover:from-sky-400 hover:to-blue-500 active:scale-[0.99] cursor-pointer"
             >
               <CloudArrowDownIcon className="h-4 w-4" />
               <span>Update &amp; Restart Now</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleOpenReleasePage}
-              className="inline-flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-800/80 px-3 py-2.5 text-xs font-semibold text-slate-300 transition hover:bg-slate-800 hover:text-white"
-              title="View release on GitHub"
-            >
-              <span>Release</span>
-              <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
             </button>
           </div>
         )}

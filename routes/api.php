@@ -57,6 +57,8 @@ use App\Http\Controllers\Api\SystemUpdateController;
 */
 Route::get('/system/version', [SystemUpdateController::class, 'version']);
 Route::get('/system/check-update', [SystemUpdateController::class, 'checkUpdate']);
+Route::get('/system/update-progress', [SystemUpdateController::class, 'updateProgress']);
+Route::post('/system/install-update', [SystemUpdateController::class, 'installUpdate']);
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 Route::post('/session/extend', [AuthController::class, 'extendSession'])->middleware('throttle:30,1');

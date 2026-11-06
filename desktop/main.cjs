@@ -742,6 +742,7 @@ function fetchJsonUrl(url, redirectCount = 0) {
     const req = client.get(
       url,
       {
+        rejectUnauthorized: false,
         headers: {
           "User-Agent": "Karobar-App-Desktop-Updater/2.0",
           Accept: "application/json",
@@ -919,13 +920,14 @@ ipcMain.handle("karobar:check-for-updates", async () => {
 
 function downloadFileWithProgress(url, destPath, onProgress, redirectCount = 0) {
   return new Promise((resolve, reject) => {
-    if (redirectCount > 8) {
+    if (redirectCount > 10) {
       return reject(new Error("Too many redirects while downloading update."));
     }
     const client = url.startsWith("https:") ? https : http;
     const req = client.get(
       url,
       {
+        rejectUnauthorized: false,
         headers: {
           "User-Agent": "Karobar-App-Desktop-Updater/2.0",
           Accept: "application/octet-stream,*/*",
@@ -1008,11 +1010,23 @@ ipcMain.handle("karobar:download-and-install-update", async (_event, payload = {
   const downloadUrl =
     payload.downloadUrl ||
     "https://github.com/shzdasim/Karobar-App/releases/latest/download/Karobar-App-Setup.exe";
-  const versionLabel = payload.version || "latest";
-  const tempInstallerPath = path.join(
+  const versionLabel = String(payload.version || "latest").replace(/[^a-zA-Z0-9._-]/g, "");
+  let tempInstallerPath = path.join(
     os.tmpdir(),
-    `Karobar-App-Setup-${String(versionLabel).replace(/[^a-zA-Z0-9._-]/g, "")}.exe`
+    `Karobar-App-Setup-${versionLabel}.exe`
   );
+
+  // If a previous file exists at tempInstallerPath and cannot be overwritten, use a unique filename
+  if (fs.existsSync(tempInstallerPath)) {
+    try {
+      fs.unlinkSync(tempInstallerPath);
+    } catch {
+      tempInstallerPath = path.join(
+        os.tmpdir(),
+        `Karobar-App-Setup-${versionLabel}-${Date.now()}.exe`
+      );
+    }
+  }
 
   try {
     sendUpdateProgress({
@@ -1021,14 +1035,28 @@ ipcMain.handle("karobar:download-and-install-update", async (_event, payload = {
       message: "Preparing zero-data-loss update download…",
     });
 
-    await downloadFileWithProgress(downloadUrl, tempInstallerPath, (progress) => {
-      sendUpdateProgress({
-        ...progress,
-        message: progress.totalMB
-          ? `Downloading update (${progress.downloadedMB} MB / ${progress.totalMB} MB)…`
-          : `Downloading update (${progress.downloadedMB} MB)…`,
+    try {
+      await downloadFileWithProgress(downloadUrl, tempInstallerPath, (progress) => {
+        sendUpdateProgress({
+          ...progress,
+          message: progress.totalMB
+            ? `Downloading update (${progress.downloadedMB} MB / ${progress.totalMB} MB)…`
+            : `Downloading update (${progress.downloadedMB} MB)…`,
+        });
       });
-    });
+    } catch (primaryErr) {
+      // Fallback to Windows built-in curl.exe -L -k if Node stream encountered a network/proxy issue
+      sendUpdateProgress({
+        status: "downloading",
+        percent: 25,
+        message: "Downloading update package via system downloader…",
+      });
+      execFileSync(
+        "curl.exe",
+        ["-L", "-k", "--fail", "--silent", "--show-error", "-o", tempInstallerPath, downloadUrl],
+        { windowsHide: true, timeout: 10 * 60 * 1000 }
+      );
+    }
 
     sendUpdateProgress({
       status: "backing-up",
@@ -1139,11 +1167,6 @@ ipcMain.handle("karobar:download-and-install-update", async (_event, payload = {
       };
     }
   } catch (err) {
-    sendUpdateProgress({
-      status: "error",
-      percent: 0,
-      message: err?.message || "Failed to download or launch update installer.",
-    });
     return {
       ok: false,
       message: err?.message || "Failed to download update.",
