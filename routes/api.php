@@ -59,6 +59,7 @@ Route::get('/system/version', [SystemUpdateController::class, 'version']);
 Route::get('/system/check-update', [SystemUpdateController::class, 'checkUpdate']);
 
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+Route::post('/session/extend', [AuthController::class, 'extendSession'])->middleware('throttle:30,1');
 Route::middleware(['auth:sanctum', 'token.expiry'])->get('/user', [AuthController::class, 'user']);
 Route::middleware(['auth:sanctum', 'token.expiry'])->put('/profile', [AuthController::class, 'updateProfile']);
 Route::middleware(['auth:sanctum', 'token.expiry'])->post('/logout', [AuthController::class, 'logout']);

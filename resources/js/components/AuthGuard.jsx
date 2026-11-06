@@ -12,11 +12,10 @@ export default function AuthGuard({ children, requireAuth = true }) {
   const location = useLocation();
   const token = localStorage.getItem("token");
   const expiresAt = localStorage.getItem("token_expires_at");
-  const isAuthenticated = !!token && (!expiresAt || Date.parse(expiresAt) > Date.now());
 
   if (requireAuth) {
-    // Protected route - require authentication
-    if (!isAuthenticated) {
+    // Protected route - keep mounted while token exists so SessionExpiryModal can offer "Wait 10 Minutes"
+    if (!token) {
       saveLastVisitedPath(location);
       const fullPath = `${location.pathname}${location.search || ""}${location.hash || ""}`;
       return <Navigate to="/" state={{ from: fullPath }} replace />;
@@ -24,7 +23,8 @@ export default function AuthGuard({ children, requireAuth = true }) {
     return children;
   }
 
-  // Public route - redirect to last visited page or dashboard if already authenticated
+  // Public route - redirect to last visited page or dashboard if already authenticated and not expired
+  const isAuthenticated = !!token && (!expiresAt || Date.parse(expiresAt) > Date.now());
   if (isAuthenticated) {
     return <Navigate to={getLastVisitedPath(location.state?.from)} replace />;
   }

@@ -35,12 +35,6 @@ class CheckTokenExpiry
 
         // Check if remember_token_expires_at is set and has passed
         if ($user->remember_token_expires_at && now()->isAfter($user->remember_token_expires_at)) {
-            // Token has expired, delete it and return 401
-            $token = $user->currentAccessToken();
-            if ($token instanceof PersonalAccessToken) {
-                $token->delete();
-            }
-
             return response()->json([
                 'message' => 'Session expired. Please login again.',
                 'expired' => true,

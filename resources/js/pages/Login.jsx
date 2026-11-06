@@ -13,7 +13,7 @@ export default function Login() {
   const { refresh: refreshLicense } = useLicense();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -76,6 +76,7 @@ export default function Login() {
 
       // Store token and its expiry
       localStorage.setItem("token", data.token);
+      localStorage.removeItem("karobar_session_prompt_at");
       if (data.expires_at) {
         localStorage.setItem("token_expires_at", data.expires_at);
       } else {

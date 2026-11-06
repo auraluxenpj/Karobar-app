@@ -91,6 +91,31 @@ function invalidateCacheForMutation(mutationUrl = "") {
 
 let notifDebounceTimer = null;
 let drawerDebounceTimer = null;
+let inflightSessionExtend = null;
+
+function dispatchSessionExpiredModal() {
+  try {
+    window.dispatchEvent(new CustomEvent("karobar:session-expired"));
+    if (window.top && window.top !== window) {
+      window.top.dispatchEvent(new CustomEvent("karobar:session-expired"));
+    }
+  } catch {
+    // ignore cross-frame dispatch errors
+  }
+}
+
+function forceLogoutAndRedirect() {
+  saveLastVisitedPath(window.location);
+  clearApiCache();
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  localStorage.removeItem("token_expires_at");
+  localStorage.removeItem("karobar_session_prompt_at");
+  delete axios.defaults.headers.common["Authorization"];
+  if (window.location.pathname !== "/") {
+    window.location.assign("/");
+  }
+}
 
 let isInitialized = false;
 
@@ -245,28 +270,42 @@ export function initAxiosAuth() {
         return Promise.reject(err);
       }
 
-      // Handle token expiry from our custom middleware
-      if (status === 401 && err?.response?.data?.expired) {
-        saveLastVisitedPath(window.location);
-        clearApiCache();
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        localStorage.removeItem("token_expires_at");
-        delete axios.defaults.headers.common["Authorization"];
-        window.location.href = "/";
-        return Promise.reject(err);
-      }
+      // When a 401 occurs while logged in, do NOT abruptly close the session or lose unsaved invoice work.
+      // Instead, show the "Wait 10 Minutes / Login Now" popup and extend the backend token for 10 minutes
+      // so the in-flight request (e.g. saving an invoice) succeeds without data loss.
+      if (status === 401 && !url.includes("/login") && !url.includes("/session/extend")) {
+        const currentToken = localStorage.getItem("token");
+        if (!currentToken || window.location.pathname === "/") {
+          forceLogoutAndRedirect();
+          return Promise.reject(err);
+        }
 
-      // Optional: handle 401 globally for auth failures
-      if (status === 401 && !url.includes("/login")) {
-        saveLastVisitedPath(window.location);
-        clearApiCache();
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        localStorage.removeItem("token_expires_at");
-        delete axios.defaults.headers.common["Authorization"];
-        if (window.location.pathname !== "/") {
-          window.location.assign("/");
+        // Open the Session Expiry Popup ("Wait 10 Minutes" / "Login Now")
+        dispatchSessionExpiredModal();
+
+        if (err.config && !err.config._retriedAfterSessionExtend) {
+          err.config._retriedAfterSessionExtend = true;
+          if (!inflightSessionExtend) {
+            inflightSessionExtend = axios
+              .post(
+                "/api/session/extend",
+                { minutes: 10 },
+                { headers: { Authorization: `Bearer ${currentToken}` } }
+              )
+              .finally(() => {
+                inflightSessionExtend = null;
+              });
+          }
+
+          return inflightSessionExtend
+            .then(() => axios.request(err.config))
+            .catch((extendErr) => {
+              const extStatus = extendErr?.response?.status;
+              if (extStatus === 401 || extStatus === 403) {
+                forceLogoutAndRedirect();
+              }
+              return Promise.reject(err);
+            });
         }
       }
 

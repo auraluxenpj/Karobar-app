@@ -10,6 +10,7 @@ import SubWindowManager, {
   resolveTitleForPath,
 } from "../components/SubWindowManager.jsx";
 import AppUpdateNotification from "../components/AppUpdateNotification.jsx";
+import SessionExpiryModal from "../components/SessionExpiryModal.jsx";
 import { Toaster } from "react-hot-toast";
 
 const SIDEBAR_PIN_STORAGE_KEY = "karobar_sidebar_pinned";
@@ -762,6 +763,7 @@ export default function DashboardLayout({ children }) {
         />
 
         <AppUpdateNotification />
+        <SessionExpiryModal />
       </div>
     </div>
   );

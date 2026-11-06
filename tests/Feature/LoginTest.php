@@ -94,4 +94,49 @@ class LoginTest extends TestCase
         $this->getJson('/api/user')->assertUnauthorized()->assertJsonPath('expired', true);
         $this->getJson('/api/user')->assertUnauthorized();
     }
+
+    public function test_session_can_be_extended_by_ten_minutes_repeatedly_after_expiry(): void
+    {
+        $this->freezeSecond();
+        $loginRes = $this->postJson('/api/login', [
+            'email' => 'login@example.com',
+            'password' => 'correct-password',
+            'remember' => true,
+        ])->assertOk();
+
+        $token = $loginRes->json('token');
+
+        config(['sanctum.guard' => []]);
+        $this->app['auth']->forgetGuards();
+
+        // Travel past the 24-hour mark so token is expired
+        $this->travel(1441)->minutes();
+        $this->withToken($token)->getJson('/api/user')->assertUnauthorized();
+
+        // User clicks "Wait 10 Minutes" -> extends session by 10 minutes
+        $extendRes = $this->withToken($token)
+            ->postJson('/api/session/extend', ['minutes' => 10])
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('wait_minutes', 10);
+
+        $this->assertSame(now()->addMinutes(10)->toIso8601String(), $extendRes->json('expires_at'));
+
+        // User can now save their invoice / call protected APIs during the 10-minute wait window
+        $this->app['auth']->forgetGuards();
+        $this->withToken($token)->getJson('/api/user')->assertOk();
+
+        // After 11 minutes, session expires again and can be extended for another 10 minutes
+        $this->travel(11)->minutes();
+        $this->app['auth']->forgetGuards();
+        $this->withToken($token)->getJson('/api/user')->assertUnauthorized();
+
+        $this->withToken($token)
+            ->postJson('/api/session/extend', ['minutes' => 10])
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        $this->app['auth']->forgetGuards();
+        $this->withToken($token)->getJson('/api/user')->assertOk();
+    }
 }

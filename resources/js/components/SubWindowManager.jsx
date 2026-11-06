@@ -276,31 +276,12 @@ export default function SubWindowManager({
                 }}
                 className="flex items-center justify-between gap-3 px-4 py-2.5 cursor-move select-none"
               >
-                {/* Left: macOS / Modern Traffic-Light + Title */}
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div
-                    className="flex items-center gap-1.5 mr-1"
-                    onMouseDown={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => onCloseWindow(win.id)}
-                      title="Close sub-window"
-                      className="w-3 h-3 rounded-full bg-rose-400/90 hover:bg-rose-500 transition-colors cursor-pointer"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => onMinimizeWindow(win.id)}
-                      title="Minimize to dock"
-                      className="w-3 h-3 rounded-full bg-amber-400/90 hover:bg-amber-500 transition-colors cursor-pointer"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => onToggleMaximizeWindow(win.id)}
-                      title={win.isMaximized ? "Restore size" : "Maximize sub-window"}
-                      className="w-3 h-3 rounded-full bg-emerald-400/90 hover:bg-emerald-500 transition-colors cursor-pointer"
-                    />
-                  </div>
+                {/* Left: Window Icon + Title */}
+                <div className="flex items-center gap-2 min-w-0">
+                  <WindowIcon
+                    style={{ color: "var(--workspace-muted, #536176)" }}
+                    className="w-4 h-4 shrink-0 opacity-75"
+                  />
                   <span
                     style={{ color: "var(--workspace-ink, #172033)" }}
                     className="font-semibold text-[13px] tracking-tight truncate"

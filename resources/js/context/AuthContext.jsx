@@ -65,6 +65,7 @@ export function AuthProvider({ children }) {
     invalidatePermissionsCache();
     localStorage.setItem("token", tokenValue);
     localStorage.setItem("user", JSON.stringify(userData));
+    localStorage.removeItem("karobar_session_prompt_at");
     try {
       sessionStorage.setItem("karobar_just_logged_in", "1");
     } catch {
@@ -89,6 +90,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("token_expires_at");
+    localStorage.removeItem("karobar_session_prompt_at");
     localStorage.removeItem("productModalPos");
     localStorage.removeItem("productModalSize");
     try {

@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Laravel\Sanctum\PersonalAccessToken;
 use App\Services\LicenseService;
 
 class AuthController extends Controller
@@ -163,6 +164,71 @@ public function logout(Request $request): \Illuminate\Http\JsonResponse
 {
     $request->user()->currentAccessToken()?->delete();
     return response()->json(['message' => 'Logged out']);
+}
+
+/**
+ * Extend the current user's session by N minutes (default 10 minutes)
+ * when the user clicks "Wait 10 Minutes" on the session expiry popup,
+ * preventing any loss of unsaved invoice/form progress.
+ */
+public function extendSession(Request $request): JsonResponse
+{
+    $minutes = max(1, min(60, (int) $request->input('minutes', 10)));
+    $bearer = $request->bearerToken();
+    $accessToken = null;
+    $user = null;
+
+    if ($bearer) {
+        if (!str_contains($bearer, '|')) {
+            $accessToken = PersonalAccessToken::where('token', hash('sha256', $bearer))->first();
+        } else {
+            [$id, $tokenPart] = explode('|', $bearer, 2);
+            $instance = PersonalAccessToken::find($id);
+            if ($instance && hash_equals($instance->token, hash('sha256', $tokenPart))) {
+                $accessToken = $instance;
+            }
+        }
+        if ($accessToken) {
+            $user = $accessToken->tokenable;
+        }
+    }
+
+    if (!$user) {
+        $user = $request->user();
+    }
+
+    if (!$user instanceof User) {
+        return response()->json([
+            'ok' => false,
+            'message' => 'Unable to extend session. Please log in again.',
+        ], 401);
+    }
+
+    if (($user->status ?? 'active') !== 'active') {
+        $user->tokens()->delete();
+        return response()->json([
+            'ok' => false,
+            'message' => 'Your account has been deactivated.',
+        ], 403);
+    }
+
+    $expiresAt = now()->addMinutes($minutes);
+
+    if ($accessToken) {
+        $accessToken->forceFill([
+            'expires_at' => $expiresAt,
+        ])->save();
+    }
+
+    $user->update([
+        'remember_token_expires_at' => $expiresAt,
+    ]);
+
+    return response()->json([
+        'ok' => true,
+        'expires_at' => $expiresAt->toIso8601String(),
+        'wait_minutes' => $minutes,
+    ]);
 }
 
 public function confirmPassword(Request $request)

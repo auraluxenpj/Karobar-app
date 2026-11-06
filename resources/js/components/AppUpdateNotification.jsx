@@ -11,10 +11,27 @@ import {
   ArrowTopRightOnSquareIcon,
 } from "@heroicons/react/24/outline";
 
+const UPDATE_DISMISSED_UNTIL_KEY = "karobar_update_dismissed_until";
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+function getDismissedUntilMs() {
+  try {
+    const raw = localStorage.getItem(UPDATE_DISMISSED_UNTIL_KEY);
+    if (!raw) return 0;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function isDismissedForToday() {
+  return Date.now() < getDismissedUntilMs();
+}
+
 export default function AppUpdateNotification() {
   const [updateInfo, setUpdateInfo] = useState(null);
-  const [minimized, setMinimized] = useState(false);
-  const [dismissedForSession, setDismissedForSession] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(() => isDismissedForToday());
   const [isChecking, setIsChecking] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
   const [progress, setProgress] = useState({
@@ -25,7 +42,23 @@ export default function AppUpdateNotification() {
     message: "",
   });
 
+  const dismissForOneDay = useCallback(() => {
+    const until = Date.now() + ONE_DAY_MS;
+    try {
+      localStorage.setItem(UPDATE_DISMISSED_UNTIL_KEY, String(until));
+    } catch {
+      // ignore storage errors
+    }
+    setIsDismissed(true);
+    window.dispatchEvent(new CustomEvent("karobar:update-dismissed", { detail: { until } }));
+  }, []);
+
   const checkForUpdates = useCallback(async ({ manual = false } = {}) => {
+    if (!manual && isDismissedForToday()) {
+      setIsDismissed(true);
+      return;
+    }
+
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       if (manual) {
         toast.error("You are currently offline. Connect to the internet to check for Karobar-App updates.");
@@ -118,9 +151,15 @@ export default function AppUpdateNotification() {
 
       if (data.update_available) {
         setUpdateInfo(data);
-        setDismissedForSession(false);
         if (manual) {
-          setMinimized(false);
+          try {
+            localStorage.removeItem(UPDATE_DISMISSED_UNTIL_KEY);
+          } catch {
+            // ignore
+          }
+          setIsDismissed(false);
+        } else {
+          setIsDismissed(isDismissedForToday());
         }
       } else if (manual) {
         toast.success(
@@ -136,6 +175,34 @@ export default function AppUpdateNotification() {
       setIsChecking(false);
     }
   }, []);
+
+  useEffect(() => {
+    const syncDismissState = () => {
+      setIsDismissed(isDismissedForToday());
+    };
+    window.addEventListener("storage", syncDismissState);
+    window.addEventListener("karobar:update-dismissed", syncDismissState);
+    return () => {
+      window.removeEventListener("storage", syncDismissState);
+      window.removeEventListener("karobar:update-dismissed", syncDismissState);
+    };
+  }, []);
+
+  // Re-open automatically once the 24-hour dismissal window expires
+  useEffect(() => {
+    if (!isDismissed) return;
+    const remainingMs = getDismissedUntilMs() - Date.now();
+    if (remainingMs <= 0) {
+      setIsDismissed(false);
+      checkForUpdates({ manual: false });
+      return;
+    }
+    const timer = setTimeout(() => {
+      setIsDismissed(false);
+      checkForUpdates({ manual: false });
+    }, Math.min(remainingMs + 500, ONE_DAY_MS + 1000));
+    return () => clearTimeout(timer);
+  }, [isDismissed, checkForUpdates]);
 
   useEffect(() => {
     // Initial check shortly after startup when online
@@ -240,32 +307,8 @@ export default function AppUpdateNotification() {
     }
   };
 
-  if (!updateInfo?.update_available || dismissedForSession) {
+  if (!updateInfo?.update_available || (isDismissed && !isInstalling)) {
     return null;
-  }
-
-  // Minimized pill in bottom-right corner
-  if (minimized && !isInstalling) {
-    return (
-      <div className="fixed bottom-4 right-4 z-[9990] print:hidden">
-        <button
-          type="button"
-          onClick={() => setMinimized(false)}
-          className="group flex items-center gap-2.5 rounded-full border border-sky-400/40 bg-slate-900/95 px-4 py-2 text-xs font-semibold text-white shadow-xl backdrop-blur-xl transition-all hover:scale-[1.02] hover:border-sky-400 hover:bg-slate-900"
-          title="Click to view and install the new Karobar-App update"
-        >
-          <span className="relative flex h-2.5 w-2.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          </span>
-          <SparklesIcon className="h-4 w-4 text-sky-400" />
-          <span>Karobar-App v{updateInfo.latest_version} Ready</span>
-          <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-300">
-            Update
-          </span>
-        </button>
-      </div>
-    );
   }
 
   return (
@@ -305,17 +348,17 @@ export default function AppUpdateNotification() {
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => setMinimized(true)}
-                className="rounded-lg px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
-                title="Minimize to corner"
+                onClick={dismissForOneDay}
+                className="rounded-lg px-2 py-1 text-[11px] font-medium text-slate-400 transition hover:bg-slate-800 hover:text-slate-200 cursor-pointer"
+                title="Remind me again in 24 hours"
               >
                 Later
               </button>
               <button
                 type="button"
-                onClick={() => setDismissedForSession(true)}
-                className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
-                title="Dismiss for this session"
+                onClick={dismissForOneDay}
+                className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200 cursor-pointer"
+                title="Dismiss for 24 hours"
               >
                 <XMarkIcon className="h-4 w-4" />
               </button>
