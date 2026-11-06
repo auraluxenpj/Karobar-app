@@ -35,6 +35,7 @@ import CustomerSearch from "@/components/CustomerSearch";
 import ProductSearchInput from "@/components/ProductSearchInput";
 import ShareDocumentModal from "@/components/ShareDocumentModal.jsx";
 import SubstituteProductsModal from "@/components/SubstituteProductsModal.jsx";
+import { printSlipUrl } from "@/utils/printHelper.js";
 import {
   GuideBotTopbarButton,
   useGuideBotOpenState,
@@ -671,8 +672,23 @@ export default function BarcodePos() {
     setParkedCarts((prev) => prev.filter((it) => it.id !== p.id));
   };
 
+  // Direct silent print for POS receipt slip
+  const handlePrintPosReceipt = async (invoiceId) => {
+    if (!invoiceId) return;
+    try {
+      const { data } = await axios.get(`/api/sale-invoices/${invoiceId}/print-url`);
+      if (data?.url) {
+        await printSlipUrl(data.url);
+      } else {
+        toast.error("Failed to generate receipt print link.");
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to print receipt.");
+    }
+  };
+
   // Final Checkout & Sale Submission
-  const handleCompleteSale = async () => {
+  const handleCompleteSale = async ({ autoPrint = false } = {}) => {
     if (items.length === 0) {
       toast.error("Cart is empty. Scan products first.");
       posSound.playError();
@@ -779,6 +795,10 @@ export default function BarcodePos() {
       posSound.playSuccess();
       toast.success("Sale completed successfully!");
 
+      if (autoPrint && saleId) {
+        handlePrintPosReceipt(saleId);
+      }
+
       // Set completed sale modal
       setCompletedSale({
         invoice_id: saleId,
@@ -822,6 +842,15 @@ export default function BarcodePos() {
         e.preventDefault();
         handleCompleteSale();
       }
+      // Direct Print Slip (or Complete Sale & Direct Print): Ctrl+P
+      if (isCtrl && key === "p") {
+        e.preventDefault();
+        if (completedSale?.invoice_id) {
+          handlePrintPosReceipt(completedSale.invoice_id);
+        } else {
+          handleCompleteSale({ autoPrint: true });
+        }
+      }
       // Exact Cash: Ctrl+C (only when no text is selected so native Copy still works)
       if (isCtrl && key === "c") {
         const hasSelection = Boolean(window.getSelection?.()?.toString());
@@ -849,7 +878,7 @@ export default function BarcodePos() {
 
     window.addEventListener("keydown", handlePosHotkeys);
     return () => window.removeEventListener("keydown", handlePosHotkeys);
-  }, [items, selectedCustomerId, paymentMethod, totals, cashGiven, paymentRef]);
+  }, [items, selectedCustomerId, paymentMethod, totals, cashGiven, paymentRef, completedSale]);
 
   // Unified React-Select styles matching day / night theme
   const selectStyles = useMemo(
@@ -2062,18 +2091,19 @@ export default function BarcodePos() {
 
             {/* Action Buttons */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2">
-              <Link
-                to={`/sale-invoices/${completedSale.invoice_id}`}
-                target="_blank"
-                className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors ${
+              <button
+                type="button"
+                onClick={() => handlePrintPosReceipt(completedSale.invoice_id)}
+                title="Direct Print Receipt (Ctrl+P)"
+                className={`py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
                   isDark
                     ? "border-slate-700 bg-slate-800 hover:bg-slate-700 text-white"
                     : "border-slate-300 bg-slate-100 hover:bg-slate-200 text-slate-800"
                 }`}
               >
                 <PrinterIcon className="w-4 h-4" />
-                <span>Print</span>
-              </Link>
+                <span>Print (Ctrl+P)</span>
+              </button>
 
               <button
                 type="button"

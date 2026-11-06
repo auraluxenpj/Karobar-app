@@ -602,12 +602,13 @@ export default function Topbar({
 
       const cleanPath = (window.location.pathname || "").replace(/\/+$/, "");
 
-      // Ctrl+P opens Product Search Modal anywhere in the software (even when focused in forms)
-      // Except on printable document/statement views where Ctrl+P triggers page print
+      // Ctrl+P opens Product Search Modal on general pages, and yields to Direct Print on all invoice/POS/ledger/barcode/report views
       if (e.code === "KeyP" || (e.key || "").toLowerCase() === "p") {
         if (
-          /^\/(sale-invoices|purchase-invoices)\/\d+$/.test(cleanPath) ||
-          /^\/(purchase-orders\/forecast|smart-reorder|customer-ledger|supplier-ledger)$/.test(cleanPath)
+          /^\/(sale-invoices|wholesale-invoices|purchase-invoices|stock-adjustments)\/\d+(\/edit)?$/.test(cleanPath) ||
+          /^\/sale-invoices\/(create\/(retail|wholesale)|pos|barcode-pos)$/.test(cleanPath) ||
+          /^\/(purchase-orders\/forecast|smart-reorder|customer-ledger|supplier-ledger|barcode-labels)$/.test(cleanPath) ||
+          /^\/reports\//.test(cleanPath)
         ) {
           return;
         }

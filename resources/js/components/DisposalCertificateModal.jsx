@@ -14,6 +14,7 @@ import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { useTheme } from "@/context/ThemeContext.jsx";
 import { getThemeButtonClasses } from "@/utils/buttonStyles";
 import ShareDocumentModal from "@/components/ShareDocumentModal.jsx";
+import { printCurrentView } from "@/utils/printHelper.js";
 
 export default function DisposalCertificateModal({
   isOpen,
@@ -52,7 +53,7 @@ export default function DisposalCertificateModal({
   const isRestored = disposal.status === "restored";
 
   const handlePrint = () => {
-    window.print();
+    printCurrentView();
   };
 
   return (

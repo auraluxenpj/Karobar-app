@@ -17,6 +17,7 @@ import {
   TagIcon,
 } from "@heroicons/react/24/outline";
 import { useCurrency } from "@/context/CurrencyContext";
+import { printCurrentView } from "@/utils/printHelper.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => `${today().slice(0, 7)}-01`;
@@ -102,7 +103,7 @@ export default function NetProfitReport() {
   }
 
   function handlePrint() {
-    window.print();
+    printCurrentView();
   }
 
   const [exportingPdf, setExportingPdf] = useState(false);

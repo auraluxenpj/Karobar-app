@@ -214,7 +214,7 @@ const [suppliers, setSuppliers] = useState([]);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [can.create, can.update, can.view]);
+  }, [can.create, can.update, can.view, supplierId, fromDate, toDate, rows]);
 
   // Load suppliers
   useEffect(() => {
@@ -680,7 +680,6 @@ const [suppliers, setSuppliers] = useState([]);
   const handlePrint = async (type /* 'a4'|'thermal' optional */) => {
     if (!can.view) return toast.error("You don't have permission to print.");
     if (!supplierId) return toast.error("Select a supplier first");
-    const w = window.open("about:blank", "_blank");
     try {
       const { data } = await axios.get("/api/supplier-ledger/print-url", {
         params: {
@@ -690,13 +689,12 @@ const [suppliers, setSuppliers] = useState([]);
           to: toDate || undefined,
         },
       });
-      if (!w) {
-        await printUrlViaIframe(data.url);
+      if (!data?.url) {
+        toast.error("Failed to generate print link.");
         return;
       }
-      w.location.replace(data.url);
+      await printUrlViaIframe(data.url);
     } catch (err) {
-      try { if (w) w.close(); } catch {}
       toast.error(err?.response?.data?.message || "Failed to generate print link.");
     }
   };

@@ -18,6 +18,7 @@ import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { usePermissions } from "@/api/usePermissions.js";
 import InvoiceDraftIndicator from "@/components/InvoiceDraftIndicator.jsx";
 import PaymentAccountSelector from "../../components/PaymentAccountSelector.jsx";
+import { printSlipUrl } from "@/utils/printHelper.js";
 
 const SubstituteProductsModal = lazy(() => import("../../components/SubstituteProductsModal.jsx"));
 const InvoiceDraftsModal = lazy(() => import("@/components/InvoiceDraftsModal.jsx"));
@@ -353,6 +354,9 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
       if ((isCtrl && (key === "s" || e.key === "Enter")) || e.key === "F9") {
         e.preventDefault();
         handleSubmit(e);
+      } else if (isCtrl && key === "p") {
+        e.preventDefault();
+        handleSubmit(e, { printAfterSave: true });
       } else if (isCtrl && key === "t") {
         e.preventDefault();
         handleInvoiceTypeChange(form.invoice_type === "debit" ? "credit" : "debit");
@@ -1560,8 +1564,9 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
     return batchMap;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e, submitOptions = {}) => {
+    if (e?.preventDefault) e.preventDefault();
+    const shouldPrintAfterSave = Boolean(submitOptions?.printAfterSave);
     invoiceErrors.clear();
 
     // Safety fallback: ensure customer_id is populated for debit sales
@@ -1687,6 +1692,18 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
     };
     delete payload.cash_given;
 
+    const triggerDirectPrintForSavedId = async (savedId) => {
+      if (!shouldPrintAfterSave || !savedId) return;
+      try {
+        const { data } = await axios.get(`/api/sale-invoices/${savedId}/print-url`);
+        if (data?.url) {
+          await printSlipUrl(data.url);
+        }
+      } catch (printErr) {
+        toast.error(printErr?.response?.data?.message || "Saved invoice, but failed to print slip.");
+      }
+    };
+
     const executeSave = async (dataPayload, updateDrawer = null) => {
       try {
         if (saleId) {
@@ -1700,6 +1717,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
           try { localStorage.setItem("cash_drawer_sync", String(Date.now())); } catch {}
           try { localStorage.setItem("accounts_sync", String(Date.now())); } catch {}
           toast.success("Sale invoice updated");
+          triggerDirectPrintForSavedId(id);
           navigate(`/sale-invoices/${id}`);
         } else {
           if (draftHook.activeDraftId) {
@@ -1713,7 +1731,10 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
           try { localStorage.setItem("accounts_sync", String(Date.now())); } catch {}
           draftHook.resetToNew();
           toast.success("Sale invoice created");
-          if (id) navigate(`/sale-invoices/${id}`);
+          if (id) {
+            triggerDirectPrintForSavedId(id);
+            navigate(`/sale-invoices/${id}`);
+          }
           else invoiceErrors.showMessage("Missing invoice ID from server response.");
         }
       } catch (err) {

@@ -26,6 +26,7 @@ import {
 import { usePermissions, Guard } from "@/api/usePermissions.js";
 import DocumentHistoryModal from "@/components/DocumentHistoryModal.jsx";
 import ShareDocumentModal from "@/components/ShareDocumentModal.jsx";
+import { printCurrentView } from "@/utils/printHelper.js";
 
 // Reusable components
 import {
@@ -717,7 +718,7 @@ export default function PurchaseReturnsIndex() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => window.print()}
+                      onClick={() => printCurrentView()}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 transition-colors"
                     >
                       <PrinterIcon className="w-4 h-4" />

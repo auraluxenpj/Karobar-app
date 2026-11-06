@@ -1,5 +1,5 @@
 // resources/js/components/settings/PrinterSetting.jsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import {
   PrinterIcon,
@@ -11,6 +11,12 @@ import {
   BoltIcon,
   QrCodeIcon,
 } from "@heroicons/react/24/solid";
+import {
+  getDesktopPrintBridge,
+  getPreferredPrinter,
+  setPreferredPrinter,
+  printSlipUrl,
+} from "@/utils/printHelper.js";
 
 export default function PrinterSetting({
   form,
@@ -24,6 +30,55 @@ export default function PrinterSetting({
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewingTemplate, setPreviewingTemplate] = useState(null);
   const [previewingType, setPreviewingType] = useState('thermal'); // 'thermal' or 'a4'
+  const [installedPrinters, setInstalledPrinters] = useState([]);
+  const [preferredDeviceName, setPreferredDeviceName] = useState(() => getPreferredPrinter());
+  const [loadingPrinters, setLoadingPrinters] = useState(false);
+
+  const desktopBridge = getDesktopPrintBridge();
+  const isDesktopApp = Boolean(desktopBridge?.isDesktop);
+
+  const loadDesktopPrinters = async () => {
+    const bridge = getDesktopPrintBridge();
+    if (!bridge || typeof bridge.getPrinters !== "function") return;
+    setLoadingPrinters(true);
+    try {
+      const list = await bridge.getPrinters();
+      setInstalledPrinters(Array.isArray(list) ? list : []);
+    } catch {
+      setInstalledPrinters([]);
+    } finally {
+      setLoadingPrinters(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isDesktopApp) {
+      loadDesktopPrinters();
+    }
+  }, [isDesktopApp]);
+
+  const handlePreferredPrinterChange = (e) => {
+    const nextName = e.target.value;
+    setPreferredDeviceName(nextName);
+    setPreferredPrinter(nextName);
+    toast.success(
+      nextName
+        ? `Direct print target set to: ${nextName}`
+        : "Direct print target set to Windows Default Printer"
+    );
+  };
+
+  const handleTestDirectPrint = async () => {
+    const activeType = form.printer_type === "thermal" ? "thermal" : "a4";
+    const activeTpl =
+      activeType === "thermal"
+        ? form.thermal_template || selectedThermalTemplate || "standard"
+        : form.a4_template || selectedA4Template || "standard";
+    await printSlipUrl(`/print/${activeType}-preview/${activeTpl}`, {
+      loadingMessage: "Sending test slip to printer...",
+      successMessage: "Test slip sent directly to printer",
+    });
+  };
 
   // Thermal templates data
   const thermalTemplates = [
@@ -277,6 +332,68 @@ export default function PrinterSetting({
       </div>
 
       {/* ===== Printer type ===== */}
+      {isDesktopApp && (
+        <div className="settings-block">
+          <div className="settings-block-heading">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="settings-block-icon">
+                <PrinterIcon />
+              </div>
+              <div className="min-w-0">
+                <h2 className="settings-block-title">Windows Hardware Printer (Direct Silent Print)</h2>
+                <p className="settings-block-note">
+                  Ctrl+P and Print buttons send slips directly to this printer without any popup window
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="settings-body">
+            <div className="settings-field">
+              <label className="settings-label" htmlFor="setting-windows-printer">
+                Target Windows Printer
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  id="setting-windows-printer"
+                  value={preferredDeviceName}
+                  onChange={handlePreferredPrinterChange}
+                  disabled={disableInputs || loadingPrinters}
+                  className="flex-1 min-w-[240px]"
+                >
+                  <option value="">Windows System Default Printer (Automatic)</option>
+                  {installedPrinters.map((p) => (
+                    <option key={p.name} value={p.name}>
+                      {p.displayName || p.name}
+                      {p.isDefault ? " (Windows Default)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={loadDesktopPrinters}
+                  disabled={loadingPrinters}
+                  className="products-action theme-btn-secondary"
+                >
+                  {loadingPrinters ? "Scanning..." : "Refresh Printers"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleTestDirectPrint}
+                  className="products-action products-action-primary theme-btn-primary"
+                >
+                  <PrinterIcon className="w-4 h-4" />
+                  <span>Test Direct Print</span>
+                </button>
+              </div>
+              <p className="settings-hint">
+                Selected printer is used immediately for silent Ctrl+P receipt and invoice printing.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="settings-block">
         <div className="settings-block-heading">
           <div className="flex items-center gap-3 min-w-0">
@@ -447,17 +564,19 @@ export default function PrinterSetting({
 
             {/* Footer */}
             <div className="settings-modal-footer">
-              <a
-                href={`/print/${previewingType}-preview/${previewingTemplate.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={() =>
+                  printSlipUrl(`/print/${previewingType}-preview/${previewingTemplate.id}`, {
+                    loadingMessage: "Printing preview slip...",
+                    successMessage: "Preview slip sent to printer",
+                  })
+                }
                 className="products-action theme-btn-secondary"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-                <span>Open in new tab</span>
-              </a>
+                <PrinterIcon className="w-4 h-4" aria-hidden="true" />
+                <span>Test Print Template</span>
+              </button>
 
               <div className="flex flex-wrap gap-2">
                 <button

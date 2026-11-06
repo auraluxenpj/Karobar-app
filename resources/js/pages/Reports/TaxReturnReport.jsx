@@ -17,6 +17,7 @@ import {
 import { useTheme } from "@/context/ThemeContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { getThemeButtonClasses } from "@/utils/buttonStyles";
+import { printCurrentView } from "@/utils/printHelper.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => `${today().slice(0, 7)}-01`;
@@ -360,7 +361,7 @@ export default function TaxReturnReport() {
           </button>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={() => printCurrentView()}
             className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold ${buttonClasses.secondary.className}`}
             style={buttonClasses.secondary.style}
           >

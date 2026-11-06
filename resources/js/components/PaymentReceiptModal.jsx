@@ -12,6 +12,7 @@ import { useCurrency } from "@/context/CurrencyContext.jsx";
 import { useTheme } from "@/context/ThemeContext.jsx";
 import { getThemeButtonClasses } from "@/utils/buttonStyles";
 import ShareDocumentModal from "@/components/ShareDocumentModal.jsx";
+import { printCurrentView } from "@/utils/printHelper.js";
 
 export default function PaymentReceiptModal({
   isOpen,
@@ -46,7 +47,7 @@ export default function PaymentReceiptModal({
   if (!isOpen || !payment) return null;
 
   const handlePrint = () => {
-    window.print();
+    printCurrentView();
   };
 
   const isCustomer = payment.party_type === "customer";

@@ -21,7 +21,7 @@
     }
   </style>
 </head>
-<body onload="window.print()">
+<body onload="if (!window.karobarDesktop && window.self === window.top && !new URLSearchParams(window.location.search).has('silent_print')) window.print()">
   @php
     if (!function_exists('nf')) {
       function nf($v){

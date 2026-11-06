@@ -4,6 +4,7 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { useTheme } from "@/context/ThemeContext.jsx";
 import { getThemeButtonClasses } from "@/utils/buttonStyles.js";
+import { printCurrentView } from "@/utils/printHelper.js";
 import {
   UserGroupIcon,
   ClockIcon,
@@ -2674,7 +2675,7 @@ export default function HrPayrollCenter() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={() => printCurrentView()}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-bold cursor-pointer"
                 >
                   <PrinterIcon className="w-4 h-4" />

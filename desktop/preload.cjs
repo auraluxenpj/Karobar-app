@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld("karobarDesktop", {
   getAppInfo: () => ipcRenderer.invoke("karobar:app-info"),
   getPrinters: () => ipcRenderer.invoke("karobar:get-printers"),
   silentPrint: (options = {}) => ipcRenderer.invoke("karobar:silent-print", options),
+  printUrl: (url, options = {}) => ipcRenderer.invoke("karobar:print-url", { url, ...options }),
+  printHtml: (html, options = {}) => ipcRenderer.invoke("karobar:print-html", { html, ...options }),
   selectDirectory: () => ipcRenderer.invoke("karobar:select-directory"),
   runBackupNow: () => ipcRenderer.invoke("karobar:run-backup-now"),
   checkForUpdates: (force = false) => ipcRenderer.invoke("karobar:check-for-updates", { force }),

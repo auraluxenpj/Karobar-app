@@ -183,13 +183,11 @@ export default function CashDrawerModal({ isOpen, onClose, onSessionUpdated }) {
     }
   }, [sessionData]);
 
-  const handlePrintDetailedReport = () => {
+  const handlePrintDetailedReport = async () => {
     if (!detailedReport?.session || !detailedReport?.summary) return;
     const { session, summary, transactions } = detailedReport;
     const isClosed = session.status === "closed";
     const diff = Number(session.difference || 0);
-
-    const win = window.open("", "_blank", "width=800,height=900");
 
     const orderedTxns = sortAndAttachRunningBalance(transactions || [], session.opening_balance);
     const rowsHtml = orderedTxns.map((tx, idx) => {
@@ -301,21 +299,11 @@ export default function CashDrawerModal({ isOpen, onClose, onSessionUpdated }) {
           <div><div class="sig-line">Cashier Signature</div></div>
           <div><div class="sig-line">Manager / Supervisor Signature</div></div>
         </div>
-
-        <script>
-          window.onload = function() { window.print(); };
-        </script>
       </body>
       </html>
     `;
 
-    if (win) {
-      win.document.open();
-      win.document.write(htmlContent);
-      win.document.close();
-    } else {
-      printHtmlViaIframe(htmlContent);
-    }
+    await printHtmlViaIframe(htmlContent);
   };
 
   useEffect(() => {

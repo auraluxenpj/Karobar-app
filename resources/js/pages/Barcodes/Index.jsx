@@ -1002,7 +1002,7 @@ export default function BarcodeIndex() {
   };
 
   // High-Precision Print Handler
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (printQueue.length === 0) {
       toast.error("Please add at least one product to the print queue.");
       return;
@@ -1043,9 +1043,6 @@ export default function BarcodeIndex() {
         layout.options.store_name_override.trim() ||
         storeInfo.store_name ||
         "Karobar Store";
-
-      // Open print window (falls back to hidden print iframe if popups are blocked)
-      const printWindow = window.open("", "_blank", "width=850,height=700");
 
       // Generate HTML content for printing
       const isRoll = layout.paper_type === "roll";
@@ -1294,29 +1291,34 @@ export default function BarcodeIndex() {
         </head>
         <body>
           ${labelsHtml}
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
-            };
-          </script>
         </body>
         </html>
       `;
 
-      if (printWindow) {
-        printWindow.document.open();
-        printWindow.document.write(fullHtml);
-        printWindow.document.close();
-      } else {
-        printHtmlViaIframe(fullHtml);
-      }
+      await printHtmlViaIframe(fullHtml, {
+        loadingMessage: "Printing barcode labels...",
+        successMessage: "Barcode labels sent to printer",
+      });
     } catch (err) {
       toast.error("Failed to generate print layout");
     } finally {
       setIsPrinting(false);
     }
   };
+
+  // Ctrl+P: direct print barcode labels when queue has items
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.repeat) return;
+      if ((e.key || "").toLowerCase() !== "p") return;
+      e.preventDefault();
+      if (printQueue.length > 0 && !isPrinting) {
+        handlePrint();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [printQueue, layout, storeInfo, isPrinting, skipLabelsCount]);
 
   const escapeHtml = (str) => {
     return String(str || "")

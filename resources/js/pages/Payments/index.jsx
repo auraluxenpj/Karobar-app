@@ -28,6 +28,7 @@ import {
 import { useTheme } from "@/context/ThemeContext";
 import { useCurrency } from "@/context/CurrencyContext";
 import { getThemeButtonClasses } from "@/utils/buttonStyles";
+import { printCurrentView } from "@/utils/printHelper.js";
 import { GlassCard, GlassSectionHeader, GlassInput, GlassToolbar } from "@/components";
 import { usePermissions } from "@/api/usePermissions.js";
 import PaymentReceiptModal from "@/components/PaymentReceiptModal.jsx";
@@ -806,7 +807,7 @@ export default function PaymentsPage() {
                             onClick={async () => {
                               await handleViewReceipt(payment);
                               // Small delay to let modal render, then print
-                              setTimeout(() => window.print(), 300);
+                              setTimeout(() => printCurrentView(), 300);
                             }}
                             className={`p-1.5 rounded-lg transition-colors ${isDark ? "hover:bg-slate-700 text-slate-400 hover:text-slate-200" : "hover:bg-slate-100 text-slate-500 hover:text-slate-700"}`}
                             title="Print receipt"

@@ -76,9 +76,9 @@
   .thankyou { font-size:14px; font-style:italic; margin-top:15px; }
 </style>
 </head>
-<body onload="window.print()">
+<body onload="if (!window.karobarDesktop && window.self === window.top && !new URLSearchParams(window.location.search).has('silent_print')) window.print()">
 <div class="print-actions">
-  <button onclick="window.print()">PRINT</button>
+  <button onclick="if (window.karobarDesktop && window.karobarDesktop.silentPrint) { window.karobarDesktop.silentPrint(); } else { window.print(); }">PRINT</button>
 </div>
 
 <div class="page">

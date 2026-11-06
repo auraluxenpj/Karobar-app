@@ -540,8 +540,10 @@ export default function DashboardLayout({ children }) {
           } catch {}
         } else if (key === "p" || e.code === "KeyP") {
           if (
-            /^\/(sale-invoices|purchase-invoices)\/\d+$/.test(cleanSubPath) ||
-            /^\/(purchase-orders\/forecast|smart-reorder|customer-ledger|supplier-ledger)$/.test(cleanSubPath)
+            /^\/(sale-invoices|wholesale-invoices|purchase-invoices|stock-adjustments)\/\d+(\/edit)?$/.test(cleanSubPath) ||
+            /^\/sale-invoices\/(create\/(retail|wholesale)|pos|barcode-pos)$/.test(cleanSubPath) ||
+            /^\/(purchase-orders\/forecast|smart-reorder|customer-ledger|supplier-ledger|barcode-labels)$/.test(cleanSubPath) ||
+            /^\/reports\//.test(cleanSubPath)
           ) {
             return;
           }

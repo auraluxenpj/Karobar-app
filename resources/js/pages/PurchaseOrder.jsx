@@ -437,45 +437,13 @@ ${isA4 ? `
 </html>`;
   };
 
-  const doPrint = (type = printerType) => {
+  const doPrint = async (type = printerType) => {
     if (!canView) return toast.error("You don't have permission to view/print.");
     if (!rows.length) return toast.error("Nothing to print.");
     if (!printRows.length) return toast.error("No products with Order Packs > 0 to print.");
 
     const html = buildPrintHtml(type);
-
-    const width = type === "thermal" ? 400 : 900;
-    const height = 700;
-    const left = Math.max(0, (window.screenX || 0) + (window.outerWidth - width) / 2);
-    const top = Math.max(0, (window.screenY || 0) + (window.outerHeight - height) / 2);
-    const features = [
-      `width=${width}`,
-      `height=${height}`,
-      `left=${left}`,
-      `top=${top}`,
-      "menubar=no",
-      "toolbar=no",
-      "location=no",
-      "status=no",
-      "scrollbars=yes",
-      "resizable=yes",
-    ].join(",");
-
-    const w = window.open("", "poPrintWin", features);
-    if (!w) {
-      printHtmlViaIframe(html);
-      return;
-    }
-
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
-
-    const trigger = () => {
-      try { w.focus(); w.print(); } catch {}
-    };
-    w.onload = trigger;
-    setTimeout(trigger, 400);
+    await printHtmlViaIframe(html);
   };
 
   const handleFetch = async () => {

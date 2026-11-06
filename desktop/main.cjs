@@ -677,7 +677,7 @@ ipcMain.handle("karobar:app-info", () => ({
 }));
 
 ipcMain.handle("karobar:get-printers", async () => {
-  if (!mainWindow) return [];
+  if (!mainWindow || mainWindow.isDestroyed()) return [];
   try {
     return await mainWindow.webContents.getPrintersAsync();
   } catch {
@@ -685,20 +685,219 @@ ipcMain.handle("karobar:get-printers", async () => {
   }
 });
 
-ipcMain.handle("karobar:silent-print", async (_event, options = {}) => {
-  if (!mainWindow) return { ok: false };
-  return new Promise((resolve) => {
-    mainWindow.webContents.print(
-      {
-        silent: options.silent !== false,
-        printBackground: true,
-        deviceName: options.deviceName || undefined,
-      },
-      (success, errorType) => {
-        resolve({ ok: success, error: errorType || null });
-      }
+/**
+ * Resolve a requested Windows printer deviceName against currently installed printers.
+ * Falls back to undefined (Windows system default printer) if not specified or no longer present.
+ */
+async function resolveTargetPrinterName(contents, requestedDeviceName) {
+  const requested = String(requestedDeviceName || "").trim();
+  if (!requested || requested === "default" || requested === "system_default") {
+    return undefined;
+  }
+  try {
+    const printers = await contents.getPrintersAsync();
+    if (!Array.isArray(printers) || printers.length === 0) return undefined;
+    const exact = printers.find((p) => p && p.name === requested);
+    if (exact) return exact.name;
+    const caseInsensitive = printers.find(
+      (p) => p && String(p.name || "").toLowerCase() === requested.toLowerCase()
     );
+    return caseInsensitive ? caseInsensitive.name : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Wait for all images, SVGs, and fonts inside an offscreen print window to finish rendering.
+ */
+async function waitForPrintResources(contents) {
+  try {
+    await Promise.race([
+      contents.executeJavaScript(
+        `
+        (async () => {
+          try { window.print = () => {}; } catch {}
+          if (document.fonts && document.fonts.ready) {
+            try { await document.fonts.ready; } catch {}
+          }
+          const imgs = Array.from(document.images || []);
+          await Promise.all(
+            imgs.map((img) =>
+              img.complete
+                ? Promise.resolve()
+                : new Promise((res) => {
+                    img.addEventListener("load", res, { once: true });
+                    img.addEventListener("error", res, { once: true });
+                    setTimeout(res, 2500);
+                  })
+            )
+          );
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          return true;
+        })()
+        `,
+        true
+      ),
+      new Promise((resolve) => setTimeout(resolve, 3500)),
+    ]);
+  } catch {
+    // Proceed even if script evaluation fails
+  }
+}
+
+/**
+ * Run a silent print job on a hidden offscreen BrowserWindow and clean up afterwards.
+ */
+async function runOffscreenPrintJob(loadTargetFn, options = {}) {
+  let printWin = null;
+  try {
+    const sessionToUse =
+      mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.session : undefined;
+
+    printWin = new BrowserWindow({
+      width: 820,
+      height: 900,
+      show: false,
+      skipTaskbar: true,
+      frame: false,
+      transparent: false,
+      backgroundColor: "#ffffff",
+      webPreferences: {
+        preload: path.join(__dirname, "preload.cjs"),
+        session: sessionToUse,
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
+
+    // Ensure window.print() inside the loaded template never triggers the native dialog
+    printWin.webContents.on("dom-ready", () => {
+      if (printWin && !printWin.isDestroyed()) {
+        printWin.webContents.executeJavaScript("window.print = () => {};").catch(() => {});
+      }
+    });
+
+    await loadTargetFn(printWin);
+    await waitForPrintResources(printWin.webContents);
+
+    const resolvedDeviceName = await resolveTargetPrinterName(
+      printWin.webContents,
+      options.deviceName
+    );
+
+    const printOptions = {
+      silent: options.silent !== false,
+      printBackground: true,
+      margins: { marginType: "none" },
+    };
+    if (resolvedDeviceName) {
+      printOptions.deviceName = resolvedDeviceName;
+    }
+
+    const result = await new Promise((resolve) => {
+      const safetyTimer = setTimeout(() => {
+        resolve({ ok: false, error: "Print spooler timed out" });
+      }, 20000);
+
+      printWin.webContents.print(printOptions, (success, errorType) => {
+        clearTimeout(safetyTimer);
+        resolve({ ok: Boolean(success), error: errorType || null });
+      });
+    });
+
+    return result;
+  } catch (err) {
+    return { ok: false, error: err?.message || "Failed to print slip" };
+  } finally {
+    if (printWin && !printWin.isDestroyed()) {
+      try {
+        printWin.close();
+        printWin.destroy();
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
+ipcMain.handle("karobar:silent-print", async (event, options = {}) => {
+  const targetContents =
+    event?.sender && !event.sender.isDestroyed()
+      ? event.sender
+      : mainWindow && !mainWindow.isDestroyed()
+      ? mainWindow.webContents
+      : null;
+
+  if (!targetContents) return { ok: false, error: "No active window to print" };
+
+  const resolvedDeviceName = await resolveTargetPrinterName(targetContents, options.deviceName);
+  const printOptions = {
+    silent: options.silent !== false,
+    printBackground: true,
+  };
+  if (resolvedDeviceName) {
+    printOptions.deviceName = resolvedDeviceName;
+  }
+
+  return new Promise((resolve) => {
+    targetContents.print(printOptions, (success, errorType) => {
+      resolve({ ok: Boolean(success), error: errorType || null });
+    });
   });
+});
+
+ipcMain.handle("karobar:print-url", async (_event, payload = {}) => {
+  const rawUrl = String(payload?.url || "").trim();
+  if (!rawUrl) {
+    return { ok: false, error: "Missing print URL" };
+  }
+
+  const resolvedUrl = rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
+    ? rawUrl
+    : `http://127.0.0.1:${activePort}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+
+  return runOffscreenPrintJob(
+    async (printWin) => {
+      await printWin.loadURL(resolvedUrl);
+    },
+    payload
+  );
+});
+
+ipcMain.handle("karobar:print-html", async (_event, payload = {}) => {
+  const rawHtml = String(payload?.html || "");
+  if (!rawHtml.trim()) {
+    return { ok: false, error: "Missing print HTML content" };
+  }
+
+  // Neutralize any inline window.print() / window.close() calls inside the HTML
+  const sanitizedHtml = rawHtml
+    .replace(/window\.print\s*\(\s*\)/g, "void(0)")
+    .replace(/window\.close\s*\(\s*\)/g, "void(0)");
+
+  const tempFilePath = path.join(
+    os.tmpdir(),
+    `karobar-print-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.html`
+  );
+
+  try {
+    fs.writeFileSync(tempFilePath, sanitizedHtml, "utf8");
+    return await runOffscreenPrintJob(
+      async (printWin) => {
+        await printWin.loadFile(tempFilePath);
+      },
+      payload
+    );
+  } finally {
+    try {
+      if (fs.existsSync(tempFilePath)) {
+        fs.unlinkSync(tempFilePath);
+      }
+    } catch {
+      // ignore temp file cleanup errors
+    }
+  }
 });
 
 ipcMain.handle("karobar:select-directory", async () => {

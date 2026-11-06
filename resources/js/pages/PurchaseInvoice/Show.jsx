@@ -28,6 +28,7 @@ import VoidInvoiceModal from "@/components/VoidInvoiceModal.jsx";
 import RecordPaymentModal from "@/components/RecordPaymentModal.jsx";
 import InvoiceDraftsModal from "@/components/InvoiceDraftsModal.jsx";
 import ShareDocumentModal from "@/components/ShareDocumentModal.jsx";
+import { printCurrentView } from "@/utils/printHelper.js";
 
 const to2 = (n) => Number(parseFloat(n || 0).toFixed(2));
 
@@ -292,7 +293,7 @@ export default function PurchaseInvoiceShow() {
       }
       if (k === "p" || e.code === "KeyP") {
         e.preventDefault();
-        window.print();
+        printCurrentView();
       }
       if (k === "e" || e.code === "KeyE") {
         if (!can.update || inv?.status === "reversed") return;
@@ -454,7 +455,7 @@ export default function PurchaseInvoiceShow() {
 
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => printCurrentView()}
               className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
               style={btnSecondary.style}
               title="Print GRN / Purchase Invoice (Ctrl+P)"

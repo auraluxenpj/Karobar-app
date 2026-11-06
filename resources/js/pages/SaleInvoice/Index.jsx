@@ -466,68 +466,17 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
     }
   };
 
-  // Print popup logic
+  // Direct silent print logic (zero popup windows & zero system print dialog in Desktop .exe)
   const handlePrint = async (id) => {
     if (!id) return;
-
-    const width = 900;
-    const height = 700;
-    const left = Math.max(
-      0,
-      (window.screenX || window.screenLeft || 0) + (window.outerWidth - width) / 2
-    );
-    const top = Math.max(
-      0,
-      (window.screenY || window.screenTop || 0) + (window.outerHeight - height) / 2
-    );
-
-    const features = [
-      `width=${Math.round(width)}`,
-      `height=${Math.round(height)}`,
-      `left=${Math.round(left)}`,
-      `top=${Math.round(top)}`,
-      "menubar=no",
-      "toolbar=no",
-      "location=no",
-      "status=no",
-      "scrollbars=yes",
-      "resizable=yes",
-    ].join(",");
-
-    const w = window.open("about:blank", "salePrintWin", features);
-
     try {
       const { data } = await axios.get(`/api/sale-invoices/${id}/print-url`);
-      const url = data.url;
-      if (!w) {
-        await printUrlViaIframe(url);
+      if (!data?.url) {
+        toast.error("Failed to generate print link.");
         return;
       }
-
-      try {
-        w.location.replace(url);
-      } catch {
-        const w2 = window.open(url, "salePrintWin", features);
-        if (!w2) {
-          await printUrlViaIframe(url);
-          return;
-        }
-      }
-
-      w.onload = () => {
-        try { w.focus(); w.print(); } catch {}
-      };
-
-      const timer = setInterval(() => {
-        try {
-          if (w.location?.href !== "about:blank" && w.document?.readyState === "complete") {
-            w.focus(); w.print(); clearInterval(timer);
-          }
-        } catch {}
-        if (w.closed) clearInterval(timer);
-      }, 400);
+      await printUrlViaIframe(data.url);
     } catch (err) {
-      try { if (w) w.close(); } catch {}
       toast.error(err?.response?.data?.message || "Failed to generate print link.");
     }
   };

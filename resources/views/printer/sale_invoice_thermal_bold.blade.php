@@ -75,9 +75,9 @@
   .foot { margin-top:12px; text-align:center; font-size:10px; text-transform:uppercase; }
 </style>
 </head>
-<body onload="window.print()">
+<body onload="if (!window.karobarDesktop && window.self === window.top && !new URLSearchParams(window.location.search).has('silent_print')) window.print()">
 <div class="print-actions">
-  <button onclick="window.print()">PRINT</button>
+  <button onclick="if (window.karobarDesktop && window.karobarDesktop.silentPrint) { window.karobarDesktop.silentPrint(); } else { window.print(); }">PRINT</button>
 </div>
 <div class="receipt">
   @if($logo)

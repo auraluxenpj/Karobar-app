@@ -13,6 +13,7 @@ import {
 import { usePermissions } from "@/api/usePermissions";
 import SupplierSearch from "@/components/SupplierSearch.jsx";
 import ShareDocumentModal from "@/components/ShareDocumentModal.jsx";
+import { printCurrentView } from "@/utils/printHelper.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => `${today().slice(0, 7)}-01`;
@@ -491,7 +492,7 @@ export default function MissingReports({ type }) {
                   <ArrowDownOnSquareIcon className={`w-4 h-4 ${exportingPdf ? "animate-bounce" : ""}`} />
                   {exportingPdf ? "Building PDF…" : "Export PDF"}
                 </button>
-                <button type="button" onClick={() => window.print()} disabled={!rows.length} className="products-action theme-btn-secondary">
+                <button type="button" onClick={() => printCurrentView()} disabled={!rows.length} className="products-action theme-btn-secondary">
                   <PrinterIcon className="w-4 h-4" /> Print
                 </button>
               </>
