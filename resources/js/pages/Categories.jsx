@@ -110,10 +110,10 @@ export default function Categories() {
 
   useEffect(() => { nameRef.current?.focus(); }, [editingId]);
 
-  // Alt+S save
+  // Ctrl+S save
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.altKey && (e.key || "").toLowerCase() === "s") {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key || "").toLowerCase() === "s") {
         if (!can.create && !can.update) return;
         e.preventDefault();
         handleSave();
@@ -389,7 +389,7 @@ return (
                   className="glass-save-btn flex-1 h-9 theme-btn-primary"
                   disabled={saving || (!can.create && !can.update)}
                   aria-busy={saving}
-                  aria-keyshortcuts="Alt+S"
+                  aria-keyshortcuts="Control+S"
                 >
                   {saving ? (
                     <ArrowPathIcon aria-hidden="true" className="w-4 h-4 animate-spin motion-reduce:animate-none" />
@@ -402,7 +402,7 @@ return (
                 </GlassBtn>
               </div>
 
-              <div className="text-[10px] text-gray-500 text-center">Alt+S to save</div>
+              <div className="text-[10px] text-gray-500 text-center">Ctrl+S to save</div>
             </form>
           </GlassCard>
         )}

@@ -65,15 +65,13 @@ export default function RolesIndex() {
   const primaryColor = theme?.primary_color || '#3b82f6';
   const primaryTextColor = getContrastText(primaryColor);
 
-  // === Alt+N => /roles/create (gated by can.create) ===
+  // === Ctrl+N => /roles/create (gated by can.create) ===
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (!e.altKey) return;
+      if (e.defaultPrevented) return;
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
       const key = (e.key || "").toLowerCase();
       if (key !== "n") return;
-      const tag = (e.target?.tagName || "").toLowerCase();
-      const isTyping = ["input", "textarea", "select"].includes(tag) || e.target?.isContentEditable;
-      if (isTyping) return;
       if (!can.create) return;
       e.preventDefault();
       navigate("/roles/create");
@@ -215,8 +213,8 @@ export default function RolesIndex() {
             <Guard when={can.create}>
               <Link
                 to="/roles/create"
-                title="Add Role (Alt+N)"
-                aria-keyshortcuts="Alt+N"
+                title="Add Role (Ctrl+N)"
+                aria-keyshortcuts="Control+N"
                 className="products-action products-action-primary theme-btn-primary"
               >
                 <PlusCircleIcon className="w-4 h-4" />

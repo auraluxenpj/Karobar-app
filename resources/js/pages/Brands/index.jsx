@@ -76,10 +76,11 @@ export default function BrandsIndex() {
     document.title = "Brands - Karobar App";
   }, []);
 
-  // Alt + N -> Open Create Brand page
+  // Ctrl + N -> Open Create Brand page
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.altKey && (e.key || "").toLowerCase() === "n") {
+      if (e.defaultPrevented) return;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key || "").toLowerCase() === "n") {
         if (!can.create) return;
         e.preventDefault();
         navigate("/brands/create");
@@ -232,11 +233,11 @@ export default function BrandsIndex() {
             <Guard when={can.create}>
               <Link
                 to="/brands/create"
-                title="Add Brand (Alt+N)"
+                title="Add Brand (Ctrl+N)"
                 className="products-action products-action-primary theme-btn-primary"
               >
                 <PlusCircleIcon className="w-4 h-4" />
-                <span>Add Brand (Alt+N)</span>
+                <span>Add Brand (Ctrl+N)</span>
               </Link>
             </Guard>
             <Guard when={can.import}>

@@ -551,7 +551,7 @@ async function fetchNearExpiry() {
   useEffect(() => {
     fetchAll();
     const onKey = (e) => {
-      if (e.altKey && (e.key === "r" || e.key === "R")) {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === "r" || e.key === "R")) {
         e.preventDefault();
         fetchAll();
       }
@@ -866,7 +866,7 @@ const heroStats = [
               <span>{loading ? "Loading…" : "Refresh"}</span>
             </button>
             <kbd className="hidden xl:flex items-center rounded-md bg-white/5 ring-1 ring-white/10 px-1.5 py-1 text-xs font-medium text-slate-400 whitespace-nowrap">
-              Alt+R
+              Ctrl+R
             </kbd>
           </div>
         </div>

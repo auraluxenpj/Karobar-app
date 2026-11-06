@@ -344,17 +344,40 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
     })();
   }, [saleId]);
 
-  // Alt+S save
+  // Ctrl+S / Ctrl+Enter / F9 save, Ctrl+T toggle Debit/Credit, Ctrl+C customer search, Ctrl+R toggle Retail/Wholesale, Ctrl+N add row (edit mode)
   useEffect(() => {
     const handle = (e) => {
-      if (e.altKey && e.key.toLowerCase() === "s") {
+      if (e.defaultPrevented) return;
+      const isCtrl = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey;
+      const key = (e.key || "").toLowerCase();
+      if ((isCtrl && (key === "s" || e.key === "Enter")) || e.key === "F9") {
         e.preventDefault();
         handleSubmit(e);
+      } else if (isCtrl && key === "t") {
+        e.preventDefault();
+        handleInvoiceTypeChange(form.invoice_type === "debit" ? "credit" : "debit");
+      } else if (isCtrl && key === "c") {
+        const sel = window.getSelection?.()?.toString?.() || "";
+        const el = document.activeElement;
+        const hasInputSel =
+          el && typeof el.selectionStart === "number" && el.selectionStart !== el.selectionEnd;
+        if (!sel && !hasInputSel) {
+          e.preventDefault();
+          setCustomerSearchOpen(true);
+        }
+      } else if (isCtrl && key === "r" && !saleId) {
+        e.preventDefault();
+        navigate("/sale-invoices/create/wholesale");
+      } else if (isCtrl && key === "n" && saleId) {
+        e.preventDefault();
+        const nextIdx = form.items.length;
+        addRow();
+        setTimeout(() => focusCell(nextIdx, "product"), 40);
       }
     };
     document.addEventListener("keydown", handle);
     return () => document.removeEventListener("keydown", handle);
-  }, [form]);
+  }, [form, saleId]);
 
   /* -------- helpers -------- */
   const to2 = (n) => Number(parseFloat(n || 0).toFixed(2));
@@ -1941,7 +1964,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
                 </span>
               </div>
               <p className="text-[10px] text-white/80 mt-0.5 hidden sm:block">
-                Alt+S save · Enter=next · ↑/↓ rows
+                Ctrl+S save · Ctrl+T toggle · Enter=next · ↑/↓ rows
               </p>
             </div>
           </div>
@@ -1996,7 +2019,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
               className={`px-4 py-2 text-[11px] font-bold transition-all duration-200 ${btnPrimary.className}`}
               style={btnPrimary.style}
             >
-              {saleId ? "Edit (Alt+S)" : "Create (Alt+S)"}
+              {saleId ? "Edit (Ctrl+S)" : "Create (Ctrl+S)"}
             </button>
           </div>
         </div>

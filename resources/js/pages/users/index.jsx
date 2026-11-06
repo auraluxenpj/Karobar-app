@@ -78,15 +78,13 @@ export default function UsersIndex() {
   const primaryColor = theme?.primary_color || '#3b82f6';
   const primaryTextColor = getContrastText(primaryColor);
 
-  // === Alt+N => /users/create (only when can.create) ===
+  // === Ctrl+N => /users/create (only when can.create) ===
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (!e.altKey) return;
+      if (e.defaultPrevented) return;
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
       const key = (e.key || "").toLowerCase();
       if (key !== "n") return;
-      const tag = (e.target?.tagName || "").toLowerCase();
-      const isTyping = ["input", "textarea", "select"].includes(tag) || e.target?.isContentEditable;
-      if (isTyping) return;
       if (!can.create) return;
       e.preventDefault();
       navigate("/users/create");
@@ -314,8 +312,8 @@ export default function UsersIndex() {
             <Guard when={can.create}>
               <Link
                 to="/users/create"
-                title="Add User (Alt+N)"
-                aria-keyshortcuts="Alt+N"
+                title="Add User (Ctrl+N)"
+                aria-keyshortcuts="Control+N"
                 className="products-action products-action-primary theme-btn-primary"
               >
                 <PlusCircleIcon className="w-4 h-4" />

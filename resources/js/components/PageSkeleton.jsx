@@ -269,7 +269,7 @@ function TopbarSkeleton({ showDockButton = false }) {
     <div className="workspace-topbar-slot" aria-hidden="true">
       <header className="workspace-topbar">
         <div className="workspace-topbar-row">
-          {/* Left: Dock Trigger + Search Pages (Alt+K) + Products (Alt+P) + GuideBot (Alt+G) */}
+          {/* Left: Dock Trigger + Search Pages (Ctrl+K) + Products (Ctrl+P) + GuideBot (Ctrl+G) */}
           <div className="flex items-center gap-2 shrink-0">
             {/* Mobile / Dock hamburger trigger */}
             <div className={showDockButton ? "shrink-0" : "lg:hidden shrink-0"}>
@@ -278,21 +278,21 @@ function TopbarSkeleton({ showDockButton = false }) {
               </div>
             </div>
 
-            {/* Quick Page Search Pill (Alt+K) */}
+            {/* Quick Page Search Pill (Ctrl+K) */}
             <div className="inline-flex items-center gap-2 h-9 px-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 shrink-0">
               <Bone className="w-4 h-4 rounded-full shrink-0" />
               <Bone className="hidden sm:block h-3 w-20 rounded-full" />
               <Bone tone="soft" className="hidden md:block h-4 w-10 rounded" />
             </div>
 
-            {/* Quick Product Lookup Pill (Alt+P) */}
+            {/* Quick Product Lookup Pill (Ctrl+P) */}
             <div className="inline-flex items-center gap-2 h-9 px-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 shrink-0">
               <Bone className="w-4 h-4 rounded-md shrink-0" />
               <Bone className="hidden xl:block h-3 w-14 rounded-full" />
               <Bone tone="soft" className="hidden md:block h-4 w-9 rounded" />
             </div>
 
-            {/* Screen-Aware GuideBot Trigger Pill (Alt+G) */}
+            {/* Screen-Aware GuideBot Trigger Pill (Ctrl+G) */}
             <div className="inline-flex items-center gap-2 h-9 px-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/80 shrink-0">
               <Bone tone="accent" className="w-5 h-5 rounded-lg shrink-0" />
               <Bone className="hidden md:block h-3 w-16 rounded-full" />

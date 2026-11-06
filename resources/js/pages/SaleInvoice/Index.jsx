@@ -133,10 +133,10 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
     fetchDrafts();
   }, [fetchDrafts]);
 
-  // Alt+H or Alt+D to open Held Drafts modal
+  // Ctrl+H or Ctrl+D to open Held Drafts modal
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.altKey && ["d", "h"].includes((e.key || "").toLowerCase())) {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && ["d", "h"].includes((e.key || "").toLowerCase())) {
         e.preventDefault();
         fetchDrafts();
         setIsDraftsOpen(true);
@@ -364,15 +364,13 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
     return () => ctrl.abort();
   }, [page, pageSize, saleTypeFilter, permsLoading, can.view]);
 
-  // Alt+N -> create wholesale (when on wholesale index) or retail, Alt+W -> create wholesale
+  // Ctrl+N -> create wholesale (when on wholesale index) or retail, Ctrl+W -> create wholesale
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (!e.altKey) return;
+      if (e.defaultPrevented || isDraftsOpen) return;
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
       const key = (e.key || "").toLowerCase();
       const code = e.code || "";
-      const tag = (e.target?.tagName || "").toLowerCase();
-      const isTyping = ["input", "textarea", "select"].includes(tag) || e.target?.isContentEditable;
-      if (isTyping) return;
       if (!can.create) return;
 
       if (key === "n" || code === "KeyN") {
@@ -394,7 +392,7 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [navigate, can.create, hasWholesale, saleSystemLoading, defaultSaleType, saleTypeFilter]);
+  }, [navigate, can.create, hasWholesale, saleSystemLoading, defaultSaleType, saleTypeFilter, isDraftsOpen]);
 
   // ===== search + pagination =====
   const didMountFiltersRef = useRef(false);
@@ -663,7 +661,7 @@ export default function SaleInvoicesIndex({ defaultSaleType = "" }) {
                   fetchDrafts();
                   setIsDraftsOpen(true);
                 }}
-                title="View Held Invoices & Drafts (Alt+H / Alt+D)"
+                title="View Held Invoices & Drafts (Ctrl+H / Ctrl+D)"
                 className="products-action theme-btn-secondary relative"
               >
                 <ClockIcon className="w-3.5 h-3.5 shrink-0" />

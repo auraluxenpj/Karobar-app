@@ -1292,11 +1292,13 @@ export default function ProductForm({ initialData = null, onSubmitSuccess }) {
   // ===== Keyboard Shortcuts =====
   useEffect(() => {
     const handleShortcut = (e) => {
-      if (e.altKey && (e.key.toLowerCase() === "s" || e.key.toLowerCase() === "n")) {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      const key = (e.key || "").toLowerCase();
+      if (key === "s" || key === "n" || e.key === "Enter") {
         e.preventDefault();
         document.getElementById("save-product-btn-top")?.click();
       }
-      if (e.altKey && e.key.toLowerCase() === "c") {
+      if (key === "b") {
         e.preventDefault();
         navigate("/products");
       }
@@ -1499,7 +1501,7 @@ export default function ProductForm({ initialData = null, onSubmitSuccess }) {
               <Link 
                 to="/products" 
                 className="products-action theme-btn-secondary"
-                title="Back (Alt+C)"
+                title="Back (Ctrl+B)"
               >
                 <ArrowLeftIcon className="w-4 h-4" />
                 <span className="text-sm">Back</span>
@@ -1509,7 +1511,7 @@ export default function ProductForm({ initialData = null, onSubmitSuccess }) {
                 type="submit"
                 form="product-form"
                 className="products-action products-action-primary theme-btn-primary"
-                title="Save (Alt+S)"
+                title="Save (Ctrl+S)"
               >
                 <PencilSquareIcon className="w-4 h-4" />
                 <span className="text-sm font-medium">Save Changes</span>

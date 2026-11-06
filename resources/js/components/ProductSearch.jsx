@@ -235,10 +235,10 @@ export default function ProductSearch({ navigationStyle = "sidebar" }) {
   const abortRef = useRef(null);
   const debounceRef = useRef(null);
 
-  // Focus shortcut: Alt+/
+  // Focus shortcut: Ctrl+/
   useEffect(() => {
     const onKey = (e) => {
-      if (e.altKey && (e.key === "/" || e.code === "Slash")) {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === "/" || e.code === "Slash")) {
         e.preventDefault();
         inputRef.current?.focus();
         setPanelOpen(true);
@@ -364,7 +364,7 @@ export default function ProductSearch({ navigationStyle = "sidebar" }) {
           onKeyDown={onKeyDown}
           placeholder="Search products..."
           className="w-full bg-transparent border-0 ring-0 focus:ring-0 focus:border-0 placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm text-slate-900 dark:text-slate-100"
-          title="Search products (Alt+/)"
+          title="Search products (Ctrl+/)"
           aria-label="Search products"
         />
         {loading ? (
@@ -386,7 +386,7 @@ export default function ProductSearch({ navigationStyle = "sidebar" }) {
           </button>
         ) : (
           <kbd className="text-[10px] border border-slate-200 dark:border-slate-600 rounded-sm px-1.5 py-0.5 bg-slate-50 dark:bg-slate-600 text-slate-500 dark:text-slate-400 font-mono">
-            Alt+/
+            Ctrl+/
           </kbd>
         )}
       </div>

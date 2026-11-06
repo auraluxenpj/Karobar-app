@@ -277,7 +277,7 @@ function createApplicationMenu() {
       submenu: [
         {
           label: "Dashboard (Main View)",
-          accelerator: "Alt+D",
+          accelerator: "CmdOrCtrl+Shift+H",
           click: () => sendNavigate("/dashboard", "Dashboard"),
         },
         {
@@ -335,7 +335,7 @@ function createApplicationMenu() {
         },
         {
           label: "Reload Application",
-          accelerator: "CmdOrCtrl+R",
+          accelerator: "CmdOrCtrl+Shift+R",
           click: () => {
             if (mainWindow && !mainWindow.isDestroyed()) {
               mainWindow.webContents.reload();

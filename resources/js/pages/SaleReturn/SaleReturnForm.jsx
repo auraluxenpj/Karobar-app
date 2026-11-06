@@ -426,12 +426,33 @@ const [saleInvoices, setSaleInvoices] = useState([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [returnId]);
 
-  // Alt+S quick save
+  // Ctrl+S / Ctrl+Enter / F9 quick save, Ctrl+T toggle settlement, Ctrl+N add row, Ctrl+C customer search
   useEffect(() => {
     const onKey = (e) => {
-      if (e.altKey && (e.key === "s" || e.key === "S")) {
+      if (e.defaultPrevented) return;
+      const hasCtrl = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey;
+      const key = (e.key || "").toLowerCase();
+      if ((hasCtrl && (key === "s" || e.key === "Enter")) || e.key === "F9") {
         e.preventDefault();
         handleSubmit();
+      } else if (hasCtrl && key === "t") {
+        e.preventDefault();
+        setForm((prev) => ({
+          ...prev,
+          settlement_mode: prev.settlement_mode === "credit_note" ? "cash_refund" : "credit_note",
+        }));
+      } else if (hasCtrl && key === "n") {
+        e.preventDefault();
+        addItem();
+      } else if (hasCtrl && key === "c") {
+        const sel = window.getSelection?.()?.toString?.() || "";
+        const el = document.activeElement;
+        const hasInputSel =
+          el && typeof el.selectionStart === "number" && el.selectionStart !== el.selectionEnd;
+        if (!sel && !hasInputSel) {
+          e.preventDefault();
+          setCustomerSearchOpen(true);
+        }
       }
     };
     document.addEventListener("keydown", onKey);
@@ -1371,7 +1392,7 @@ const handleSelectChange = async (field, value) => {
                   </span>
                 </div>
                 <p className="text-[10px] text-white/80 mt-0.5">
-                  Alt+S save · Enter=next · ↑/↓ rows
+                  Ctrl+S save · Enter=next · ↑/↓ rows
                 </p>
               </div>
             </div>
@@ -1382,7 +1403,7 @@ const handleSelectChange = async (field, value) => {
               className={`px-4 py-2 text-[11px] font-bold transition-all duration-200 ${btnPrimary.className}`}
               style={btnPrimary.style}
             >
-              {returnId ? "Edit (Alt+S)" : "Create (Alt+S)"}
+              {returnId ? "Edit (Ctrl+S)" : "Create (Ctrl+S)"}
             </button>
           </div>
 

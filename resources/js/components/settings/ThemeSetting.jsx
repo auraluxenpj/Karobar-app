@@ -705,7 +705,7 @@ export default function ThemeSetting({ disableInputs }) {
                   Show Bottom Roaming Cube Mascot
                 </label>
                 <p className="settings-hint mt-0.5">
-                  Turns only the bottom roaming character on or off. The top bar Guide Bot button (<kbd className="px-1.5 py-0.5 text-[11px] font-mono rounded bg-slate-200/80 dark:bg-slate-700">Alt+G</kbd>) stays enabled.
+                  Turns only the bottom roaming character on or off. The top bar Guide Bot button (<kbd className="px-1.5 py-0.5 text-[11px] font-mono rounded bg-slate-200/80 dark:bg-slate-700">Ctrl+G</kbd>) stays enabled.
                 </p>
               </div>
             </div>

@@ -811,18 +811,24 @@ export default function BarcodePos() {
     }
   };
 
-  // Hotkey shortcuts listener: F4 / Alt+S for checkout, Alt+C for exact cash, F2 for manual barcode, F3 for product search
+  // Hotkey shortcuts listener: F4 / Ctrl+S / Ctrl+Enter / F9 for checkout, Ctrl+C for exact cash, F2 for manual barcode, F3 for product search, F8 / Ctrl+H for park cart
   useEffect(() => {
     const handlePosHotkeys = (e) => {
-      // Complete Sale: F4 or Alt+S
-      if (e.key === "F4" || (e.altKey && e.key.toLowerCase() === "s")) {
+      const isCtrl = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey;
+      const key = (e.key || "").toLowerCase();
+
+      // Complete Sale: F4, F9, Ctrl+S, or Ctrl+Enter
+      if (e.key === "F4" || e.key === "F9" || (isCtrl && (key === "s" || e.key === "Enter"))) {
         e.preventDefault();
         handleCompleteSale();
       }
-      // Exact Cash: Alt+C
-      if (e.altKey && e.key.toLowerCase() === "c") {
-        e.preventDefault();
-        handleQuickCash("exact");
+      // Exact Cash: Ctrl+C (only when no text is selected so native Copy still works)
+      if (isCtrl && key === "c") {
+        const hasSelection = Boolean(window.getSelection?.()?.toString());
+        if (!hasSelection) {
+          e.preventDefault();
+          handleQuickCash("exact");
+        }
       }
       // Focus manual barcode scan: F2
       if (e.key === "F2") {
@@ -834,8 +840,8 @@ export default function BarcodePos() {
         e.preventDefault();
         productSearchRef.current?.openMenu();
       }
-      // Park cart: F8
-      if (e.key === "F8") {
+      // Park cart: F8 or Ctrl+H
+      if (e.key === "F8" || (isCtrl && key === "h")) {
         e.preventDefault();
         handleParkCart();
       }
@@ -1642,7 +1648,7 @@ export default function BarcodePos() {
                         onClick={() => handleQuickCash("exact")}
                         className="text-[10px] text-blue-500 dark:text-blue-400 hover:underline font-bold"
                       >
-                        Exact Total (Alt+C)
+                        Exact Total (Ctrl+C)
                       </button>
                     </div>
 
@@ -1943,7 +1949,7 @@ export default function BarcodePos() {
                 ) : (
                   <>
                     <CheckCircleIcon className="w-5 h-5" />
-                    <span>Complete Sale (Alt+S / F4)</span>
+                    <span>Complete Sale (Ctrl+S / F4)</span>
                   </>
                 )}
               </button>

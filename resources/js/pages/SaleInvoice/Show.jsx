@@ -386,7 +386,7 @@ export default function SaleInvoiceShow({ defaultSaleType = null }) {
   // Keyboard shortcuts (mimic form topbar)
   useEffect(() => {
     const onKey = (e) => {
-      if (!e.altKey) return;
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
       const k = (e.key || "").toLowerCase();
       if (k === "b" || e.code === "KeyB") { e.preventDefault(); navigate(-1); }
       if (k === "p" || e.code === "KeyP") { e.preventDefault(); handlePrint(); }
@@ -560,7 +560,7 @@ export default function SaleInvoiceShow({ defaultSaleType = null }) {
                 )}
               </div>
               <p className="text-[10px] text-white/80 mt-0.5">
-                Alt+F search · Alt+E edit · Alt+P print · Alt+N new · Alt+B back
+                Ctrl+F search · Ctrl+E edit · Ctrl+P print · Ctrl+N new · Ctrl+B back
               </p>
             </div>
           </div>
@@ -658,7 +658,7 @@ export default function SaleInvoiceShow({ defaultSaleType = null }) {
               }}
               className={`px-3 py-2 text-[11px] font-bold transition-all duration-200 ${btnSecondary.className} relative flex items-center gap-1.5`}
               style={btnSecondary.style}
-              title="Open Held Invoices (Alt+H)"
+              title="Open Held Invoices (Ctrl+H)"
             >
               <ClockIcon className="w-4 h-4 text-amber-400" aria-hidden="true" />
               <span>Held Invoices</span>
@@ -1690,7 +1690,7 @@ export default function SaleInvoiceShow({ defaultSaleType = null }) {
                         onClick={handlePrint}
                         className={`h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnSuccess.className}`}
                         style={btnSuccess.style}
-                        title="Alt+P"
+                        title="Ctrl+P"
                       >
                         <PrinterIcon className="w-4 h-4" aria-hidden="true" />
                         <span>Print</span>
@@ -1701,7 +1701,7 @@ export default function SaleInvoiceShow({ defaultSaleType = null }) {
                           onClick={() => navigate(`/sale-invoices/${id}/edit`)}
                           className={`h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
                           style={btnSecondary.style}
-                          title="Alt+E"
+                          title="Ctrl+E"
                         >
                           <PencilSquareIcon className="w-4 h-4" aria-hidden="true" />
                           <span>Edit</span>
@@ -1904,7 +1904,7 @@ export default function SaleInvoiceShow({ defaultSaleType = null }) {
                     onClick={handlePrint}
                     className={`h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnSuccess.className}`}
                     style={btnSuccess.style}
-                    title="Alt+P"
+                    title="Ctrl+P"
                   >
                     <PrinterIcon className="w-4 h-4" aria-hidden="true" />
                     <span>Print</span>
@@ -1915,7 +1915,7 @@ export default function SaleInvoiceShow({ defaultSaleType = null }) {
                       onClick={() => navigate(`/sale-invoices/${id}/edit`)}
                       className={`h-8 rounded-lg text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
                       style={btnSecondary.style}
-                      title="Alt+E"
+                      title="Ctrl+E"
                     >
                       <PencilSquareIcon className="w-4 h-4" aria-hidden="true" />
                       <span>Edit</span>

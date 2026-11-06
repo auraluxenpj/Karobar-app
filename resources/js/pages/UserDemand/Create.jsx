@@ -218,10 +218,12 @@ export default function CreateUserDemand() {
   useEffect(() => {
     if (!canCreate) return;
     const onShortcut = (event) => {
-      if (event.altKey && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "s") {
+      const hasCtrl = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey;
+      const key = (event.key || "").toLowerCase();
+      if (hasCtrl && (key === "s" || event.key === "Enter")) {
         event.preventDefault();
         if (!customerSearchOpen && !inFlight.current) save();
-      } else if (event.altKey && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "c") {
+      } else if (hasCtrl && key === "b") {
         event.preventDefault();
         navigate("/user-demands");
       }
@@ -257,7 +259,7 @@ export default function CreateUserDemand() {
           <div className="flex flex-wrap gap-2 print:hidden">
             <Link
               to="/user-demands"
-              title="Back to User Demands (Alt+C)"
+              title="Back to User Demands (Ctrl+B)"
               className="g-btn-ghost theme-btn-tertiary inline-flex items-center justify-center gap-2"
             >
               All Demands
@@ -293,7 +295,7 @@ export default function CreateUserDemand() {
           </label>
           <div className="sm:col-span-2 flex items-center">
             <p className="text-xs text-[var(--workspace-muted)]">
-              Enter: next field / new row · ↑↓: move between rows (↓ on last row adds a new row) · Alt+S: save.
+              Enter: next field / new row · ↑↓: move between rows (↓ on last row adds a new row) · Ctrl+S: save.
             </p>
           </div>
         </div>
@@ -456,7 +458,7 @@ export default function CreateUserDemand() {
             onClick={save}
             className="g-btn-primary theme-btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            {saving ? "Saving Demands…" : "Save User Demands (Alt+S)"}
+            {saving ? "Saving Demands…" : "Save User Demands (Ctrl+S)"}
           </button>
         </div>
 

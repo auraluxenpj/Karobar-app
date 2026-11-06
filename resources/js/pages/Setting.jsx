@@ -298,10 +298,10 @@ export default function Setting() {
     }
   }, [loading, can.view, activeTab]);
 
-  // Alt+S to save
+  // Ctrl+S to save
   useEffect(() => {
     const handleShortcut = (e) => {
-      if (e.altKey && (e.key || "").toLowerCase() === "s") {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key || "").toLowerCase() === "s") {
         e.preventDefault();
         if (can.update) handleSave();
         else toast.error("You do not have permission to update settings.");
@@ -647,7 +647,7 @@ export default function Setting() {
               onClick={handleSave}
               disabled={saveDisabled}
               className="products-action products-action-primary theme-btn-primary"
-              title={can.update ? "Save (Alt+S)" : "You lack update permission"}
+              title={can.update ? "Save (Ctrl+S)" : "You lack update permission"}
             >
               <ArrowDownOnSquareIcon className="w-4 h-4" />
               <span>
@@ -913,14 +913,14 @@ export default function Setting() {
               <div className="settings-body">
                 <div className="settings-actions settings-actions-between">
                   <span className="settings-hint">
-                    Keyboard shortcut: <span className="people-shortcut">Alt+S</span> to save settings
+                    Keyboard shortcut: <span className="people-shortcut">Ctrl+S</span> to save settings
                   </span>
                   <button
                     type="button"
                     onClick={handleSave}
                     disabled={saveDisabled}
                     className="products-action products-action-primary theme-btn-primary"
-                    title={can.update ? "Save (Alt+S)" : "You lack update permission"}
+                    title={can.update ? "Save (Ctrl+S)" : "You lack update permission"}
                   >
                     <ArrowDownOnSquareIcon className="w-4 h-4" />
                     <span>{saving ? "Saving…" : "Save Settings"}</span>

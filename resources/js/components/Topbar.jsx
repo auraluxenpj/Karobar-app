@@ -90,16 +90,16 @@ export default function Topbar({
   const [accountsModalOpen, setAccountsModalOpen] = useState(false);
   const [accountsStatus, setAccountsStatus] = useState({ total_balance: 0, loading: true });
 
-  // Product Search Modal state (opens anywhere with Alt+P)
+  // Product Search Modal state (opens anywhere with Ctrl+P)
   const [productSearchModalOpen, setProductSearchModalOpen] = useState(false);
 
-  // Page Navigation Search Modal state (opens anywhere with Alt+K)
+  // Page Navigation Search Modal state (opens anywhere with Ctrl+K)
   const [pageSearchModalOpen, setPageSearchModalOpen] = useState(false);
 
   // Keyboard Shortcuts Modal state (opens anywhere with ?)
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
 
-  // Screen-Aware Bilingual Feature Guide Bot state (opens anywhere with Alt+G and stays open across pages)
+  // Screen-Aware Bilingual Feature Guide Bot state (opens anywhere with Ctrl+G and stays open across pages)
   const [guideBotOpen, setGuideBotOpen] = useGuideBotOpenState();
 
   const canViewAccounts = has("account.view");
@@ -586,6 +586,7 @@ export default function Topbar({
 
   useEffect(() => {
     const onKeyDown = (e) => {
+      if (e.defaultPrevented) return;
       const tag = (e.target?.tagName || "").toLowerCase();
       const isTyping =
         ["input", "textarea", "select"].includes(tag) || e.target?.isContentEditable;
@@ -597,13 +598,17 @@ export default function Topbar({
         return;
       }
 
-      if (!e.altKey) return;
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
 
-      // Alt+P opens Product Search Modal anywhere in the software (even when focused in forms)
-      // Except on Sale Invoice Show (/sale-invoices/:id), where Alt+P prints the invoice
+      const cleanPath = (window.location.pathname || "").replace(/\/+$/, "");
+
+      // Ctrl+P opens Product Search Modal anywhere in the software (even when focused in forms)
+      // Except on printable document/statement views where Ctrl+P triggers page print
       if (e.code === "KeyP" || (e.key || "").toLowerCase() === "p") {
-        const cleanPath = (window.location.pathname || "").replace(/\/+$/, "");
-        if (/^\/sale-invoices\/\d+$/.test(cleanPath)) {
+        if (
+          /^\/(sale-invoices|purchase-invoices)\/\d+$/.test(cleanPath) ||
+          /^\/(purchase-orders\/forecast|smart-reorder|customer-ledger|supplier-ledger)$/.test(cleanPath)
+        ) {
           return;
         }
         e.preventDefault();
@@ -611,15 +616,21 @@ export default function Topbar({
         return;
       }
 
-      // Alt+K opens Page Navigation Search modal anywhere in the software
-      if (e.code === "KeyK" || e.key.toLowerCase() === "k") {
+      // Ctrl+K opens Page Navigation Search modal anywhere in the software
+      if (e.code === "KeyK" || (e.key || "").toLowerCase() === "k") {
         e.preventDefault();
         setPageSearchModalOpen((v) => !v);
         return;
       }
 
-      // Alt+D opens Cash Drawer modal anywhere (only if user has operational drawer permissions)
-      if (e.code === "KeyD" || e.key.toLowerCase() === "d") {
+      // Ctrl+D opens Cash Drawer modal (yields on invoice screens where Ctrl+D opens Held Drafts or Deletes)
+      if (e.code === "KeyD" || (e.key || "").toLowerCase() === "d") {
+        if (
+          /^\/(sale-invoices|wholesale-invoices|purchase-invoices)(\/.*)?$/.test(cleanPath) &&
+          !/^\/sale-invoices\/(pos|barcode-pos)$/.test(cleanPath)
+        ) {
+          return;
+        }
         e.preventDefault();
         if (canOpenDrawerPopup) {
           setDrawerModalOpen((v) => !v);
@@ -627,31 +638,46 @@ export default function Topbar({
         return;
       }
 
-      // Alt+A opens Accounts Register modal anywhere
-      if (e.code === "KeyA" || e.key.toLowerCase() === "a") {
-        e.preventDefault();
-        setAccountsModalOpen((v) => !v);
-        return;
-      }
-
-      // Alt+G opens the Screen-Aware Bilingual Guide Bot anywhere
-      if (e.code === "KeyG" || e.key.toLowerCase() === "g") {
+      // Ctrl+G opens the Screen-Aware Bilingual Guide Bot anywhere
+      if (e.code === "KeyG" || (e.key || "").toLowerCase() === "g") {
         e.preventDefault();
         setGuideBotOpen((v) => !v);
         return;
       }
 
-      if (isTyping) return;
-
+      // Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+W quick-open invoice sub-windows from anywhere
       if (e.code === "Digit1" || e.code === "Numpad1") {
         e.preventDefault();
         openInNewTab("/purchase-invoices/create");
+        return;
       } else if (e.code === "Digit2" || e.code === "Numpad2") {
         e.preventDefault();
         openInNewTab("/sale-invoices/create/retail");
-      } else if (e.key.toLowerCase() === "w") {
+        return;
+      } else if (
+        e.code === "Digit3" ||
+        e.code === "Numpad3" ||
+        (e.key || "").toLowerCase() === "w"
+      ) {
+        if (
+          (e.key || "").toLowerCase() === "w" &&
+          /^\/(sale-invoices|wholesale-invoices)$/.test(cleanPath)
+        ) {
+          return;
+        }
         e.preventDefault();
         openInNewTab("/sale-invoices/create/wholesale");
+        return;
+      }
+
+      // Guard native text-input shortcuts (Ctrl+A Select All, etc.) when focused inside an input
+      if (isTyping) return;
+
+      // Ctrl+A opens Accounts Register modal when not typing in an input
+      if (e.code === "KeyA" || (e.key || "").toLowerCase() === "a") {
+        e.preventDefault();
+        setAccountsModalOpen((v) => !v);
+        return;
       }
     };
 
@@ -672,7 +698,7 @@ export default function Topbar({
       window.removeEventListener("open-shortcuts-modal", onOpenShortcuts);
       window.removeEventListener("open-guide-bot", onOpenGuideBot);
     };
-  }, []);
+  }, [canOpenDrawerPopup]);
 
   useEffect(() => {
     function onClick(e) {
@@ -704,7 +730,7 @@ export default function Topbar({
         className="workspace-topbar"
       >
         <div className="workspace-topbar-row">
-          {/* Left: Navigation Toggle + Quick Search (Alt+K) + Product Lookup (Alt+P) */}
+          {/* Left: Navigation Toggle + Quick Search (Ctrl+K) + Product Lookup (Ctrl+P) */}
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0">
             {/* Mobile menu button — visible on < lg */}
             <div className="lg:hidden shrink-0">
@@ -733,39 +759,39 @@ export default function Topbar({
               </div>
             )}
 
-            {/* Quick Page Navigation Search (Alt+K) */}
+            {/* Quick Page Navigation Search (Ctrl+K) */}
             <button
               type="button"
               onClick={() => setPageSearchModalOpen(true)}
-              title="Quick Navigation — Go to any page or report (Alt+K)"
+              title="Quick Navigation — Go to any page or report (Ctrl+K)"
               aria-label="Open page search"
-              aria-keyshortcuts="Alt+K"
+              aria-keyshortcuts="Ctrl+K"
               className="inline-flex items-center justify-center gap-2 h-9 w-9 md:w-auto md:px-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 text-xs text-slate-600 dark:text-slate-300 transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap"
             >
               <MagnifyingGlassIcon className="w-4 h-4 text-slate-500 dark:text-slate-400 shrink-0" />
               <span className="hidden md:inline font-medium">Search Pages</span>
               <kbd className="hidden xl:inline-block px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shrink-0">
-                Alt+K
+                Ctrl+K
               </kbd>
             </button>
 
-            {/* Quick Product Lookup (Alt+P) */}
+            {/* Quick Product Lookup (Ctrl+P) */}
             <button
               type="button"
               onClick={() => setProductSearchModalOpen(true)}
-              title="Global Product & Batch Lookup (Alt+P)"
+              title="Global Product & Batch Lookup (Ctrl+P)"
               aria-label="Open product lookup"
-              aria-keyshortcuts="Alt+P"
+              aria-keyshortcuts="Ctrl+P"
               className="inline-flex items-center justify-center gap-2 h-9 w-9 xl:w-auto xl:px-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 text-xs font-medium text-slate-700 dark:text-slate-200 transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap"
             >
               <CubeIcon className="w-4 h-4 text-slate-500 dark:text-slate-400 shrink-0" />
               <span className="hidden xl:inline">Products</span>
               <kbd className="hidden 2xl:inline-block px-1.5 py-0.5 text-[10px] font-mono font-semibold rounded bg-white dark:bg-slate-900 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shrink-0">
-                Alt+P
+                Ctrl+P
               </kbd>
             </button>
 
-            {/* Screen-Aware Bilingual Guide Bot (English + اردو) (Alt+G) */}
+            {/* Screen-Aware Bilingual Guide Bot (English + اردو) (Ctrl+G) */}
             <GuideBotTopbarButton
               onClick={() => setGuideBotOpen((v) => !v)}
               isOpen={guideBotOpen}
@@ -822,9 +848,9 @@ export default function Topbar({
                     aria-label="Cash Drawer register"
                     title={
                       drawerStatus.isOpen
-                        ? `Cash Drawer Open: ${formatCurrency(drawerStatus.expected)} (Alt+D)`
+                        ? `Cash Drawer Open: ${formatCurrency(drawerStatus.expected)} (Ctrl+D)`
                         : canOpenDrawerPopup
-                        ? "Cash Drawer is Closed — Click to Open Shift (Alt+D)"
+                        ? "Cash Drawer is Closed — Click to Open Shift (Ctrl+D)"
                         : "Cash Drawer is Closed"
                     }
                     className={`inline-flex items-center gap-1 sm:gap-1.5 h-9 px-2 sm:px-2.5 text-xs font-semibold rounded-xl transition-all duration-150 relative z-20 shrink-0 whitespace-nowrap border ${
@@ -860,7 +886,7 @@ export default function Topbar({
                     type="button"
                     onClick={() => setAccountsModalOpen(true)}
                     aria-label="Financial Accounts register"
-                    title={`Financial Accounts Register: ${formatCurrency(accountsStatus.total_balance)} across all accounts (Alt+A)`}
+                    title={`Financial Accounts Register: ${formatCurrency(accountsStatus.total_balance)} across all accounts (Ctrl+A)`}
                     className="inline-flex items-center gap-1 sm:gap-1.5 h-9 px-2 sm:px-2.5 text-xs font-semibold rounded-xl transition-all duration-150 relative z-20 shrink-0 whitespace-nowrap border bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 cursor-pointer"
                   >
                     <BuildingLibraryIcon className="w-4 h-4 shrink-0" />

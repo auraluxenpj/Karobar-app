@@ -145,7 +145,7 @@ export default function PurchaseOrders() {
   useEffect(() => {
     if (permissionsLoading || !has('purchase-order.generate')) return;
     const onShortcut = (event) => {
-      if (event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.key.toLowerCase() === 'n') {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'n') {
         event.preventDefault();
         if (!inFlight.current) navigate('/purchase-orders/forecast');
       }
@@ -223,7 +223,7 @@ export default function PurchaseOrders() {
   useEffect(() => {
     if (!entryMode || permissionsLoading || !has(creating ? 'purchase-order.create' : 'purchase-order.update')) return;
     const onSaveShortcut = (event) => {
-      if (event.altKey && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === 's') {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && (event.key.toLowerCase() === 's' || event.key === 'Enter')) {
         event.preventDefault();
         if (!supplierOpen && !inFlight.current) save();
       }
@@ -258,7 +258,7 @@ export default function PurchaseOrders() {
       <div className="purchase-entry-header purchase-entry-banner flex flex-wrap justify-between gap-3 items-center px-5 py-4">
         <div className="flex items-center gap-3"><div className="purchase-entry-icon p-2.5 rounded-xl"><ClipboardDocumentListIcon className="h-6 w-6" /></div><h1 className="purchase-entry-title text-xl font-semibold">{creating ? 'New Purchase Order' : editing ? `Edit ${order?.number || 'Purchase Order'}` : order?.number || 'Purchase Orders'}</h1></div>
         <div className="flex flex-wrap gap-2 print:hidden">
-          {has('purchase-order.generate') && <Link className="g-btn-secondary theme-btn-secondary inline-flex items-center justify-center gap-2 disabled:opacity-50" to="/purchase-orders/forecast" title="New Forecast (Alt+N)"><span>New Forecast</span> <kbd className="text-[10px] opacity-70">Alt+N</kbd></Link>}
+          {has('purchase-order.generate') && <Link className="g-btn-secondary theme-btn-secondary inline-flex items-center justify-center gap-2 disabled:opacity-50" to="/purchase-orders/forecast" title="New Forecast (Ctrl+N)"><span>New Forecast</span> <kbd className="text-[10px] opacity-70">Ctrl+N</kbd></Link>}
           {order && !editing && order.status === 'ordered' && has('purchase-invoice.create') && <button className="g-btn-primary theme-btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50" disabled={busy} onClick={receive}><ArrowDownTrayIcon className="w-4 h-4" /><span>{busy ? 'Preparing…' : 'Receive Delivery'}</span></button>}
           {entryMode && <button className="purchase-entry-add-product theme-btn-secondary inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg" disabled={busy} onClick={addItem}><PlusIcon className="h-4 w-4" /><span>Add Product</span></button>}
           {(id || creating) && <Link className="g-btn-ghost theme-btn-tertiary inline-flex items-center justify-center gap-2 disabled:opacity-50" to="/purchase-orders">All Orders</Link>}
@@ -282,7 +282,7 @@ export default function PurchaseOrders() {
           </label>
           <label>Notes<input className="w-full h-8 border rounded-md px-2 text-xs" value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} /></label>
         </div>
-        <p className="text-sm px-5 text-[var(--workspace-muted)]">Enter: next field / new row · ↑↓: move between rows · Alt+S: save. Order whole packs; one supplier applies to all brands.</p>
+        <p className="text-sm px-5 text-[var(--workspace-muted)]">Enter: next field / new row · ↑↓: move between rows · Ctrl+S: save. Order whole packs; one supplier applies to all brands.</p>
         <div ref={itemsContainerRef} className="purchase-entry-items purchase-order-form-items px-1 py-2"><table className="purchase-order-form-table w-full border-collapse text-[11px]"><colgroup>{[3, 26, 12, 6, 8, 12, 7, 7, 7, 12].map((width, index) => <col key={index} style={{ width: `${width}%` }} />)}</colgroup><thead><tr><th rowSpan={2} aria-label="Remove item" />{['Product', 'Brand', 'Pack Size', 'Order Packs', 'Pack Purchase Price'].map(label => <th rowSpan={2} key={label}>{label}</th>)}<th colSpan={2}>Bonus Quantity</th><th rowSpan={2}>Discount %</th><th rowSpan={2}>Total</th></tr><tr><th>Pack Bonus</th><th>Unit Bonus</th></tr></thead><tbody>
           {rows.map((row, i) => <tr key={i} ref={ref => { itemRowRefs.current[i] = ref; }} onFocusCapture={event => { if (event.currentTarget.contains(event.target)) scrollToItem(i); }}>
             <td data-label="Remove"><button className="products-row-action products-row-delete" title="Remove item" aria-label={`Remove row ${i + 1}`} onClick={() => setForm({ ...form, items: rows.filter((_, n) => i !== n) })}><TrashIcon className="h-4 w-4 text-red-500" /></button></td>
@@ -298,7 +298,7 @@ export default function PurchaseOrders() {
             <td data-label="Total" className="text-right font-semibold break-words">{(Number(row.ordered_packs || 0) * Number(row.pack_purchase_price || 0) * (1 - Number(row.item_discount_percentage || 0) / 100)).toFixed(2)}</td>
           </tr>)}
         </tbody></table></div>
-        <div className="purchase-entry-footer flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div className="flex flex-wrap gap-2"><button className="g-btn-secondary theme-btn-secondary inline-flex items-center justify-center gap-2 disabled:opacity-50" onClick={addItem}><PlusIcon className="h-4 w-4" /><span>Add Product</span></button>{supplier?.id && <button className="g-btn-ghost theme-btn-tertiary inline-flex items-center justify-center gap-2 disabled:opacity-50" disabled={busy} title={`Arrange products in ${supplier.name}'s remembered order`} onClick={() => applySupplierOrder()}>Apply Saved Order</button>}</div><div className="text-right text-xs"><p>{rows.length} items · {rows.reduce((sum, row) => sum + Number(row.ordered_packs || 0), 0)} packs</p><p className="font-semibold text-lg">Total: {total.toFixed(2)}</p></div><button className="g-btn-primary theme-btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50" disabled={busy} onClick={() => save()}>{busy ? 'Saving Purchase Order…' : 'Save Purchase Order (Alt+S)'}</button></div>
+        <div className="purchase-entry-footer flex flex-wrap items-center justify-between gap-3 px-5 py-4"><div className="flex flex-wrap gap-2"><button className="g-btn-secondary theme-btn-secondary inline-flex items-center justify-center gap-2 disabled:opacity-50" onClick={addItem}><PlusIcon className="h-4 w-4" /><span>Add Product</span></button>{supplier?.id && <button className="g-btn-ghost theme-btn-tertiary inline-flex items-center justify-center gap-2 disabled:opacity-50" disabled={busy} title={`Arrange products in ${supplier.name}'s remembered order`} onClick={() => applySupplierOrder()}>Apply Saved Order</button>}</div><div className="text-right text-xs"><p>{rows.length} items · {rows.reduce((sum, row) => sum + Number(row.ordered_packs || 0), 0)} packs</p><p className="font-semibold text-lg">Total: {total.toFixed(2)}</p></div><button className="g-btn-primary theme-btn-primary inline-flex items-center justify-center gap-2 disabled:opacity-50" disabled={busy} onClick={() => save()}>{busy ? 'Saving Purchase Order…' : 'Save Purchase Order (Ctrl+S)'}</button></div>
         <SupplierSearch title="Select Supplier" isOpen={supplierOpen} onClose={() => setSupplierOpen(false)} onSelect={chosen => { setSupplier(chosen); setSupplierOpen(false); setError(''); applySupplierOrder(chosen, { quiet: true }); }} />
       </> : order ? <>
         <div className="purchase-entry-details grid gap-2 sm:grid-cols-4 px-3 py-2 text-xs"><p>Date: {order.date}</p><p>Expected Receiving: {order.expected_received_date || "Not scheduled"}</p><p>Supplier: {order.supplier?.name}</p><p>Status: {statusLabel(order.status)}</p><p>Reference: {order.reference || '—'}</p></div>

@@ -494,15 +494,15 @@ function buildDashboardSpotlightSteps(container) {
       element: overviewEl,
       title: {
         en: "Business Intelligence Command Bar & Live Refresh",
-        ur: "بزنس ڈیش بورڈ ہیڈر اور لائیو ریفریش (Alt+R)",
+        ur: "بزنس ڈیش بورڈ ہیڈر اور لائیو ریفریش (Ctrl+R)",
       },
       instruction: {
-        en: "This top command bar shows your active date window along with live headline pills for Net Sales, Daily Average, and Return Rate. Click 'Refresh' (or press Alt+R) anytime to reload live figures.",
-        ur: "یہ اوپری بار آپ کی منتخب کردہ تاریخ، خالص سیلز (Net Sales)، روزانہ اوسط اور واپسی کی شرح (Return Rate) دکھاتی ہے۔ تازہ ترین اعداد و شمار کے لیے 'Refresh' بٹن (یا Alt+R) دبائیں۔",
+        en: "This top command bar shows your active date window along with live headline pills for Net Sales, Daily Average, and Return Rate. Click 'Refresh' (or press Ctrl+R) anytime to reload live figures.",
+        ur: "یہ اوپری بار آپ کی منتخب کردہ تاریخ، خالص سیلز (Net Sales)، روزانہ اوسط اور واپسی کی شرح (Return Rate) دکھاتی ہے۔ تازہ ترین اعداد و شمار کے لیے 'Refresh' بٹن (یا Ctrl+R) دبائیں۔",
       },
       observedInstruction: {
-        en: "This top command bar shows your active date window along with live headline pills for Net Sales, Daily Average, and Return Rate. Click 'Refresh' (or press Alt+R) anytime to reload live figures.",
-        ur: "یہ اوپری بار آپ کی منتخب کردہ تاریخ، خالص سیلز (Net Sales)، روزانہ اوسط اور واپسی کی شرح (Return Rate) دکھاتی ہے۔ تازہ ترین اعداد و شمار کے لیے 'Refresh' بٹن (یا Alt+R) دبائیں۔",
+        en: "This top command bar shows your active date window along with live headline pills for Net Sales, Daily Average, and Return Rate. Click 'Refresh' (or press Ctrl+R) anytime to reload live figures.",
+        ur: "یہ اوپری بار آپ کی منتخب کردہ تاریخ، خالص سیلز (Net Sales)، روزانہ اوسط اور واپسی کی شرح (Return Rate) دکھاتی ہے۔ تازہ ترین اعداد و شمار کے لیے 'Refresh' بٹن (یا Ctrl+R) دبائیں۔",
       },
       checkpoint: {
         en: "Read-only analytical screen — refreshing or changing filters never alters any accounting or stock records.",
@@ -676,16 +676,16 @@ function buildRetailSaleInvoiceFormSteps(container, currentPath) {
         ur: "ٹاپ کمانڈ بار: نقد (Debit) بمقابلہ ادھار (Credit)، ڈرافٹس اور POS",
       },
       instruction: {
-        en: "Start here: toggle between Debit (Cash — full payment auto-received) and Credit (Udhar — posts to Customer Ledger, shortcut Alt+T). Your invoice auto-saves as you type—press Alt+H anytime to hold/recall drafts, switch to 'Barcode POS', or press Alt+S to Create/Save.",
-        ur: "یہاں سے بل کی قسم منتخب کریں: نقد فروخت کے لیے Debit یا کھاتے میں ادھار لکھنے کے لیے Credit (شارٹ کٹ Alt+T)۔ بل ٹائپ کرتے وقت خودکار ڈرافٹ محفوظ ہوتا رہتا ہے (ہولڈ بل دیکھنے کے لیے Alt+H اور بل محفوظ کرنے کے لیے Alt+S دبائیں)۔",
+        en: "Start here: toggle between Debit (Cash — full payment auto-received) and Credit (Udhar — posts to Customer Ledger, shortcut Ctrl+T). Your invoice auto-saves as you type—press Ctrl+H anytime to hold/recall drafts, switch to 'Barcode POS', or press Ctrl+S to Create/Save.",
+        ur: "یہاں سے بل کی قسم منتخب کریں: نقد فروخت کے لیے Debit یا کھاتے میں ادھار لکھنے کے لیے Credit (شارٹ کٹ Ctrl+T)۔ بل ٹائپ کرتے وقت خودکار ڈرافٹ محفوظ ہوتا رہتا ہے (ہولڈ بل دیکھنے کے لیے Ctrl+H اور بل محفوظ کرنے کے لیے Ctrl+S دبائیں)۔",
       },
       observedInstruction: {
-        en: "Start here: toggle between Debit (Cash — full payment auto-received) and Credit (Udhar — posts to Customer Ledger, shortcut Alt+T). Your invoice auto-saves as you type—press Alt+H anytime to hold/recall drafts, switch to 'Barcode POS', or press Alt+S to Create/Save.",
-        ur: "یہاں سے بل کی قسم منتخب کریں: نقد فروخت کے لیے Debit یا کھاتے میں ادھار لکھنے کے لیے Credit (شارٹ کٹ Alt+T)۔ بل ٹائپ کرتے وقت خودکار ڈرافٹ محفوظ ہوتا رہتا ہے (ہولڈ بل دیکھنے کے لیے Alt+H اور بل محفوظ کرنے کے لیے Alt+S دبائیں)۔",
+        en: "Start here: toggle between Debit (Cash — full payment auto-received) and Credit (Udhar — posts to Customer Ledger, shortcut Ctrl+T). Your invoice auto-saves as you type—press Ctrl+H anytime to hold/recall drafts, switch to 'Barcode POS', or press Ctrl+S to Create/Save.",
+        ur: "یہاں سے بل کی قسم منتخب کریں: نقد فروخت کے لیے Debit یا کھاتے میں ادھار لکھنے کے لیے Credit (شارٹ کٹ Ctrl+T)۔ بل ٹائپ کرتے وقت خودکار ڈرافٹ محفوظ ہوتا رہتا ہے (ہولڈ بل دیکھنے کے لیے Ctrl+H اور بل محفوظ کرنے کے لیے Ctrl+S دبائیں)۔",
       },
       checkpoint: {
-        en: "Shortcut Tip: Alt+T toggles Debit/Credit mode; Alt+H opens Held Drafts; Alt+S saves & prints.",
-        ur: "شارٹ کٹ: Alt+T نقد/ادھار بدلتا ہے، Alt+H ہولڈ بل کھولتا ہے، اور Alt+S بل محفوظ کرتا ہے۔",
+        en: "Shortcut Tip: Ctrl+T toggles Debit/Credit mode; Ctrl+H opens Held Drafts; Ctrl+S saves & prints.",
+        ur: "شارٹ کٹ: Ctrl+T نقد/ادھار بدلتا ہے، Ctrl+H ہولڈ بل کھولتا ہے، اور Ctrl+S بل محفوظ کرتا ہے۔",
       },
     },
     {
@@ -774,12 +774,12 @@ function buildRetailSaleInvoiceFormSteps(container, currentPath) {
         ur: "بل سمری سائیڈ بار: منافع %، پیمنٹ اکاؤنٹ اور بقایا واپسی (Return) کیلکولیٹر",
       },
       instruction: {
-        en: "On the right sidebar, inspect your live Margin % badge, optional Tax %, and bill-level Disc % / Disc Amt. Select the Payment Method & Account (Cash, Card/POS, Bank, or Wallet), enter 'Cash Given' (or click Exact / 500 / 1000 / 5000 note chips) to see instant 'Return' change, verify 'Received' & 'Remaining Due', and click 'Create Sale' (Alt+S).",
-        ur: "دائیں جانب سمری پینل میں لائیو Margin %، ٹیکس اور مجموعی ڈسکاؤنٹ چیک کریں۔ پیمنٹ کا طریقہ اور اکاؤنٹ (نقد، کارڈ، بینک یا والٹ) منتخب کریں، گاہک کی دی گئی رقم 'Cash Given' میں لکھیں (یا 500 / 1000 / 5000 کے بٹن دبائیں) تاکہ واپس کرنے والی رقم (Return) نکل آئے، اور 'Create Sale' (Alt+S) دبائیں۔",
+        en: "On the right sidebar, inspect your live Margin % badge, optional Tax %, and bill-level Disc % / Disc Amt. Select the Payment Method & Account (Cash, Card/POS, Bank, or Wallet), enter 'Cash Given' (or click Exact / 500 / 1000 / 5000 note chips) to see instant 'Return' change, verify 'Received' & 'Remaining Due', and click 'Create Sale' (Ctrl+S).",
+        ur: "دائیں جانب سمری پینل میں لائیو Margin %، ٹیکس اور مجموعی ڈسکاؤنٹ چیک کریں۔ پیمنٹ کا طریقہ اور اکاؤنٹ (نقد، کارڈ، بینک یا والٹ) منتخب کریں، گاہک کی دی گئی رقم 'Cash Given' میں لکھیں (یا 500 / 1000 / 5000 کے بٹن دبائیں) تاکہ واپس کرنے والی رقم (Return) نکل آئے، اور 'Create Sale' (Ctrl+S) دبائیں۔",
       },
       observedInstruction: {
-        en: "On the right sidebar, inspect your live Margin % badge, optional Tax %, and bill-level Disc % / Disc Amt. Select the Payment Method & Account (Cash, Card/POS, Bank, or Wallet), enter 'Cash Given' (or click Exact / 500 / 1000 / 5000 note chips) to see instant 'Return' change, verify 'Received' & 'Remaining Due', and click 'Create Sale' (Alt+S).",
-        ur: "دائیں جانب سمری پینل میں لائیو Margin %، ٹیکس اور مجموعی ڈسکاؤنٹ چیک کریں۔ پیمنٹ کا طریقہ اور اکاؤنٹ (نقد، کارڈ، بینک یا والٹ) منتخب کریں، گاہک کی دی گئی رقم 'Cash Given' میں لکھیں (یا 500 / 1000 / 5000 کے بٹن دبائیں) تاکہ واپس کرنے والی رقم (Return) نکل آئے، اور 'Create Sale' (Alt+S) دبائیں۔",
+        en: "On the right sidebar, inspect your live Margin % badge, optional Tax %, and bill-level Disc % / Disc Amt. Select the Payment Method & Account (Cash, Card/POS, Bank, or Wallet), enter 'Cash Given' (or click Exact / 500 / 1000 / 5000 note chips) to see instant 'Return' change, verify 'Received' & 'Remaining Due', and click 'Create Sale' (Ctrl+S).",
+        ur: "دائیں جانب سمری پینل میں لائیو Margin %، ٹیکس اور مجموعی ڈسکاؤنٹ چیک کریں۔ پیمنٹ کا طریقہ اور اکاؤنٹ (نقد، کارڈ، بینک یا والٹ) منتخب کریں، گاہک کی دی گئی رقم 'Cash Given' میں لکھیں (یا 500 / 1000 / 5000 کے بٹن دبائیں) تاکہ واپس کرنے والی رقم (Return) نکل آئے، اور 'Create Sale' (Ctrl+S) دبائیں۔",
       },
       checkpoint: {
         en: "Accounting Impact: Saving deducts batch stock, posts COGS & Revenue to GL, updates Cash Drawer/Bank, and records any Remaining Due in Customer Ledger.",
@@ -812,12 +812,12 @@ function buildWholesaleSaleInvoiceFormSteps(container, currentPath) {
         ur: "ہول سیل (B2B) ہیڈر: نقد (Debit) بمقابلہ کھاتہ (Credit) اور ڈرافٹس",
       },
       instruction: {
-        en: "This screen is built for B2B distribution and bulk wholesale orders (Pack & Unit billing). Toggle between 'Debit (Cash)' and 'Credit (Ledger)' using Alt+T, manage auto-saved or held drafts via Alt+H, and press Alt+S anytime to save and print your wholesale invoice.",
-        ur: "یہ اسکرین ہول سیل اور ڈسٹری بیوشن بلنگ (پیک اور کھلے یونٹس) کے لیے بنائی گئی ہے۔ Alt+T سے Debit (نقد) یا Credit (کھاتہ) منتخب کریں، Alt+H سے ہولڈ ڈرافٹس دیکھیں، اور بل محفوظ کرنے کے لیے Alt+S دبائیں۔",
+        en: "This screen is built for B2B distribution and bulk wholesale orders (Pack & Unit billing). Toggle between 'Debit (Cash)' and 'Credit (Ledger)' using Ctrl+T, manage auto-saved or held drafts via Ctrl+H, and press Ctrl+S anytime to save and print your wholesale invoice.",
+        ur: "یہ اسکرین ہول سیل اور ڈسٹری بیوشن بلنگ (پیک اور کھلے یونٹس) کے لیے بنائی گئی ہے۔ Ctrl+T سے Debit (نقد) یا Credit (کھاتہ) منتخب کریں، Ctrl+H سے ہولڈ ڈرافٹس دیکھیں، اور بل محفوظ کرنے کے لیے Ctrl+S دبائیں۔",
       },
       observedInstruction: {
-        en: "This screen is built for B2B distribution and bulk wholesale orders (Pack & Unit billing). Toggle between 'Debit (Cash)' and 'Credit (Ledger)' using Alt+T, manage auto-saved or held drafts via Alt+H, and press Alt+S anytime to save and print your wholesale invoice.",
-        ur: "یہ اسکرین ہول سیل اور ڈسٹری بیوشن بلنگ (پیک اور کھلے یونٹس) کے لیے بنائی گئی ہے۔ Alt+T سے Debit (نقد) یا Credit (کھاتہ) منتخب کریں، Alt+H سے ہولڈ ڈرافٹس دیکھیں، اور بل محفوظ کرنے کے لیے Alt+S دبائیں۔",
+        en: "This screen is built for B2B distribution and bulk wholesale orders (Pack & Unit billing). Toggle between 'Debit (Cash)' and 'Credit (Ledger)' using Ctrl+T, manage auto-saved or held drafts via Ctrl+H, and press Ctrl+S anytime to save and print your wholesale invoice.",
+        ur: "یہ اسکرین ہول سیل اور ڈسٹری بیوشن بلنگ (پیک اور کھلے یونٹس) کے لیے بنائی گئی ہے۔ Ctrl+T سے Debit (نقد) یا Credit (کھاتہ) منتخب کریں، Ctrl+H سے ہولڈ ڈرافٹس دیکھیں، اور بل محفوظ کرنے کے لیے Ctrl+S دبائیں۔",
       },
       checkpoint: {
         en: "Wholesale invoices support A4 printouts as well as unpriced Delivery Challans for warehouse dispatch.",
@@ -887,12 +887,12 @@ function buildWholesaleSaleInvoiceFormSteps(container, currentPath) {
         ur: "ہول سیل سمری فوٹر: ڈسکاؤنٹ/ٹیکس، پیمنٹ اکاؤنٹ اور بل کی تکمیل",
       },
       instruction: {
-        en: "At the bottom footer, review the active row's Margin %, apply any bill-level Disc % / Disc Amt or Tax %, and check Gross Amount vs. Net Total. Choose your Payment Method & Account, enter Cash Given (or click Exact / 1000 / 5000 / 10000 chips), adjust 'Received' for partial credit recovery, and click 'Create Wholesale Sale' (Alt+S).",
-        ur: "نچلے فوٹر میں ڈسکاؤنٹ، ٹیکس اور کل بل (Net Total) چیک کریں۔ پیمنٹ کا طریقہ اور اکاؤنٹ منتخب کریں، وصول شدہ رقم ('Received') درج کریں (ادھار بل میں جتنی رقم کم ہو گی وہ خودکار گاہک کے کھاتے میں جائے گی) اور 'Create Wholesale Sale' (Alt+S) دبائیں۔",
+        en: "At the bottom footer, review the active row's Margin %, apply any bill-level Disc % / Disc Amt or Tax %, and check Gross Amount vs. Net Total. Choose your Payment Method & Account, enter Cash Given (or click Exact / 1000 / 5000 / 10000 chips), adjust 'Received' for partial credit recovery, and click 'Create Wholesale Sale' (Ctrl+S).",
+        ur: "نچلے فوٹر میں ڈسکاؤنٹ، ٹیکس اور کل بل (Net Total) چیک کریں۔ پیمنٹ کا طریقہ اور اکاؤنٹ منتخب کریں، وصول شدہ رقم ('Received') درج کریں (ادھار بل میں جتنی رقم کم ہو گی وہ خودکار گاہک کے کھاتے میں جائے گی) اور 'Create Wholesale Sale' (Ctrl+S) دبائیں۔",
       },
       observedInstruction: {
-        en: "At the bottom footer, review the active row's Margin %, apply any bill-level Disc % / Disc Amt or Tax %, and check Gross Amount vs. Net Total. Choose your Payment Method & Account, enter Cash Given (or click Exact / 1000 / 5000 / 10000 chips), adjust 'Received' for partial credit recovery, and click 'Create Wholesale Sale' (Alt+S).",
-        ur: "نچلے فوٹر میں ڈسکاؤنٹ، ٹیکس اور کل بل (Net Total) چیک کریں۔ پیمنٹ کا طریقہ اور اکاؤنٹ منتخب کریں، وصول شدہ رقم ('Received') درج کریں (ادھار بل میں جتنی رقم کم ہو گی وہ خودکار گاہک کے کھاتے میں جائے گی) اور 'Create Wholesale Sale' (Alt+S) دبائیں۔",
+        en: "At the bottom footer, review the active row's Margin %, apply any bill-level Disc % / Disc Amt or Tax %, and check Gross Amount vs. Net Total. Choose your Payment Method & Account, enter Cash Given (or click Exact / 1000 / 5000 / 10000 chips), adjust 'Received' for partial credit recovery, and click 'Create Wholesale Sale' (Ctrl+S).",
+        ur: "نچلے فوٹر میں ڈسکاؤنٹ، ٹیکس اور کل بل (Net Total) چیک کریں۔ پیمنٹ کا طریقہ اور اکاؤنٹ منتخب کریں، وصول شدہ رقم ('Received') درج کریں (ادھار بل میں جتنی رقم کم ہو گی وہ خودکار گاہک کے کھاتے میں جائے گی) اور 'Create Wholesale Sale' (Ctrl+S) دبائیں۔",
       },
       checkpoint: {
         en: "Accounting Impact: Both billed units and bonus units deduct from batch stock and post accurate COGS to the General Ledger.",
@@ -999,16 +999,16 @@ function buildBarcodePosSteps(container, currentPath) {
       exactSelector: "#pos-tender-panel",
       element: container?.querySelector("#pos-tender-panel") || null,
       title: {
-        en: "Customer, Giant Total Payable, 4-Way Payment & Instant Checkout (F4 / Alt+S)",
-        ur: "کسٹمر، ٹوٹل بل، پیمنٹ میتھڈ اور فوری بل مکمل کرنا (F4 / Alt+S)",
+        en: "Customer, Giant Total Payable, 4-Way Payment & Instant Checkout (F4 / Ctrl+S)",
+        ur: "کسٹمر، ٹوٹل بل، پیمنٹ میتھڈ اور فوری بل مکمل کرنا (F4 / Ctrl+S)",
       },
       instruction: {
-        en: "On the right tender panel, keep 'Walk-in Customer' or click 'Search Directory' for a named customer. Review the giant Total Payable banner and optional Extra Bill Discount. Pick your Payment Method (Cash, Card / POS, Wallet, or Split / Credit), enter Cash Given (or press Alt+C for Exact Cash / click 500, 1000, 2000, 5000 chips) to see Change Due, and press 'Complete Sale (Alt+S / F4)'!",
-        ur: "دائیں جانب ٹینڈر پینل میں Walk-in Customer رکھیں یا رجسٹرڈ گاہک سرچ کریں۔ کل واجب الادا رقم (Total Payable) اور اضافی ڈسکاؤنٹ چیک کریں۔ پیمنٹ کا طریقہ (Cash, Card / POS, Wallet یا Split / Credit) منتخب کریں، وصول شدہ نقدی لکھیں (پوری رقم کے لیے Alt+C دبائیں) اور رسید پرنٹ کرنے کے لیے 'Complete Sale (Alt+S / F4)' دبائیں!",
+        en: "On the right tender panel, keep 'Walk-in Customer' or click 'Search Directory' for a named customer. Review the giant Total Payable banner and optional Extra Bill Discount. Pick your Payment Method (Cash, Card / POS, Wallet, or Split / Credit), enter Cash Given (or press Ctrl+C for Exact Cash / click 500, 1000, 2000, 5000 chips) to see Change Due, and press 'Complete Sale (Ctrl+S / F4)'!",
+        ur: "دائیں جانب ٹینڈر پینل میں Walk-in Customer رکھیں یا رجسٹرڈ گاہک سرچ کریں۔ کل واجب الادا رقم (Total Payable) اور اضافی ڈسکاؤنٹ چیک کریں۔ پیمنٹ کا طریقہ (Cash, Card / POS, Wallet یا Split / Credit) منتخب کریں، وصول شدہ نقدی لکھیں (پوری رقم کے لیے Ctrl+C دبائیں) اور رسید پرنٹ کرنے کے لیے 'Complete Sale (Ctrl+S / F4)' دبائیں!",
       },
       observedInstruction: {
-        en: "On the right tender panel, keep 'Walk-in Customer' or click 'Search Directory' for a named customer. Review the giant Total Payable banner and optional Extra Bill Discount. Pick your Payment Method (Cash, Card / POS, Wallet, or Split / Credit), enter Cash Given (or press Alt+C for Exact Cash / click 500, 1000, 2000, 5000 chips) to see Change Due, and press 'Complete Sale (Alt+S / F4)'!",
-        ur: "دائیں جانب ٹینڈر پینل میں Walk-in Customer رکھیں یا رجسٹرڈ گاہک سرچ کریں۔ کل واجب الادا رقم (Total Payable) اور اضافی ڈسکاؤنٹ چیک کریں۔ پیمنٹ کا طریقہ (Cash, Card / POS, Wallet یا Split / Credit) منتخب کریں، وصول شدہ نقدی لکھیں (پوری رقم کے لیے Alt+C دبائیں) اور رسید پرنٹ کرنے کے لیے 'Complete Sale (Alt+S / F4)' دبائیں!",
+        en: "On the right tender panel, keep 'Walk-in Customer' or click 'Search Directory' for a named customer. Review the giant Total Payable banner and optional Extra Bill Discount. Pick your Payment Method (Cash, Card / POS, Wallet, or Split / Credit), enter Cash Given (or press Ctrl+C for Exact Cash / click 500, 1000, 2000, 5000 chips) to see Change Due, and press 'Complete Sale (Ctrl+S / F4)'!",
+        ur: "دائیں جانب ٹینڈر پینل میں Walk-in Customer رکھیں یا رجسٹرڈ گاہک سرچ کریں۔ کل واجب الادا رقم (Total Payable) اور اضافی ڈسکاؤنٹ چیک کریں۔ پیمنٹ کا طریقہ (Cash, Card / POS, Wallet یا Split / Credit) منتخب کریں، وصول شدہ نقدی لکھیں (پوری رقم کے لیے Ctrl+C دبائیں) اور رسید پرنٹ کرنے کے لیے 'Complete Sale (Ctrl+S / F4)' دبائیں!",
       },
       checkpoint: {
         en: "Split / Credit lets you collect partial cash/card/wallet now and post any remaining balance to the customer's Udhar ledger.",
@@ -1037,20 +1037,20 @@ function buildPurchaseInvoiceFormSteps(container, currentPath) {
       exactSelector: ".purchase-entry-banner",
       element: container?.querySelector(".purchase-entry-banner") || null,
       title: {
-        en: "Purchase Header: Held Drafts (Alt+H), Debit/Credit Toggle (Alt+T) & '+ Add Product'",
-        ur: "پرچیز ہیڈر: ڈرافٹس (Alt+H)، نقد/ادھار بٹن (Alt+T) اور '+ Add Product'",
+        en: "Purchase Header: Held Drafts (Ctrl+H), Debit/Credit Toggle (Ctrl+T) & '+ Add Product'",
+        ur: "پرچیز ہیڈر: ڈرافٹس (Ctrl+H)، نقد/ادھار بٹن (Ctrl+T) اور '+ Add Product'",
       },
       instruction: {
-        en: "Use this top bar to toggle between 'Debit' (Cash/Bank Paid immediately) and 'Credit' (Supplier Payable ledger, shortcut Alt+T), or manage auto-saved drafts (Alt+H). If the supplier's bill contains a brand-new medicine not in your catalog yet, click '+ Add Product' right here to create it without leaving your invoice!",
-        ur: "یہاں سے بل کی قسم منتخب کریں: نقد ادائیگی کے لیے Debit یا سپلائر کے کھاتے میں ادھار لکھنے کے لیے Credit (Alt+T)۔ اگر سپلائر کے بل میں کوئی بالکل نئی پروڈکٹ ہے جو پہلے سسٹم میں نہیں، تو بل بند کیے بغیر '+ Add Product' بٹن دبا کر اسے فوری رجسٹر کریں!",
+        en: "Use this top bar to toggle between 'Debit' (Cash/Bank Paid immediately) and 'Credit' (Supplier Payable ledger, shortcut Ctrl+T), or manage auto-saved drafts (Ctrl+H). If the supplier's bill contains a brand-new medicine not in your catalog yet, click '+ Add Product' right here to create it without leaving your invoice!",
+        ur: "یہاں سے بل کی قسم منتخب کریں: نقد ادائیگی کے لیے Debit یا سپلائر کے کھاتے میں ادھار لکھنے کے لیے Credit (Ctrl+T)۔ اگر سپلائر کے بل میں کوئی بالکل نئی پروڈکٹ ہے جو پہلے سسٹم میں نہیں، تو بل بند کیے بغیر '+ Add Product' بٹن دبا کر اسے فوری رجسٹر کریں!",
       },
       observedInstruction: {
-        en: "Use this top bar to toggle between 'Debit' (Cash/Bank Paid immediately) and 'Credit' (Supplier Payable ledger, shortcut Alt+T), or manage auto-saved drafts (Alt+H). If the supplier's bill contains a brand-new medicine not in your catalog yet, click '+ Add Product' right here to create it without leaving your invoice!",
-        ur: "یہاں سے بل کی قسم منتخب کریں: نقد ادائیگی کے لیے Debit یا سپلائر کے کھاتے میں ادھار لکھنے کے لیے Credit (Alt+T)۔ اگر سپلائر کے بل میں کوئی بالکل نئی پروڈکٹ ہے جو پہلے سسٹم میں نہیں، تو بل بند کیے بغیر '+ Add Product' بٹن دبا کر اسے فوری رجسٹر کریں!",
+        en: "Use this top bar to toggle between 'Debit' (Cash/Bank Paid immediately) and 'Credit' (Supplier Payable ledger, shortcut Ctrl+T), or manage auto-saved drafts (Ctrl+H). If the supplier's bill contains a brand-new medicine not in your catalog yet, click '+ Add Product' right here to create it without leaving your invoice!",
+        ur: "یہاں سے بل کی قسم منتخب کریں: نقد ادائیگی کے لیے Debit یا سپلائر کے کھاتے میں ادھار لکھنے کے لیے Credit (Ctrl+T)۔ اگر سپلائر کے بل میں کوئی بالکل نئی پروڈکٹ ہے جو پہلے سسٹم میں نہیں، تو بل بند کیے بغیر '+ Add Product' بٹن دبا کر اسے فوری رجسٹر کریں!",
       },
       checkpoint: {
-        en: "Shortcut Tip: Alt+T toggles Debit/Credit; Alt+H opens Held Drafts; Alt+S saves the Purchase Invoice.",
-        ur: "شارٹ کٹ: Alt+T نقد/ادھار بدلتا ہے، Alt+H ڈرافٹس کھولتا ہے اور Alt+S بل محفوظ کرتا ہے۔",
+        en: "Shortcut Tip: Ctrl+T toggles Debit/Credit; Ctrl+H opens Held Drafts; Ctrl+S saves the Purchase Invoice.",
+        ur: "شارٹ کٹ: Ctrl+T نقد/ادھار بدلتا ہے، Ctrl+H ڈرافٹس کھولتا ہے اور Ctrl+S بل محفوظ کرتا ہے۔",
       },
     },
     {
@@ -1106,16 +1106,16 @@ function buildPurchaseInvoiceFormSteps(container, currentPath) {
       exactSelector: ".purchase-entry-footer",
       element: container?.querySelector(".purchase-entry-footer") || null,
       title: {
-        en: "Sticky 2-Row Purchase Footer: Bill Discount/Tax, Payment Account & Save (Alt+S)",
-        ur: "پرچیز سمری فوٹر: بل ڈسکاؤنٹ/ٹیکس، پیمنٹ اکاؤنٹ اور محفوظ کرنا (Alt+S)",
+        en: "Sticky 2-Row Purchase Footer: Bill Discount/Tax, Payment Account & Save (Ctrl+S)",
+        ur: "پرچیز سمری فوٹر: بل ڈسکاؤنٹ/ٹیکس، پیمنٹ اکاؤنٹ اور محفوظ کرنا (Ctrl+S)",
       },
       instruction: {
-        en: "In Row 1 of the footer, enter any flat bill-level 'Disc %' / 'Discount' or 'Tax %' / 'Tax' (WHT/GST) and confirm 'Total Amount'. In Row 2, choose the Payment Method & Account (Cash, Bank, Card, Wallet), enter 'Total Paid' (click the Relink icon to auto-match full Total Amount in Debit mode, or enter 0/partial in Credit mode), and click 'Save Purchase Invoice' (Alt+S).",
-        ur: "فوٹر کی پہلی قطار میں بل کا مجموعی ڈسکاؤنٹ یا ودہولڈنگ ٹیکس ('Tax %') درج کریں اور 'Total Amount' چیک کریں۔ دوسری قطار میں پیمنٹ اکاؤنٹ منتخب کریں، ادا شدہ رقم ('Total Paid') لکھیں (ادھار بل میں بقایا رقم سپلائر کھاتے میں چلی جائے گی) اور 'Save Purchase Invoice' (Alt+S) پر کلک کریں۔",
+        en: "In Row 1 of the footer, enter any flat bill-level 'Disc %' / 'Discount' or 'Tax %' / 'Tax' (WHT/GST) and confirm 'Total Amount'. In Row 2, choose the Payment Method & Account (Cash, Bank, Card, Wallet), enter 'Total Paid' (click the Relink icon to auto-match full Total Amount in Debit mode, or enter 0/partial in Credit mode), and click 'Save Purchase Invoice' (Ctrl+S).",
+        ur: "فوٹر کی پہلی قطار میں بل کا مجموعی ڈسکاؤنٹ یا ودہولڈنگ ٹیکس ('Tax %') درج کریں اور 'Total Amount' چیک کریں۔ دوسری قطار میں پیمنٹ اکاؤنٹ منتخب کریں، ادا شدہ رقم ('Total Paid') لکھیں (ادھار بل میں بقایا رقم سپلائر کھاتے میں چلی جائے گی) اور 'Save Purchase Invoice' (Ctrl+S) پر کلک کریں۔",
       },
       observedInstruction: {
-        en: "In Row 1 of the footer, enter any flat bill-level 'Disc %' / 'Discount' or 'Tax %' / 'Tax' (WHT/GST) and confirm 'Total Amount'. In Row 2, choose the Payment Method & Account (Cash, Bank, Card, Wallet), enter 'Total Paid' (click the Relink icon to auto-match full Total Amount in Debit mode, or enter 0/partial in Credit mode), and click 'Save Purchase Invoice' (Alt+S).",
-        ur: "فوٹر کی پہلی قطار میں بل کا مجموعی ڈسکاؤنٹ یا ودہولڈنگ ٹیکس ('Tax %') درج کریں اور 'Total Amount' چیک کریں۔ دوسری قطار میں پیمنٹ اکاؤنٹ منتخب کریں، ادا شدہ رقم ('Total Paid') لکھیں (ادھار بل میں بقایا رقم سپلائر کھاتے میں چلی جائے گی) اور 'Save Purchase Invoice' (Alt+S) پر کلک کریں۔",
+        en: "In Row 1 of the footer, enter any flat bill-level 'Disc %' / 'Discount' or 'Tax %' / 'Tax' (WHT/GST) and confirm 'Total Amount'. In Row 2, choose the Payment Method & Account (Cash, Bank, Card, Wallet), enter 'Total Paid' (click the Relink icon to auto-match full Total Amount in Debit mode, or enter 0/partial in Credit mode), and click 'Save Purchase Invoice' (Ctrl+S).",
+        ur: "فوٹر کی پہلی قطار میں بل کا مجموعی ڈسکاؤنٹ یا ودہولڈنگ ٹیکس ('Tax %') درج کریں اور 'Total Amount' چیک کریں۔ دوسری قطار میں پیمنٹ اکاؤنٹ منتخب کریں، ادا شدہ رقم ('Total Paid') لکھیں (ادھار بل میں بقایا رقم سپلائر کھاتے میں چلی جائے گی) اور 'Save Purchase Invoice' (Ctrl+S) پر کلک کریں۔",
       },
       checkpoint: {
         en: "Accounting Impact: Saving immediately increments batch stock (including Bonus units), updates product prices, and posts to Supplier Ledger & GL.",
@@ -1144,16 +1144,16 @@ function buildSaleReturnFormSteps(container, currentPath) {
       exactSelector: ".sale-entry-banner",
       element: container?.querySelector(".sale-entry-banner") || null,
       title: {
-        en: "Sale Return Header & Keyboard Shortcuts (Alt+S)",
-        ur: "سیل ریٹرن ہیڈر اور شارٹ کٹ (Alt+S)",
+        en: "Sale Return Header & Keyboard Shortcuts (Ctrl+S)",
+        ur: "سیل ریٹرن ہیڈر اور شارٹ کٹ (Ctrl+S)",
       },
       instruction: {
-        en: "Use the Sale Return form whenever a customer returns medicines or items. All returns are Unit-Based so you can accept back single tablets, strips, or full packs. Press Alt+S anytime to save the return.",
-        ur: "جب کوئی گاہک دوائی یا آئٹم واپس کرے تو یہ سیل ریٹرن فارم استعمال کریں۔ یہاں آپ کھلی گولیاں یا پورا پیک یونٹس کی صورت میں واپس لے سکتے ہیں۔ محفوظ کرنے کے لیے Alt+S دبائیں۔",
+        en: "Use the Sale Return form whenever a customer returns medicines or items. All returns are Unit-Based so you can accept back single tablets, strips, or full packs. Press Ctrl+S anytime to save the return.",
+        ur: "جب کوئی گاہک دوائی یا آئٹم واپس کرے تو یہ سیل ریٹرن فارم استعمال کریں۔ یہاں آپ کھلی گولیاں یا پورا پیک یونٹس کی صورت میں واپس لے سکتے ہیں۔ محفوظ کرنے کے لیے Ctrl+S دبائیں۔",
       },
       observedInstruction: {
-        en: "Use the Sale Return form whenever a customer returns medicines or items. All returns are Unit-Based so you can accept back single tablets, strips, or full packs. Press Alt+S anytime to save the return.",
-        ur: "جب کوئی گاہک دوائی یا آئٹم واپس کرے تو یہ سیل ریٹرن فارم استعمال کریں۔ یہاں آپ کھلی گولیاں یا پورا پیک یونٹس کی صورت میں واپس لے سکتے ہیں۔ محفوظ کرنے کے لیے Alt+S دبائیں۔",
+        en: "Use the Sale Return form whenever a customer returns medicines or items. All returns are Unit-Based so you can accept back single tablets, strips, or full packs. Press Ctrl+S anytime to save the return.",
+        ur: "جب کوئی گاہک دوائی یا آئٹم واپس کرے تو یہ سیل ریٹرن فارم استعمال کریں۔ یہاں آپ کھلی گولیاں یا پورا پیک یونٹس کی صورت میں واپس لے سکتے ہیں۔ محفوظ کرنے کے لیے Ctrl+S دبائیں۔",
       },
       checkpoint: {
         en: "Saving a Sale Return automatically puts the returned units back into their active batch stock.",
@@ -1223,12 +1223,12 @@ function buildSaleReturnFormSteps(container, currentPath) {
         ur: "ریٹرن سمری اور رقم کی واپسی کا طریقہ (کھاتہ ایڈجسٹمنٹ یا فوری نقد واپسی)",
       },
       instruction: {
-        en: "Check Gross Total, Discount, Tax, and Net Total on the right panel, then choose your 'Settlement Outcome': (1) 'Adjust Customer Ledger (Credit Note)' — reduces the customer's Udhar receivable balance without touching cash; or (2) 'Instant Refund (Cash / Bank / Wallet)' — pays cash/bank back immediately from your chosen Refund Account. Click 'Create Return' (Alt+S).",
-        ur: "دائیں جانب کل واپسی کی رقم چیک کریں اور 'Settlement Outcome' میں سے ایک طریقہ منتخب کریں: (1) 'Adjust Customer Ledger (Credit Note)' — گاہک کے ادھار کھاتے سے رقم کم کرنے کے لیے؛ یا (2) 'Instant Refund (Cash / Bank / Wallet)' — گلے یا بینک سے فوری نقد رقم واپس کرنے کے لیے۔ آخر میں 'Create Return' (Alt+S) دبائیں۔",
+        en: "Check Gross Total, Discount, Tax, and Net Total on the right panel, then choose your 'Settlement Outcome': (1) 'Adjust Customer Ledger (Credit Note)' — reduces the customer's Udhar receivable balance without touching cash; or (2) 'Instant Refund (Cash / Bank / Wallet)' — pays cash/bank back immediately from your chosen Refund Account. Click 'Create Return' (Ctrl+S).",
+        ur: "دائیں جانب کل واپسی کی رقم چیک کریں اور 'Settlement Outcome' میں سے ایک طریقہ منتخب کریں: (1) 'Adjust Customer Ledger (Credit Note)' — گاہک کے ادھار کھاتے سے رقم کم کرنے کے لیے؛ یا (2) 'Instant Refund (Cash / Bank / Wallet)' — گلے یا بینک سے فوری نقد رقم واپس کرنے کے لیے۔ آخر میں 'Create Return' (Ctrl+S) دبائیں۔",
       },
       observedInstruction: {
-        en: "Check Gross Total, Discount, Tax, and Net Total on the right panel, then choose your 'Settlement Outcome': (1) 'Adjust Customer Ledger (Credit Note)' — reduces the customer's Udhar receivable balance without touching cash; or (2) 'Instant Refund (Cash / Bank / Wallet)' — pays cash/bank back immediately from your chosen Refund Account. Click 'Create Return' (Alt+S).",
-        ur: "دائیں جانب کل واپسی کی رقم چیک کریں اور 'Settlement Outcome' میں سے ایک طریقہ منتخب کریں: (1) 'Adjust Customer Ledger (Credit Note)' — گاہک کے ادھار کھاتے سے رقم کم کرنے کے لیے؛ یا (2) 'Instant Refund (Cash / Bank / Wallet)' — گلے یا بینک سے فوری نقد رقم واپس کرنے کے لیے۔ آخر میں 'Create Return' (Alt+S) دبائیں۔",
+        en: "Check Gross Total, Discount, Tax, and Net Total on the right panel, then choose your 'Settlement Outcome': (1) 'Adjust Customer Ledger (Credit Note)' — reduces the customer's Udhar receivable balance without touching cash; or (2) 'Instant Refund (Cash / Bank / Wallet)' — pays cash/bank back immediately from your chosen Refund Account. Click 'Create Return' (Ctrl+S).",
+        ur: "دائیں جانب کل واپسی کی رقم چیک کریں اور 'Settlement Outcome' میں سے ایک طریقہ منتخب کریں: (1) 'Adjust Customer Ledger (Credit Note)' — گاہک کے ادھار کھاتے سے رقم کم کرنے کے لیے؛ یا (2) 'Instant Refund (Cash / Bank / Wallet)' — گلے یا بینک سے فوری نقد رقم واپس کرنے کے لیے۔ آخر میں 'Create Return' (Ctrl+S) دبائیں۔",
       },
       checkpoint: {
         en: "Note: Walk-in Customer returns require 'Instant Refund' since Walk-in does not maintain a credit ledger.",
@@ -1257,16 +1257,16 @@ function buildPurchaseReturnFormSteps(container, currentPath) {
       exactSelector: ".purchase-entry-banner",
       element: container?.querySelector(".purchase-entry-banner") || null,
       title: {
-        en: "Purchase Return Header & Save Action (Alt+S)",
-        ur: "پرچیز ریٹرن ہیڈر اور شارٹ کٹ (Alt+S)",
+        en: "Purchase Return Header & Save Action (Ctrl+S)",
+        ur: "پرچیز ریٹرن ہیڈر اور شارٹ کٹ (Ctrl+S)",
       },
       instruction: {
-        en: "Use Purchase Return when sending near-expiry, expired, damaged, or excess stock back to a supplier/distributor. Press Alt+S anytime to save the return.",
-        ur: "جب سپلائر یا ڈسٹری بیوٹر کو ایکسپائر، قریب ایکسپائری، خراب یا فالتو مال واپس بھیجنا ہو تو یہ پرچیز ریٹرن فارم استعمال کریں۔ محفوظ کرنے کا شارٹ کٹ Alt+S ہے۔",
+        en: "Use Purchase Return when sending near-expiry, expired, damaged, or excess stock back to a supplier/distributor. Press Ctrl+S anytime to save the return.",
+        ur: "جب سپلائر یا ڈسٹری بیوٹر کو ایکسپائر، قریب ایکسپائری، خراب یا فالتو مال واپس بھیجنا ہو تو یہ پرچیز ریٹرن فارم استعمال کریں۔ محفوظ کرنے کا شارٹ کٹ Ctrl+S ہے۔",
       },
       observedInstruction: {
-        en: "Use Purchase Return when sending near-expiry, expired, damaged, or excess stock back to a supplier/distributor. Press Alt+S anytime to save the return.",
-        ur: "جب سپلائر یا ڈسٹری بیوٹر کو ایکسپائر، قریب ایکسپائری، خراب یا فالتو مال واپس بھیجنا ہو تو یہ پرچیز ریٹرن فارم استعمال کریں۔ محفوظ کرنے کا شارٹ کٹ Alt+S ہے۔",
+        en: "Use Purchase Return when sending near-expiry, expired, damaged, or excess stock back to a supplier/distributor. Press Ctrl+S anytime to save the return.",
+        ur: "جب سپلائر یا ڈسٹری بیوٹر کو ایکسپائر، قریب ایکسپائری، خراب یا فالتو مال واپس بھیجنا ہو تو یہ پرچیز ریٹرن فارم استعمال کریں۔ محفوظ کرنے کا شارٹ کٹ Ctrl+S ہے۔",
       },
       checkpoint: {
         en: "Saving a Purchase Return immediately deducts the returned units from your batch inventory.",
@@ -1330,12 +1330,12 @@ function buildPurchaseReturnFormSteps(container, currentPath) {
         ur: "ریٹرن فوٹر اور حساب کا طریقہ (سپلائر کھاتہ ایڈجسٹمنٹ یا نقد واپسی)",
       },
       instruction: {
-        en: "In the bottom footer, verify Gross Total, Discount, Tax, and Net Total, then choose the 'Settlement Outcome': (1) 'Adjust Supplier Ledger (Debit Note)' — deducts this return amount from what you owe the supplier; or (2) 'Instant Refund (Cash / Bank / Wallet)' — records immediate cash/bank money received back into your chosen account. Click 'Create' (Alt+S).",
-        ur: "نچلے فوٹر میں کل رقم چیک کریں اور 'Settlement Outcome' منتخب کریں: (1) 'Adjust Supplier Ledger (Debit Note)' — سپلائر کے واجب الادا کھاتے سے رقم کم کرنے کے لیے؛ یا (2) 'Instant Refund (Cash / Bank / Wallet)' — اگر سپلائر سے فوری نقد یا بینک میں رقم واپس ملی ہے تو متعلقہ اکاؤنٹ منتخب کریں اور 'Create' (Alt+S) دبائیں۔",
+        en: "In the bottom footer, verify Gross Total, Discount, Tax, and Net Total, then choose the 'Settlement Outcome': (1) 'Adjust Supplier Ledger (Debit Note)' — deducts this return amount from what you owe the supplier; or (2) 'Instant Refund (Cash / Bank / Wallet)' — records immediate cash/bank money received back into your chosen account. Click 'Create' (Ctrl+S).",
+        ur: "نچلے فوٹر میں کل رقم چیک کریں اور 'Settlement Outcome' منتخب کریں: (1) 'Adjust Supplier Ledger (Debit Note)' — سپلائر کے واجب الادا کھاتے سے رقم کم کرنے کے لیے؛ یا (2) 'Instant Refund (Cash / Bank / Wallet)' — اگر سپلائر سے فوری نقد یا بینک میں رقم واپس ملی ہے تو متعلقہ اکاؤنٹ منتخب کریں اور 'Create' (Ctrl+S) دبائیں۔",
       },
       observedInstruction: {
-        en: "In the bottom footer, verify Gross Total, Discount, Tax, and Net Total, then choose the 'Settlement Outcome': (1) 'Adjust Supplier Ledger (Debit Note)' — deducts this return amount from what you owe the supplier; or (2) 'Instant Refund (Cash / Bank / Wallet)' — records immediate cash/bank money received back into your chosen account. Click 'Create' (Alt+S).",
-        ur: "نچلے فوٹر میں کل رقم چیک کریں اور 'Settlement Outcome' منتخب کریں: (1) 'Adjust Supplier Ledger (Debit Note)' — سپلائر کے واجب الادا کھاتے سے رقم کم کرنے کے لیے؛ یا (2) 'Instant Refund (Cash / Bank / Wallet)' — اگر سپلائر سے فوری نقد یا بینک میں رقم واپس ملی ہے تو متعلقہ اکاؤنٹ منتخب کریں اور 'Create' (Alt+S) دبائیں۔",
+        en: "In the bottom footer, verify Gross Total, Discount, Tax, and Net Total, then choose the 'Settlement Outcome': (1) 'Adjust Supplier Ledger (Debit Note)' — deducts this return amount from what you owe the supplier; or (2) 'Instant Refund (Cash / Bank / Wallet)' — records immediate cash/bank money received back into your chosen account. Click 'Create' (Ctrl+S).",
+        ur: "نچلے فوٹر میں کل رقم چیک کریں اور 'Settlement Outcome' منتخب کریں: (1) 'Adjust Supplier Ledger (Debit Note)' — سپلائر کے واجب الادا کھاتے سے رقم کم کرنے کے لیے؛ یا (2) 'Instant Refund (Cash / Bank / Wallet)' — اگر سپلائر سے فوری نقد یا بینک میں رقم واپس ملی ہے تو متعلقہ اکاؤنٹ منتخب کریں اور 'Create' (Ctrl+S) دبائیں۔",
       },
       checkpoint: {
         en: "Accounting Impact: Inventory Asset decreases and either Accounts Payable (Debit Note) is reduced or Cash/Bank is debited.",
@@ -1364,16 +1364,16 @@ function buildPurchaseOrderSteps(container, currentPath) {
         exactSelector: ".purchase-order-heading",
         element: container?.querySelector(".purchase-order-heading") || null,
         title: {
-          en: "Smart Forecast Command Bar: Generate (Alt+G), Print Format & Create PO",
-          ur: "سمارٹ فورکاسٹ ہیڈر: فورکاسٹ نکالیں (Alt+G)، پرنٹ فارمیٹ اور PO بنائیں",
+          en: "Smart Forecast Command Bar: Generate (Ctrl+Enter), Print Format & Create PO",
+          ur: "سمارٹ فورکاسٹ ہیڈر: فورکاسٹ نکالیں (Ctrl+Enter)، پرنٹ فارمیٹ اور PO بنائیں",
         },
         instruction: {
-          en: "Click 'Generate forecast' (Alt+G) to calculate suggested reorder quantities from your historical sales velocity. Toggle 'Exclude zero-price items', switch between 'A4' and 'Thermal' print formats, or click 'Create Order from Forecast' to turn the suggestions into a formal Purchase Order.",
-          ur: "اپنی پچھلی سیلز کی رفتار کے مطابق مطلوبہ آرڈر مقدار نکالنے کے لیے 'Generate forecast' (Alt+G) پر کلک کریں۔ یہاں سے A4 یا Thermal پرنٹ منتخب کریں، یا ایک کلک سے باقاعدہ پرچیز آرڈر بنانے کے لیے 'Create Order from Forecast' دبائیں۔",
+          en: "Click 'Generate forecast' (Ctrl+Enter) to calculate suggested reorder quantities from your historical sales velocity. Toggle 'Exclude zero-price items', switch between 'A4' and 'Thermal' print formats, or click 'Create Order from Forecast' to turn the suggestions into a formal Purchase Order.",
+          ur: "اپنی پچھلی سیلز کی رفتار کے مطابق مطلوبہ آرڈر مقدار نکالنے کے لیے 'Generate forecast' (Ctrl+Enter) پر کلک کریں۔ یہاں سے A4 یا Thermal پرنٹ منتخب کریں، یا ایک کلک سے باقاعدہ پرچیز آرڈر بنانے کے لیے 'Create Order from Forecast' دبائیں۔",
         },
         observedInstruction: {
-          en: "Click 'Generate forecast' (Alt+G) to calculate suggested reorder quantities from your historical sales velocity. Toggle 'Exclude zero-price items', switch between 'A4' and 'Thermal' print formats, or click 'Create Order from Forecast' to turn the suggestions into a formal Purchase Order.",
-          ur: "اپنی پچھلی سیلز کی رفتار کے مطابق مطلوبہ آرڈر مقدار نکالنے کے لیے 'Generate forecast' (Alt+G) پر کلک کریں۔ یہاں سے A4 یا Thermal پرنٹ منتخب کریں، یا ایک کلک سے باقاعدہ پرچیز آرڈر بنانے کے لیے 'Create Order from Forecast' دبائیں۔",
+          en: "Click 'Generate forecast' (Ctrl+Enter) to calculate suggested reorder quantities from your historical sales velocity. Toggle 'Exclude zero-price items', switch between 'A4' and 'Thermal' print formats, or click 'Create Order from Forecast' to turn the suggestions into a formal Purchase Order.",
+          ur: "اپنی پچھلی سیلز کی رفتار کے مطابق مطلوبہ آرڈر مقدار نکالنے کے لیے 'Generate forecast' (Ctrl+Enter) پر کلک کریں۔ یہاں سے A4 یا Thermal پرنٹ منتخب کریں، یا ایک کلک سے باقاعدہ پرچیز آرڈر بنانے کے لیے 'Create Order from Forecast' دبائیں۔",
         },
       },
       {
@@ -1435,16 +1435,16 @@ function buildPurchaseOrderSteps(container, currentPath) {
         exactSelector: ".purchase-entry-banner",
         element: container?.querySelector(".purchase-entry-banner") || null,
         title: {
-          en: "Purchase Order Header: Smart Forecast (Alt+N), Add Product & All Orders",
-          ur: "پرچیز آرڈر ہیڈر: سمارٹ فورکاسٹ (Alt+N)، نئی پروڈکٹ اور تمام آرڈرز",
+          en: "Purchase Order Header: Smart Forecast (Ctrl+N), Add Product & All Orders",
+          ur: "پرچیز آرڈر ہیڈر: سمارٹ فورکاسٹ (Ctrl+N)، نئی پروڈکٹ اور تمام آرڈرز",
         },
         instruction: {
-          en: "Prepare a formal Purchase Order (PO) for your supplier. From this header you can jump to 'New Forecast' (Alt+N), register a new product via 'Add Product', or view 'All Orders'.",
-          ur: "سپلائر کے لیے پرچیز آرڈر (PO) تیار کریں۔ اس ہیڈر سے آپ سمارٹ فورکاسٹ (Alt+N) کھول سکتے ہیں، نئی پروڈکٹ بنا سکتے ہیں یا تمام آرڈرز کی فہرست دیکھ سکتے ہیں۔",
+          en: "Prepare a formal Purchase Order (PO) for your supplier. From this header you can jump to 'New Forecast' (Ctrl+N), register a new product via 'Add Product', or view 'All Orders'.",
+          ur: "سپلائر کے لیے پرچیز آرڈر (PO) تیار کریں۔ اس ہیڈر سے آپ سمارٹ فورکاسٹ (Ctrl+N) کھول سکتے ہیں، نئی پروڈکٹ بنا سکتے ہیں یا تمام آرڈرز کی فہرست دیکھ سکتے ہیں۔",
         },
         observedInstruction: {
-          en: "Prepare a formal Purchase Order (PO) for your supplier. From this header you can jump to 'New Forecast' (Alt+N), register a new product via 'Add Product', or view 'All Orders'.",
-          ur: "سپلائر کے لیے پرچیز آرڈر (PO) تیار کریں۔ اس ہیڈر سے آپ سمارٹ فورکاسٹ (Alt+N) کھول سکتے ہیں، نئی پروڈکٹ بنا سکتے ہیں یا تمام آرڈرز کی فہرست دیکھ سکتے ہیں۔",
+          en: "Prepare a formal Purchase Order (PO) for your supplier. From this header you can jump to 'New Forecast' (Ctrl+N), register a new product via 'Add Product', or view 'All Orders'.",
+          ur: "سپلائر کے لیے پرچیز آرڈر (PO) تیار کریں۔ اس ہیڈر سے آپ سمارٹ فورکاسٹ (Ctrl+N) کھول سکتے ہیں، نئی پروڈکٹ بنا سکتے ہیں یا تمام آرڈرز کی فہرست دیکھ سکتے ہیں۔",
         },
         checkpoint: {
           en: "Important: Saving a Purchase Order does NOT increase stock or supplier payable until you click 'Receive Delivery' when goods arrive.",
@@ -1496,16 +1496,16 @@ function buildPurchaseOrderSteps(container, currentPath) {
         exactSelector: ".purchase-entry-footer",
         element: container?.querySelector(".purchase-entry-footer") || null,
         title: {
-          en: "PO Footer: Apply Saved Brand Order, Total Packs/Amount & Save (Alt+S)",
-          ur: "پرچیز آرڈر فوٹر: محفوظ شدہ برانڈ ترتیب لگائیں اور آرڈر سیو کریں (Alt+S)",
+          en: "PO Footer: Apply Saved Brand Order, Total Packs/Amount & Save (Ctrl+S)",
+          ur: "پرچیز آرڈر فوٹر: محفوظ شدہ برانڈ ترتیب لگائیں اور آرڈر سیو کریں (Ctrl+S)",
         },
         instruction: {
-          en: "Click 'Apply Saved Order' to sort rows by the supplier's saved brand sequence, review total Items, Packs, Units, and Order Total, and click 'Save Purchase Order' (Alt+S).",
-          ur: "سپلائر کی محفوظ شدہ برانڈ ترتیب لگانے کے لیے 'Apply Saved Order' دبائیں، کل پیکس اور رقم چیک کریں، اور 'Save Purchase Order' (Alt+S) پر کلک کریں۔",
+          en: "Click 'Apply Saved Order' to sort rows by the supplier's saved brand sequence, review total Items, Packs, Units, and Order Total, and click 'Save Purchase Order' (Ctrl+S).",
+          ur: "سپلائر کی محفوظ شدہ برانڈ ترتیب لگانے کے لیے 'Apply Saved Order' دبائیں، کل پیکس اور رقم چیک کریں، اور 'Save Purchase Order' (Ctrl+S) پر کلک کریں۔",
         },
         observedInstruction: {
-          en: "Click 'Apply Saved Order' to sort rows by the supplier's saved brand sequence, review total Items, Packs, Units, and Order Total, and click 'Save Purchase Order' (Alt+S).",
-          ur: "سپلائر کی محفوظ شدہ برانڈ ترتیب لگانے کے لیے 'Apply Saved Order' دبائیں، کل پیکس اور رقم چیک کریں، اور 'Save Purchase Order' (Alt+S) پر کلک کریں۔",
+          en: "Click 'Apply Saved Order' to sort rows by the supplier's saved brand sequence, review total Items, Packs, Units, and Order Total, and click 'Save Purchase Order' (Ctrl+S).",
+          ur: "سپلائر کی محفوظ شدہ برانڈ ترتیب لگانے کے لیے 'Apply Saved Order' دبائیں، کل پیکس اور رقم چیک کریں، اور 'Save Purchase Order' (Ctrl+S) پر کلک کریں۔",
         },
       },
     ].filter((st) => st.element || st.exactSelector || st.resolveTarget);
@@ -1634,24 +1634,24 @@ function buildInvoiceShowSteps(container, currentPath) {
         );
       },
       title: {
-        en: "Document Command Bar: Search (Alt+F), Print (Alt+P), Share PDF, Payment, History & Void",
-        ur: "بل کمانڈ بار: سرچ (Alt+F)، پرنٹ (Alt+P)، شیئر، پیمنٹ، ہسٹری اور کینسل (Void)",
+        en: "Document Command Bar: Search (Ctrl+F), Print (Ctrl+P), Share PDF, Payment, History & Void",
+        ur: "بل کمانڈ بار: سرچ (Ctrl+F)، پرنٹ (Ctrl+P)، شیئر، پیمنٹ، ہسٹری اور کینسل (Void)",
       },
       instruction: {
         en: isPurchase
-          ? "From this top toolbar you can Search & jump to another Purchase Invoice (Alt+F), Print (Alt+P), Share PDF, click 'Pay Supplier' if a credit balance is remaining, inspect Audit History, Void/Reverse the invoice safely, Edit (Alt+E), Delete (Alt+D), or start a New invoice (Alt+N)."
-          : "From this top toolbar you can Search & jump to another Sale Invoice (Alt+F), Print Receipt/A4 (Alt+P), Share PDF on WhatsApp/Email, print an unpriced 'Delivery Challan', click 'Receive Payment' if Udhar balance is due, inspect Audit History, Void/Reverse the bill, or Edit (Alt+E).",
+          ? "From this top toolbar you can Search & jump to another Purchase Invoice (Ctrl+F), Print (Ctrl+P), Share PDF, click 'Pay Supplier' if a credit balance is remaining, inspect Audit History, Void/Reverse the invoice safely, Edit (Ctrl+E), Delete (Ctrl+D), or start a New invoice (Ctrl+N)."
+          : "From this top toolbar you can Search & jump to another Sale Invoice (Ctrl+F), Print Receipt/A4 (Ctrl+P), Share PDF on WhatsApp/Email, print an unpriced 'Delivery Challan', click 'Receive Payment' if Udhar balance is due, inspect Audit History, Void/Reverse the bill, or Edit (Ctrl+E).",
         ur: isPurchase
-          ? "اس ٹاپ بار سے آپ کوئی دوسرا بل سرچ کر سکتے ہیں (Alt+F)، پرنٹ نکال سکتے ہیں (Alt+P)، بقایا رقم کی ادائیگی کے لیے 'Pay Supplier' دبا سکتے ہیں، بل کی ہسٹری دیکھ سکتے ہیں، یا بل کو ریورس (Void) اور ایڈٹ (Alt+E) کر سکتے ہیں۔"
-          : "اس ٹاپ بار سے آپ کوئی دوسرا بل سرچ کر سکتے ہیں (Alt+F)، پرنٹ نکال سکتے ہیں (Alt+P)، واٹس ایپ پر PDF شیئر کر سکتے ہیں، ڈلیوری چالان نکال سکتے ہیں، بقایا ادھار وصول کرنے کے لیے 'Receive Payment' دبا سکتے ہیں، یا بل کو Void اور ایڈٹ (Alt+E) کر سکتے ہیں۔",
+          ? "اس ٹاپ بار سے آپ کوئی دوسرا بل سرچ کر سکتے ہیں (Ctrl+F)، پرنٹ نکال سکتے ہیں (Ctrl+P)، بقایا رقم کی ادائیگی کے لیے 'Pay Supplier' دبا سکتے ہیں، بل کی ہسٹری دیکھ سکتے ہیں، یا بل کو ریورس (Void) اور ایڈٹ (Ctrl+E) کر سکتے ہیں۔"
+          : "اس ٹاپ بار سے آپ کوئی دوسرا بل سرچ کر سکتے ہیں (Ctrl+F)، پرنٹ نکال سکتے ہیں (Ctrl+P)، واٹس ایپ پر PDF شیئر کر سکتے ہیں، ڈلیوری چالان نکال سکتے ہیں، بقایا ادھار وصول کرنے کے لیے 'Receive Payment' دبا سکتے ہیں، یا بل کو Void اور ایڈٹ (Ctrl+E) کر سکتے ہیں۔",
       },
       observedInstruction: {
         en: isPurchase
-          ? "From this top toolbar you can Search & jump to another Purchase Invoice (Alt+F), Print (Alt+P), Share PDF, click 'Pay Supplier' if a credit balance is remaining, inspect Audit History, Void/Reverse the invoice safely, Edit (Alt+E), Delete (Alt+D), or start a New invoice (Alt+N)."
-          : "From this top toolbar you can Search & jump to another Sale Invoice (Alt+F), Print Receipt/A4 (Alt+P), Share PDF on WhatsApp/Email, print an unpriced 'Delivery Challan', click 'Receive Payment' if Udhar balance is due, inspect Audit History, Void/Reverse the bill, or Edit (Alt+E).",
+          ? "From this top toolbar you can Search & jump to another Purchase Invoice (Ctrl+F), Print (Ctrl+P), Share PDF, click 'Pay Supplier' if a credit balance is remaining, inspect Audit History, Void/Reverse the invoice safely, Edit (Ctrl+E), Delete (Ctrl+D), or start a New invoice (Ctrl+N)."
+          : "From this top toolbar you can Search & jump to another Sale Invoice (Ctrl+F), Print Receipt/A4 (Ctrl+P), Share PDF on WhatsApp/Email, print an unpriced 'Delivery Challan', click 'Receive Payment' if Udhar balance is due, inspect Audit History, Void/Reverse the bill, or Edit (Ctrl+E).",
         ur: isPurchase
-          ? "اس ٹاپ بار سے آپ کوئی دوسرا بل سرچ کر سکتے ہیں (Alt+F)، پرنٹ نکال سکتے ہیں (Alt+P)، بقایا رقم کی ادائیگی کے لیے 'Pay Supplier' دبا سکتے ہیں، بل کی ہسٹری دیکھ سکتے ہیں، یا بل کو ریورس (Void) اور ایڈٹ (Alt+E) کر سکتے ہیں۔"
-          : "اس ٹاپ بار سے آپ کوئی دوسرا بل سرچ کر سکتے ہیں (Alt+F)، پرنٹ نکال سکتے ہیں (Alt+P)، واٹس ایپ پر PDF شیئر کر سکتے ہیں، ڈلیوری چالان نکال سکتے ہیں، بقایا ادھار وصول کرنے کے لیے 'Receive Payment' دبا سکتے ہیں، یا بل کو Void اور ایڈٹ (Alt+E) کر سکتے ہیں۔",
+          ? "اس ٹاپ بار سے آپ کوئی دوسرا بل سرچ کر سکتے ہیں (Ctrl+F)، پرنٹ نکال سکتے ہیں (Ctrl+P)، بقایا رقم کی ادائیگی کے لیے 'Pay Supplier' دبا سکتے ہیں، بل کی ہسٹری دیکھ سکتے ہیں، یا بل کو ریورس (Void) اور ایڈٹ (Ctrl+E) کر سکتے ہیں۔"
+          : "اس ٹاپ بار سے آپ کوئی دوسرا بل سرچ کر سکتے ہیں (Ctrl+F)، پرنٹ نکال سکتے ہیں (Ctrl+P)، واٹس ایپ پر PDF شیئر کر سکتے ہیں، ڈلیوری چالان نکال سکتے ہیں، بقایا ادھار وصول کرنے کے لیے 'Receive Payment' دبا سکتے ہیں، یا بل کو Void اور ایڈٹ (Ctrl+E) کر سکتے ہیں۔",
       },
     },
     {
@@ -1806,16 +1806,16 @@ function buildStockAdjustmentFormSteps(container, currentPath) {
       exactSelector: ".stock-adjustment-footer",
       element: container?.querySelector(".stock-adjustment-footer") || null,
       title: {
-        en: "Total Worth Adjusted & Save Adjustment (Alt+S)",
-        ur: "کل ایڈجسٹ شدہ مالیت اور محفوظ کرنے کا بٹن (Alt+S)",
+        en: "Total Worth Adjusted & Save Adjustment (Ctrl+S)",
+        ur: "کل ایڈجسٹ شدہ مالیت اور محفوظ کرنے کا بٹن (Ctrl+S)",
       },
       instruction: {
-        en: "Review 'Total Worth Adjusted' at the bottom right and click 'Create Adjustment' (Alt+S) to update batch inventory and post the Inventory Gain/Shrinkage journal entry.",
-        ur: "نیچے کل ایڈجسٹ شدہ مالیت ('Total Worth Adjusted') چیک کریں اور اسٹاک و جنرل لیجر اپڈیٹ کرنے کے لیے 'Create Adjustment' (Alt+S) دبائیں۔",
+        en: "Review 'Total Worth Adjusted' at the bottom right and click 'Create Adjustment' (Ctrl+S) to update batch inventory and post the Inventory Gain/Shrinkage journal entry.",
+        ur: "نیچے کل ایڈجسٹ شدہ مالیت ('Total Worth Adjusted') چیک کریں اور اسٹاک و جنرل لیجر اپڈیٹ کرنے کے لیے 'Create Adjustment' (Ctrl+S) دبائیں۔",
       },
       observedInstruction: {
-        en: "Review 'Total Worth Adjusted' at the bottom right and click 'Create Adjustment' (Alt+S) to update batch inventory and post the Inventory Gain/Shrinkage journal entry.",
-        ur: "نیچے کل ایڈجسٹ شدہ مالیت ('Total Worth Adjusted') چیک کریں اور اسٹاک و جنرل لیجر اپڈیٹ کرنے کے لیے 'Create Adjustment' (Alt+S) دبائیں۔",
+        en: "Review 'Total Worth Adjusted' at the bottom right and click 'Create Adjustment' (Ctrl+S) to update batch inventory and post the Inventory Gain/Shrinkage journal entry.",
+        ur: "نیچے کل ایڈجسٹ شدہ مالیت ('Total Worth Adjusted') چیک کریں اور اسٹاک و جنرل لیجر اپڈیٹ کرنے کے لیے 'Create Adjustment' (Ctrl+S) دبائیں۔",
       },
     },
   ].filter((st) => st.element || st.exactSelector || st.resolveTarget);
@@ -1913,16 +1913,16 @@ function buildProductFormSteps(container, currentPath) {
         return submitBtn?.closest(".flex") || submitBtn;
       },
       title: {
-        en: "Save Product (Alt+S) & Next Step: Add Stock via Purchase Invoice",
-        ur: "پروڈکٹ محفوظ کریں (Alt+S) اور پرچیز انوائس سے اسٹاک شامل کریں",
+        en: "Save Product (Ctrl+S) & Next Step: Add Stock via Purchase Invoice",
+        ur: "پروڈکٹ محفوظ کریں (Ctrl+S) اور پرچیز انوائس سے اسٹاک شامل کریں",
       },
       instruction: {
-        en: "Click 'Save' (or press Alt+S) to register the product in your master catalog. To add physical batch quantities and expiry dates into inventory, open Create Purchase Invoice (Alt+1) or Stock Adjustment.",
-        ur: "'Save' بٹن (یا Alt+S) دبا کر پروڈکٹ کیٹلاگ میں محفوظ کریں۔ اس کے بعد فزیکل اسٹاک اور بیچ شامل کرنے کے لیے Purchase Invoice (Alt+1) استعمال کریں۔",
+        en: "Click 'Save' (or press Ctrl+S) to register the product in your master catalog. To add physical batch quantities and expiry dates into inventory, open Create Purchase Invoice (Ctrl+1) or Stock Adjustment.",
+        ur: "'Save' بٹن (یا Ctrl+S) دبا کر پروڈکٹ کیٹلاگ میں محفوظ کریں۔ اس کے بعد فزیکل اسٹاک اور بیچ شامل کرنے کے لیے Purchase Invoice (Ctrl+1) استعمال کریں۔",
       },
       observedInstruction: {
-        en: "Click 'Save' (or press Alt+S) to register the product in your master catalog. To add physical batch quantities and expiry dates into inventory, open Create Purchase Invoice (Alt+1) or Stock Adjustment.",
-        ur: "'Save' بٹن (یا Alt+S) دبا کر پروڈکٹ کیٹلاگ میں محفوظ کریں۔ اس کے بعد فزیکل اسٹاک اور بیچ شامل کرنے کے لیے Purchase Invoice (Alt+1) استعمال کریں۔",
+        en: "Click 'Save' (or press Ctrl+S) to register the product in your master catalog. To add physical batch quantities and expiry dates into inventory, open Create Purchase Invoice (Ctrl+1) or Stock Adjustment.",
+        ur: "'Save' بٹن (یا Ctrl+S) دبا کر پروڈکٹ کیٹلاگ میں محفوظ کریں۔ اس کے بعد فزیکل اسٹاک اور بیچ شامل کرنے کے لیے Purchase Invoice (Ctrl+1) استعمال کریں۔",
       },
     },
   ].filter((st) => st.element || st.exactSelector || st.resolveTarget);

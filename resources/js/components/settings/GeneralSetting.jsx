@@ -486,7 +486,7 @@ export default function GeneralSetting({
                   Show Bottom Roaming Cube Mascot
                 </label>
                 <p className="settings-hint mt-0.5">
-                  When turned off, only the bottom roaming character is hidden. You can still open Guide Bot anytime from the top bar or with <kbd className="px-1.5 py-0.5 text-[11px] font-mono rounded bg-slate-200/80 dark:bg-slate-700">Alt+G</kbd>.
+                  When turned off, only the bottom roaming character is hidden. You can still open Guide Bot anytime from the top bar or with <kbd className="px-1.5 py-0.5 text-[11px] font-mono rounded bg-slate-200/80 dark:bg-slate-700">Ctrl+G</kbd>.
                 </p>
               </div>
             </div>

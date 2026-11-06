@@ -66,7 +66,8 @@ export default function UserDemandsIndex() {
 
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (!e.altKey || e.ctrlKey || e.metaKey || e.repeat || e.key.toLowerCase() !== "n") return;
+      if (e.defaultPrevented) return;
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.repeat || (e.key || "").toLowerCase() !== "n") return;
       if (!canView || !canCreate || deleteOpen) return;
       e.preventDefault();
       navigate("/user-demands/create");
@@ -167,13 +168,13 @@ export default function UserDemandsIndex() {
             {canCreate && (
               <Link
                 to="/user-demands/create"
-                title="Request products (Alt+N)"
-                aria-keyshortcuts="Alt+N"
+                title="Request products (Ctrl+N)"
+                aria-keyshortcuts="Control+N"
                 className="products-action products-action-primary theme-btn-primary"
               >
                 <PlusCircleIcon className="w-4 h-4" />
                 <span>Request Products</span>
-                <kbd className="text-[10px] opacity-70">Alt+N</kbd>
+                <kbd className="text-[10px] opacity-70">Ctrl+N</kbd>
               </Link>
             )}
           </div>

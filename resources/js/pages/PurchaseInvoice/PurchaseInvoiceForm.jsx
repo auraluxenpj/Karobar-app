@@ -416,25 +416,36 @@ export default function PurchaseInvoiceForm({ invoiceId, onSuccess, onSubmit, in
   }, [invoiceId]);
 
   useEffect(() => {
-    // Handle shortcuts: Alt+S for save, Alt+D for Debit, Alt+C for Credit, Alt+T to toggle
+    // Handle shortcuts: Ctrl+S / Ctrl+Enter / F9 for save, Ctrl+T to toggle Debit/Credit, Ctrl+C for Supplier Search, Ctrl+N add row (edit mode)
     const handleKeyDown = (e) => {
-      if (e.altKey && e.key.toLowerCase() === "s") {
+      if (e.defaultPrevented) return;
+      const isCtrl = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey;
+      const key = (e.key || "").toLowerCase();
+      if ((isCtrl && (key === "s" || e.key === "Enter")) || e.key === "F9") {
         e.preventDefault();
         handleSubmit(e);
-      } else if (e.altKey && e.key.toLowerCase() === "d") {
-        e.preventDefault();
-        handleInvoiceTypeChange("debit");
-      } else if (e.altKey && e.key.toLowerCase() === "c") {
-        e.preventDefault();
-        handleInvoiceTypeChange("credit");
-      } else if (e.altKey && e.key.toLowerCase() === "t") {
+      } else if (isCtrl && key === "t") {
         e.preventDefault();
         handleInvoiceTypeChange(form.invoice_type === "debit" ? "credit" : "debit");
+      } else if (isCtrl && key === "c") {
+        const sel = window.getSelection?.()?.toString?.() || "";
+        const el = document.activeElement;
+        const hasInputSel =
+          el && typeof el.selectionStart === "number" && el.selectionStart !== el.selectionEnd;
+        if (!sel && !hasInputSel) {
+          e.preventDefault();
+          setSupplierSearchOpen(true);
+        }
+      } else if (isCtrl && key === "n" && invoiceId) {
+        e.preventDefault();
+        const nextIdx = form.items.length;
+        addItem();
+        setTimeout(() => focusProductSearch(nextIdx), 60);
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [form, paidTouched, arrangement, displayOrder, products, selectedSupplier]);
+  }, [form, paidTouched, arrangement, displayOrder, products, selectedSupplier, invoiceId]);
 
   const fetchSuppliers = async () => {
     const res = await axios.get("/api/suppliers/search", { params: { limit: 100 } });
@@ -1614,7 +1625,7 @@ const contRect = container.getBoundingClientRect();
             <div className="flex items-baseline gap-2 min-w-0 truncate">
               <h2 className="purchase-entry-title text-sm font-semibold leading-none">Purchase Invoice</h2>
               <span className="products-subtitle text-[10px] hidden sm:inline truncate">
-                Enter to navigate · Alt+S save · Alt+T toggle
+                Enter to navigate · Ctrl+S save · Ctrl+T toggle
               </span>
             </div>
           </div>

@@ -88,10 +88,10 @@ export default function SupplierForm({
     }
   }, [initialData]);
 
-  // Alt+S shortcut
+  // Ctrl+S shortcut
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.altKey && (e.key || "").toLowerCase() === "s") {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key || "").toLowerCase() === "s") {
         e.preventDefault();
         handleSubmit(e);
       }
@@ -292,7 +292,7 @@ export default function SupplierForm({
         />
 
         <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-200/70 dark:border-slate-700/70">
-          <span className="text-xs text-slate-400">Shortcut: Alt + S to Save</span>
+          <span className="text-xs text-slate-400">Shortcut: Ctrl + S to Save</span>
           <GlassBtn
             type="submit"
             variant="primary"

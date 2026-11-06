@@ -191,15 +191,13 @@ export default function PurchaseReturnsIndex() {
     return () => ctrl.abort();
   }, [fetchReturns, permsLoading, can.view]);
 
-  // Alt+N -> create
+  // Ctrl+N -> create
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (!e.altKey) return;
+      if (e.defaultPrevented) return;
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
       const key = (e.key || "").toLowerCase();
       if (key !== "n") return;
-      const tag = (e.target?.tagName || "").toLowerCase();
-      const isTyping = ["input", "textarea", "select"].includes(tag) || e.target?.isContentEditable;
-      if (isTyping) return;
       if (!can.create) return;
       e.preventDefault();
       navigate("/purchase-returns/create");
@@ -365,8 +363,8 @@ export default function PurchaseReturnsIndex() {
             <Guard when={can.create}>
               <Link
                 to="/purchase-returns/create"
-                title="Add Return (Alt+N)"
-                aria-keyshortcuts="Alt+N"
+                title="Add Return (Ctrl+N)"
+                aria-keyshortcuts="Control+N"
                 className="products-action products-action-primary theme-btn-primary"
               >
                 <PlusCircleIcon className="w-4 h-4" />

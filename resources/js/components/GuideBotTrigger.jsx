@@ -1509,8 +1509,8 @@ export function GuideBotTopbarButton({
       onClick={onClick}
       aria-haspopup="dialog"
       aria-expanded={isOpen}
-      aria-keyshortcuts="Alt+G"
-      title="Guide Bot (Alt+G)"
+      aria-keyshortcuts="Ctrl+G"
+      title="Guide Bot (Ctrl+G)"
       className="group relative inline-flex items-center justify-center gap-1.5 h-9 px-2 sm:px-2.5 rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white hover:bg-slate-50 dark:bg-slate-900 dark:hover:bg-slate-800/90 text-slate-900 dark:text-slate-100 transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap shadow-2xs hover:shadow-sm active:scale-[0.98]"
     >
       {/* Cube Mascot Icon */}
@@ -1526,7 +1526,7 @@ export function GuideBotTopbarButton({
       )}
 
       <kbd className="hidden 2xl:inline-block px-1.5 py-0.5 text-[0.625rem] font-mono font-semibold rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 shrink-0">
-        Alt+G
+        Ctrl+G
       </kbd>
     </button>
   );

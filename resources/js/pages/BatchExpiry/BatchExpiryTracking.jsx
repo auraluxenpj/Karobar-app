@@ -297,10 +297,10 @@ export default function BatchExpiryTracking() {
     fetchData();
   }, [fetchData]);
 
-  // Alt+R quick refresh
+  // Ctrl+R quick refresh
   useEffect(() => {
     const onKey = (e) => {
-      if (e.altKey && (e.key === "r" || e.key === "R")) {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === "r" || e.key === "R")) {
         e.preventDefault();
         fetchData();
       }
@@ -579,7 +579,7 @@ export default function BatchExpiryTracking() {
             disabled={loading}
             className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold theme-btn-secondary ${btnSecondary.className}`}
             style={btnSecondary.style}
-            title="Refresh (Alt+R)"
+            title="Refresh (Ctrl+R)"
           >
             <ArrowPathIcon className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
             <span>Refresh</span>

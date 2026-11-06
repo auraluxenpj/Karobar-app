@@ -280,10 +280,10 @@ const [rows, setRows] = useState([]);
     [printRows]
   );
 
-  // Alt+P: print (must be declared after printRows so its deps array can reference it)
+  // Ctrl+P: print (must be declared after printRows so its deps array can reference it)
   useEffect(() => {
     const onKey = (e) => {
-      if (!e.altKey) return;
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
       const key = (e.key || "").toLowerCase();
       if (key !== "p") return;
       e.preventDefault();
@@ -519,6 +519,20 @@ ${isA4 ? `
     }
   };
 
+  // Ctrl+Enter: generate forecast
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      if (e.key !== "Enter") return;
+      if (!canGenerate || loading) return;
+      e.preventDefault();
+      handleFetch();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canGenerate, loading, dateFrom, dateTo, projectedDays, safetyPacks, moqPacks, supplier, brands]);
+
   const pruneNoPackPrice = () => {
     if (!rows.length) return;
     const before = rows.length;
@@ -739,7 +753,7 @@ ${isA4 ? `
               onClick={handleFetch}
               disabled={loading || !canGenerate}
               className="purchase-order-action purchase-order-action-primary theme-btn-primary"
-              title={!canGenerate ? "Not permitted" : "Generate forecast (Alt+G)"}
+              title={!canGenerate ? "Not permitted" : "Generate forecast (Ctrl+Enter)"}
             >
               <PlayCircleIcon aria-hidden="true" />
               <span>{loading ? "Generating…" : "Generate forecast"}</span>
@@ -786,7 +800,7 @@ ${isA4 ? `
               ref={printBtnRef}
               onClick={doPrint}
               className="purchase-order-action theme-btn-secondary"
-              title={`Print ${printerType === "thermal" ? "Thermal (80mm)" : "A4"} (Alt+P)${hasActiveResultFilters ? " — prints the filtered view" : ""}`}
+              title={`Print ${printerType === "thermal" ? "Thermal (80mm)" : "A4"} (Ctrl+P)${hasActiveResultFilters ? " — prints the filtered view" : ""}`}
             >
               <PrinterIcon aria-hidden="true" />
               <span>Print</span>

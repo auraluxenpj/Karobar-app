@@ -80,10 +80,11 @@ export default function SuppliersIndex() {
     document.title = "Suppliers - Karobar App";
   }, []);
 
-  // Alt + N -> Open Create Supplier page
+  // Ctrl + N -> Open Create Supplier page
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.altKey && (e.key || "").toLowerCase() === "n") {
+      if (e.defaultPrevented) return;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key || "").toLowerCase() === "n") {
         if (!can.create) return;
         e.preventDefault();
         navigate("/suppliers/create");
@@ -234,11 +235,11 @@ export default function SuppliersIndex() {
             <Guard when={can.create}>
               <Link
                 to="/suppliers/create"
-                title="Add Supplier (Alt+N)"
+                title="Add Supplier (Ctrl+N)"
                 className="products-action products-action-primary theme-btn-primary"
               >
                 <PlusCircleIcon className="w-4 h-4" />
-                <span>Add Supplier (Alt+N)</span>
+                <span>Add Supplier (Ctrl+N)</span>
               </Link>
             </Guard>
             <Guard when={can.import}>

@@ -59,7 +59,7 @@ export default function CreateProduct() {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               to="/products"
-              title="Back to products (Alt+C)"
+              title="Back to products (Ctrl+B)"
               className="products-action theme-btn-secondary"
             >
               <ArrowLeftIcon className="w-3.5 h-3.5" />
@@ -70,7 +70,7 @@ export default function CreateProduct() {
               id="save-product-btn-top"
               type="submit"
               form="product-form"
-              title="Save (Alt+S)"
+              title="Save (Ctrl+S)"
               className="products-action products-action-primary theme-btn-primary"
             >
               <PlusCircleIcon className="w-4 h-4" />
@@ -78,7 +78,7 @@ export default function CreateProduct() {
             </button>
 
             <kbd className="product-form-shortcut">
-              Alt+S
+              Ctrl+S
             </kbd>
           </div>
         </div>

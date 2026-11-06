@@ -34,6 +34,7 @@ export default function DashboardLayout({ children }) {
   const [defaultSubWindowMode, setDefaultSubWindowMode] = useState(false);
   const zCounterRef = useRef(100);
   const winIdCounterRef = useRef(1);
+  const lastMdiActionTsRef = useRef(0);
 
   // Mobile sidebar state
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -484,7 +485,92 @@ export default function DashboardLayout({ children }) {
 
   // Listen to Electron Native Top Menu IPC events & Custom DOM events (only in main window)
   useEffect(() => {
-    if (isSubWindow) return;
+    if (isSubWindow) {
+      // Forward global & MDI multi-window shortcuts from Sub-Window iframe to top window
+      const forwardGlobalShortcuts = (e) => {
+        if (e.defaultPrevented) return;
+        const tag = (e.target?.tagName || "").toLowerCase();
+        const isTyping =
+          ["input", "textarea", "select"].includes(tag) || e.target?.isContentEditable;
+
+        if (!isTyping && e.key === "?") {
+          e.preventDefault();
+          try {
+            window.top?.dispatchEvent(new CustomEvent("open-shortcuts-modal"));
+          } catch {}
+          return;
+        }
+
+        const hasCtrl = e.ctrlKey || e.metaKey;
+        if (!hasCtrl || e.altKey) return;
+        const key = (e.key || "").toLowerCase();
+        const cleanSubPath = (window.location.pathname || "").replace(/\/+$/, "");
+
+        if (e.shiftKey) {
+          if (["n", "p", "s", "w", "u", "l", "d", "t", "g", "c", "m", "x", "h"].includes(key)) {
+            e.preventDefault();
+            try {
+              window.top?.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                  key: e.key,
+                  code: e.code,
+                  ctrlKey: e.ctrlKey,
+                  metaKey: e.metaKey,
+                  shiftKey: true,
+                  altKey: false,
+                  bubbles: true,
+                  cancelable: true,
+                })
+              );
+            } catch {}
+          }
+          return;
+        }
+
+        // Plain Ctrl+<key> global shortcuts inside Sub-Window
+        if (key === "k" || e.code === "KeyK") {
+          e.preventDefault();
+          try {
+            window.top?.dispatchEvent(new CustomEvent("open-page-search"));
+          } catch {}
+        } else if (key === "g" || e.code === "KeyG") {
+          e.preventDefault();
+          try {
+            window.top?.dispatchEvent(new CustomEvent("open-guide-bot"));
+          } catch {}
+        } else if (key === "p" || e.code === "KeyP") {
+          if (
+            /^\/(sale-invoices|purchase-invoices)\/\d+$/.test(cleanSubPath) ||
+            /^\/(purchase-orders\/forecast|smart-reorder|customer-ledger|supplier-ledger)$/.test(cleanSubPath)
+          ) {
+            return;
+          }
+          e.preventDefault();
+          try {
+            window.top?.dispatchEvent(new CustomEvent("open-product-search"));
+          } catch {}
+        } else if (e.code === "Digit1" || e.code === "Numpad1") {
+          e.preventDefault();
+          navigate("/purchase-invoices/create");
+        } else if (e.code === "Digit2" || e.code === "Numpad2") {
+          e.preventDefault();
+          navigate("/sale-invoices/create/retail");
+        } else if (e.code === "Digit3" || e.code === "Numpad3") {
+          e.preventDefault();
+          navigate("/sale-invoices/create/wholesale");
+        }
+      };
+
+      window.addEventListener("keydown", forwardGlobalShortcuts);
+      return () => window.removeEventListener("keydown", forwardGlobalShortcuts);
+    }
+
+    const markMdiAction = () => {
+      const now = Date.now();
+      if (now - lastMdiActionTsRef.current < 180) return false;
+      lastMdiActionTsRef.current = now;
+      return true;
+    };
 
     const handleCustomOpen = (e) => {
       const detail = e.detail || {};
@@ -498,17 +584,22 @@ export default function DashboardLayout({ children }) {
 
     const desktopApi = window.karobarDesktop;
     const unsubNav = desktopApi?.onNavigate?.((payload) => {
-      if (payload?.path) {
+      if (payload?.path && markMdiAction()) {
         navigate(payload.path);
       }
     });
     const unsubSubWin = desktopApi?.onOpenSubWindow?.((payload) => {
-      if (payload?.path) {
+      if (payload?.path && markMdiAction()) {
         openSubWindow(payload.path, payload.title);
       }
     });
     const unsubCmd = desktopApi?.onWindowCommand?.((payload) => {
       const cmd = payload?.command;
+      if (cmd === "set-menu-subwindow-mode") {
+        setDefaultSubWindowMode(Boolean(payload?.enabled));
+        return;
+      }
+      if (!markMdiAction()) return;
       if (cmd === "open-current") {
         openSubWindow(currentPath || "/dashboard", pageTitle);
       } else if (cmd === "preset-sale-purchase") {
@@ -525,29 +616,44 @@ export default function DashboardLayout({ children }) {
         restoreAllSubWindows();
       } else if (cmd === "close-all") {
         closeAllSubWindows();
-      } else if (cmd === "set-menu-subwindow-mode") {
-        setDefaultSubWindowMode(Boolean(payload?.enabled));
       }
     });
 
     const handleKeyShortcuts = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
-        const key = e.key.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey) {
+        const key = (e.key || "").toLowerCase();
+        if (!["n", "p", "s", "w", "u", "l", "d", "t", "g", "c", "m", "x", "h"].includes(key)) {
+          return;
+        }
+        e.preventDefault();
+        if (!markMdiAction()) return;
+
         if (key === "n") {
-          e.preventDefault();
           openSubWindow(currentPath || "/dashboard", pageTitle);
         } else if (key === "p") {
-          e.preventDefault();
           openSubWindow("/sale-invoices/pos", "Barcode POS");
         } else if (key === "s") {
-          e.preventDefault();
           openSubWindow("/sale-invoices/create/retail", "Create Retail Sale");
+        } else if (key === "w") {
+          openSubWindow("/sale-invoices/create/wholesale", "Create Wholesale Sale");
         } else if (key === "u") {
-          e.preventDefault();
           openSubWindow("/purchase-invoices/create", "Create Purchase Invoice");
+        } else if (key === "l") {
+          openSubWindow("/customer-ledger", "Customer Ledger");
+        } else if (key === "d") {
+          openSalePurchaseSplit();
         } else if (key === "t") {
-          e.preventDefault();
           tileSubWindows();
+        } else if (key === "g") {
+          gridSubWindows();
+        } else if (key === "c") {
+          cascadeSubWindows();
+        } else if (key === "m") {
+          minimizeAllSubWindows();
+        } else if (key === "x") {
+          closeAllSubWindows();
+        } else if (key === "h") {
+          navigate("/dashboard");
         }
       }
     };

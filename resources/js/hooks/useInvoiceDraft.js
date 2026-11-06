@@ -165,7 +165,7 @@ export function useInvoiceDraft({ type, form, setForm, enabled = true, onDraftLo
     [performSave, hasMeaningfulData]
   );
 
-  // Hold current invoice and reset to clean blank form for next customer (Alt+H or Hold button)
+  // Hold current invoice and reset to clean blank form for next customer (Ctrl+H or Hold button)
   const holdAndNew = useCallback(
     async (title = null) => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -188,7 +188,7 @@ export function useInvoiceDraft({ type, form, setForm, enabled = true, onDraftLo
   );
 
   // NOTE: Automatic background holding is disabled per user workflow.
-  // Invoices are only held when the user explicitly clicks the Hold button or presses Alt+H.
+  // Invoices are only held when the user explicitly clicks the Hold button or presses Ctrl+H.
 
   // Resume / Load a saved draft into the form
   const loadDraft = useCallback(
@@ -270,25 +270,25 @@ export function useInvoiceDraft({ type, form, setForm, enabled = true, onDraftLo
     } catch {}
   }, [enabled, loadDraft]);
 
-  // Global Keyboard Shortcuts (Alt+H: Hold & New, Alt+D: Open Drafts Modal, Alt+N: New Blank)
+  // Global Keyboard Shortcuts (Ctrl+H: Hold & New, Ctrl+D: Open Drafts Modal, Ctrl+N: New Blank)
   useEffect(() => {
     if (!enabled) return;
 
     const handleKeyDown = (e) => {
-      if (!e.altKey) return;
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
       const key = (e.key || "").toLowerCase();
 
-      // Alt+H: Hold current invoice and clear for next
+      // Ctrl+H: Hold current invoice and clear for next
       if (key === "h") {
         e.preventDefault();
         holdAndNew();
       }
-      // Alt+D: Open Held Invoices & Drafts Modal
+      // Ctrl+D: Open Held Invoices & Drafts Modal
       else if (key === "d") {
         e.preventDefault();
         setIsDraftsModalOpen(true);
       }
-      // Alt+N: New Blank Invoice
+      // Ctrl+N: New Blank Invoice
       else if (key === "n") {
         e.preventDefault();
         if (typeof onStartBlank === "function") {

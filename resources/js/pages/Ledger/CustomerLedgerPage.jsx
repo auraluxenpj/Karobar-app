@@ -198,13 +198,14 @@ const [customers, setCustomers] = useState([]);
   // hotkeys (guarded)
   useEffect(() => {
     const onKey = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
       const k = (e.key || "").toLowerCase();
-      if (e.altKey && k === "s") {
+      if (k === "s") {
         e.preventDefault();
         if (!can.create && !can.update) return;
         openSaveModal();
       }
-      if (e.altKey && k === "p") {
+      if (k === "p") {
         e.preventDefault();
         if (!can.view) return;
         handlePrint();
@@ -816,6 +817,7 @@ return (
                 <button
                   onClick={openSaveModal}
                   disabled={!customerId || (newCount === 0 && updCount === 0)}
+                  title="Save changes (Ctrl+S)"
                   className="products-action products-action-primary theme-btn-primary"
                 >
                   <ArrowDownOnSquareIcon className="w-3.5 h-3.5" />
@@ -833,6 +835,7 @@ return (
             <button
               onClick={() => handlePrint()}
               disabled={!customerId}
+              title="Print statement (Ctrl+P)"
               className="products-action theme-btn-secondary"
             >
               <PrinterIcon className="w-4 h-4" />

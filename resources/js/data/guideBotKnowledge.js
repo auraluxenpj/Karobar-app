@@ -123,10 +123,10 @@ export const SCREEN_GUIDES = {
       ur: "یہ صرف معلومات دیکھنے کی اسکرین ہے۔ یہاں فلٹر بدلنے سے کسی کھاتے یا اسٹاک میں کوئی تبدیلی نہیں ہوتی۔",
     },
     shortcuts: [
-      { keys: ["Alt", "K"], en: "Quick Jump to any Page", ur: "کسی بھی صفحے پر فوری جائیں" },
-      { keys: ["Alt", "P"], en: "Global Product & Batch Lookup", ur: "پروڈکٹ اور بیچ سرچ کریں" },
-      { keys: ["Alt", "2"], en: "Open New Retail Sale Invoice", ur: "نیا ریٹیل سیل بل کھولیں" },
-      { keys: ["Alt", "1"], en: "Open New Purchase Invoice", ur: "نیا پرچیز بل کھولیں" },
+      { keys: ["Ctrl", "K"], en: "Quick Jump to any Page", ur: "کسی بھی صفحے پر فوری جائیں" },
+      { keys: ["Ctrl", "P"], en: "Global Product & Batch Lookup", ur: "پروڈکٹ اور بیچ سرچ کریں" },
+      { keys: ["Ctrl", "2"], en: "Open New Retail Sale Invoice", ur: "نیا ریٹیل سیل بل کھولیں" },
+      { keys: ["Ctrl", "1"], en: "Open New Purchase Invoice", ur: "نیا پرچیز بل کھولیں" },
     ],
     faqs: [
       {
@@ -188,7 +188,7 @@ export const SCREEN_GUIDES = {
       ur: "اس سے آپ کی لاگ ان معلومات اپڈیٹ ہو جاتی ہیں اور پرانے بلوں کا ریکارڈ محفوظ رہتا ہے۔",
     },
     shortcuts: [
-      { keys: ["Alt", "K"], en: "Search & switch page", ur: "کسی بھی صفحے پر جائیں" },
+      { keys: ["Ctrl", "K"], en: "Search & switch page", ur: "کسی بھی صفحے پر جائیں" },
     ],
     faqs: [],
     relatedRoutes: [
@@ -248,8 +248,8 @@ export const SCREEN_GUIDES = {
       ur: "یہاں درج کی گئی قیمتیں اور پیک سائز سیل اور پرچیز بل بناتے وقت خودکار طریقے سے استعمال ہوتے ہیں۔",
     },
     shortcuts: [
-      { keys: ["Alt", "P"], en: "Quick Product Lookup Modal", ur: "کہیں سے بھی پروڈکٹ سرچ کریں" },
-      { keys: ["Alt", "K"], en: "Navigate to another page", ur: "دوسرے صفحے پر جائیں" },
+      { keys: ["Ctrl", "P"], en: "Quick Product Lookup Modal", ur: "کہیں سے بھی پروڈکٹ سرچ کریں" },
+      { keys: ["Ctrl", "K"], en: "Navigate to another page", ur: "دوسرے صفحے پر جائیں" },
     ],
     faqs: [
       {
@@ -901,8 +901,8 @@ export const SCREEN_GUIDES = {
       ur: "تمام فروخت کے بلوں، دوبارہ پرنٹنگ اور گاہکوں سے وصولیوں کا مرکزی ریکارڈ۔",
     },
     shortcuts: [
-      { keys: ["Alt", "2"], en: "New Retail Sale Invoice", ur: "نیا ریٹیل بل بنائیں" },
-      { keys: ["Alt", "W"], en: "New Wholesale Invoice", ur: "نیا ہول سیل بل بنائیں" },
+      { keys: ["Ctrl", "2"], en: "New Retail Sale Invoice", ur: "نیا ریٹیل بل بنائیں" },
+      { keys: ["Ctrl", "W"], en: "New Wholesale Invoice", ur: "نیا ہول سیل بل بنائیں" },
     ],
     faqs: [],
     relatedRoutes: [
@@ -941,11 +941,11 @@ export const SCREEN_GUIDES = {
     },
     steps: {
       en: [
-        "Click '+ Create Wholesale Invoice' (or press Alt+W) to bill a wholesale client.",
+        "Click '+ Create Wholesale Invoice' (or press Ctrl+W) to bill a wholesale client.",
         "Search or filter existing wholesale bills to print Delivery Challans or record payments.",
       ],
       ur: [
-        "نیا ہول سیل بل بنانے کے لیے '+ Create Wholesale Invoice' یا Alt+W دبائیں۔",
+        "نیا ہول سیل بل بنانے کے لیے '+ Create Wholesale Invoice' یا Ctrl+W دبائیں۔",
         "کسی بھی بل کا ڈلیوری چالان پرنٹ کرنے یا وصولی درج کرنے کے لیے فہرست سے بل منتخب کریں۔",
       ],
     },
@@ -954,7 +954,7 @@ export const SCREEN_GUIDES = {
       ur: "اسٹاک کم کرتا ہے، ہول سیل گاہک کے کھاتے میں رقم درج کرتا ہے اور ادھار کی مدت (Aging) ٹریک کرتا ہے۔",
     },
     shortcuts: [
-      { keys: ["Alt", "W"], en: "Create Wholesale Invoice", ur: "نیا ہول سیل بل کھولیں" },
+      { keys: ["Ctrl", "W"], en: "Create Wholesale Invoice", ur: "نیا ہول سیل بل کھولیں" },
     ],
     faqs: [],
     relatedRoutes: [
@@ -981,14 +981,14 @@ export const SCREEN_GUIDES = {
     features: {
       en: [
         "Keyboard-first line entry: search product, pick batch, enter quantity and discount % using Enter key progression.",
-        "Auto-Save Drafts & Hold/Recall (Alt+H): never lose an in-progress invoice even if the browser refreshes.",
+        "Auto-Save Drafts & Hold/Recall (Ctrl+H): never lose an in-progress invoice even if the browser refreshes.",
         "Substitute Medicine Finder: replace out-of-stock items with matching generic formulation.",
         "Manager Override Modals for Credit Limit breaches, high discounts, or near-expiry batch warnings.",
         "Select Payment Method (Cash Drawer, Bank Account, Mobile Wallet) or post on Credit (Debit invoice).",
       ],
       ur: [
         "کی بورڈ سے تیز ترین انٹری: پروڈکٹ منتخب کریں، بیچ چنیں، مقدار لکھیں اور Enter دبا کر اگلی لائن پر جائیں۔",
-        "آٹو سیو ڈرافٹ اور ہولڈ بل (Alt+H): بل بناتے وقت خودکار محفوظ رہتا ہے اور آپ اسے ہولڈ کر کے بعد میں دوبارہ کھول سکتے ہیں۔",
+        "آٹو سیو ڈرافٹ اور ہولڈ بل (Ctrl+H): بل بناتے وقت خودکار محفوظ رہتا ہے اور آپ اسے ہولڈ کر کے بعد میں دوبارہ کھول سکتے ہیں۔",
         "متبادل دوائی (Substitutes) تلاش کرنے اور منیجر اوور رائیڈ (کریڈٹ لمٹ یا زیادہ ڈسکاؤنٹ) کی سہولت۔",
         "نقد (کیش ڈراور)، بینک/والٹ یا ادھار (Credit) پر بل بنانے کی سہولت۔",
       ],
@@ -1013,10 +1013,10 @@ export const SCREEN_GUIDES = {
     },
     shortcuts: [
       { keys: ["Ctrl", "Enter"], en: "Finalize & Save Invoice", ur: "بل محفوظ اور مکمل کریں" },
-      { keys: ["Alt", "C"], en: "Focus Customer Selector", ur: "گاہک منتخب کرنے والے خانے میں جائیں" },
-      { keys: ["Alt", "N"], en: "Add New Item Row", ur: "نئی پروڈکٹ لائن شامل کریں" },
-      { keys: ["Alt", "H"], en: "Hold / Recall Draft Invoices", ur: "بل ہولڈ کریں یا ہولڈ شدہ بل کھولیں" },
-      { keys: ["Alt", "M"], en: "Focus Payment Method", ur: "ادائیگی کا طریقہ منتخب کریں" },
+      { keys: ["Ctrl", "C"], en: "Focus Customer Selector", ur: "گاہک منتخب کرنے والے خانے میں جائیں" },
+      { keys: ["Ctrl", "N"], en: "Add New Item Row", ur: "نئی پروڈکٹ لائن شامل کریں" },
+      { keys: ["Ctrl", "H"], en: "Hold / Recall Draft Invoices", ur: "بل ہولڈ کریں یا ہولڈ شدہ بل کھولیں" },
+      { keys: ["Ctrl", "M"], en: "Focus Payment Method", ur: "ادائیگی کا طریقہ منتخب کریں" },
     ],
     faqs: [],
     relatedRoutes: [
@@ -1070,8 +1070,8 @@ export const SCREEN_GUIDES = {
     },
     shortcuts: [
       { keys: ["Ctrl", "Enter"], en: "Save Wholesale Invoice", ur: "ہول سیل بل محفوظ کریں" },
-      { keys: ["Alt", "C"], en: "Focus Customer Search", ur: "گاہک تلاش کریں" },
-      { keys: ["Alt", "R"], en: "Toggle Pricing Mode", ur: "ریٹ موڈ تبدیل کریں" },
+      { keys: ["Ctrl", "C"], en: "Focus Customer Search", ur: "گاہک تلاش کریں" },
+      { keys: ["Ctrl", "R"], en: "Toggle Pricing Mode", ur: "ریٹ موڈ تبدیل کریں" },
     ],
     faqs: [],
     relatedRoutes: [
@@ -1097,12 +1097,12 @@ export const SCREEN_GUIDES = {
     },
     features: {
       en: [
-        "Press Alt+P to print the invoice immediately using your configured printer template.",
+        "Press Ctrl+P to print the invoice immediately using your configured printer template.",
         "Switch between Thermal Receipt and A4 Invoice/Delivery Challan layouts.",
         "Share PDF link via WhatsApp or Email.",
       ],
       ur: [
-        "بل کا فوری پرنٹ نکالنے کے لیے Alt+P دبائیں۔",
+        "بل کا فوری پرنٹ نکالنے کے لیے Ctrl+P دبائیں۔",
         "تھرمل رسید، A4 بل یا ڈلیوری چالان کے ڈیزائن منتخب کریں۔",
         "واٹس ایپ یا ای میل کے ذریعے گاہک کو بل بھیجیں۔",
       ],
@@ -1110,16 +1110,16 @@ export const SCREEN_GUIDES = {
     steps: {
       en: [
         "Review the invoice line items, totals, and customer balance.",
-        "Click Print (or press Alt+P) to send to your thermal or laser printer.",
+        "Click Print (or press Ctrl+P) to send to your thermal or laser printer.",
       ],
       ur: [
         "بل کے آئٹمز اور کل رقم کا جائزہ لیں۔",
-        "پرنٹ نکالنے کے لیے Print بٹن یا Alt+P دبائیں۔",
+        "پرنٹ نکالنے کے لیے Print بٹن یا Ctrl+P دبائیں۔",
       ],
     },
     impacts: { en: "Read and print view for an existing sale invoice.", ur: "محفوظ شدہ بل دیکھنے اور پرنٹ کرنے کی اسکرین۔" },
     shortcuts: [
-      { keys: ["Alt", "P"], en: "Print Invoice Immediately", ur: "بل فوری پرنٹ کریں" },
+      { keys: ["Ctrl", "P"], en: "Print Invoice Immediately", ur: "بل فوری پرنٹ کریں" },
     ],
     faqs: [],
     relatedRoutes: [
@@ -1180,11 +1180,11 @@ export const SCREEN_GUIDES = {
     },
     steps: {
       en: [
-        "Click '+ Create Purchase Invoice' (or press Alt+1) when new stock arrives from a supplier.",
+        "Click '+ Create Purchase Invoice' (or press Ctrl+1) when new stock arrives from a supplier.",
         "Locate any existing bill in the table to view details, edit, or record a supplier payment.",
       ],
       ur: [
-        "سپلائر سے نیا مال آنے پر '+ Create Purchase Invoice' (یا Alt+1) دبا کر بل چڑھائیں۔",
+        "سپلائر سے نیا مال آنے پر '+ Create Purchase Invoice' (یا Ctrl+1) دبا کر بل چڑھائیں۔",
         "پرانے بل کی تفصیل دیکھنے یا ادائیگی درج کرنے کے لیے فہرست سے بل منتخب کریں۔",
       ],
     },
@@ -1193,7 +1193,7 @@ export const SCREEN_GUIDES = {
       ur: "پرچیز بلوں سے دکان کا اسٹاک بڑھتا ہے، نئے بیچ اور ایکسپائری درج ہوتے ہیں اور سپلائر کا کھاتہ اپڈیٹ ہوتا ہے۔",
     },
     shortcuts: [
-      { keys: ["Alt", "1"], en: "New Purchase Invoice", ur: "نیا پرچیز بل بنائیں" },
+      { keys: ["Ctrl", "1"], en: "New Purchase Invoice", ur: "نیا پرچیز بل بنائیں" },
     ],
     faqs: [],
     relatedRoutes: [
@@ -1234,16 +1234,16 @@ export const SCREEN_GUIDES = {
     },
     steps: {
       en: [
-        "Select the Supplier (Alt+S) and enter the Supplier's Invoice Number and Date.",
+        "Select the Supplier and enter the Supplier's Invoice Number and Date.",
         "Add products row by row (or load from a Purchase Order), entering Batch #, Expiry, Packs/Units, Purchase Price, Bonus, and Sale Price.",
         "Enter any Paid Amount (and select payment account) or leave as payable on credit.",
-        "Press Ctrl+Enter (or Save) to post the purchase bill and add stock.",
+        "Press Ctrl+S / Ctrl+Enter (or Save) to post the purchase bill and add stock.",
       ],
       ur: [
-        "سپلائر منتخب کریں (Alt+S) اور سپلائر کا بل نمبر اور تاریخ لکھیں۔",
+        "سپلائر منتخب کریں اور سپلائر کا بل نمبر اور تاریخ لکھیں۔",
         "پروڈکٹس شامل کریں اور ہر لائن میں بیچ نمبر، ایکسپائری، پیک کی تعداد، قیمتِ خرید، بونس اور قیمتِ فروخت درج کریں۔",
         "اگر موقع پر کچھ رقم ادا کی ہے تو Paid خانے میں لکھیں ورنہ ادھار کھاتے کے لیے خالی چھوڑ دیں۔",
-        "بل محفوظ کرنے اور اسٹاک بڑھانے کے لیے Ctrl+Enter یا Save دبائیں۔",
+        "بل محفوظ کرنے اور اسٹاک بڑھانے کے لیے Ctrl+S / Ctrl+Enter یا Save دبائیں۔",
       ],
     },
     impacts: {
@@ -1251,9 +1251,9 @@ export const SCREEN_GUIDES = {
       ur: "اس سے پروڈکٹ اور بیچ کا اسٹاک فوری بڑھ جاتا ہے، نئی قیمتیں اپڈیٹ ہو جاتی ہیں، سپلائر کھاتے میں بل جمع ہو جاتا ہے اور جنرل لیجر میں اندراج ہو جاتا ہے۔",
     },
     shortcuts: [
-      { keys: ["Ctrl", "Enter"], en: "Save Purchase Invoice", ur: "پرچیز بل محفوظ کریں" },
-      { keys: ["Alt", "S"], en: "Focus Supplier Selector", ur: "سپلائر منتخب کریں" },
-      { keys: ["Alt", "N"], en: "Add New Item Row", ur: "نئی آئٹم لائن شامل کریں" },
+      { keys: ["Ctrl", "S"], en: "Save Purchase Invoice", ur: "پرچیز بل محفوظ کریں" },
+      { keys: ["Ctrl", "T"], en: "Toggle Debit / Credit Mode", ur: "نقد یا ادھار موڈ تبدیل کریں" },
+      { keys: ["Ctrl", "N"], en: "Add New Item Row", ur: "نئی آئٹم لائن شامل کریں" },
     ],
     faqs: [],
     relatedRoutes: [
@@ -2259,11 +2259,11 @@ export const SCREEN_GUIDES = {
       ],
     },
     impacts: {
-      en: "Synchronizes live with the Topbar Cash Drawer pill (Alt+D) and links physical counter cash to the Cash in Hand financial account.",
-      ur: "اوپر ٹاپ بار میں نظر آنے والے Drawer بٹن (Alt+D) کے ساتھ لائیو جڑا ہوتا ہے اور کاؤنٹر کی نقدی کا مکمل آڈٹ رکھتا ہے۔",
+      en: "Synchronizes live with the Topbar Cash Drawer pill (Ctrl+D) and links physical counter cash to the Cash in Hand financial account.",
+      ur: "اوپر ٹاپ بار میں نظر آنے والے Drawer بٹن (Ctrl+D) کے ساتھ لائیو جڑا ہوتا ہے اور کاؤنٹر کی نقدی کا مکمل آڈٹ رکھتا ہے۔",
     },
     shortcuts: [
-      { keys: ["Alt", "D"], en: "Quick Cash Drawer Popup Anywhere", ur: "کہیں سے بھی کیش ڈراور پاپ اپ کھولیں" },
+      { keys: ["Ctrl", "D"], en: "Quick Cash Drawer Popup Anywhere", ur: "کہیں سے بھی کیش ڈراور پاپ اپ کھولیں" },
     ],
     faqs: [],
     relatedRoutes: [
@@ -2316,7 +2316,7 @@ export const SCREEN_GUIDES = {
       ur: "سیلز، پرچیز، اخراجات اور تنخواہوں کی تمام ادائیگیاں انہی اکاؤنٹس کے ذریعے ریکارڈ ہوتی ہیں۔",
     },
     shortcuts: [
-      { keys: ["Alt", "A"], en: "Quick Financial Accounts Popup Anywhere", ur: "کہیں سے بھی اکاؤنٹس کا بیلنس دیکھیں" },
+      { keys: ["Ctrl", "A"], en: "Quick Financial Accounts Popup Anywhere", ur: "کہیں سے بھی اکاؤنٹس کا بیلنس دیکھیں" },
     ],
     faqs: [],
     relatedRoutes: [
@@ -2508,11 +2508,11 @@ export const SCREEN_GUIDES = {
       ur: ["نفع و نقصان، ٹیکس گوشوارہ، لاگت (COGS) اور بقایاجات کی رپورٹس۔", "سیلز، پرچیز اور ریٹرنز کی تفصیلی رپورٹس۔", "موجودہ اسٹاک کی مالیت، کم اسٹاک اور ایکسپائری رپورٹس۔"],
     },
     steps: {
-      en: ["Pick any report from the Reports menu in the sidebar or search via Alt+K."],
-      ur: ["سائیڈ بار کے Reports مینو سے یا Alt+K دبا کر مطلوبہ رپورٹ منتخب کریں۔"],
+      en: ["Pick any report from the Reports menu in the sidebar or search via Ctrl+K."],
+      ur: ["سائیڈ بار کے Reports مینو سے یا Ctrl+K دبا کر مطلوبہ رپورٹ منتخب کریں۔"],
     },
     impacts: { en: "Read-only analytical reporting suite.", ur: "کاروباری تجزیے اور پرنٹنگ کے لیے رپورٹس۔" },
-    shortcuts: [{ keys: ["Alt", "K"], en: "Quick Search Any Report", ur: "کوئی بھی رپورٹ فوری تلاش کریں" }],
+    shortcuts: [{ keys: ["Ctrl", "K"], en: "Quick Search Any Report", ur: "کوئی بھی رپورٹ فوری تلاش کریں" }],
     faqs: [],
     relatedRoutes: [
       { path: "/reports/net-profit", en: "Net Profit (P&L)", ur: "نفع و نقصان (P&L)" },

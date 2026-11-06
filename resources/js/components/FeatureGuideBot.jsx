@@ -5948,7 +5948,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               dir="ltr"
             >
               <span>↵ Send · ⇧↵ New line · / Commands</span>
-              <span>Alt+G Toggle</span>
+              <span>Ctrl+G Toggle</span>
             </div>
           </div>
         </footer>

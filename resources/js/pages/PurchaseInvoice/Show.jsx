@@ -280,7 +280,7 @@ export default function PurchaseInvoiceShow() {
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e) => {
-      if (!e.altKey) return;
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
       const k = (e.key || "").toLowerCase();
       if (k === "b" || e.code === "KeyB") {
         e.preventDefault();
@@ -403,7 +403,7 @@ export default function PurchaseInvoiceShow() {
                 )}
               </div>
               <p className="purchase-show-shortcuts text-[10px] mt-0.5 hidden sm:block truncate">
-                Alt+F search · Alt+E edit · Alt+P print · Alt+D delete · Alt+N new · Alt+B back
+                Ctrl+F search · Ctrl+E edit · Ctrl+P print · Ctrl+D delete · Ctrl+N new · Ctrl+B back
               </p>
             </div>
           </div>
@@ -434,7 +434,7 @@ export default function PurchaseInvoiceShow() {
               onClick={() => setSearchOpen(true)}
               className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
               style={btnSecondary.style}
-              title="Search Purchase Invoices (Alt+F)"
+              title="Search Purchase Invoices (Ctrl+F)"
             >
               <MagnifyingGlassIcon className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Search</span>
@@ -457,7 +457,7 @@ export default function PurchaseInvoiceShow() {
               onClick={() => window.print()}
               className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
               style={btnSecondary.style}
-              title="Print GRN / Purchase Invoice (Alt+P)"
+              title="Print GRN / Purchase Invoice (Ctrl+P)"
             >
               <PrinterIcon className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Print</span>
@@ -493,7 +493,7 @@ export default function PurchaseInvoiceShow() {
               }}
               className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className} relative flex items-center gap-1.5`}
               style={btnSecondary.style}
-              title="Open Held Invoices (Alt+H)"
+              title="Open Held Invoices (Ctrl+H)"
             >
               <ClockIcon className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
               <span>Held</span>
@@ -525,7 +525,7 @@ export default function PurchaseInvoiceShow() {
                   onClick={() => navigate(`/purchase-invoices/${id}/edit`)}
                   className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnSecondary.className}`}
                   style={btnSecondary.style}
-                  title="Edit Invoice (Alt+E)"
+                  title="Edit Invoice (Ctrl+E)"
                 >
                   <PencilSquareIcon className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>Edit</span>
@@ -547,7 +547,7 @@ export default function PurchaseInvoiceShow() {
                 onClick={openDeleteModal}
                 className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnDanger.className}`}
                 style={btnDanger.style}
-                title="Delete Invoice (Alt+D)"
+                title="Delete Invoice (Ctrl+D)"
               >
                 <TrashIcon className="w-3.5 h-3.5" aria-hidden="true" />
                 <span>Delete</span>
@@ -560,7 +560,7 @@ export default function PurchaseInvoiceShow() {
                 onClick={() => navigate("/purchase-invoices/create")}
                 className={`h-7 px-2.5 rounded-md text-[11px] font-semibold transition-all duration-200 ${btnPrimary.className}`}
                 style={btnPrimary.style}
-                title="New Purchase Invoice (Alt+N)"
+                title="New Purchase Invoice (Ctrl+N)"
               >
                 <PlusIcon className="w-3.5 h-3.5" aria-hidden="true" />
                 <span>New</span>
@@ -572,7 +572,7 @@ export default function PurchaseInvoiceShow() {
               onClick={() => navigate(-1)}
               className={`h-7 px-2.5 rounded-md text-[11px] font-medium transition-all duration-200 ${btnGlass.className}`}
               style={btnGlass.style}
-              title="Back (Alt+B)"
+              title="Back (Ctrl+B)"
             >
               <ArrowLeftIcon className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Back</span>

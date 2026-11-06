@@ -108,10 +108,11 @@ export default function CustomersIndex() {
     document.title = "Customers - Karobar App";
   }, []);
 
-  // Alt + N -> Open Create Customer page
+  // Ctrl + N -> Open Create Customer page
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.altKey && (e.key || "").toLowerCase() === "n") {
+      if (e.defaultPrevented) return;
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key || "").toLowerCase() === "n") {
         if (!can.create) return;
         e.preventDefault();
         navigate("/customers/create");
@@ -465,11 +466,11 @@ export default function CustomersIndex() {
             <Guard when={can.create}>
               <Link
                 to="/customers/create"
-                title="Add Customer (Alt+N)"
+                title="Add Customer (Ctrl+N)"
                 className="products-action products-action-primary theme-btn-primary"
               >
                 <PlusCircleIcon className="w-4 h-4" />
-                <span>Add Customer (Alt+N)</span>
+                <span>Add Customer (Ctrl+N)</span>
               </Link>
             </Guard>
             <Guard when={can.import}>

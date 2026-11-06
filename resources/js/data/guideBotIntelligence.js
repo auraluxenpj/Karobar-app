@@ -257,8 +257,8 @@ export const TRAINED_ERP_INTENTS = [
       en: "Purchase Order (PO) vs. Purchase Invoice (GRN)",
       ur: "پرچیز آرڈر (PO) اور پرچیز انوائس (بل) میں فرق",
     },
-    en: "Here is the exact difference in Karobar ERP:\n\n1. **Purchase Order (`/purchase-orders`):**\n   • A **Purchase Order (PO)** is a **demand list / order sheet** you prepare and send to your supplier or order booker.\n   • **Impact:** Creating a PO **does NOT increase product stock** and **does NOT create a supplier payable** in the ledger yet.\n\n2. **Purchase Invoice / GRN (`/purchase-invoices/create` or `Alt+1`):**\n   • A **Purchase Invoice** is recorded when the supplier physically delivers the goods and bill to your shop.\n   • **Impact:** Saving a Purchase Invoice **immediately increases your batch stock**, records batch numbers & expiry dates, and **updates your Supplier Ledger / General Ledger**.\n   • **Tip:** You can convert any saved PO into a Purchase Invoice in one click!",
-    ur: "کاروبار ایپ میں ان دونوں کا فرق بہت واضح ہے:\n\n1. **پرچیز آرڈر (`Purchase Order — /purchase-orders`):**\n   • پرچیز آرڈر (PO) وہ **ڈیمانڈ لسٹ یا آرڈر شیٹ** ہے جو آپ سپلائر یا آرڈر بُکر کو مال منگوانے کے لیے بھیجتے ہیں۔\n   • **اثر:** پرچیز آرڈر بنانے سے **اسٹاک میں اضافہ نہیں ہوتا** اور نہ ہی سپلائر کے کھاتے میں رقم جمع ہوتی ہے۔\n\n2. **پرچیز انوائس (`Purchase Invoice — /purchase-invoices/create` یا `Alt+1`):**\n   • جب سپلائر دکان پر مال اور بل پہنچا دے، تب آپ **Purchase Invoice** درج کرتے ہیں۔\n   • **اثر:** اسے محفوظ کرتے ہی **اسٹاک اور بیچ فوری بڑھ جاتے ہیں** اور سپلائر کے کھاتے (Ledger) میں بل درج ہو جاتا ہے۔ آپ کسی بھی PO کو ایک کلک سے پرچیز انوائس میں تبدیل کر سکتے ہیں!",
+    en: "Here is the exact difference in Karobar ERP:\n\n1. **Purchase Order (`/purchase-orders`):**\n   • A **Purchase Order (PO)** is a **demand list / order sheet** you prepare and send to your supplier or order booker.\n   • **Impact:** Creating a PO **does NOT increase product stock** and **does NOT create a supplier payable** in the ledger yet.\n\n2. **Purchase Invoice / GRN (`/purchase-invoices/create` or `Ctrl+1`):**\n   • A **Purchase Invoice** is recorded when the supplier physically delivers the goods and bill to your shop.\n   • **Impact:** Saving a Purchase Invoice **immediately increases your batch stock**, records batch numbers & expiry dates, and **updates your Supplier Ledger / General Ledger**.\n   • **Tip:** You can convert any saved PO into a Purchase Invoice in one click!",
+    ur: "کاروبار ایپ میں ان دونوں کا فرق بہت واضح ہے:\n\n1. **پرچیز آرڈر (`Purchase Order — /purchase-orders`):**\n   • پرچیز آرڈر (PO) وہ **ڈیمانڈ لسٹ یا آرڈر شیٹ** ہے جو آپ سپلائر یا آرڈر بُکر کو مال منگوانے کے لیے بھیجتے ہیں۔\n   • **اثر:** پرچیز آرڈر بنانے سے **اسٹاک میں اضافہ نہیں ہوتا** اور نہ ہی سپلائر کے کھاتے میں رقم جمع ہوتی ہے۔\n\n2. **پرچیز انوائس (`Purchase Invoice — /purchase-invoices/create` یا `Ctrl+1`):**\n   • جب سپلائر دکان پر مال اور بل پہنچا دے، تب آپ **Purchase Invoice** درج کرتے ہیں۔\n   • **اثر:** اسے محفوظ کرتے ہی **اسٹاک اور بیچ فوری بڑھ جاتے ہیں** اور سپلائر کے کھاتے (Ledger) میں بل درج ہو جاتا ہے۔ آپ کسی بھی PO کو ایک کلک سے پرچیز انوائس میں تبدیل کر سکتے ہیں!",
     links: [
       { path: "/purchase-orders", en: "Open Purchase Orders (PO)", ur: "پرچیز آرڈرز (PO) کھولیں" },
       { path: "/purchase-invoices/create", en: "Create Purchase Invoice (Add Stock)", ur: "پرچیز انوائس بنائیں (اسٹاک ڈالیں)" },
@@ -324,10 +324,10 @@ export const TRAINED_ERP_INTENTS = [
       en: "How to Add New Stock (Create Purchase Invoice / GRN)",
       ur: "نیا اسٹاک اور خریداری کا بل (Purchase Invoice) درج کرنے کا طریقہ",
     },
-    en: "To add new stock bought from a supplier into your inventory:\n\n1. Open **Create Purchase Invoice** (`/purchase-invoices/create`) or press **`Alt + 1`** from anywhere.\n2. Select the **Supplier**, enter the supplier's **Invoice / Reference #**, and verify the **Invoice Date**.\n3. Search and select each **Product**, then enter:\n   • **Batch Number** & **Expiry Date**\n   • **Pack / Unit Quantity** & **Bonus Units** (free scheme units)\n   • **Purchase Cost**, **Sale Price (MRP)**, **Discount %**, and **Tax/WHT %**\n4. At the bottom, enter **Paid Amount** (if paying cash/bank now) or leave `0` for **Credit (Payable)**, then click **Save (`Ctrl+S`)**.\n\n**Result:** Your product & batch stock increases immediately, and the supplier's ledger is updated automatically.",
-    ur: "سپلائر سے خریدا گیا نیا مال (Stock) سسٹم میں ڈالنے کا طریقہ:\n\n1. **Create Purchase Invoice** (`/purchase-invoices/create`) کھولیں یا کی بورڈ سے **`Alt + 1`** دبائیں۔\n2. **Supplier (سپلائر)** منتخب کریں اور سپلائر کا بل نمبر اور تاریخ درج کریں۔\n3. ہر پروڈکٹ کو سرچ کر کے شامل کریں اور درج ذیل تفصیلات لکھیں:\n   • **بیچ نمبر (Batch #)** اور **ایکسپائری تاریخ (Expiry Date)**\n   • **پیک یا یونٹ کی مقدار** اور **بونس یونٹس (Bonus Units)**\n   • **قیمتِ خرید (Cost)**، **قیمتِ فروخت (Sale Price)** اور ڈسکاؤنٹ/ٹیکس\n4. نیچے اگر نقد ادائیگی کی ہے تو **Paid Amount** لکھیں ورنہ ادھار کے لیے `0` چھوڑ کر **Save (`Ctrl+S`)** دبا دیں۔\n\n**نتیجہ:** تمام آئٹمز کا اسٹاک اور بیچ فوری بڑھ جائیں گے اور سپلائر کے کھاتے میں بل درج ہو جائے گا۔",
+    en: "To add new stock bought from a supplier into your inventory:\n\n1. Open **Create Purchase Invoice** (`/purchase-invoices/create`) or press **`Ctrl + 1`** from anywhere.\n2. Select the **Supplier**, enter the supplier's **Invoice / Reference #**, and verify the **Invoice Date**.\n3. Search and select each **Product**, then enter:\n   • **Batch Number** & **Expiry Date**\n   • **Pack / Unit Quantity** & **Bonus Units** (free scheme units)\n   • **Purchase Cost**, **Sale Price (MRP)**, **Discount %**, and **Tax/WHT %**\n4. At the bottom, enter **Paid Amount** (if paying cash/bank now) or leave `0` for **Credit (Payable)**, then click **Save (`Ctrl+S`)**.\n\n**Result:** Your product & batch stock increases immediately, and the supplier's ledger is updated automatically.",
+    ur: "سپلائر سے خریدا گیا نیا مال (Stock) سسٹم میں ڈالنے کا طریقہ:\n\n1. **Create Purchase Invoice** (`/purchase-invoices/create`) کھولیں یا کی بورڈ سے **`Ctrl + 1`** دبائیں۔\n2. **Supplier (سپلائر)** منتخب کریں اور سپلائر کا بل نمبر اور تاریخ درج کریں۔\n3. ہر پروڈکٹ کو سرچ کر کے شامل کریں اور درج ذیل تفصیلات لکھیں:\n   • **بیچ نمبر (Batch #)** اور **ایکسپائری تاریخ (Expiry Date)**\n   • **پیک یا یونٹ کی مقدار** اور **بونس یونٹس (Bonus Units)**\n   • **قیمتِ خرید (Cost)**، **قیمتِ فروخت (Sale Price)** اور ڈسکاؤنٹ/ٹیکس\n4. نیچے اگر نقد ادائیگی کی ہے تو **Paid Amount** لکھیں ورنہ ادھار کے لیے `0` چھوڑ کر **Save (`Ctrl+S`)** دبا دیں۔\n\n**نتیجہ:** تمام آئٹمز کا اسٹاک اور بیچ فوری بڑھ جائیں گے اور سپلائر کے کھاتے میں بل درج ہو جائے گا۔",
     links: [
-      { path: "/purchase-invoices/create", en: "Create Purchase Invoice (Alt+1)", ur: "نیا پرچیز بل بنائیں (Alt+1)" },
+      { path: "/purchase-invoices/create", en: "Create Purchase Invoice (Ctrl+1)", ur: "نیا پرچیز بل بنائیں (Ctrl+1)" },
       { path: "/purchase-invoices", en: "All Purchase Invoices", ur: "تمام پرچیز بل دیکھیں" },
       { path: "/stock-adjustments/create", en: "Opening Stock / Adjustment", ur: "اوپننگ اسٹاک / ایڈجسٹمنٹ" },
     ],
@@ -366,10 +366,10 @@ export const TRAINED_ERP_INTENTS = [
       en: "How to Return Goods to a Supplier (Purchase Return / Debit Note)",
       ur: "سپلائر کو مال واپس کرنے (Purchase Return) کا طریقہ",
     },
-    en: "To return damaged, slow-moving, or near-expiry stock back to a supplier:\n\n1. Open **Create Purchase Return** (`/purchase-returns/create`) or press **`Alt + R`**.\n2. Select the **Supplier** (or load items from the original Purchase Invoice).\n3. Pick the exact **Product & Batch** being returned and enter the **Return Quantity**.\n4. Choose whether the supplier gave a **Cash/Bank Refund** or a **Payable Ledger Deduction (Debit Note)**.\n5. Click **Save**.\n\n**Impact:** The returned units are immediately deducted from that batch's stock, and your Supplier Payable balance is reduced.",
-    ur: "خراب، زائد المیعاد (Near-Expiry) یا فالتو مال سپلائر کو واپس کرنے کا طریقہ:\n\n1. **Create Purchase Return** (`/purchase-returns/create`) کھولیں یا **`Alt + R`** دبائیں۔\n2. اپنا **Supplier (سپلائر)** منتخب کریں (یا اصل پرچیز بل لوڈ کریں)۔\n3. واپس کیے جانے والے پروڈکٹ کا **بیچ (Batch)** اور **مقدار (Return Qty)** درج کریں۔\n4. منتخب کریں کہ سپلائر سے نقد رقم واپس ملی ہے یا کھاتے (Payable Balance) میں کٹوتی کرنی ہے۔\n5. **Save** بٹن دبائیں۔ اسٹاک فوری کم ہو جائے گا اور سپلائر کے کھاتے سے رقم منہا ہو جائے گی۔",
+    en: "To return damaged, slow-moving, or near-expiry stock back to a supplier:\n\n1. Open **Create Purchase Return** (`/purchase-returns/create`) or press **`Ctrl + N`** on the Purchase Returns screen.\n2. Select the **Supplier** (or load items from the original Purchase Invoice).\n3. Pick the exact **Product & Batch** being returned and enter the **Return Quantity**.\n4. Choose whether the supplier gave a **Cash/Bank Refund** or a **Payable Ledger Deduction (Debit Note)**.\n5. Click **Save (`Ctrl+S`)**.\n\n**Impact:** The returned units are immediately deducted from that batch's stock, and your Supplier Payable balance is reduced.",
+    ur: "خراب، زائد المیعاد (Near-Expiry) یا فالتو مال سپلائر کو واپس کرنے کا طریقہ:\n\n1. **Create Purchase Return** (`/purchase-returns/create`) کھولیں یا پرچیز ریٹرنز پیج پر **`Ctrl + N`** دبائیں۔\n2. اپنا **Supplier (سپلائر)** منتخب کریں (یا اصل پرچیز بل لوڈ کریں)۔\n3. واپس کیے جانے والے پروڈکٹ کا **بیچ (Batch)** اور **مقدار (Return Qty)** درج کریں۔\n4. منتخب کریں کہ سپلائر سے نقد رقم واپس ملی ہے یا کھاتے (Payable Balance) میں کٹوتی کرنی ہے۔\n5. **Save (`Ctrl+S`)** بٹن دبائیں۔ اسٹاک فوری کم ہو جائے گا اور سپلائر کے کھاتے سے رقم منہا ہو جائے گی۔",
     links: [
-      { path: "/purchase-returns/create", en: "Create Purchase Return (Alt+R)", ur: "نئی پرچیز ریٹرن بنائیں (Alt+R)" },
+      { path: "/purchase-returns/create", en: "Create Purchase Return (Ctrl+N)", ur: "نئی پرچیز ریٹرن بنائیں (Ctrl+N)" },
       { path: "/purchase-returns", en: "Purchase Returns History", ur: "پرچیز ریٹرنز کی فہرست" },
     ],
   },
@@ -412,12 +412,12 @@ export const TRAINED_ERP_INTENTS = [
       en: "3 Ways to Bill Customers (POS vs. Retail vs. Wholesale)",
       ur: "گاہک کا سیل بل بنانے کے 3 طریقے (POS، ریٹیل اور ہول سیل)",
     },
-    en: "Karobar ERP gives you **3 specialized billing screens** depending on your counter workflow:\n\n1. **High-Speed Barcode POS (`/sale-invoices/pos`):**\n   • Best for fast walk-in counter billing with a barcode scanner, instant FEFO batch pick, Hold/Recall carts (`F8`), and thermal receipt printing (`Ctrl+P`).\n2. **Create Retail Sale Invoice (`/sale-invoices/create/retail` or `Alt+2`):**\n   • Full-page tabular invoice form ideal for detailed walk-in or credit customer bills.\n3. **Create Wholesale (B2B) Invoice (`/sale-invoices/create/wholesale` or `Alt+3`):**\n   • Designed for B2B distributors/clinics with Wholesale Prices, Bonus Units, Credit Limit checks, and Salesman Commission tracking.",
-    ur: "کاروبار ایپ میں سیل بل بنانے کے **3 بہترین طریقے** موجود ہیں:\n\n1. **بارکوڈ POS ٹرمینل (`/sale-invoices/pos`):**\n   • کاؤنٹر پر تیز ترین بارکوڈ اسکیننگ، فوری بلنگ، بل ہولڈ (`F8`) اور تھرمل سلپ پرنٹنگ (`Ctrl+P`) کے لیے۔\n2. **ریٹیل سیل انوائس (`/sale-invoices/create/retail` یا `Alt+2`):**\n   • تفصیلی ریٹیل بل اور ادھار/نقد گاہکوں کے لیے مکمل انوائس فارم۔\n3. **ہول سیل (B2B) انوائس (`/sale-invoices/create/wholesale` یا `Alt+3`):**\n   • ہول سیل ریٹ، بونس یونٹس، کریڈٹ لمٹ اور سیلز مین کمیشن کے ساتھ بل بنانے کے لیے۔",
+    en: "Karobar ERP gives you **3 specialized billing screens** depending on your counter workflow:\n\n1. **High-Speed Barcode POS (`/sale-invoices/pos`):**\n   • Best for fast walk-in counter billing with a barcode scanner, instant FEFO batch pick, Hold/Recall carts (`F8`), and thermal receipt printing (`Ctrl+P`).\n2. **Create Retail Sale Invoice (`/sale-invoices/create/retail` or `Ctrl+2`):**\n   • Full-page tabular invoice form ideal for detailed walk-in or credit customer bills.\n3. **Create Wholesale (B2B) Invoice (`/sale-invoices/create/wholesale` or `Ctrl+3` / `Ctrl+W`):**\n   • Designed for B2B distributors/clinics with Wholesale Prices, Bonus Units, Credit Limit checks, and Salesman Commission tracking.",
+    ur: "کاروبار ایپ میں سیل بل بنانے کے **3 بہترین طریقے** موجود ہیں:\n\n1. **بارکوڈ POS ٹرمینل (`/sale-invoices/pos`):**\n   • کاؤنٹر پر تیز ترین بارکوڈ اسکیننگ، فوری بلنگ، بل ہولڈ (`F8`) اور تھرمل سلپ پرنٹنگ (`Ctrl+P`) کے لیے۔\n2. **ریٹیل سیل انوائس (`/sale-invoices/create/retail` یا `Ctrl+2`):**\n   • تفصیلی ریٹیل بل اور ادھار/نقد گاہکوں کے لیے مکمل انوائس فارم۔\n3. **ہول سیل (B2B) انوائس (`/sale-invoices/create/wholesale` یا `Ctrl+3` / `Ctrl+W`):**\n   • ہول سیل ریٹ، بونس یونٹس، کریڈٹ لمٹ اور سیلز مین کمیشن کے ساتھ بل بنانے کے لیے۔",
     links: [
       { path: "/sale-invoices/pos", en: "Open Barcode POS", ur: "بارکوڈ POS کھولیں" },
-      { path: "/sale-invoices/create/retail", en: "Create Retail Invoice (Alt+2)", ur: "ریٹیل بل بنائیں (Alt+2)" },
-      { path: "/sale-invoices/create/wholesale", en: "Create Wholesale Invoice (Alt+3)", ur: "ہول سیل بل بنائیں (Alt+3)" },
+      { path: "/sale-invoices/create/retail", en: "Create Retail Invoice (Ctrl+2)", ur: "ریٹیل بل بنائیں (Ctrl+2)" },
+      { path: "/sale-invoices/create/wholesale", en: "Create Wholesale Invoice (Ctrl+3)", ur: "ہول سیل بل بنائیں (Ctrl+3)" },
     ],
   },
 
@@ -477,11 +477,11 @@ export const TRAINED_ERP_INTENTS = [
       en: "How to Hold (Park) & Recall a Customer Bill",
       ur: "گاہک کا بل ہولڈ (Hold / Park) اور دوبارہ اوپن کرنے کا طریقہ",
     },
-    en: "If a customer at the counter is still shopping or forgot their wallet, you can **Hold (Park)** their bill without losing items:\n\n1. **In Barcode POS (`/sale-invoices/pos`):**\n   • Press **`F8`** (or click the **Hold Bill** button). Your cart is saved to the Held Queue and the screen clears immediately for the next customer.\n   • To resume: click the **Held Bills** badge at the top to restore the cart in one click.\n2. **In Retail & Wholesale Invoice Forms:**\n   • Press **`Alt + H`** (or click **Hold / Drafts**) to park the current invoice and recall it anytime.",
-    ur: "اگر کاؤنٹر پر موجود گاہک مزید چیزیں لے رہا ہو اور آپ نے اگلے گاہک کا بل بنانا ہو تو بل کو **Hold (ہولڈ)** کریں:\n\n1. **بارکوڈ POS میں (`/sale-invoices/pos`):**\n   • کی بورڈ سے **`F8`** دبائیں یا **Hold Bill** بٹن پر کلک کریں۔ موجودہ بل محفوظ ہو جائے گا اور اسکرین نئے گاہک کے لیے خالی ہو جائے گی۔\n   • واپس لانے کے لیے اوپر **Held Bills** بٹن پر کلک کر کے بل دوبارہ لوڈ کر لیں۔\n2. **ریٹیل اور ہول سیل فارم میں:**\n   • **`Alt + H`** دبا کر بل ڈرافٹ/ہولڈ میں محفوظ کریں۔",
+    en: "If a customer at the counter is still shopping or forgot their wallet, you can **Hold (Park)** their bill without losing items:\n\n1. **In Barcode POS (`/sale-invoices/pos`):**\n   • Press **`F8`** or **`Ctrl + H`** (or click the **Hold Bill** button). Your cart is saved to the Held Queue and the screen clears immediately for the next customer.\n   • To resume: click the **Held Bills** badge at the top to restore the cart in one click.\n2. **In Retail & Wholesale Invoice Forms:**\n   • Press **`Ctrl + H`** (or click **Hold / Drafts**) to park the current invoice and recall it anytime.",
+    ur: "اگر کاؤنٹر پر موجود گاہک مزید چیزیں لے رہا ہو اور آپ نے اگلے گاہک کا بل بنانا ہو تو بل کو **Hold (ہولڈ)** کریں:\n\n1. **بارکوڈ POS میں (`/sale-invoices/pos`):**\n   • کی بورڈ سے **`F8`** یا **`Ctrl + H`** دبائیں یا **Hold Bill** بٹن پر کلک کریں۔ موجودہ بل محفوظ ہو جائے گا اور اسکرین نئے گاہک کے لیے خالی ہو جائے گی۔\n   • واپس لانے کے لیے اوپر **Held Bills** بٹن پر کلک کر کے بل دوبارہ لوڈ کر لیں۔\n2. **ریٹیل اور ہول سیل فارم میں:**\n   • **`Ctrl + H`** دبا کر بل ڈرافٹ/ہولڈ میں محفوظ کریں۔",
     links: [
       { path: "/sale-invoices/pos", en: "Open Barcode POS (F8 Hold)", ur: "بارکوڈ POS کھولیں" },
-      { path: "/sale-invoices/create/retail", en: "Create Retail Invoice (Alt+H)", ur: "ریٹیل بل کھولیں" },
+      { path: "/sale-invoices/create/retail", en: "Create Retail Invoice (Ctrl+H)", ur: "ریٹیل بل کھولیں" },
     ],
   },
 
@@ -543,10 +543,10 @@ export const TRAINED_ERP_INTENTS = [
       en: "How to Process a Customer Sale Return & Refund",
       ur: "گاہک سے مال واپس لینے (Sale Return) اور رقم واپسی کا طریقہ",
     },
-    en: "When a customer returns sold items:\n\n1. Open **Create Sale Return** (`/sale-returns/create`) or press **`Alt + S`**.\n2. Search the original **Sale Invoice #** (recommended, as it auto-loads exact sold batches and prices) or select the **Customer** and **Product/Batch** manually.\n3. Enter the **Return Quantity**.\n4. Choose the settlement mode:\n   • **Cash / Bank Refund:** Deducts cash from your Cash Drawer/Bank.\n   • **Credit Ledger Adjustment:** Reduces the customer's unpaid receivable (`Udhar`) balance.\n5. Click **Save**—the returned units are added right back into batch inventory!",
-    ur: "جب کوئی گاہک خریدا ہوا مال واپس لائے تو **Sale Return** درج کرنے کا طریقہ:\n\n1. **Create Sale Return** (`/sale-returns/create`) کھولیں یا کی بورڈ سے **`Alt + S`** دبائیں۔\n2. اصل **Sale Invoice #** سرچ کر کے لوڈ کریں یا گاہک اور پروڈکٹ منتخب کریں۔\n3. واپس آنے والی مقدار (**Return Qty**) درج کریں۔\n4. منتخب کریں کہ گاہک کو **نقد رقم (Cash Refund)** واپس دی ہے یا اس کے **ادھار کھاتے (Credit Balance)** میں سے رقم کم کرنی ہے۔\n5. **Save** پر کلک کریں—واپس آنے والا مال خودکار طور پر دوبارہ اسٹاک میں جمع ہو جائے گا۔",
+    en: "When a customer returns sold items:\n\n1. Open **Create Sale Return** (`/sale-returns/create`) or press **`Ctrl + N`** on the Sale Returns screen.\n2. Search the original **Sale Invoice #** (recommended, as it auto-loads exact sold batches and prices) or select the **Customer** and **Product/Batch** manually.\n3. Enter the **Return Quantity**.\n4. Choose the settlement mode:\n   • **Cash / Bank Refund:** Deducts cash from your Cash Drawer/Bank.\n   • **Credit Ledger Adjustment:** Reduces the customer's unpaid receivable (`Udhar`) balance.\n5. Click **Save (`Ctrl+S`)**—the returned units are added right back into batch inventory!",
+    ur: "جب کوئی گاہک خریدا ہوا مال واپس لائے تو **Sale Return** درج کرنے کا طریقہ:\n\n1. **Create Sale Return** (`/sale-returns/create`) کھولیں یا سیل ریٹرنز پیج پر **`Ctrl + N`** دبائیں۔\n2. اصل **Sale Invoice #** سرچ کر کے لوڈ کریں یا گاہک اور پروڈکٹ منتخب کریں۔\n3. واپس آنے والی مقدار (**Return Qty**) درج کریں۔\n4. منتخب کریں کہ گاہک کو **نقد رقم (Cash Refund)** واپس دی ہے یا اس کے **ادھار کھاتے (Credit Balance)** میں سے رقم کم کرنی ہے۔\n5. **Save (`Ctrl+S`)** پر کلک کریں—واپس آنے والا مال خودکار طور پر دوبارہ اسٹاک میں جمع ہو جائے گا۔",
     links: [
-      { path: "/sale-returns/create", en: "Create Sale Return (Alt+S)", ur: "نئی سیل ریٹرن بنائیں (Alt+S)" },
+      { path: "/sale-returns/create", en: "Create Sale Return (Ctrl+N)", ur: "نئی سیل ریٹرن بنائیں (Ctrl+N)" },
       { path: "/sale-returns", en: "Sale Returns History", ur: "سیل ریٹرنز کی فہرست" },
     ],
   },
@@ -764,11 +764,11 @@ export const TRAINED_ERP_INTENTS = [
       en: "How to Open & Close the Cash Drawer Shift (Z-Report)",
       ur: "کیش ڈراور (Cash Drawer / گلہ) شفٹ کھولنے اور بند کرنے کا طریقہ",
     },
-    en: "To track physical counter cash across cashier shifts:\n\n1. Open **Cash Drawer** (`/cash-drawer`) or press **`Alt + D`** from the topbar.\n2. **Start of Day (Open Shift):** Enter your **Opening Cash Float** (change money in the drawer) and click **Open Shift**.\n3. **During the Day:** Every cash Sale, Sale Return refund, Customer Receipt, Supplier Payment, and Expense automatically updates the **Expected Cash in Drawer**.\n4. **End of Day (Close Shift):** Count the physical cash notes in the till, enter the **Counted Cash**, review any **Over / Short variance**, and click **Close Shift & Print Z-Report**.",
-    ur: "کاؤنٹر کے گلے (Cash Drawer) کا روزانہ حساب رکھنے کا طریقہ:\n\n1. **Cash Drawer** (`/cash-drawer`) کھولیں یا کی بورڈ سے **`Alt + D`** دبائیں۔\n2. **صبح شفٹ شروع کرتے وقت:** گلے میں موجود ابتدائی نقدی (**Opening Float**) لکھ کر **Open Shift** پر کلک کریں۔\n3. **دن بھر کے دوران:** تمام نقد سیلز، واپسی، وصولیاں اور اخراجات خودکار طور پر گلے کے بیلنس میں شامل ہوتے رہیں گے۔\n4. **رات کو دکان بند کرتے وقت:** گلے کی نقدی گن کر **Closing Count** درج کریں، فرق چیک کریں اور **Close Shift (Z-Report)** پرنٹ کر لیں۔",
+    en: "To track physical counter cash across cashier shifts:\n\n1. Open **Cash Drawer** (`/cash-drawer`) or press **`Ctrl + D`** from the topbar.\n2. **Start of Day (Open Shift):** Enter your **Opening Cash Float** (change money in the drawer) and click **Open Shift**.\n3. **During the Day:** Every cash Sale, Sale Return refund, Customer Receipt, Supplier Payment, and Expense automatically updates the **Expected Cash in Drawer**.\n4. **End of Day (Close Shift):** Count the physical cash notes in the till, enter the **Counted Cash**, review any **Over / Short variance**, and click **Close Shift & Print Z-Report**.",
+    ur: "کاؤنٹر کے گلے (Cash Drawer) کا روزانہ حساب رکھنے کا طریقہ:\n\n1. **Cash Drawer** (`/cash-drawer`) کھولیں یا کی بورڈ سے **`Ctrl + D`** دبائیں۔\n2. **صبح شفٹ شروع کرتے وقت:** گلے میں موجود ابتدائی نقدی (**Opening Float**) لکھ کر **Open Shift** پر کلک کریں۔\n3. **دن بھر کے دوران:** تمام نقد سیلز، واپسی، وصولیاں اور اخراجات خودکار طور پر گلے کے بیلنس میں شامل ہوتے رہیں گے۔\n4. **رات کو دکان بند کرتے وقت:** گلے کی نقدی گن کر **Closing Count** درج کریں، فرق چیک کریں اور **Close Shift (Z-Report)** پرنٹ کر لیں۔",
     links: [
-      { path: "/cash-drawer", en: "Open Cash Drawer (Alt+D)", ur: "کیش ڈراور کھولیں (Alt+D)" },
-      { path: "/accounts", en: "Financial Accounts (Alt+A)", ur: "بینک اور کیش اکاؤنٹس" },
+      { path: "/cash-drawer", en: "Open Cash Drawer (Ctrl+D)", ur: "کیش ڈراور کھولیں (Ctrl+D)" },
+      { path: "/accounts", en: "Financial Accounts (Ctrl+A)", ur: "بینک اور کیش اکاؤنٹس" },
     ],
   },
 
@@ -785,10 +785,10 @@ export const TRAINED_ERP_INTENTS = [
       en: "How to Manage Bank / Wallet Accounts & Transfer Funds (Cash / Bank)",
       ur: "بینک / والٹ اکاؤنٹس بنانے اور کیش سے بینک میں رقم منتقل کرنے کا طریقہ",
     },
-    en: "To manage your **Bank Accounts**, **Mobile Wallets (JazzCash / EasyPaisa)**, and **Cash Drawer** balances:\n\n1. Open **Financial Accounts** (`/accounts`) or press **`Alt + A`** from anywhere.\n2. **Add a Bank or Wallet:** Click **+ Add Account**, choose the type (`Bank`, `Mobile Wallet`, or `Cash`), enter the Account Title/Number and Opening Balance, and click **Save**.\n3. **Transfer Money (e.g., Cash Drawer → Bank Deposit):** Click **Transfer Funds**, select **From Account** (e.g., Cash Drawer) and **To Account** (e.g., Meezan Bank), enter the **Amount**, and click **Transfer**.",
-    ur: "بینک اکاؤنٹس، جاز کیش/ایزی پیسہ اور کیش ٹرانسفر منیج کرنے کا طریقہ:\n\n1. **Financial Accounts** (`/accounts`) کھولیں یا **`Alt + A`** دبائیں۔\n2. **نیا اکاؤنٹ بنانے کے لیے:** **+ Add Account** پر کلک کر کے بینک یا موبائل والٹ کا نام اور ابتدائی بیلنس درج کریں۔\n3. **کیش سے بینک میں رقم جمع کروانے کے لیے:** **Transfer Funds** بٹن دبائیں، کس اکاؤنٹ سے کس اکاؤنٹ میں رقم بھیجنی ہے منتخب کریں اور رقم لکھ کر محفوظ کریں۔",
+    en: "To manage your **Bank Accounts**, **Mobile Wallets (JazzCash / EasyPaisa)**, and **Cash Drawer** balances:\n\n1. Open **Financial Accounts** (`/accounts`) or press **`Ctrl + A`** from anywhere.\n2. **Add a Bank or Wallet:** Click **+ Add Account**, choose the type (`Bank`, `Mobile Wallet`, or `Cash`), enter the Account Title/Number and Opening Balance, and click **Save**.\n3. **Transfer Money (e.g., Cash Drawer → Bank Deposit):** Click **Transfer Funds**, select **From Account** (e.g., Cash Drawer) and **To Account** (e.g., Meezan Bank), enter the **Amount**, and click **Transfer**.",
+    ur: "بینک اکاؤنٹس، جاز کیش/ایزی پیسہ اور کیش ٹرانسفر منیج کرنے کا طریقہ:\n\n1. **Financial Accounts** (`/accounts`) کھولیں یا **`Ctrl + A`** دبائیں۔\n2. **نیا اکاؤنٹ بنانے کے لیے:** **+ Add Account** پر کلک کر کے بینک یا موبائل والٹ کا نام اور ابتدائی بیلنس درج کریں۔\n3. **کیش سے بینک میں رقم جمع کروانے کے لیے:** **Transfer Funds** بٹن دبائیں، کس اکاؤنٹ سے کس اکاؤنٹ میں رقم بھیجنی ہے منتخب کریں اور رقم لکھ کر محفوظ کریں۔",
     links: [
-      { path: "/accounts", en: "Open Financial Accounts (Alt+A)", ur: "فنانشل اکاؤنٹس کھولیں (Alt+A)" },
+      { path: "/accounts", en: "Open Financial Accounts (Ctrl+A)", ur: "فنانشل اکاؤنٹس کھولیں (Ctrl+A)" },
       { path: "/accounting", en: "Double-Entry Accounting", ur: "ڈبل انٹری اکاؤنٹنگ" },
     ],
   },
@@ -1087,8 +1087,8 @@ export const TRAINED_ERP_INTENTS = [
       en: "All Keyboard Shortcuts in Karobar App ERP",
       ur: "کاروبار ایپ کے تمام اہم کی بورڈ شارٹ کٹس",
     },
-    en: "Use these keyboard shortcuts anywhere in Karobar ERP for high-speed operation:\n\n• **`Alt + G`** — Open/Close Karo AI Assistant\n• **`Alt + K`** — Quick Go-To-Page Command Palette\n• **`Alt + P`** — Global Product, Price & Batch Lookup\n• **`Alt + 1`** — Create Purchase Invoice (Add Stock)\n• **`Alt + 2`** — Create Retail Sale Invoice\n• **`Alt + 3`** — Create Wholesale Sale Invoice\n• **`Alt + S`** — Create Customer Sale Return\n• **`Alt + R`** — Create Supplier Purchase Return\n• **`Alt + A`** — Quick Financial Accounts Popup\n• **`Alt + D`** — Open Cash Drawer Shift Modal\n• **`F2` / `F8` / `Ctrl + S` / `Ctrl + P`** — Search / Hold / Save / Print on POS & Invoices",
-    ur: "تیز رفتار کام کے لیے یہ کی بورڈ شارٹ کٹس استعمال کریں:\n\n• **`Alt + G`** — کارو اے آئی گائیڈ کھولیں/بند کریں\n• **`Alt + K`** — کسی بھی صفحے پر فوری جائیں\n• **`Alt + P`** — کوئی بھی پروڈکٹ، قیمت یا بیچ سرچ کریں\n• **`Alt + 1`** — نیا پرچیز بل بنائیں (اسٹاک ڈالیں)\n• **`Alt + 2`** — نیا ریٹیل سیل بل بنائیں\n• **`Alt + 3`** — نیا ہول سیل بل بنائیں\n• **`Alt + S`** — نئی سیل ریٹرن بنائیں\n• **`Alt + R`** — نئی پرچیز ریٹرن بنائیں\n• **`Alt + A`** — بینک اور کیش اکاؤنٹس دیکھیں\n• **`Alt + D`** — کیش ڈراور کھولیں",
+    en: "Use these keyboard shortcuts anywhere in Karobar ERP for high-speed operation:\n\n• **`Ctrl + G`** — Open/Close Karo AI Assistant\n• **`Ctrl + K`** — Quick Go-To-Page Command Palette\n• **`Ctrl + P`** — Global Product, Price & Batch Lookup\n• **`Ctrl + 1`** — Create Purchase Invoice (Add Stock)\n• **`Ctrl + 2`** — Create Retail Sale Invoice\n• **`Ctrl + 3` / `Ctrl + W`** — Create Wholesale Sale Invoice\n• **`Ctrl + Shift + P`** — Open Barcode POS Sub-Window\n• **`Ctrl + Shift + S` / `W` / `U` / `L`** — Open Retail / Wholesale / Purchase / Customer Ledger Sub-Window\n• **`Ctrl + A`** — Quick Financial Accounts Popup\n• **`Ctrl + D`** — Open Cash Drawer Shift Modal (or Held Drafts on Invoice screens)\n• **`F2` / `F8` / `Ctrl + S` / `Ctrl + P`** — Search / Hold / Save / Print on POS & Invoices",
+    ur: "تیز رفتار کام کے لیے یہ کی بورڈ شارٹ کٹس استعمال کریں:\n\n• **`Ctrl + G`** — کارو اے آئی گائیڈ کھولیں/بند کریں\n• **`Ctrl + K`** — کسی بھی صفحے پر فوری جائیں\n• **`Ctrl + P`** — کوئی بھی پروڈکٹ، قیمت یا بیچ سرچ کریں\n• **`Ctrl + 1`** — نیا پرچیز بل بنائیں (اسٹاک ڈالیں)\n• **`Ctrl + 2`** — نیا ریٹیل سیل بل بنائیں\n• **`Ctrl + 3` / `Ctrl + W`** — نیا ہول سیل بل بنائیں\n• **`Ctrl + Shift + P`** — بارکوڈ POS سب ونڈو کھولیں\n• **`Ctrl + Shift + S` / `W` / `U` / `L`** — ریٹیل / ہول سیل / پرچیز / کسٹمر کھاتہ سب ونڈو کھولیں\n• **`Ctrl + A`** — بینک اور کیش اکاؤنٹس دیکھیں\n• **`Ctrl + D`** — کیش ڈراور کھولیں (یا انوائس پیج پر ہولڈ ڈرافٹس دیکھیں)",
     links: [
       { path: "/sale-invoices/pos", en: "Open Barcode POS", ur: "بارکوڈ POS کھولیں" },
       { path: "/dashboard", en: "Dashboard", ur: "ڈیش بورڈ" },
@@ -1246,8 +1246,8 @@ export const TRAINED_ERP_INTENTS = [
       en: "You're Most Welcome! — Karo AI Guide",
       ur: "بہت شکریہ! میں ہمیشہ آپ کی خدمت میں حاضر ہوں",
     },
-    en: "You're very welcome! Anytime you have a question about **Karobar App ERP**, just press **`Alt + G`** or type your question below.",
-    ur: "آپ کا بہت شکریہ! جب بھی آپ کو **کاروبار ایپ ERP** کے کسی فیچر کے بارے میں کچھ پوچھنا ہو تو **`Alt + G`** دبائیں یا نیچے اپنا سوال لکھیں۔",
+    en: "You're very welcome! Anytime you have a question about **Karobar App ERP**, just press **`Ctrl + G`** or type your question below.",
+    ur: "آپ کا بہت شکریہ! جب بھی آپ کو **کاروبار ایپ ERP** کے کسی فیچر کے بارے میں کچھ پوچھنا ہو تو **`Ctrl + G`** دبائیں یا نیچے اپنا سوال لکھیں۔",
     links: [
       { path: "/dashboard", en: "Dashboard", ur: "ڈیش بورڈ" },
     ],
@@ -1395,7 +1395,7 @@ export const DEMO_MANIFESTS = {
         target: ".purchase-order-form-items, table",
         title: { en: "Add Products, Order Packs, Pack Price & Bonus", ur: "پروڈکٹس، آرڈر پیکس، قیمتِ خرید اور بونس درج کریں" },
         instruction: {
-          en: "Search and add items in the table, enter Order Packs, Pack Purchase Price, Bonus, and Discount %, or use Smart Forecast (`Alt+N`).",
+          en: "Search and add items in the table, enter Order Packs, Pack Purchase Price, Bonus, and Discount %, or use Smart Forecast (`Ctrl+N`).",
           ur: "ٹیبل میں مطلوبہ آئٹمز شامل کریں اور Order Packs، قیمتِ خرید اور ڈسکاؤنٹ لکھیں۔",
         },
         observedInstruction: {
@@ -1413,14 +1413,14 @@ export const DEMO_MANIFESTS = {
         screenLabel: { en: "Purchase Orders", ur: "پرچیز آرڈرز" },
         exactSelector: ".purchase-entry-footer",
         target: ".purchase-entry-footer, button[type='submit']",
-        title: { en: "Apply Saved Brand Order & Save Purchase Order (Alt+S)", ur: "محفوظ شدہ برانڈ ترتیب لگائیں اور آرڈر سیو کریں (Alt+S)" },
+        title: { en: "Apply Saved Brand Order & Save Purchase Order (Ctrl+S)", ur: "محفوظ شدہ برانڈ ترتیب لگائیں اور آرڈر سیو کریں (Ctrl+S)" },
         instruction: {
-          en: "Click 'Save Purchase Order' (`Alt+S`). You can share the PDF on WhatsApp and click 'Receive Delivery' when goods arrive to convert it into a Purchase Invoice.",
-          ur: "Save Purchase Order (`Alt+S`) دبا کر آرڈر محفوظ کریں۔ مال آنے پر 'Receive Delivery' سے اسے پرچیز انوائس میں تبدیل کر لیں۔",
+          en: "Click 'Save Purchase Order' (`Ctrl+S`). You can share the PDF on WhatsApp and click 'Receive Delivery' when goods arrive to convert it into a Purchase Invoice.",
+          ur: "Save Purchase Order (`Ctrl+S`) دبا کر آرڈر محفوظ کریں۔ مال آنے پر 'Receive Delivery' سے اسے پرچیز انوائس میں تبدیل کر لیں۔",
         },
         observedInstruction: {
-          en: "Review the total Packs and Order Total in the footer and click 'Save Purchase Order' (`Alt+S`).",
-          ur: "فوٹر میں کل پیکس اور رقم چیک کر کے 'Save Purchase Order' (`Alt+S`) پر کلک کریں۔",
+          en: "Review the total Packs and Order Total in the footer and click 'Save Purchase Order' (`Ctrl+S`).",
+          ur: "فوٹر میں کل پیکس اور رقم چیک کر کے 'Save Purchase Order' (`Ctrl+S`) پر کلک کریں۔",
         },
         checkpoint: {
           en: "Walkthrough complete! Your PO is ready without prematurely inflating stock.",
@@ -1447,7 +1447,7 @@ export const DEMO_MANIFESTS = {
         target: ".purchase-entry-details",
         title: { en: "Select Supplier, Paper Invoice # & Bill Amt (±5 Rs Diff Guard)", ur: "سپلائر، بل نمبر اور Bill Amt (±5 روپے Diff گارڈ) درج کریں" },
         instruction: {
-          en: "Open Create Purchase Invoice (`/purchase-invoices/create` or `Alt+1`), select the Supplier *, and enter their paper Invoice # and printed Bill Amt so the Diff box verifies accuracy within ±5 Rs.",
+          en: "Open Create Purchase Invoice (`/purchase-invoices/create` or `Ctrl+1`), select the Supplier *, and enter their paper Invoice # and printed Bill Amt so the Diff box verifies accuracy within ±5 Rs.",
           ur: "Create Purchase Invoice (`/purchase-invoices/create`) کھولیں، سپلائر، بل نمبر اور بل کی کل رقم (Bill Amt) لکھیں۔",
         },
         observedInstruction: {
@@ -1485,14 +1485,14 @@ export const DEMO_MANIFESTS = {
         screenLabel: { en: "Create Purchase Invoice", ur: "نیا پرچیز بل" },
         exactSelector: ".purchase-entry-footer",
         target: ".purchase-entry-footer",
-        title: { en: "Select Payment Account, Enter Total Paid & Save (Alt+S)", ur: "پیمنٹ اکاؤنٹ اور ادا شدہ رقم لکھیں اور Save (Alt+S) دبائیں" },
+        title: { en: "Select Payment Account, Enter Total Paid & Save (Ctrl+S)", ur: "پیمنٹ اکاؤنٹ اور ادا شدہ رقم لکھیں اور Save (Ctrl+S) دبائیں" },
         instruction: {
-          en: "Choose the Payment Account, enter Total Paid (or 0 for Credit payable), and press Save Purchase Invoice (`Alt+S`).",
-          ur: "پیمنٹ اکاؤنٹ اور ادا شدہ رقم (Total Paid) لکھیں یا ادھار رکھ کر Save Purchase Invoice (`Alt+S`) دبائیں۔",
+          en: "Choose the Payment Account, enter Total Paid (or 0 for Credit payable), and press Save Purchase Invoice (`Ctrl+S`).",
+          ur: "پیمنٹ اکاؤنٹ اور ادا شدہ رقم (Total Paid) لکھیں یا ادھار رکھ کر Save Purchase Invoice (`Ctrl+S`) دبائیں۔",
         },
         observedInstruction: {
-          en: "Review the sticky 2-row footer, verify Discount/Tax and Total Paid, and click 'Save Purchase Invoice' (`Alt+S`).",
-          ur: "نچلے فوٹر میں کل رقم چیک کریں اور 'Save Purchase Invoice' (`Alt+S`) دبا کر اسٹاک جمع کر لیں۔",
+          en: "Review the sticky 2-row footer, verify Discount/Tax and Total Paid, and click 'Save Purchase Invoice' (`Ctrl+S`).",
+          ur: "نچلے فوٹر میں کل رقم چیک کریں اور 'Save Purchase Invoice' (`Ctrl+S`) دبا کر اسٹاک جمع کر لیں۔",
         },
         checkpoint: {
           en: "Walkthrough complete! Batch stock and Supplier Ledger update immediately on Save.",
@@ -1557,14 +1557,14 @@ export const DEMO_MANIFESTS = {
         screenLabel: { en: "Barcode POS Terminal", ur: "بارکوڈ POS ٹرمینل" },
         exactSelector: "#pos-tender-panel",
         target: "#pos-tender-panel",
-        title: { en: "Select Payment Method, Enter Cash Given (Alt+C) & Complete Sale (F4 / Alt+S)", ur: "پیمنٹ کا طریقہ منتخب کریں اور بل مکمل کریں (F4 / Alt+S)" },
+        title: { en: "Select Payment Method, Enter Cash Given (Ctrl+C) & Complete Sale (F4 / Ctrl+S)", ur: "پیمنٹ کا طریقہ منتخب کریں اور بل مکمل کریں (F4 / Ctrl+S)" },
         instruction: {
-          en: "Choose Cash, Card / POS, Wallet, or Split / Credit, enter Cash Given (or press `Alt+C` for Exact Cash), and press `F4` or `Alt+S` to Complete Sale & Print.",
-          ur: "وصول شدہ رقم درج کریں (`Alt+C`) اور `F4` یا `Alt+S` دبا کر بل محفوظ اور پرنٹ کر لیں۔",
+          en: "Choose Cash, Card / POS, Wallet, or Split / Credit, enter Cash Given (or press `Ctrl+C` for Exact Cash), and press `F4` or `Ctrl+S` to Complete Sale & Print.",
+          ur: "وصول شدہ رقم درج کریں (`Ctrl+C`) اور `F4` یا `Ctrl+S` دبا کر بل محفوظ اور پرنٹ کر لیں۔",
         },
         observedInstruction: {
-          en: "Complete the right-side tender panel and press `F4` or `Alt+S` to post the sale and print the receipt.",
-          ur: "دائیں جانب ٹینڈر پینل میں رقم لکھیں اور `F4` یا `Alt+S` دبا کر رسید پرنٹ کریں۔",
+          en: "Complete the right-side tender panel and press `F4` or `Ctrl+S` to post the sale and print the receipt.",
+          ur: "دائیں جانب ٹینڈر پینل میں رقم لکھیں اور `F4` یا `Ctrl+S` دبا کر رسید پرنٹ کریں۔",
         },
         checkpoint: {
           en: "Walkthrough complete! Stock, Cash Drawer, COGS, and General Ledger are all updated.",
@@ -1591,8 +1591,8 @@ export const DEMO_MANIFESTS = {
         target: ".sale-entry-details",
         title: { en: "Choose Walk-In or Credit Customer & Clinical Details", ur: "نقد یا ادھار والا گاہک اور ڈاکٹر/مریض کا نام منتخب کریں" },
         instruction: {
-          en: "Open Create Retail Invoice (`/sale-invoices/create/retail`), toggle Debit (Cash) or Credit (Udhar) with `Alt+T`, and select Walk-In Customer or a registered Customer.",
-          ur: "Create Retail Invoice (`/sale-invoices/create/retail`) کھولیں، `Alt+T` سے نقد یا ادھار منتخب کریں اور گاہک سلیکٹ کریں۔",
+          en: "Open Create Retail Invoice (`/sale-invoices/create/retail`), toggle Debit (Cash) or Credit (Udhar) with `Ctrl+T`, and select Walk-In Customer or a registered Customer.",
+          ur: "Create Retail Invoice (`/sale-invoices/create/retail`) کھولیں، `Ctrl+T` سے نقد یا ادھار منتخب کریں اور گاہک سلیکٹ کریں۔",
         },
         observedInstruction: {
           en: "Choose your Customer * in the header details section (required for Credit/Udhar sales) and optionally enter Doctor/Patient names.",
@@ -1629,14 +1629,14 @@ export const DEMO_MANIFESTS = {
         screenLabel: { en: "Create Retail Sale Invoice", ur: "ریٹیل سیل انوائس" },
         exactSelector: ".sale-entry-summary",
         target: ".sale-entry-summary",
-        title: { en: "Select Payment Account, Cash Given & Create Sale (Alt+S)", ur: "پیمنٹ اکاؤنٹ، وصول شدہ رقم اور بل محفوظ کریں (Alt+S)" },
+        title: { en: "Select Payment Account, Cash Given & Create Sale (Ctrl+S)", ur: "پیمنٹ اکاؤنٹ، وصول شدہ رقم اور بل محفوظ کریں (Ctrl+S)" },
         instruction: {
-          en: "On the right summary sidebar, choose the Payment Method & Account, enter Cash Given (or adjust Received in Credit mode), and click 'Create Sale' (`Alt+S`).",
-          ur: "دائیں جانب سمری پینل میں پیمنٹ اکاؤنٹ اور وصول شدہ رقم چیک کریں اور 'Create Sale' (`Alt+S`) دبائیں۔",
+          en: "On the right summary sidebar, choose the Payment Method & Account, enter Cash Given (or adjust Received in Credit mode), and click 'Create Sale' (`Ctrl+S`).",
+          ur: "دائیں جانب سمری پینل میں پیمنٹ اکاؤنٹ اور وصول شدہ رقم چیک کریں اور 'Create Sale' (`Ctrl+S`) دبائیں۔",
         },
         observedInstruction: {
-          en: "Check the right-side Summary & Tender panel and click 'Create Sale' (`Alt+S`) to post and print the invoice.",
-          ur: "دائیں جانب ٹوٹل اور وصولی چیک کر کے 'Create Sale' (`Alt+S`) پر کلک کریں۔",
+          en: "Check the right-side Summary & Tender panel and click 'Create Sale' (`Ctrl+S`) to post and print the invoice.",
+          ur: "دائیں جانب ٹوٹل اور وصولی چیک کر کے 'Create Sale' (`Ctrl+S`) پر کلک کریں۔",
         },
         checkpoint: {
           en: "Walkthrough complete!",
@@ -1781,7 +1781,7 @@ export const DEMO_MANIFESTS = {
         target: "a[href*='/products/create'], input[type='search'], input[type='text']",
         title: { en: "Search Catalog or Click '+ Add Product'", ur: "کیٹلاگ سرچ کریں یا '+ Add Product' دبائیں" },
         instruction: {
-          en: "Open Products (`/products`) and click '+ Add Product' (`Alt+P`) to create a new item.",
+          en: "Open Products (`/products`) and click '+ Add Product' (`Ctrl+N`) to create a new item.",
           ur: "Products (`/products`) کھولیں اور نیا آئٹم بنانے کے لیے '+ Add Product' پر کلک کریں۔",
         },
         observedInstruction: {
@@ -1808,7 +1808,7 @@ export const DEMO_MANIFESTS = {
           ur: "پروڈکٹ کا نام، پیک سائز اور ڈبے کی قیمت لکھیں—سنگل یونٹ ریٹ خودکار بن جائے گا۔",
         },
         checkpoint: {
-          en: "Walkthrough complete! Once saved, add physical stock via Purchase Invoice (`Alt+1`).",
+          en: "Walkthrough complete! Once saved, add physical stock via Purchase Invoice (`Ctrl+1`).",
           ur: "ڈیمو مکمل! پروڈکٹ محفوظ کرنے کے بعد Purchase Invoice کے ذریعے اسٹاک شامل کریں۔",
         },
       },

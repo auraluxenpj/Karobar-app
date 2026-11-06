@@ -183,19 +183,20 @@ const supplierRef = useRef(null);
     }
   }, [open]);
 
-  // Keyboard shortcut: Alt+S to save, Escape to close
+  // Keyboard shortcut: Ctrl+S to save, Escape to close
   useEffect(() => {
     if (!open) return;
     
     const handleKeyDown = (e) => {
-      if (e.altKey && e.key.toLowerCase() === "s") {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key || "").toLowerCase() === "s") {
         e.preventDefault();
+        e.stopPropagation();
         handleSubmit(e);
       }
     };
     
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [open, form]);
 
 const handleChange = (e) => {
@@ -922,7 +923,7 @@ onKeyDown={(e) => {
         {/* Footer */}
         <div className="product-modal-footer px-4 py-3 flex items-center justify-between">
           <div className="product-modal-shortcuts">
-            Alt+S to save • Esc to close
+            Ctrl+S to save • Esc to close
           </div>
           <div className="flex items-center gap-2">
             <button

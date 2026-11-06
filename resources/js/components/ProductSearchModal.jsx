@@ -391,7 +391,7 @@ export default function ProductSearchModal({ isOpen, onClose }) {
             type="text"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search products by name, generic/formula, barcode, brand, or supplier... (Alt+P)"
+            placeholder="Search products by name, generic/formula, barcode, brand, or supplier... (Ctrl+P)"
             className="flex-1 bg-transparent text-base sm:text-sm font-medium text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none"
             autoComplete="off"
             spellCheck="false"

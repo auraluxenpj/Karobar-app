@@ -220,10 +220,12 @@ export default function StockAdjustmentForm({ adjustmentId, onSuccess }){
     setTimeout(()=>noteRef.current?.focus(), 80);
   })(); }, [adjustmentId]);
 
-  // Alt+S save
+  // Ctrl+S / Ctrl+Enter / F9 save
   useEffect(() => {
     const onKey = (e) => {
-      if (e.altKey && (e.key === "s" || e.key === "S")) {
+      const hasCtrl = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey;
+      const key = (e.key || "").toLowerCase();
+      if ((hasCtrl && (key === "s" || e.key === "Enter")) || e.key === "F9") {
         e.preventDefault();
         handleSubmit(new Event("submit"));
       }
@@ -847,10 +849,10 @@ export default function StockAdjustmentForm({ adjustmentId, onSuccess }){
                   type="button"
                   onClick={handleSubmit}
                   className="products-action products-action-primary theme-btn-primary"
-                  title="Save (Alt+S)"
+                  title="Save (Ctrl+S)"
                 >
                   <span>{adjustmentId ? 'Update Adjustment' : 'Create Adjustment'}</span>
-                  <span className="ml-2 hidden sm:inline text-[10px] opacity-80 border rounded-sm px-1 py-0.5">Alt+S</span>
+                  <span className="ml-2 hidden sm:inline text-[10px] opacity-80 border rounded-sm px-1 py-0.5">Ctrl+S</span>
                 </button>
               </td>
             </tr>

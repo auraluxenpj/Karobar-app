@@ -91,7 +91,7 @@ export default function InvoiceDraftsModal({
     }
   }, [isOpen]);
 
-  // Keyboard navigation within modal (Up/Down/Enter/Escape/Alt+N)
+  // Keyboard navigation within modal (Up/Down/Enter/Escape/Ctrl+N)
   useEffect(() => {
     if (!isOpen) return;
 
@@ -102,7 +102,7 @@ export default function InvoiceDraftsModal({
         return;
       }
 
-      if (e.altKey && e.key.toLowerCase() === "n") {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key || "").toLowerCase() === "n") {
         e.preventDefault();
         onStartBlank && onStartBlank();
         onClose();
@@ -262,7 +262,7 @@ export default function InvoiceDraftsModal({
               onStartBlank && onStartBlank();
               onClose();
             }}
-            title="Create fresh new blank invoice (Alt+N)"
+            title="Create fresh new blank invoice (Ctrl+N)"
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors shrink-0 shadow-xs ${
               isDark
                 ? "text-slate-200 bg-slate-800 hover:bg-slate-700 border-slate-700"
@@ -270,7 +270,7 @@ export default function InvoiceDraftsModal({
             }`}
           >
             <DocumentPlusIcon className="w-4 h-4 text-emerald-500" />
-            <span>New Blank (Alt+N)</span>
+            <span>New Blank (Ctrl+N)</span>
           </button>
         </div>
 
@@ -283,7 +283,7 @@ export default function InvoiceDraftsModal({
                 {searchTerm ? `No held drafts match "${searchTerm}"` : "No held drafts found for this document type."}
               </p>
               <p className={`text-xs mt-1 ${isDark ? "text-slate-500" : "text-gray-400"}`}>
-                Press <kbd className={`px-1 py-0.5 rounded border ${isDark ? "bg-slate-800 border-slate-700" : "bg-gray-100 border-gray-200"}`}>Alt+H</kbd> while entering an invoice to hold it.
+                Press <kbd className={`px-1 py-0.5 rounded border ${isDark ? "bg-slate-800 border-slate-700" : "bg-gray-100 border-gray-200"}`}>Ctrl+H</kbd> while entering an invoice to hold it.
               </p>
             </div>
           ) : (
@@ -530,7 +530,7 @@ export default function InvoiceDraftsModal({
               <kbd className={`px-1 py-0.5 rounded border font-mono ${isDark ? "bg-slate-800 border-slate-700" : "bg-gray-200/80 border-gray-300 text-gray-700"}`}>Enter</kbd> resume
             </span>
             <span>
-              <kbd className={`px-1 py-0.5 rounded border font-mono ${isDark ? "bg-slate-800 border-slate-700" : "bg-gray-200/80 border-gray-300 text-gray-700"}`}>Alt+N</kbd> blank
+              <kbd className={`px-1 py-0.5 rounded border font-mono ${isDark ? "bg-slate-800 border-slate-700" : "bg-gray-200/80 border-gray-300 text-gray-700"}`}>Ctrl+N</kbd> blank
             </span>
             <span>
               <kbd className={`px-1 py-0.5 rounded border font-mono ${isDark ? "bg-slate-800 border-slate-700" : "bg-gray-200/80 border-gray-300 text-gray-700"}`}>Esc</kbd> close

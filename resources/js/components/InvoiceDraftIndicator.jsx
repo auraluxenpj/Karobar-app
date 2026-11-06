@@ -73,11 +73,11 @@ export default function InvoiceDraftIndicator({
         </div>
       )}
 
-      {/* Manual Hold/Save Draft Button (Alt+H) */}
+      {/* Manual Hold/Save Draft Button (Ctrl+H) */}
       <button
         type="button"
         onClick={() => onSaveDraft && onSaveDraft()}
-        title="Hold / Save Draft (Shortcut: Alt+H)"
+        title="Hold / Save Draft (Shortcut: Ctrl+H)"
         className={`inline-flex items-center justify-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-semibold border transition-all shrink-0 shadow-xs ${
           isDark
             ? "text-slate-200 bg-slate-800 hover:bg-slate-700 border-slate-600"
@@ -93,15 +93,15 @@ export default function InvoiceDraftIndicator({
               : "bg-gray-100 text-gray-500 border-gray-200"
           }`}
         >
-          Alt+H
+          Ctrl+H
         </kbd>
       </button>
 
-      {/* Held Drafts Modal Toggle with Count Badge (Alt+D) */}
+      {/* Held Drafts Modal Toggle with Count Badge (Ctrl+D) */}
       <button
         type="button"
         onClick={() => onOpenDrafts && onOpenDrafts()}
-        title="View Held Invoices & Drafts (Shortcut: Alt+D)"
+        title="View Held Invoices & Drafts (Shortcut: Ctrl+D)"
         className={`inline-flex items-center justify-center gap-1.5 h-8 px-2.5 rounded-lg text-xs font-semibold border transition-all shrink-0 shadow-xs ${
           isDark
             ? "text-white bg-blue-700 hover:bg-blue-600 border-blue-600"
@@ -126,7 +126,7 @@ export default function InvoiceDraftIndicator({
               : "bg-blue-100 text-blue-700 border-blue-200"
           }`}
         >
-          Alt+D
+          Ctrl+D
         </kbd>
       </button>
     </div>

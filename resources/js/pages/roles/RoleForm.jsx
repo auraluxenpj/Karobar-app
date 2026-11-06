@@ -182,10 +182,10 @@ export default function RoleForm({ onSubmit, initial, submitting }) {
     });
   };
 
-  // Alt+S => submit
+  // Ctrl+S => submit
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.altKey && (e.key || "").toLowerCase() === "s") {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key || "").toLowerCase() === "s") {
         e.preventDefault();
         formRef.current?.requestSubmit();
       }
@@ -313,7 +313,7 @@ export default function RoleForm({ onSubmit, initial, submitting }) {
             </div>
           </div>
 
-          <span className="people-shortcut">Alt+S to save</span>
+          <span className="people-shortcut">Ctrl+S to save</span>
         </div>
 
         <form ref={formRef} onSubmit={submit} className="people-form">
@@ -429,12 +429,12 @@ export default function RoleForm({ onSubmit, initial, submitting }) {
           {/* Actions */}
           <div className="people-actions">
             <span className="people-hint">
-              Shortcut: <span className="people-shortcut">Alt+S</span> to save
+              Shortcut: <span className="people-shortcut">Ctrl+S</span> to save
             </span>
             <button
               type="submit"
-              aria-keyshortcuts="Alt+S"
-              title="Save (Alt+S)"
+              aria-keyshortcuts="Control+S"
+              title="Save (Ctrl+S)"
               className="products-action products-action-primary theme-btn-primary"
               disabled={submitting}
             >

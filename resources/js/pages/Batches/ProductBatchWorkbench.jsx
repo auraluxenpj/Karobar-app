@@ -485,14 +485,14 @@ export default function ProductBatchWorkbench() {
     }, 20);
   };
 
-  // Save or Update Batch (Alt+S or Enter on last field / form submit)
+  // Save or Update Batch (Ctrl+S or Enter on last field / form submit)
   const handleSaveBatch = useCallback(
     async (e) => {
       if (e?.preventDefault) e.preventDefault();
       if (savingBatch) return;
 
       if (!selectedProduct?.id) {
-        toast.error("Please select a product first (Alt+F).");
+        toast.error("Please select a product first (Ctrl+F).");
         productSearchInputRef.current?.focus();
         return;
       }
@@ -632,35 +632,37 @@ export default function ProductBatchWorkbench() {
   // Global Keyboard Shortcuts Listener
   useEffect(() => {
     const onKeyDown = (e) => {
-      // Alt + S -> Save / Update Batch
-      if (e.altKey && (e.key === "s" || e.key === "S")) {
+      const hasCtrl = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey;
+      const key = (e.key || "").toLowerCase();
+      // Ctrl + S -> Save / Update Batch
+      if (hasCtrl && key === "s") {
         e.preventDefault();
         handleSaveBatch();
         return;
       }
-      // Alt + F or F2 -> Focus Product Search Input
-      if ((e.altKey && (e.key === "f" || e.key === "F")) || e.key === "F2") {
+      // Ctrl + F or F2 -> Focus Product Search Input
+      if ((hasCtrl && key === "f") || e.key === "F2") {
         e.preventDefault();
         setProductDropdownOpen(true);
         productSearchInputRef.current?.focus();
         productSearchInputRef.current?.select?.();
         return;
       }
-      // Alt + B -> Focus Batch Number Input
-      if (e.altKey && (e.key === "b" || e.key === "B")) {
+      // Ctrl + B -> Focus Batch Number Input
+      if (hasCtrl && key === "b") {
         e.preventDefault();
         batchNumberRef.current?.focus();
         batchNumberRef.current?.select?.();
         return;
       }
-      // Alt + N -> Reset to New Batch Mode
-      if (e.altKey && (e.key === "n" || e.key === "N")) {
+      // Ctrl + N -> Reset to New Batch Mode
+      if (hasCtrl && key === "n") {
         e.preventDefault();
         handleResetToNewBatch(true);
         return;
       }
-      // Alt + R -> Refresh
-      if (e.altKey && (e.key === "r" || e.key === "R")) {
+      // Ctrl + R -> Refresh
+      if (hasCtrl && key === "r") {
         e.preventDefault();
         if (selectedProduct?.id) {
           loadProductAndBatches(selectedProduct.id, { focusBatchInput: false });
@@ -809,12 +811,12 @@ export default function ProductBatchWorkbench() {
         {/* Keyboard Shortcut Keycaps */}
         <div className="hidden lg:flex items-center flex-wrap gap-1.5 text-[11px]">
           {[
-            { keys: "Alt + F / F2", label: "Search Product" },
-            { keys: "Alt + B", label: "Batch #" },
+            { keys: "Ctrl + F / F2", label: "Search Product" },
+            { keys: "Ctrl + B", label: "Batch #" },
             { keys: "Enter ↵", label: "Next Field" },
-            { keys: "Alt + S", label: "Save Batch" },
-            { keys: "Alt + N", label: "Clear / New" },
-            { keys: "Alt + R", label: "Refresh" },
+            { keys: "Ctrl + S", label: "Save Batch" },
+            { keys: "Ctrl + N", label: "Clear / New" },
+            { keys: "Ctrl + R", label: "Refresh" },
           ].map((sc) => (
             <div
               key={sc.keys}
@@ -855,7 +857,7 @@ export default function ProductBatchWorkbench() {
                 </span>
                 <span>Select Product</span>
                 <kbd className="ml-1 px-1.5 py-0.5 text-[10px] font-mono rounded bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300">
-                  Alt + F
+                  Ctrl + F
                 </kbd>
               </label>
 
@@ -1138,7 +1140,7 @@ export default function ProductBatchWorkbench() {
                 Search and select a product above (or click any row in the directory below) to immediately focus the Batch Number field.
               </span>
               <kbd className="px-2 py-0.5 font-mono text-[10px] font-bold rounded bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-700">
-                Alt + F
+                Ctrl + F
               </kbd>
             </div>
           )}
@@ -1216,7 +1218,7 @@ export default function ProductBatchWorkbench() {
                     Batch Number *
                   </label>
                   <kbd className="text-[10px] font-mono px-1 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
-                    Alt+B
+                    Ctrl+B
                   </kbd>
                 </div>
                 <input
@@ -1513,7 +1515,7 @@ export default function ProductBatchWorkbench() {
               <div className="text-[11px] text-slate-500 dark:text-slate-400">
                 Tip: In Quantity, type <code className="font-mono font-bold">2p</code> to auto-calculate{" "}
                 <code className="font-mono">2 × pack size</code>. Press{" "}
-                <kbd className="font-mono font-bold">Alt + S</kbd> anywhere to save.
+                <kbd className="font-mono font-bold">Ctrl + S</kbd> anywhere to save.
               </div>
 
               <div className="flex items-center gap-2">
@@ -1521,9 +1523,9 @@ export default function ProductBatchWorkbench() {
                   type="button"
                   onClick={() => handleResetToNewBatch(true)}
                   className="px-3.5 py-2 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
-                  title="Clear / Reset to New Batch (Alt+N)"
+                  title="Clear / Reset to New Batch (Ctrl+N)"
                 >
-                  {editingBatchId ? "Cancel Edit (Esc)" : "Clear (Alt+N)"}
+                  {editingBatchId ? "Cancel Edit (Esc)" : "Clear (Ctrl+N)"}
                 </button>
 
                 <button
@@ -1535,7 +1537,7 @@ export default function ProductBatchWorkbench() {
                   title={
                     isNewBatchBlockedByZeroUnassigned
                       ? "No unassigned stock available to create a new batch"
-                      : "Save Batch (Alt+S)"
+                      : "Save Batch (Ctrl+S)"
                   }
                 >
                   {editingBatchId ? (
@@ -1547,8 +1549,8 @@ export default function ProductBatchWorkbench() {
                     {savingBatch
                       ? "Saving..."
                       : editingBatchId
-                      ? "Update Batch (Alt+S)"
-                      : "Save Batch (Alt+S)"}
+                      ? "Update Batch (Ctrl+S)"
+                      : "Save Batch (Ctrl+S)"}
                   </span>
                 </button>
               </div>
@@ -1583,7 +1585,7 @@ export default function ProductBatchWorkbench() {
             {!selectedProduct ? (
               <div className="py-14 text-center text-xs text-slate-400 dark:text-slate-500">
                 <CubeIcon className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                Select a product on the left (<kbd className="font-mono">Alt + F</kbd>) to view and manage its batches.
+                Select a product on the left (<kbd className="font-mono">Ctrl + F</kbd>) to view and manage its batches.
               </div>
             ) : loadingProductBatches ? (
               <div className="py-14 text-center text-xs text-slate-400">
@@ -1594,7 +1596,7 @@ export default function ProductBatchWorkbench() {
               <div className="py-12 text-center text-xs text-slate-500 dark:text-slate-400">
                 No batches recorded for <strong>{selectedProduct.name}</strong> yet.
                 <div className="mt-1 text-[11px] text-emerald-600 dark:text-emerald-400">
-                  Enter a Batch Number on the left and press <strong>Alt + S</strong> to create the first batch!
+                  Enter a Batch Number on the left and press <strong>Ctrl + S</strong> to create the first batch!
                 </div>
               </div>
             ) : (

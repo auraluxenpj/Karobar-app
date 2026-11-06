@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import axios from "axios";
 import Select from "react-select";
 import {
@@ -36,6 +36,21 @@ export default function PaymentAccountSelector({
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [accountsModalOpen, setAccountsModalOpen] = useState(false);
+  const methodSelectRef = useRef(null);
+
+  // Ctrl+M focuses the Payment Method selector
+  useEffect(() => {
+    if (disabled) return;
+    const onKeyDown = (e) => {
+      if (e.defaultPrevented) return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key || "").toLowerCase() === "m") {
+        e.preventDefault();
+        methodSelectRef.current?.focus?.();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [disabled]);
 
   const fetchAccounts = useCallback(async () => {
     try {
@@ -240,6 +255,8 @@ export default function PaymentAccountSelector({
             </label>
             <div className="w-28">
               <Select
+                ref={methodSelectRef}
+                openMenuOnFocus={true}
                 options={PAYMENT_METHOD_OPTIONS}
                 value={
                   PAYMENT_METHOD_OPTIONS.find((o) => o.value === paymentMethod) ||
@@ -317,6 +334,8 @@ export default function PaymentAccountSelector({
             </label>
             <div className="w-28">
               <Select
+                ref={methodSelectRef}
+                openMenuOnFocus={true}
                 options={PAYMENT_METHOD_OPTIONS}
                 value={
                   PAYMENT_METHOD_OPTIONS.find((o) => o.value === paymentMethod) ||
@@ -406,6 +425,8 @@ export default function PaymentAccountSelector({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <div>
               <Select
+                ref={methodSelectRef}
+                openMenuOnFocus={true}
                 options={PAYMENT_METHOD_OPTIONS}
                 value={
                   PAYMENT_METHOD_OPTIONS.find((o) => o.value === paymentMethod) ||

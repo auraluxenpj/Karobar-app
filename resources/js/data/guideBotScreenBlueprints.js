@@ -1003,8 +1003,8 @@ export const UNIVERSAL_CONTROL_DICTIONARY = [
   {
     keywords: ["posted #", "posted_number", "auto on save"],
     title: { en: "System Posted Invoice Number (Posted # — Auto)", ur: "سسٹم انوائس نمبر (Posted # — خودکار)" },
-    en: "**What this read-only field shows:** The unique, sequential system voucher number (e.g., `PI-00124` or `SI-00450`).\n**Why it says `Auto`:** Assigned automatically by the server at the exact moment you press **Save (`Alt+S`)** so two open billing tabs never collide on the same number.",
-    ur: "**یہ خانہ کیا دکھاتا ہے:** سسٹم کی طرف سے دیا جانے والا منفرد بل نمبر جو بل محفوظ کرتے وقت (`Alt+S`) خودکار طور پر جاری ہوتا ہے۔",
+    en: "**What this read-only field shows:** The unique, sequential system voucher number (e.g., `PI-00124` or `SI-00450`).\n**Why it says `Auto`:** Assigned automatically by the server at the exact moment you press **Save (`Ctrl+S`)** so two open billing tabs never collide on the same number.",
+    ur: "**یہ خانہ کیا دکھاتا ہے:** سسٹم کی طرف سے دیا جانے والا منفرد بل نمبر جو بل محفوظ کرتے وقت (`Ctrl+S`) خودکار طور پر جاری ہوتا ہے۔",
   },
   {
     keywords: ["relink paid to total", "relink"],
@@ -1023,9 +1023,9 @@ export const UNIVERSAL_CONTROL_DICTIONARY = [
     keywords: ["debit"],
     exactTokens: ["debit"],
     shortcut: {
-      keys: "Alt + D (Select Debit) · Alt + T (Toggle Debit / Credit)",
-      en: "Press `Alt + D` to switch directly to **Debit (Cash)** mode, or `Alt + T` to toggle between Debit and Credit",
-      ur: "`Alt + D` دبا کر فوری نقد (Debit) موڈ منتخب کریں، یا `Alt + T` سے موڈ تبدیل کریں",
+      keys: "Ctrl + T (Toggle Debit / Credit)",
+      en: "Press `Ctrl + T` to toggle between **Debit (Cash)** and **Credit (Udhar)** mode",
+      ur: "`Ctrl + T` دبا کر فوری نقد (Debit) یا ادھار (Credit) موڈ تبدیل کریں",
     },
     title: { en: "Debit (Immediate Cash / Bank Settlement) Mode", ur: "ڈیبٹ / نقد ادائیگی موڈ (Debit)" },
     en: "**What this mode button does:** Sets the invoice to **Debit (Cash / Immediate Payment)** mode.\n**Accounting Impact:**\n• Auto-links `Total Paid / Received` to the full `Total Amount`.\n• Deducts or deposits the payment immediately in your selected **Cash Drawer / Bank Account** upon saving.",
@@ -1336,26 +1336,26 @@ export const UNIVERSAL_CONTROL_DICTIONARY = [
     ur: "**یہ بٹن کیا کرتا ہے:** اس بل یا ریکارڈ کی مکمل تفصیل دیکھنے کے لیے ونڈو کھولتا ہے۔",
   },
   {
-    keywords: ["alt+c", "cash register", "cash drawer"],
+    keywords: ["ctrl+d", "cash register", "cash drawer"],
     shortcut: {
-      keys: "Alt + C",
-      en: "Press `Alt + C` from anywhere in the app to open the Cash Register",
-      ur: "کیش رجسٹر کھولنے کے لیے کہیں بھی `Alt + C` دبائیں",
+      keys: "Ctrl + D",
+      en: "Press `Ctrl + D` from anywhere in the app to open the Cash Register",
+      ur: "کیش رجسٹر کھولنے کے لیے کہیں بھی `Ctrl + D` دبائیں",
     },
-    title: { en: "Cash Register / Shift Drawer Shortcut (Alt+C)", ur: "کیش رجسٹر / گلے کا بٹن (Alt+C)" },
-    en: "**What this topbar button does:** Opens the **Cash Register & Shift Reconciliation** screen (or press `Alt+C` anytime) to view live counter cash, record cash in/out, or close the shift with a Z-Report.",
-    ur: "**یہ بٹن کیا کرتا ہے:** کیش رجسٹر (گلے کا حساب) کھولتا ہے جہاں آپ موجودہ کیش بیلنس دیکھ سکتے ہیں اور شفٹ کلوز کر سکتے ہیں۔ شارٹ کٹ: `Alt+C`۔",
+    title: { en: "Cash Register / Shift Drawer Shortcut (Ctrl+D)", ur: "کیش رجسٹر / گلے کا بٹن (Ctrl+D)" },
+    en: "**What this topbar button does:** Opens the **Cash Register & Shift Reconciliation** screen (or press `Ctrl+D` anytime) to view live counter cash, record cash in/out, or close the shift with a Z-Report.",
+    ur: "**یہ بٹن کیا کرتا ہے:** کیش رجسٹر (گلے کا حساب) کھولتا ہے جہاں آپ موجودہ کیش بیلنس دیکھ سکتے ہیں اور شفٹ کلوز کر سکتے ہیں۔ شارٹ کٹ: `Ctrl+D`۔",
   },
   {
-    keywords: ["alt+a", "accounts hub", "chart of accounts"],
+    keywords: ["ctrl+a", "accounts hub", "chart of accounts"],
     shortcut: {
-      keys: "Alt + A",
-      en: "Press `Alt + A` from anywhere in the app to open the Accounts & Finance Hub",
-      ur: "اکاؤنٹس ماڈیول کھولنے کے لیے کہیں بھی `Alt + A` دبائیں",
+      keys: "Ctrl + A",
+      en: "Press `Ctrl + A` from anywhere in the app to open the Accounts & Finance Hub",
+      ur: "اکاؤنٹس ماڈیول کھولنے کے لیے کہیں بھی `Ctrl + A` دبائیں",
     },
-    title: { en: "Accounts & Ledgers Shortcut (Alt+A)", ur: "اکاؤنٹس اور کھاتہ ہب بٹن (Alt+A)" },
-    en: "**What this topbar button does:** Jumps directly to the **Accounts & Finance** module (`Alt+A`) to inspect cash/bank accounts, expenses, and financial statements.",
-    ur: "**یہ بٹن کیا کرتا ہے:** براہِ راست اکاؤنٹس اور فنانس ماڈیول (`Alt+A`) کھولتا ہے جہاں بینک، کیش اور اخراجات کا مکمل حساب موجود ہے۔",
+    title: { en: "Accounts & Ledgers Shortcut (Ctrl+A)", ur: "اکاؤنٹس اور کھاتہ ہب بٹن (Ctrl+A)" },
+    en: "**What this topbar button does:** Jumps directly to the **Accounts & Finance** module (`Ctrl+A`) to inspect cash/bank accounts, expenses, and financial statements.",
+    ur: "**یہ بٹن کیا کرتا ہے:** براہِ راست اکاؤنٹس اور فنانس ماڈیول (`Ctrl+A`) کھولتا ہے جہاں بینک، کیش اور اخراجات کا مکمل حساب موجود ہے۔",
   },
 ];
 
@@ -1603,9 +1603,9 @@ export function resolveControlShortcut(element, anatomy, matchedEntry = null) {
     };
   }
 
-  // 3. Parse shortcut pattern from button text or title (e.g., "(Alt+S)", "(F8)", "[F2]")
+  // 3. Parse shortcut pattern from button text or title (e.g., "(Ctrl+S)", "(F8)", "[F2]")
   const combinedLabel = `${anatomy.ownText} ${anatomy.titleAttr} ${anatomy.ariaLabel}`;
-  const shortcutRegex = /\b(Alt\s*\+\s*[A-Z0-9]|Ctrl\s*\+\s*[A-Z0-9]|Shift\s*\+\s*Tab|F(?:[1-9]|1[0-2])|Esc)\b/i;
+  const shortcutRegex = /\b(Ctrl\s*\+\s*(?:Shift\s*\+\s*)?(?:[A-Z0-9/]|Enter)|Shift\s*\+\s*Tab|F(?:[1-9]|1[0-2])|Esc)\b/i;
   const match = combinedLabel.match(shortcutRegex);
   if (match) {
     const keyStr = match[1].replace(/\s+/g, " ");
@@ -1625,25 +1625,25 @@ export function resolveControlShortcut(element, anatomy, matchedEntry = null) {
     /\b(save|update invoice|create|complete sale|submit|post)\b/i.test(lowerClues)
   ) {
     return {
-      keys: "Alt + S",
-      en: "Press `Alt + S` from anywhere on the form to save/post immediately",
-      ur: "فارم پر کہیں بھی رہتے ہوئے فوری محفوظ کرنے کے لیے `Alt + S` دبائیں",
+      keys: "Ctrl + S",
+      en: "Press `Ctrl + S` from anywhere on the form to save/post immediately",
+      ur: "فارم پر کہیں بھی رہتے ہوئے فوری محفوظ کرنے کے لیے `Ctrl + S` دبائیں",
     };
   }
 
   // Debit / Credit segmented buttons on Purchase & Sale Invoices
   if (anatomy.componentType.kind === "button" && /\bdebit\b/i.test(lowerClues)) {
     return {
-      keys: "Alt + D (Debit) · Alt + T (Toggle)",
-      en: "Press `Alt + D` to select Debit mode, or `Alt + T` to toggle between Debit and Credit",
-      ur: "ڈیبٹ موڈ کے لیے `Alt + D` یا موڈ بدلنے کے لیے `Alt + T` دبائیں",
+      keys: "Ctrl + T (Toggle Debit / Credit)",
+      en: "Press `Ctrl + T` to toggle between Debit and Credit mode",
+      ur: "ڈیبٹ یا کریڈٹ موڈ بدلنے کے لیے `Ctrl + T` دبائیں",
     };
   }
   if (anatomy.componentType.kind === "button" && /\bcredit\b/i.test(lowerClues)) {
     return {
-      keys: "Alt + C (Credit) · Alt + T (Toggle)",
-      en: "Press `Alt + C` to select Credit mode, or `Alt + T` to toggle between Debit and Credit",
-      ur: "کریڈٹ (ادھار) موڈ کے لیے `Alt + C` یا موڈ بدلنے کے لیے `Alt + T` دبائیں",
+      keys: "Ctrl + T (Toggle Debit / Credit)",
+      en: "Press `Ctrl + T` to toggle between Debit and Credit mode",
+      ur: "کریڈٹ (ادھار) یا ڈیبٹ موڈ بدلنے کے لیے `Ctrl + T` دبائیں",
     };
   }
 

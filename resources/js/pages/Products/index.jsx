@@ -164,15 +164,13 @@ export default function ProductsIndex() {
   const btnDanger = getButtonClasses.danger;
   const btnGlass = getButtonClasses.glass;
 
-  // === Alt+N => /products/create (only when can.create) ===
+  // === Ctrl+N => /products/create (only when can.create) ===
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (!e.altKey) return;
+      if (e.defaultPrevented) return;
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
       const key = (e.key || "").toLowerCase();
       if (key !== "n") return;
-      const tag = (e.target?.tagName || "").toLowerCase();
-      const isTyping = ["input", "textarea", "select"].includes(tag) || e.target?.isContentEditable;
-      if (isTyping) return;
       if (!can.create) return;
       e.preventDefault();
       navigate("/products/create");
@@ -477,7 +475,8 @@ useEffect(() => {
             <Guard when={can.create}>
               <Link
                 to="/products/create"
-                title="Add product"
+                title="Add product (Ctrl+N)"
+                aria-keyshortcuts="Control+N"
                 className="products-action products-action-primary theme-btn-primary"
               >
                 <PlusCircleIcon className="w-4 h-4" />
