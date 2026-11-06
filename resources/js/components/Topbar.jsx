@@ -24,9 +24,7 @@ import { usePermissions } from "@/api/usePermissions.js";
 import ThemeToggle from "./ThemeToggle.jsx";
 import {
   GuideBotTopbarButton,
-  InspectElementTopbarButton,
   useGuideBotOpenState,
-  useInspectElementState,
 } from "./GuideBotTrigger.jsx";
 import axios from "axios";
 
@@ -103,9 +101,6 @@ export default function Topbar({
 
   // Screen-Aware Bilingual Feature Guide Bot state (opens anywhere with Alt+G and stays open across pages)
   const [guideBotOpen, setGuideBotOpen] = useGuideBotOpenState();
-
-  // Click-to-Explain UI Inspector state (toggles anywhere with Alt+E)
-  const [, setInspectMode] = useInspectElementState();
 
   // Installed Karobar-App version badge state
   const [appVersionInfo, setAppVersionInfo] = useState({ version: "2.0", build_number: null });
@@ -666,13 +661,6 @@ export default function Topbar({
         return;
       }
 
-      // Alt+E toggles Click-to-Explain UI Inspector anywhere
-      if (e.code === "KeyE" || e.key.toLowerCase() === "e") {
-        e.preventDefault();
-        setInspectMode((v) => !v);
-        return;
-      }
-
       if (isTyping) return;
 
       if (e.code === "Digit1" || e.code === "Numpad1") {
@@ -803,9 +791,6 @@ export default function Topbar({
               isOpen={guideBotOpen}
               pageTitle={pageTitle}
             />
-
-            {/* Click-to-Explain Element Inspector (Alt+E) */}
-            <InspectElementTopbarButton />
 
             {/* Open Current View in a Floating Sub-Window inside Main Window */}
             {onOpenCurrentInSubWindow && (

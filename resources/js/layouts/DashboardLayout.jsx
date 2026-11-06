@@ -139,6 +139,7 @@ export default function DashboardLayout({ children }) {
     "/customers/create": "Add Customer",
     "/products": "Products",
     "/products/create": "Add Product",
+    "/background-tasks": "Background Tasks & Formulation Report",
     "/categories": "Categories",
     "/brands": "Brands",
     "/brands/create": "Add Brand",

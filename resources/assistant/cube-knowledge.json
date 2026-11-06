@@ -12252,22 +12252,22 @@
         "en": "Interactive Demo: Create a Purchase Order (PO)",
         "ur": "عملی ڈیمو: سپلائر کے لیے پرچیز آرڈر (PO) بنانا"
       },
-      "primaryScreen": "/purchase-orders",
+      "primaryScreen": "/purchase-orders/create",
       "steps": [
         {
           "step": 1,
-          "screen": "/purchase-orders",
+          "screen": "/purchase-orders/create",
           "screenLabel": {
             "en": "Purchase Orders",
             "ur": "پرچیز آرڈرز"
           },
           "title": {
-            "en": "Select Supplier & Order Date",
-            "ur": "سپلائر اور تاریخ منتخب کریں"
+            "en": "Select Supplier, PO Date & Expected Receiving Date",
+            "ur": "سپلائر، آرڈر کی تاریخ اور متوقع وصولی کی تاریخ منتخب کریں"
           },
           "instruction": {
-            "en": "Open Purchase Orders (`/purchase-orders`) and select the Supplier/Distributor you want to order from.",
-            "ur": "Purchase Orders (`/purchase-orders`) کھولیں اور اپنا سپلائر منتخب کریں۔"
+            "en": "Open Purchase Orders (`/purchase-orders/create`), set the Date and Expected Receiving Date *, and select your Supplier *.",
+            "ur": "Purchase Orders (`/purchase-orders/create`) کھولیں، متوقع تاریخ اور اپنا سپلائر منتخب کریں۔"
           },
           "checkpoint": {
             "en": "Remember: A Purchase Order is a demand sheet—it won't alter your live stock until goods arrive.",
@@ -12276,18 +12276,18 @@
         },
         {
           "step": 2,
-          "screen": "/purchase-orders",
+          "screen": "/purchase-orders/create",
           "screenLabel": {
             "en": "Purchase Orders",
             "ur": "پرچیز آرڈرز"
           },
           "title": {
-            "en": "Add Products or Load Low-Stock Suggestions",
-            "ur": "پروڈکٹس شامل کریں یا کم اسٹاک لوڈ کریں"
+            "en": "Add Products, Order Packs, Pack Price & Bonus",
+            "ur": "پروڈکٹس، آرڈر پیکس، قیمتِ خرید اور بونس درج کریں"
           },
           "instruction": {
-            "en": "Search and add items manually, or click 'Load Low-Stock / Smart Suggestions' to auto-fill items that need reordering.",
-            "ur": "مطلوبہ آئٹمز سرچ کر کے شامل کریں یا کم اسٹاک والے آئٹمز خودکار لوڈ کریں۔"
+            "en": "Search and add items in the table, enter Order Packs, Pack Purchase Price, Bonus, and Discount %, or use Smart Forecast (`Alt+N`).",
+            "ur": "ٹیبل میں مطلوبہ آئٹمز شامل کریں اور Order Packs، قیمتِ خرید اور ڈسکاؤنٹ لکھیں۔"
           },
           "checkpoint": {
             "en": "Verify the order quantities and estimated purchase rates.",
@@ -12296,18 +12296,18 @@
         },
         {
           "step": 3,
-          "screen": "/purchase-orders",
+          "screen": "/purchase-orders/create",
           "screenLabel": {
             "en": "Purchase Orders",
             "ur": "پرچیز آرڈرز"
           },
           "title": {
-            "en": "Save PO, Share on WhatsApp, or Convert to GRN",
-            "ur": "آرڈر محفوظ کریں، واٹس ایپ کریں یا بل میں بدلیں"
+            "en": "Apply Saved Brand Order & Save Purchase Order (Alt+S)",
+            "ur": "محفوظ شدہ برانڈ ترتیب لگائیں اور آرڈر سیو کریں (Alt+S)"
           },
           "instruction": {
-            "en": "Click Save Purchase Order. You can send the PDF to your supplier on WhatsApp, and click 'Convert to Purchase Invoice' when goods arrive.",
-            "ur": "Save بٹن دبا کر آرڈر محفوظ کریں۔ مال آنے پر اسے ایک کلک سے پرچیز انوائس میں تبدیل کر لیں۔"
+            "en": "Click 'Save Purchase Order' (`Alt+S`). You can share the PDF on WhatsApp and click 'Receive Delivery' when goods arrive to convert it into a Purchase Invoice.",
+            "ur": "Save Purchase Order (`Alt+S`) دبا کر آرڈر محفوظ کریں۔ مال آنے پر 'Receive Delivery' سے اسے پرچیز انوائس میں تبدیل کر لیں۔"
           },
           "checkpoint": {
             "en": "Walkthrough complete! Your PO is ready without prematurely inflating stock.",
@@ -12333,16 +12333,16 @@
             "ur": "نیا پرچیز بل"
           },
           "title": {
-            "en": "Select Supplier & Supplier Bill #",
-            "ur": "سپلائر اور بل نمبر درج کریں"
+            "en": "Select Supplier, Paper Invoice # & Bill Amt (±5 Rs Diff Guard)",
+            "ur": "سپلائر، بل نمبر اور Bill Amt (±5 روپے Diff گارڈ) درج کریں"
           },
           "instruction": {
-            "en": "Open Create Purchase Invoice (`/purchase-invoices/create` or `Alt+1`), select the Supplier, and enter their Invoice/Bill reference number.",
-            "ur": "Create Purchase Invoice (`/purchase-invoices/create`) کھولیں، سپلائر منتخب کریں اور بل نمبر لکھیں۔"
+            "en": "Open Create Purchase Invoice (`/purchase-invoices/create` or `Alt+1`), select the Supplier *, and enter their paper Invoice # and printed Bill Amt so the Diff box verifies accuracy within ±5 Rs.",
+            "ur": "Create Purchase Invoice (`/purchase-invoices/create`) کھولیں، سپلائر، بل نمبر اور بل کی کل رقم (Bill Amt) لکھیں۔"
           },
           "checkpoint": {
-            "en": "Matching the supplier's physical invoice number makes ledger audits effortless.",
-            "ur": "سپلائر کا اصل بل نمبر لکھنے سے کھاتہ ملانا آسان رہتا ہے۔"
+            "en": "Matching the supplier's printed Bill Amt within ±5 Rs prevents accidental data entry errors.",
+            "ur": "سپلائر کے بل کی کل رقم Bill Amt میں لکھنے سے غلطی کا امکان ختم ہو جاتا ہے۔"
           }
         },
         {
@@ -12353,16 +12353,16 @@
             "ur": "نیا پرچیز بل"
           },
           "title": {
-            "en": "Enter Product, Batch #, Expiry, Qty & Bonus",
-            "ur": "پروڈکٹ، بیچ نمبر، ایکسپائری، مقدار اور بونس لکھیں"
+            "en": "Enter Product, Batch, Expiry, Pack/Unit Qty, Bonus & Sale Prices",
+            "ur": "پروڈکٹ، بیچ، ایکسپائری، مقدار، بونس اور قیمتِ فروخت لکھیں"
           },
           "instruction": {
-            "en": "Add each received product and fill in Batch Number, Expiry Date, Pack/Unit Quantity, Bonus Units, Purchase Cost, and Retail Price (MRP).",
+            "en": "Add each received product and fill in Batch, Exp Date, Pack.Q / Unit.Q, Purchase Price (Pack.P / Unit.P), Disc%, PBonus / UBonus, Retail Sale Price (Pack.S / Unit.S), and Wholesale Price.",
             "ur": "پروڈکٹ منتخب کریں اور بیچ نمبر، ایکسپائری تاریخ، مقدار، بونس یونٹس اور قیمتِ خرید و فروخت درج کریں۔"
           },
           "checkpoint": {
-            "en": "Bonus units increase your physical batch stock at zero extra cost!",
-            "ur": "بونس یونٹس مفت اسٹاک کے طور پر آپ کے بیچ میں جمع ہو جاتے ہیں۔"
+            "en": "Bonus units increase your physical batch stock and automatically lower your effective Avg unit cost!",
+            "ur": "بونس یونٹس مفت اسٹاک کے طور پر جمع ہوتے ہیں اور اوسط لاگت (Avg Cost) کم کرتے ہیں۔"
           }
         },
         {
@@ -12373,12 +12373,12 @@
             "ur": "نیا پرچیز بل"
           },
           "title": {
-            "en": "Enter Paid Amount (or 0 for Credit) & Save",
-            "ur": "ادا شدہ رقم لکھیں (یا ادھار رکھیں) اور Save دبائیں"
+            "en": "Select Payment Account, Enter Total Paid & Save (Alt+S)",
+            "ur": "پیمنٹ اکاؤنٹ اور ادا شدہ رقم لکھیں اور Save (Alt+S) دبائیں"
           },
           "instruction": {
-            "en": "Enter any cash/bank Paid Amount (or leave 0 for supplier credit payable) and press Save (`Ctrl+S`).",
-            "ur": "اگر نقد ادائیگی کی ہے تو Paid Amount لکھیں ورنہ ادھار کے لیے 0 چھوڑ کر Save (`Ctrl+S`) دبائیں۔"
+            "en": "Choose the Payment Account, enter Total Paid (or 0 for Credit payable), and press Save Purchase Invoice (`Alt+S`).",
+            "ur": "پیمنٹ اکاؤنٹ اور ادا شدہ رقم (Total Paid) لکھیں یا ادھار رکھ کر Save Purchase Invoice (`Alt+S`) دبائیں۔"
           },
           "checkpoint": {
             "en": "Walkthrough complete! Batch stock and Supplier Ledger update immediately on Save.",
@@ -12404,12 +12404,12 @@
             "ur": "بارکوڈ POS ٹرمینل"
           },
           "title": {
-            "en": "Scan Barcode or Search Medicine (F2)",
-            "ur": "بارکوڈ اسکین کریں یا نام سے سرچ کریں (F2)"
+            "en": "Scan Barcode Hands-Free or Search Medicine (F3 / F2)",
+            "ur": "بارکوڈ اسکین کریں یا نام سے سرچ کریں (F3 / F2)"
           },
           "instruction": {
-            "en": "Open Barcode POS (`/sale-invoices/pos`). Scan an item's barcode or press `F2` to search by name or generic salt.",
-            "ur": "بارکوڈ POS (`/sale-invoices/pos`) کھولیں اور بارکوڈ اسکین کریں یا `F2` دبا کر نام سے سرچ کریں۔"
+            "en": "Open Barcode POS (`/sale-invoices/pos`). Scan an item's barcode hands-free, press `F3` to search by name/salt, or press `F2` to type a barcode manually.",
+            "ur": "بارکوڈ POS (`/sale-invoices/pos`) کھولیں اور بارکوڈ اسکین کریں یا `F3` دبا کر نام سے سرچ کریں۔"
           },
           "checkpoint": {
             "en": "FEFO automatically selects the batch expiring soonest to prevent expiry loss.",
@@ -12424,16 +12424,16 @@
             "ur": "بارکوڈ POS ٹرمینل"
           },
           "title": {
-            "en": "Adjust Pack / Loose Units & Discount",
-            "ur": "پیک یا کھلی گولیوں کی تعداد اور ڈسکاؤنٹ درج کریں"
+            "en": "Adjust Cart Quantity (-/+), Substitutes & Park Cart (F8)",
+            "ur": "کارٹ میں مقدار (-/+)، متبادل دوائی اور ہولڈ بل (F8)"
           },
           "instruction": {
-            "en": "Set Pack or Loose Unit quantities and optional discount. If the customer needs to pause, press `F8` to Hold the bill.",
-            "ur": "پورا ڈبہ یا کھلی گولیوں کی تعداد لکھیں۔ اگر بل روکنا ہو تو `F8` (Hold) دبائیں۔"
+            "en": "Adjust Unit Quantity (-/+), switch the FEFO Batch, click 'Substitutes' for generic salt alternatives, or press `F8` to Park (Hold) the cart.",
+            "ur": "کارٹ میں مقدار یا ڈسکاؤنٹ ایڈجسٹ کریں، متبادل دوائی دیکھیں، یا بل روکنے کے لیے `F8` (Park) دبائیں۔"
           },
           "checkpoint": {
-            "en": "Selling loose units automatically deducts from the pack's unit count.",
-            "ur": "کھلی گولیاں بیچنے سے ڈبے کے یونٹس خودکار کم ہو جاتے ہیں۔"
+            "en": "Repeated barcode scans automatically increment the item's quantity in the cart.",
+            "ur": "بار بار اسکین کرنے سے آئٹم کی تعداد خودکار بڑھتی جاتی ہے۔"
           }
         },
         {
@@ -12444,12 +12444,12 @@
             "ur": "بارکوڈ POS ٹرمینل"
           },
           "title": {
-            "en": "Collect Cash / Bank Payment & Print Receipt (Ctrl+P)",
-            "ur": "نقد یا بینک رقم وصول کریں اور سلپ پرنٹ کریں"
+            "en": "Select Payment Method, Enter Cash Given (Alt+C) & Complete Sale (F4 / Alt+S)",
+            "ur": "پیمنٹ کا طریقہ منتخب کریں اور بل مکمل کریں (F4 / Alt+S)"
           },
           "instruction": {
-            "en": "Enter Cash Received to see instant Change Due, then press `Ctrl+P` (Save & Print) or `Ctrl+S` (Save).",
-            "ur": "وصول شدہ رقم درج کریں اور `Ctrl+P` دبا کر بل محفوظ اور پرنٹ کر لیں۔"
+            "en": "Choose Cash, Card / POS, Wallet, or Split / Credit, enter Cash Given (or press `Alt+C` for Exact Cash), and press `F4` or `Alt+S` to Complete Sale & Print.",
+            "ur": "وصول شدہ رقم درج کریں (`Alt+C`) اور `F4` یا `Alt+S` دبا کر بل محفوظ اور پرنٹ کر لیں۔"
           },
           "checkpoint": {
             "en": "Walkthrough complete! Stock, Cash Drawer, COGS, and General Ledger are all updated.",
@@ -12475,16 +12475,16 @@
             "ur": "ریٹیل سیل انوائس"
           },
           "title": {
-            "en": "Choose Walk-In or Credit Customer",
-            "ur": "نقد یا ادھار والا گاہک منتخب کریں"
+            "en": "Choose Walk-In or Credit Customer & Clinical Details",
+            "ur": "نقد یا ادھار والا گاہک اور ڈاکٹر/مریض کا نام منتخب کریں"
           },
           "instruction": {
-            "en": "Open Create Retail Invoice (`/sale-invoices/create/retail` or `Alt+2`) and select either Walk-In Customer or a named Customer for Udhar/Credit.",
-            "ur": "Create Retail Invoice (`/sale-invoices/create/retail`) کھولیں اور گاہک منتخب کریں۔"
+            "en": "Open Create Retail Invoice (`/sale-invoices/create/retail`), toggle Debit (Cash) or Credit (Udhar) with `Alt+T`, and select Walk-In Customer or a registered Customer.",
+            "ur": "Create Retail Invoice (`/sale-invoices/create/retail`) کھولیں، `Alt+T` سے نقد یا ادھار منتخب کریں اور گاہک سلیکٹ کریں۔"
           },
           "checkpoint": {
-            "en": "Named customers allow partial payment or full credit (`Udhar`) tracking.",
-            "ur": "رجسٹرڈ گاہک منتخب کرنے سے ادھار کھاتہ خودکار منیج ہوتا ہے۔"
+            "en": "Named customers display a live Credit Limit, Ledger Balance, and Due Date strip.",
+            "ur": "رجسٹرڈ گاہک منتخب کرنے پر اس کی کریڈٹ لمٹ اور پچھلا بقایا نظر آتا ہے۔"
           }
         },
         {
@@ -12495,16 +12495,16 @@
             "ur": "ریٹیل سیل انوائس"
           },
           "title": {
-            "en": "Add Products, Verify Batch & Check Line Totals",
-            "ur": "آئٹمز شامل کریں اور بیچ و ٹوٹل چیک کریں"
+            "en": "Add Products, FEFO Batch, Unit Qty * & Generic Substitutes (⇄)",
+            "ur": "پروڈکٹس، FEFO بیچ، یونٹ مقدار اور متبادل دوائی (⇄) شامل کریں"
           },
           "instruction": {
-            "en": "Search products, pick the batch, enter Pack or Unit quantity, and verify row discounts and tax.",
-            "ur": "پروڈکٹس شامل کریں، بیچ اور مقدار لکھیں اور ڈسکاؤنٹ چیک کریں۔"
+            "en": "Search products in the 12-column unit-based table, verify the auto-picked FEFO Batch, enter Qty * in units, or click the green Substitute (⇄) icon for same-salt alternatives.",
+            "ur": "ٹیبل میں پروڈکٹ سرچ کریں، بیچ چیک کریں، یونٹس کی تعداد (`Qty *`) اور ڈسکاؤنٹ لکھیں۔"
           },
           "checkpoint": {
-            "en": "Each line shows live available batch stock and expiry date.",
-            "ur": "ہر لائن میں موجودہ اسٹاک اور ایکسپائری نظر آتی ہے۔"
+            "en": "Each line shows live Pack Size (PSize), Expiry, Available Units (Avail), and Unit MRP.",
+            "ur": "ہر لائن میں پیک سائز، ایکسپائری اور موجودہ یونٹس (Avail) نظر آتے ہیں۔"
           }
         },
         {
@@ -12515,12 +12515,12 @@
             "ur": "ریٹیل سیل انوائس"
           },
           "title": {
-            "en": "Set Received Amount & Save / Print",
-            "ur": "وصول شدہ رقم لکھیں اور بل محفوظ کریں"
+            "en": "Select Payment Account, Cash Given & Create Sale (Alt+S)",
+            "ur": "پیمنٹ اکاؤنٹ، وصول شدہ رقم اور بل محفوظ کریں (Alt+S)"
           },
           "instruction": {
-            "en": "Enter Received Amount (any unpaid balance goes to Customer Udhar Ledger) and click Save & Print (`Ctrl+P`).",
-            "ur": "وصول شدہ رقم لکھیں (باقی رقم خودکار ادھار کھاتے میں جائے گی) اور Save دبائیں۔"
+            "en": "On the right summary sidebar, choose the Payment Method & Account, enter Cash Given (or adjust Received in Credit mode), and click 'Create Sale' (`Alt+S`).",
+            "ur": "دائیں جانب سمری پینل میں پیمنٹ اکاؤنٹ اور وصول شدہ رقم چیک کریں اور 'Create Sale' (`Alt+S`) دبائیں۔"
           },
           "checkpoint": {
             "en": "Walkthrough complete!",

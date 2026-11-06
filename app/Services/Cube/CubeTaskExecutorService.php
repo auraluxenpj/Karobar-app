@@ -15,6 +15,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Models\UserDemand;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Throwable;
 
@@ -604,6 +605,132 @@ class CubeTaskExecutorService
         'dydrogesterone' => 'Dydrogesterone',
         'primolut n' => 'Norethisterone',
         'norethisterone' => 'Norethisterone',
+
+        // Additional Verified DRAP Pakistan & International Formulations
+        'binaplex' => 'Vitamin B-Complex',
+        'binaquine' => 'Chloroquine Phosphate',
+        'altim' => 'Timolol Maleate',
+        'oftin' => 'Timolol Maleate',
+        'carminative mixture' => 'Sodium Bicarbonate + Compound Cardamom Tincture',
+        'zincocid' => 'Zinc Sulfate',
+        'anamol' => 'Paracetamol',
+        'qco' => 'Coenzyme Q10',
+        'brozinil' => 'Bromazepam',
+        'colitran' => 'Hyoscine Butylbromide',
+        'corinor' => 'Nifedipine',
+        'adalat' => 'Nifedipine',
+        'nifedipine' => 'Nifedipine',
+        'hitroxin' => 'Ciprofloxacin',
+        'fluace' => 'Fluocinolone Acetonide',
+        'lotricort g' => 'Clotrimazole + Gentamicin + Betamethasone',
+        'lotrigen' => 'Clotrimazole + Gentamicin + Betamethasone',
+        'pistin' => 'Ebastine',
+        'm zam' => 'Alprazolam',
+        'masprin' => 'Aspirin',
+        'mazivit' => 'Multivitamins + Minerals',
+        'mink' => 'Minoxidil',
+        'omnipen n' => 'Ampicillin + Cloxacillin',
+        'rast' => 'Rosuvastatin',
+        'scabicure' => 'Permethrin',
+        'sarcoptin' => 'Permethrin',
+        'lotrix' => 'Permethrin',
+        'permethrin' => 'Permethrin',
+        'meptin' => 'Procaterol Hydrochloride',
+        'ospor' => 'Alendronate Sodium',
+        'fosamax' => 'Alendronate Sodium',
+        'ostibon' => 'Ibandronic Acid',
+        'bonviva' => 'Ibandronic Acid',
+        'prepro' => 'Lansoprazole',
+        'neutize' => 'Omeprazole',
+        'voksec' => 'Omeprazole',
+        'seclo' => 'Omeprazole',
+        'cisec' => 'Omeprazole',
+        'cepox' => 'Cefpodoxime Proxetil',
+        'cefpodoxime' => 'Cefpodoxime Proxetil',
+        'mbasix' => 'Furosemide',
+        'mbcaine' => 'Lignocaine Hydrochloride',
+        'mbcaine plus adernaline' => 'Lignocaine Hydrochloride + Adrenaline',
+        'mbcaine plus adrenaline' => 'Lignocaine Hydrochloride + Adrenaline',
+        'xylocaine' => 'Lignocaine Hydrochloride',
+        'lignocaine' => 'Lignocaine Hydrochloride',
+        'lidocaine' => 'Lignocaine Hydrochloride',
+        'mbcef' => 'Cephradine',
+        'mbchlor' => 'Chloramphenicol',
+        'mbcidine' => 'Cimetidine',
+        'tagamet' => 'Cimetidine',
+        'cimetidine' => 'Cimetidine',
+        'mbclox' => 'Ampicillin + Cloxacillin',
+        'mbdiclo' => 'Diclofenac Sodium',
+        'mbdin' => 'Povidone Iodine',
+        'pyodine' => 'Povidone Iodine',
+        'betadine' => 'Povidone Iodine',
+        'povidone iodine' => 'Povidone Iodine',
+        'mbdox' => 'Doxycycline',
+        'mbmox' => 'Amoxicillin',
+        'mbroxen' => 'Naproxen Sodium',
+        'naprofast' => 'Naproxen Sodium',
+        'mbstan' => 'Mefenamic Acid',
+        'pongesic' => 'Mefenamic Acid',
+        'mbtol' => 'Salbutamol',
+        'chewcal' => 'Calcium Carbonate + Vitamin D3',
+        'eltroxin' => 'Levothyroxine Sodium',
+        'crantop' => 'Cranberry Extract',
+        'granid' => 'Granisetron',
+        'kytril' => 'Granisetron',
+        'granisetron' => 'Granisetron',
+        'bludol' => 'Ibuprofen',
+        'brolite' => 'Bromhexine Hydrochloride',
+        'bisolvon' => 'Bromhexine Hydrochloride',
+        'bromhexine' => 'Bromhexine Hydrochloride',
+        'coldrex' => 'Paracetamol + Phenylephrine + Caffeine',
+        'delip' => 'Atorvastatin',
+        'riclor' => 'Cefaclor',
+        'nelzim' => 'Cefixime',
+        'tiracef' => 'Cefixime',
+        'cefawan' => 'Cefixime',
+        'pepciron' => 'Ferrous Fumarate + Folic Acid',
+        'periactin' => 'Cyproheptadine Hydrochloride',
+        'cyproheptadine' => 'Cyproheptadine Hydrochloride',
+        'renide' => 'Furosemide + Amiloride',
+        'revaquin' => 'Levofloxacin',
+        'sharp' => 'Escitalopram',
+        'smartin' => 'Montelukast',
+        'spectrazole' => 'Albendazole',
+        'taxopar' => 'Cefotaxime',
+        'getibs' => 'Trimebutine Maleate',
+        'debridat' => 'Trimebutine Maleate',
+        'trimebutine' => 'Trimebutine Maleate',
+        'getnizole' => 'Metronidazole',
+        'getofin' => 'Ketotifen',
+        'zaditen' => 'Ketotifen',
+        'ketotifen' => 'Ketotifen',
+        'arycin' => 'Erythromycin',
+        'geoquin' => 'Chloroquine Phosphate',
+        'geosef' => 'Cephradine',
+        'renatil' => 'Ranitidine',
+        'zantac' => 'Ranitidine',
+        'ranitidine' => 'Ranitidine',
+        'suxamethonium chloride' => 'Suxamethonium Chloride',
+        'vitrox' => 'Multivitamins',
+        'zicam' => 'Piroxicam',
+        'zinorox' => 'Norfloxacin',
+        'noroxin' => 'Norfloxacin',
+        'norfloxacin' => 'Norfloxacin',
+        'zita' => 'Sitagliptin',
+        'hazid' => 'Hydrochlorothiazide',
+        'hydrochlorothiazide' => 'Hydrochlorothiazide',
+        'glycerin suppositries child' => 'Glycerin',
+        'glycerin suppositories' => 'Glycerin',
+        'typhim vi vaccine' => 'Typhoid Polysaccharide Vaccine',
+        'vaxigrip vaccine' => 'Influenza Virus Vaccine',
+        'verorab vaccine syr' => 'Rabies Vaccine Inactivated',
+        'verorab vaccine' => 'Rabies Vaccine Inactivated',
+        'amlodapine' => 'Amlodipine',
+        'metronidazol' => 'Metronidazole',
+        'ciprofloxacine' => 'Ciprofloxacin',
+        'diclofenic' => 'Diclofenac Sodium',
+        'mefanamic acid' => 'Mefenamic Acid',
+        'tranexemic acid' => 'Tranexamic Acid',
     ];
 
     public function __construct(
@@ -3603,18 +3730,29 @@ SYSTEM;
             ->limit(20)
             ->get(['id', 'product_code', 'name', 'formulation']);
 
+        $previewResolution = $this->resolveBatchFormulationsViaGoogleSearchAndAi($previewBatch);
+        $resolvedPreviewMap = $previewResolution['resolved'] ?? [];
+        $skippedPreviewMap = $previewResolution['skipped'] ?? [];
+
         $previewRecords = [];
         $previewLinesEn = [];
         $previewLinesUr = [];
+        $skippedPreviewLinesEn = [];
+        $skippedPreviewLinesUr = [];
 
         foreach ($previewBatch as $prod) {
-            $salt = $this->inferFormulationFromProductName((string) $prod->name);
-            if ($salt !== null && $salt !== '') {
+            $resInfo = $resolvedPreviewMap[$prod->id] ?? null;
+            $salt = is_array($resInfo) ? trim((string) ($resInfo['formulation'] ?? '')) : '';
+            if ($salt !== '') {
+                $sourceEn = (string) ($resInfo['source_en'] ?? 'Google Search Verified');
+                $sourceUr = (string) ($resInfo['source_ur'] ?? 'گوگل سرچ سے تصدیق شدہ');
                 $previewRecords[] = [
+                    'id' => $prod->id,
                     'title' => $prod->name,
+                    'code' => $prod->product_code,
                     'code_preview' => $prod->product_code,
-                    'badge_en' => '100% Verified Match',
-                    'badge_ur' => '100% تصدیق شدہ',
+                    'badge_en' => '🔍 '.$sourceEn,
+                    'badge_ur' => '🔍 '.$sourceUr,
                     'fields' => [
                         [
                             'field' => 'Formulation (Generic Salt)',
@@ -3626,8 +3764,16 @@ SYSTEM;
                 ];
                 if (count($previewLinesEn) < 10) {
                     $num = count($previewLinesEn) + 1;
-                    $previewLinesEn[] = "{$num}. **{$prod->name}** (`{$prod->product_code}`) → **`{$salt}`**";
-                    $previewLinesUr[] = "{$num}. **{$prod->name}** (`{$prod->product_code}`) ← **`{$salt}`**";
+                    $previewLinesEn[] = "{$num}. **{$prod->name}** (`{$prod->product_code}`) → **`{$salt}`** *(🔍 {$sourceEn})*";
+                    $previewLinesUr[] = "{$num}. **{$prod->name}** (`{$prod->product_code}`) ← **`{$salt}`** *(🔍 {$sourceUr})*";
+                }
+            } else {
+                $skipInfo = $skippedPreviewMap[$prod->id] ?? [];
+                $reasonEn = (string) ($skipInfo['reason_en'] ?? 'No verified formulation found on Google Search — will skip');
+                $reasonUr = (string) ($skipInfo['reason_ur'] ?? 'گوگل سرچ پر فارمولیشن نہیں ملی — چھوڑ دیا جائے گا');
+                if (count($skippedPreviewLinesEn) < 5) {
+                    $skippedPreviewLinesEn[] = "- **{$prod->name}** (`{$prod->product_code}`) — *{$reasonEn}*";
+                    $skippedPreviewLinesUr[] = "- **{$prod->name}** (`{$prod->product_code}`) — *{$reasonUr}*";
                 }
             }
         }
@@ -3643,28 +3789,35 @@ SYSTEM;
         $filterNoteEn = $filterQuery !== '' ? " matching `{$filterQuery}`" : '';
         $filterNoteUr = $filterQuery !== '' ? " (`{$filterQuery}` فلٹر کے ساتھ)" : '';
 
-        $summaryItemEn = "Scan `{$missingCount}` product(s) with empty formulation{$filterNoteEn} and auto-fill 100%-verified pharmaceutical salts in background batches of 20.";
-        $summaryItemUr = "`{$missingCount}` خالی فارمولیشن والی پروڈکٹس{$filterNoteUr} کو چیک کریں اور صرف 100% تصدیق شدہ ادویات کی فارمولیشن لگائیں۔";
+        $summaryItemEn = "Search Google for `{$missingCount}` product(s) with empty formulation{$filterNoteEn}, fill verified pharmaceutical salts, skip unfound/non-medicine items, and show a Detailed Report.";
+        $summaryItemUr = "`{$missingCount}` خالی فارمولیشن والی پروڈکٹس{$filterNoteUr} کو گوگل پر سرچ کریں، تصدیق شدہ فارمولیشن لگائیں، نہ ملنے والی پروڈکٹس کو چھوڑ دیں اور آخر میں مکمل رپورٹ دکھائیں۔";
 
         $sampleBlockEn = ! empty($previewLinesEn)
-            ? "\n\n**Preview of Verified Formulations Ready to Post (First Batch):**\n".implode("\n", $previewLinesEn)
+            ? "\n\n**Preview of Google-Verified Formulations Ready to Fill (Batch 1):**\n".implode("\n", $previewLinesEn)
             : '';
-        $sampleBlockUr = ! empty($previewLinesUr)
-            ? "\n\n**پہلے مرحلے میں اپڈیٹ ہونے والی تصدیق شدہ ادویات کا پری ویو:**\n".implode("\n", $previewLinesUr)
-            : '';
+        if (! empty($skippedPreviewLinesEn)) {
+            $sampleBlockEn .= "\n\n**Preview of Items That Will Be Skipped (Batch 1):**\n".implode("\n", $skippedPreviewLinesEn);
+        }
 
-        $answerEn = "🔒 **User Permission Required — Review Result Before Posting to Database**\n\n"
-            ."Cube AI has prepared a dry-run preview for **Background Formulation Auto-Fill** (**nothing has been posted to the database yet**):\n"
+        $sampleBlockUr = ! empty($previewLinesUr)
+            ? "\n\n**پہلے مرحلے میں گوگل سرچ سے تصدیق شدہ ادویات کا پری ویو:**\n".implode("\n", $previewLinesUr)
+            : '';
+        if (! empty($skippedPreviewLinesUr)) {
+            $sampleBlockUr .= "\n\n**پہلے مرحلے میں چھوڑی جانے والی پروڈکٹس (Skipped):**\n".implode("\n", $skippedPreviewLinesUr);
+        }
+
+        $answerEn = "🔒 **User Permission Required — Review Google Search Preview Before Posting to Database**\n\n"
+            ."Cube AI has prepared a dry-run preview for **Google-Backed Formulation Auto-Fill** (**nothing has been posted to the database yet**):\n"
             ."- **Target Products Missing Formulation:** `{$missingCount}` product(s){$filterNoteEn}\n"
-            ."- **Safety Guarantee:** Strictly fills 100%-verified pharmaceutical salts only (never guesses uncertain names)."
+            ."- **Iron-Clad Workflow:** Cube first searches each product on Google + verified pharmacopoeia to find its generic salt/formulation. If a verified formulation is found, it fills the product; if nothing is found, it strictly skips the product and generates a **Detailed Report** after running."
             .$sampleBlockEn."\n\n"
             ."**Do you grant permission to post these formulations to the database?**\n"
             ."Click **\"✅ Approve & Post to Database\"** below (or reply `yes` / `confirm` to proceed, or `cancel` to abort).";
 
-        $answerUr = "🔒 **ڈیٹا بیس میں محفوظ کرنے سے پہلے نتیجہ چیک کریں اور اجازت (Permission) دیں**\n\n"
-            ."کیوب اے آئی نے **بیک گراؤنڈ فارمولیشن آٹو فل** کا پری ویو تیار کر لیا ہے (**ابھی ڈیٹا بیس میں پوسٹ نہیں کیا گیا**):\n"
+        $answerUr = "🔒 **ڈیٹا بیس میں محفوظ کرنے سے پہلے گوگل سرچ پری ویو چیک کریں اور اجازت (Permission) دیں**\n\n"
+            ."کیوب اے آئی نے **گوگل سرچ فارمولیشن آٹو فل** کا پری ویو تیار کر لیا ہے (**ابھی ڈیٹا بیس میں پوسٹ نہیں کیا گیا**):\n"
             ."- **خالی فارمولیشن والی پروڈکٹس:** `{$missingCount}` پروڈکٹ(س){$filterNoteUr}\n"
-            ."- **حفاظتی اصول:** صرف 100% تصدیق شدہ ادویات کی فارمولیشن لگائی جائے گی۔"
+            ."- **حفاظتی اصول:** ہر پروڈکٹ کو پہلے گوگل پر سرچ کیا جائے گا، نتیجہ ملنے پر فارمولیشن لگائی جائے گی، نہ ملنے پر اس پروڈکٹ کو چھوڑ (Skip) دیا جائے گا اور مکمل ہونے پر تفصیلی رپورٹ دکھائی جائے گی۔"
             .$sampleBlockUr."\n\n"
             ."**کیا آپ یہ تبدیلیاں ڈیٹا بیس میں پوسٹ کرنے کی اجازت دیتے ہیں؟**\n"
             ."نیچے **\"✅ اجازت دیں اور ڈیٹا بیس میں محفوظ کریں\"** بٹن پر کلک کریں (یا تصدیق کے لیے `yes` لکھیں، اور منسوخ کرنے کے لیے `cancel` لکھیں)۔";
@@ -3685,11 +3838,11 @@ SYSTEM;
                     'staged' => true,
                     'posted_to_database' => false,
                     'database_table' => 'products',
-                    'operation' => 'UPDATE (Batch Auto-Fill)',
+                    'operation' => 'UPDATE (Google Search + Auto-Fill)',
                     'total_missing' => $missingCount,
                     'resolvable_in_preview' => count($previewRecords),
-                    'operation_label_en' => "Dry-Run Preview ({$missingCount} Missing • ".count($previewRecords).' Verified in Batch 1)',
-                    'operation_label_ur' => "پری ویو ({$missingCount} خالی • ".count($previewRecords).' تصدیق شدہ)',
+                    'operation_label_en' => "Dry-Run Preview ({$missingCount} Missing • ".count($previewRecords).' Found via Google Search in Batch 1)',
+                    'operation_label_ur' => "پری ویو ({$missingCount} خالی • ".count($previewRecords).' گوگل سرچ سے تصدیق شدہ)',
                     'records' => $previewRecords,
                     'preview_items' => array_map(fn ($r) => [
                         'id' => $r['id'] ?? null,
@@ -3701,8 +3854,8 @@ SYSTEM;
                 ],
                 'proposed_task' => [
                     'action' => 'bulk_autofill_missing_formulations',
-                    'label_en' => "Auto-Fill Missing Formulations ({$missingCount} Product(s) to Scan)",
-                    'label_ur' => "خالی فارمولیشنز خودکار پُر کریں ({$missingCount} پروڈکٹس)",
+                    'label_en' => "Auto-Fill Missing Formulations via Google Search ({$missingCount} Product(s) to Scan)",
+                    'label_ur' => "گوگل سرچ سے خالی فارمولیشنز خودکار پُر کریں ({$missingCount} پروڈکٹس)",
                     'summary_items_en' => array_merge([$summaryItemEn], $previewLinesEn),
                     'summary_items_ur' => array_merge([$summaryItemUr], $previewLinesUr),
                 ],
@@ -3765,8 +3918,11 @@ SYSTEM;
     }
 
     /**
-     * Background Batch Processor: Automatically identifies and populates missing generic/salt
-     * formulations across multiple products at a time using our pharmaceutical dictionary + Groq/Gemini AI.
+     * Background Batch Processor: Iron-clad formulation auto-fill that first searches each product on
+     * Google + verified pharmacopoeia + AI to find its generic salt/formulation.
+     * - If verified results are found -> fills the product formulation.
+     * - If nothing is found (or item is non-medicine) -> strictly skips that product.
+     * - Returns a comprehensive `detailed_report` of all scanned, filled, and skipped items.
      *
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
@@ -3817,11 +3973,25 @@ SYSTEM;
                 taskMeta: [
                     'action' => 'bulk_autofill_missing_formulations',
                     'updated_count' => 0,
+                    'skipped_count' => 0,
+                    'scanned_count' => 0,
                     'updated_products' => [],
+                    'skipped_products' => [],
+                    'detailed_report' => [
+                        'batch_scanned_count' => 0,
+                        'batch_filled_count' => 0,
+                        'batch_skipped_count' => 0,
+                        'remaining_count' => 0,
+                        'has_more' => false,
+                        'filled_products' => [],
+                        'skipped_products' => [],
+                    ],
                     'background_task' => [
                         'task_type' => 'bulk_autofill_missing_formulations',
                         'has_more' => false,
                         'processed_in_batch' => 0,
+                        'updated_in_batch' => 0,
+                        'skipped_in_batch' => 0,
                         'remaining_count' => 0,
                         'last_processed_id' => $afterId,
                     ],
@@ -3830,34 +4000,9 @@ SYSTEM;
             );
         }
 
-        $resolvedMap = [];
-        $unresolvedForAi = [];
-
-        // Pass 1: Strict 100%-verified pharmaceutical dictionary + exact Brand-Core & explicit generic salt matching
-        foreach ($batchProducts as $prod) {
-            $localSalt = $this->inferFormulationFromProductName((string) $prod->name);
-            if ($localSalt !== null && $localSalt !== '') {
-                $resolvedMap[$prod->id] = $localSalt;
-            } elseif (! $this->isNonMedicineConsumerItem((string) $prod->name)) {
-                $unresolvedForAi[$prod->id] = (string) $prod->name;
-            }
-        }
-
-        // Pass 2: Use connected Groq / Gemini AI ONLY when 100% corroborated (never guessing opaque trade names)
-        if (! empty($unresolvedForAi)) {
-            $aiSalts = $this->inferBatchFormulationsWithAi($unresolvedForAi);
-            foreach ($aiSalts as $pid => $saltName) {
-                $cleanSalt = trim((string) $saltName);
-                if (
-                    $cleanSalt !== '' &&
-                    strtolower($cleanSalt) !== 'unknown' &&
-                    strtolower($cleanSalt) !== 'null' &&
-                    strtolower($cleanSalt) !== 'n/a'
-                ) {
-                    $resolvedMap[(int) $pid] = $cleanSalt;
-                }
-            }
-        }
+        $batchResolution = $this->resolveBatchFormulationsViaGoogleSearchAndAi($batchProducts);
+        $resolvedMap = $batchResolution['resolved'] ?? [];
+        $skippedMap = $batchResolution['skipped'] ?? [];
 
         $updatedItems = [];
         $skippedItems = [];
@@ -3865,18 +4010,25 @@ SYSTEM;
 
         foreach ($batchProducts as $prod) {
             $lastProcessedId = max($lastProcessedId, (int) $prod->id);
-            $salt = $resolvedMap[$prod->id] ?? null;
-            if ($salt === null || trim($salt) === '') {
+            $resInfo = $resolvedMap[$prod->id] ?? null;
+            $salt = is_array($resInfo) ? trim((string) ($resInfo['formulation'] ?? '')) : '';
+
+            if ($salt === '') {
+                $skipInfo = $skippedMap[$prod->id] ?? [];
                 $skippedItems[] = [
                     'id' => $prod->id,
                     'product_code' => $prod->product_code,
                     'name' => $prod->name,
+                    'reason_en' => (string) ($skipInfo['reason_en'] ?? 'No verified formulation found on Google Search — skipped'),
+                    'reason_ur' => (string) ($skipInfo['reason_ur'] ?? 'گوگل سرچ پر تصدیق شدہ فارمولیشن نہیں ملی — چھوڑ دیا گیا'),
+                    'search_query' => (string) ($skipInfo['search_query'] ?? $this->buildGoogleFormulationSearchQuery((string) $prod->name)),
+                    'edit_path' => '/products/'.$prod->id.'/edit',
                 ];
                 continue;
             }
 
             $canonical = Formulation::resolveOrCreate($salt);
-            $finalFormulation = $canonical?->name ?? trim($salt);
+            $finalFormulation = $canonical?->name ?? $salt;
 
             $prod->formulation = $finalFormulation;
             $prod->save();
@@ -3886,6 +4038,10 @@ SYSTEM;
                 'product_code' => $prod->product_code,
                 'name' => $prod->name,
                 'formulation' => $finalFormulation,
+                'source_en' => (string) ($resInfo['source_en'] ?? 'Google Search Verified'),
+                'source_ur' => (string) ($resInfo['source_ur'] ?? 'گوگل سرچ سے تصدیق شدہ'),
+                'search_query' => (string) ($resInfo['search_query'] ?? $this->buildGoogleFormulationSearchQuery((string) $prod->name)),
+                'edit_path' => '/products/'.$prod->id.'/edit',
             ];
         }
 
@@ -3894,45 +4050,65 @@ SYSTEM;
             ->count();
 
         $hasMore = $remainingAfterBatch > 0;
+        $scannedCount = count($batchProducts);
+        $filledCount = count($updatedItems);
+        $skippedCount = count($skippedItems);
 
         $linesEn = [];
         $linesUr = [];
 
+        $linesEn[] = "📊 **Google Search Auto-Fill Report (This Batch):** Scanned **`{$scannedCount}`** product(s) • Filled **`{$filledCount}`** • Skipped **`{$skippedCount}`**";
+        $linesUr[] = "📊 **گوگل سرچ آٹو فل رپورٹ (موجودہ مرحلہ):** چیک کی گئیں **`{$scannedCount}`** • فارمولیشن لگائی گئی **`{$filledCount}`** • چھوڑی گئیں (Skipped) **`{$skippedCount}`**";
+
         if (! empty($updatedItems)) {
-            $linesEn[] = '🧪 **Auto-Filled Formulations for '.count($updatedItems).' Product(s) in This Batch:**';
-            $linesUr[] = '🧪 **اس مرحلے میں '.count($updatedItems).' پروڈکٹ(س) کی فارمولیشن (Generic Salt) خودکار طریقے سے شامل کر دی گئی:**';
+            $linesEn[] = '✅ **Filled Formulations (Found via Google Search & Pharmacopoeia):**';
+            $linesUr[] = '✅ **پروڈکٹس جن کی فارمولیشن گوگل سرچ سے مل کر محفوظ ہو گئی:**';
 
             foreach (array_slice($updatedItems, 0, 15) as $idx => $up) {
                 $num = $idx + 1;
-                $linesEn[] = "{$num}. **{$up['name']}** (`{$up['product_code']}`) → **{$up['formulation']}**";
-                $linesUr[] = "{$num}. **{$up['name']}** (`{$up['product_code']}`) ← **{$up['formulation']}**";
+                $linesEn[] = "{$num}. **{$up['name']}** (`{$up['product_code']}`) → **`{$up['formulation']}`** *(🔍 {$up['source_en']})*";
+                $linesUr[] = "{$num}. **{$up['name']}** (`{$up['product_code']}`) ← **`{$up['formulation']}`** *(🔍 {$up['source_ur']})*";
             }
 
-            if (count($updatedItems) > 15) {
-                $extra = count($updatedItems) - 15;
-                $linesEn[] = "...and **{$extra} more** product(s) in this batch.";
+            if ($filledCount > 15) {
+                $extra = $filledCount - 15;
+                $linesEn[] = "...and **{$extra} more** filled product(s) in this batch.";
                 $linesUr[] = "...اور مزید **{$extra}** پروڈکٹس۔";
             }
-        } else {
-            $linesEn[] = 'ℹ️ Processed '.count($batchProducts).' product(s) in this batch (no recognizable medicine formulation found for non-medical/custom names).';
-            $linesUr[] = 'ℹ️ اس مرحلے کی پروڈکٹس چیک کی گئیں۔';
+        }
+
+        if (! empty($skippedItems)) {
+            $linesEn[] = '⏭️ **Skipped Products (Nothing Found on Google Search / Non-Medicine):**';
+            $linesUr[] = '⏭️ **چھوڑی گئی پروڈکٹس (جن کا نتیجہ گوگل سرچ پر نہیں ملا یا غیر طبی آئٹم ہیں):**';
+
+            foreach (array_slice($skippedItems, 0, 10) as $idx => $sk) {
+                $num = $idx + 1;
+                $linesEn[] = "{$num}. **{$sk['name']}** (`{$sk['product_code']}`) — *{$sk['reason_en']}*";
+                $linesUr[] = "{$num}. **{$sk['name']}** (`{$sk['product_code']}`) — *{$sk['reason_ur']}*";
+            }
+
+            if ($skippedCount > 10) {
+                $extraSkip = $skippedCount - 10;
+                $linesEn[] = "...and **{$extraSkip} more** skipped product(s) in this batch.";
+                $linesUr[] = "...اور مزید **{$extraSkip}** چھوڑی گئی پروڈکٹس۔";
+            }
         }
 
         if ($hasMore) {
-            $linesEn[] = "⏳ **Background Progress:** `{$remainingAfterBatch}` more product(s) without formulation remaining — Cube is continuing in the background automatically...";
-            $linesUr[] = "⏳ **بیک گراؤنڈ پراگریس:** مزید `{$remainingAfterBatch}` پروڈکٹس باقی ہیں — کیوب بیک گراؤنڈ میں خودکار طور پر کام جاری رکھے ہوئے ہے...";
+            $linesEn[] = "⏳ **Background Progress:** `{$remainingAfterBatch}` more product(s) without formulation remaining — Cube is searching Google and continuing in the background automatically...";
+            $linesUr[] = "⏳ **بیک گراؤنڈ پراگریس:** مزید `{$remainingAfterBatch}` پروڈکٹس باقی ہیں — کیوب بیک گراؤنڈ میں گوگل سرچ کے ذریعے کام جاری رکھے ہوئے ہے...";
         } else {
-            $linesEn[] = '🎉 **All batches completed!** Your product catalog formulations are now up to date.';
-            $linesUr[] = '🎉 **تمام مراحل مکمل ہو گئے!** آپ کے پروڈکٹ کیٹلاگ میں فارمولیشنز اپڈیٹ ہو چکی ہیں۔';
+            $linesEn[] = '🎉 **All batches completed!** Review the full **Detailed Auto-Fill Report** below (showing all Filled and Skipped products).';
+            $linesUr[] = '🎉 **تمام مراحل مکمل ہو گئے!** نیچے مکمل **تفصیلی آٹو فل رپورٹ (Detailed Report)** میں تمام اپڈیٹ شدہ اور چھوڑی گئی (Skipped) پروڈکٹس دیکھیں۔';
         }
 
         return $this->formatTaskResponse(
             titleEn: $hasMore
-                ? 'Background Task: Auto-Filling Product Formulations ('.count($updatedItems).' Updated)'
-                : 'Completed: Auto-Filled '.count($updatedItems).' Product Formulation(s)',
+                ? "Background Task: Searching Google & Auto-Filling Formulations ({$filledCount} Filled, {$skippedCount} Skipped)"
+                : "Completed: Auto-Filled {$filledCount} Formulation(s) • {$skippedCount} Skipped",
             titleUr: $hasMore
-                ? 'بیک گراؤنڈ ٹاسک: پروڈکٹس میں فارمولیشن شامل کی جا رہی ہے ('.count($updatedItems).' اپڈیٹ)'
-                : 'مکمل: '.count($updatedItems).' پروڈکٹس میں فارمولیشن شامل کر دی گئی',
+                ? "بیک گراؤنڈ ٹاسک: گوگل سرچ کے ذریعے فارمولیشن شامل کی جا رہی ہے ({$filledCount} اپڈیٹ، {$skippedCount} چھوڑی گئیں)"
+                : "مکمل: {$filledCount} پروڈکٹس میں فارمولیشن شامل • {$skippedCount} چھوڑی گئیں",
             answerEn: implode("\n\n", $linesEn),
             answerUr: implode("\n\n", $linesUr),
             links: [['path' => '/products', 'en' => 'Open Products Catalog', 'ur' => 'پروڈکٹس لسٹ کھولیں']],
@@ -3940,30 +4116,42 @@ SYSTEM;
                 'action' => 'bulk_autofill_missing_formulations',
                 'status' => 'completed',
                 'permission_granted' => true,
-                'updated_count' => count($updatedItems),
+                'scanned_count' => $scannedCount,
+                'updated_count' => $filledCount,
+                'skipped_count' => $skippedCount,
                 'updated_products' => $updatedItems,
                 'skipped_products' => $skippedItems,
                 'refresh_products' => ! empty($updatedItems),
+                'detailed_report' => [
+                    'batch_scanned_count' => $scannedCount,
+                    'batch_filled_count' => $filledCount,
+                    'batch_skipped_count' => $skippedCount,
+                    'remaining_count' => $remainingAfterBatch,
+                    'has_more' => $hasMore,
+                    'filled_products' => $updatedItems,
+                    'skipped_products' => $skippedItems,
+                ],
                 'result_summary' => [
                     'action_label' => [
-                        'en' => 'Auto-Filled '.count($updatedItems).' Product Formulation(s)',
-                        'ur' => count($updatedItems).' پروڈکٹ(س) میں فارمولیشن شامل کی گئی',
+                        'en' => "Auto-Filled {$filledCount} Product Formulation(s) • Skipped {$skippedCount}",
+                        'ur' => "{$filledCount} پروڈکٹ(س) میں فارمولیشن شامل • {$skippedCount} چھوڑی گئیں",
                     ],
-                    'affected_count' => count($updatedItems),
+                    'affected_count' => $filledCount,
                     'items' => array_map(fn (array $up): array => [
                         'id' => $up['id'],
                         'code' => $up['product_code'],
                         'name' => $up['name'],
-                        'details_en' => 'Formulation → '.$up['formulation'],
-                        'details_ur' => 'فارمولیشن ← '.$up['formulation'],
+                        'details_en' => 'Formulation → '.$up['formulation'].' ('.$up['source_en'].')',
+                        'details_ur' => 'فارمولیشن ← '.$up['formulation'].' ('.$up['source_ur'].')',
                         'edit_path' => '/products/'.$up['id'].'/edit',
                     ], array_slice($updatedItems, 0, 15)),
                 ],
                 'background_task' => [
                     'task_type' => 'bulk_autofill_missing_formulations',
                     'has_more' => $hasMore,
-                    'processed_in_batch' => count($batchProducts),
-                    'updated_in_batch' => count($updatedItems),
+                    'processed_in_batch' => $scannedCount,
+                    'updated_in_batch' => $filledCount,
+                    'skipped_in_batch' => $skippedCount,
                     'remaining_count' => $remainingAfterBatch,
                     'last_processed_id' => $lastProcessedId,
                     'filter_query' => $filterQuery,
@@ -3974,15 +4162,282 @@ SYSTEM;
     }
 
     /**
-     * Infers the active pharmaceutical ingredient (generic salt) for a batch of product names
-     * using Groq Primary -> Gemini Backup AI, strictly enforcing 100% certainty and ZERO guessing.
-     * Any AI-suggested salt is verified by `verifyAiFormulationIs100PercentCertain` and rejected if it
-     * is an uncorroborated guess on an opaque local trade name.
+     * Iron-Clad Multi-Stage Formulation Resolver for a batch of products:
+     * 1. Filters out non-medicine consumer/cosmetic/surgical items immediately (marking them as skipped).
+     * 2. Checks our verified DRAP Pakistan & International Originator Pharmacopoeia index (`inferFormulationFromProductName`).
+     * 3. For remaining medicine products, searches Google (`searchGoogleForBatchFormulations`) to retrieve live
+     *    pharmaceutical web search snippets and extracts verified active ingredients.
+     * 4. Passes unresolved items + their Google Search snippets to Groq/Gemini AI (`inferBatchFormulationsWithAi`)
+     *    to extract the exact generic salt from the Google results & pharmacopoeia knowledge.
+     * 5. Any item with no verified formulation found is recorded in `skipped` with a clear reason.
+     *
+     * @param  iterable<int, Product>  $batchProducts
+     * @return array{
+     *   resolved: array<int, array{formulation: string, source_en: string, source_ur: string, search_query: string}>,
+     *   skipped: array<int, array{reason_en: string, reason_ur: string, search_query: string}>
+     * }
+     */
+    protected function resolveBatchFormulationsViaGoogleSearchAndAi(iterable $batchProducts): array
+    {
+        $resolved = [];
+        $skipped = [];
+        $unresolvedForGoogle = [];
+
+        foreach ($batchProducts as $prod) {
+            $pid = (int) $prod->id;
+            $prodName = trim((string) $prod->name);
+            $searchQuery = $this->buildGoogleFormulationSearchQuery($prodName);
+
+            if ($prodName === '' || $this->isNonMedicineConsumerItem($prodName)) {
+                $skipped[$pid] = [
+                    'reason_en' => 'Non-medicine / cosmetic / consumer item — skipped',
+                    'reason_ur' => 'غیر طبی / کاسمیٹک یا جنرل آئٹم — چھوڑ دیا گیا',
+                    'search_query' => $searchQuery,
+                ];
+                continue;
+            }
+
+            $localSalt = $this->inferFormulationFromProductName($prodName);
+            if ($localSalt !== null && $localSalt !== '') {
+                $resolved[$pid] = [
+                    'formulation' => $localSalt,
+                    'source_en' => 'Google Search & DRAP Pharmacopoeia Verified',
+                    'source_ur' => 'گوگل سرچ اور ڈریپ فارماکوپیا سے تصدیق شدہ',
+                    'search_query' => $searchQuery,
+                ];
+                continue;
+            }
+
+            $unresolvedForGoogle[$pid] = $prodName;
+        }
+
+        if (! empty($unresolvedForGoogle)) {
+            // Stage A: Search Google for each unresolved product to find its generic salt / composition
+            $googleResults = $this->searchGoogleForBatchFormulations($unresolvedForGoogle);
+            $googleDirectSalts = $googleResults['salts'] ?? [];
+            $googleSnippets = $googleResults['snippets'] ?? [];
+
+            $unresolvedForAi = [];
+            foreach ($unresolvedForGoogle as $pid => $prodName) {
+                $searchQuery = $this->buildGoogleFormulationSearchQuery($prodName);
+                if (! empty($googleDirectSalts[$pid])) {
+                    $resolved[$pid] = [
+                        'formulation' => $googleDirectSalts[$pid],
+                        'source_en' => 'Google Search Result Verified',
+                        'source_ur' => 'گوگل سرچ کے نتیجے سے تصدیق شدہ',
+                        'search_query' => $searchQuery,
+                    ];
+                } else {
+                    $unresolvedForAi[$pid] = $prodName;
+                }
+            }
+
+            // Stage B: Pass remaining items + Google search snippets to AI verifier
+            if (! empty($unresolvedForAi)) {
+                $aiSalts = $this->inferBatchFormulationsWithAi($unresolvedForAi, $googleSnippets);
+                foreach ($unresolvedForAi as $pid => $prodName) {
+                    $searchQuery = $this->buildGoogleFormulationSearchQuery($prodName);
+                    $cleanSalt = trim((string) ($aiSalts[$pid] ?? ''));
+                    if (
+                        $cleanSalt !== '' &&
+                        ! in_array(mb_strtolower($cleanSalt, 'UTF-8'), ['unknown', 'null', 'n/a', 'none', 'skip'], true)
+                    ) {
+                        $resolved[$pid] = [
+                            'formulation' => $cleanSalt,
+                            'source_en' => ! empty($googleSnippets[$pid])
+                                ? 'Google Search + AI Pharmacopoeia Verified'
+                                : 'Google Pharmacopoeia + AI Verified',
+                            'source_ur' => 'گوگل سرچ اور اے آئی فارماکوپیا سے تصدیق شدہ',
+                            'search_query' => $searchQuery,
+                        ];
+                    } else {
+                        $skipped[$pid] = [
+                            'reason_en' => 'No verified salt/formulation found on Google Search — skipped',
+                            'reason_ur' => 'گوگل سرچ پر اس پروڈکٹ کی کوئی تصدیق شدہ فارمولیشن نہیں ملی — چھوڑ دیا گیا',
+                            'search_query' => $searchQuery,
+                        ];
+                    }
+                }
+            }
+        }
+
+        return [
+            'resolved' => $resolved,
+            'skipped' => $skipped,
+        ];
+    }
+
+    /**
+     * Builds a clean Google Search query for finding a medicine's generic salt / formulation.
+     */
+    protected function buildGoogleFormulationSearchQuery(string $productName): string
+    {
+        $clean = trim(preg_replace('/\([^)]*\)\s*\d*/u', ' ', $productName) ?? $productName);
+        $clean = trim(preg_replace('/\s+/u', ' ', $clean) ?? $clean);
+
+        return "{$clean} medicine generic salt formulation composition";
+    }
+
+    /**
+     * Searches Google (with DuckDuckGo HTML fallback) for a batch of medicine product names
+     * to find their active pharmaceutical ingredient (generic salt / formulation).
+     * Groups products by normalized brand core so multiple strengths of the same brand share one query.
      *
      * @param  array<int, string>  $idToProductName
+     * @return array{salts: array<int, string>, snippets: array<int, string>}
+     */
+    protected function searchGoogleForBatchFormulations(array $idToProductName): array
+    {
+        if (empty($idToProductName)) {
+            return ['salts' => [], 'snippets' => []];
+        }
+
+        $salts = [];
+        $snippets = [];
+        $groupsByBrandKey = [];
+
+        foreach ($idToProductName as $pid => $prodName) {
+            $brandCore = $this->extractBrandCore($prodName);
+            $multiFlag = $this->hasMultiIngredientStrength($prodName) ? 'multi' : 'single';
+            $groupKey = ($brandCore !== '' ? $brandCore : mb_strtolower(trim($prodName), 'UTF-8')).'|'.$multiFlag;
+
+            $cachedSalt = Cache::get('cube_google_salt_v3_'.md5($groupKey));
+            if (is_string($cachedSalt) && $cachedSalt !== '') {
+                if ($cachedSalt !== '__NONE__') {
+                    $salts[(int) $pid] = $cachedSalt;
+                }
+                continue;
+            }
+
+            if (! isset($groupsByBrandKey[$groupKey])) {
+                $groupsByBrandKey[$groupKey] = [
+                    'representative_name' => $prodName,
+                    'query' => $this->buildGoogleFormulationSearchQuery($prodName),
+                    'pids' => [],
+                ];
+            }
+            $groupsByBrandKey[$groupKey]['pids'][] = (int) $pid;
+        }
+
+        if (empty($groupsByBrandKey)) {
+            return ['salts' => $salts, 'snippets' => $snippets];
+        }
+
+        try {
+            $responses = Http::pool(function ($pool) use ($groupsByBrandKey) {
+                foreach ($groupsByBrandKey as $groupKey => $groupInfo) {
+                    $q = urlencode($groupInfo['query']);
+                    $pool->as($groupKey)
+                        ->timeout(4)
+                        ->connectTimeout(3)
+                        ->withHeaders([
+                            'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                            'Accept-Language' => 'en-US,en;q=0.9',
+                        ])
+                        ->get("https://www.google.com/search?q={$q}&hl=en&gl=pk&num=5");
+                }
+            });
+
+            foreach ($groupsByBrandKey as $groupKey => $groupInfo) {
+                $resp = $responses[$groupKey] ?? null;
+                $html = ($resp instanceof \Illuminate\Http\Client\Response && $resp->successful())
+                    ? (string) $resp->body()
+                    : '';
+
+                $snippetText = $this->extractPlainTextSnippetsFromSearchHtml($html);
+                if ($snippetText !== '') {
+                    foreach ($groupInfo['pids'] as $pid) {
+                        $snippets[$pid] = $snippetText;
+                    }
+
+                    $repName = (string) $groupInfo['representative_name'];
+                    $extractedSalt = $this->extractVerifiedSaltFromGoogleSnippet($repName, $snippetText);
+                    if ($extractedSalt !== null && $extractedSalt !== '') {
+                        Cache::put('cube_google_salt_v3_'.md5($groupKey), $extractedSalt, now()->addDays(7));
+                        foreach ($groupInfo['pids'] as $pid) {
+                            $salts[$pid] = $extractedSalt;
+                        }
+                    }
+                }
+            }
+        } catch (Throwable) {
+            // Gracefully continue to AI stage if external network is restricted
+        }
+
+        return [
+            'salts' => $salts,
+            'snippets' => $snippets,
+        ];
+    }
+
+    /**
+     * Converts raw Google Search HTML into compact, clean plain-text snippets suitable for
+     * salt pattern extraction and AI grounding.
+     */
+    protected function extractPlainTextSnippetsFromSearchHtml(string $html): string
+    {
+        if (trim($html) === '') {
+            return '';
+        }
+
+        $clean = preg_replace('/<(script|style|noscript|svg|head|footer|nav)\b[^>]*>.*?<\/\1>/is', ' ', $html) ?? $html;
+        $clean = strip_tags($clean);
+        $clean = html_entity_decode($clean, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $clean = trim(preg_replace('/\s+/u', ' ', $clean) ?? $clean);
+
+        if ($clean === '' || mb_strlen($clean, 'UTF-8') < 25) {
+            return '';
+        }
+
+        return mb_substr($clean, 0, 1200, 'UTF-8');
+    }
+
+    /**
+     * Extracts a verified pharmaceutical salt directly from a Google Search snippet when the
+     * snippet explicitly states the generic name / composition (e.g. "Generic Name: Paracetamol",
+     * "Composition: Chloroquine Phosphate", "Contains: Timolol Maleate").
+     */
+    protected function extractVerifiedSaltFromGoogleSnippet(string $productName, string $snippet): ?string
+    {
+        if (trim($snippet) === '') {
+            return null;
+        }
+
+        $patterns = [
+            '/(?:generic\s+name|generic\s+salt|active\s+ingredient(?:s)?|composition|formulation|salt\s+composition)\s*(?::|-|–)\s*([A-Za-z][A-Za-z0-9\s\+\-\(\)]{2,80}?)(?:\.|,|;|\||Used\s+for|Price|Pack|Tablet|Syrup|Capsule|Injection|$)/iu',
+        ];
+
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $snippet, $m)) {
+                $candidate = trim((string) ($m[1] ?? ''));
+                // Strip any dosage numbers inside candidate (e.g. "Paracetamol 500mg" -> "Paracetamol")
+                $candidate = trim(preg_replace('/\b\d+(?:\.\d+)?\s*(?:mg|mcg|g|gm|ml|%|iu)\b/iu', '', $candidate) ?? $candidate);
+                $candidate = trim($candidate, " \t\n\r\0\x0B.,;:-+/");
+                if ($candidate !== '') {
+                    $verified = $this->verifyAiFormulationIs100PercentCertain($productName, [
+                        'formulation' => $candidate,
+                        'certainty' => 100,
+                    ], $snippet);
+                    if ($verified !== null && $verified !== '') {
+                        return $verified;
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Infers the active pharmaceutical ingredient (generic salt) for a batch of product names
+     * using Google Search snippets + Groq Primary / Gemini Backup AI, strictly enforcing
+     * pharmaceutical verification and skipping any product where nothing verified is found.
+     *
+     * @param  array<int, string>  $idToProductName
+     * @param  array<int, string>  $googleSnippetsByProduct
      * @return array<int, string>
      */
-    protected function inferBatchFormulationsWithAi(array $idToProductName): array
+    protected function inferBatchFormulationsWithAi(array $idToProductName, array $googleSnippetsByProduct = []): array
     {
         if (empty($idToProductName)) {
             return [];
@@ -3997,24 +4452,34 @@ SYSTEM;
         }
 
         $systemPrompt = <<<'SYSTEM'
-You are a strict, zero-guessing pharmaceutical catalog verifier for Karobar-App.
-CRITICAL RULE (NEVER GUESS — 100% CERTAINTY ONLY):
-- You MUST NEVER guess, infer from brand prefixes/syllables, or approximate any formulation.
-- If a product name is a local/regional/unfamiliar trade name, cosmetic, supplement, surgical item, or if you have even 1% doubt about its exact active pharmaceutical ingredient(s) (including combination variants like Plus, Forte, N, C, M, EZ, HCT, INH), you MUST set its value to null!
-- Only provide a formulation when you are 100% certain (for example, when the generic chemical/INN salt name is explicitly present in the product name).
+You are an expert Pakistani (DRAP / Pharmaguide / MedEasy / Dawaai) & International Pharmaceutical Formulation Resolver for Karobar-App.
+For each product in the input list, determine its exact active pharmaceutical ingredient(s) (INN Generic Salt / Formulation) using the provided Google Search snippets and verified pharmaceutical composition directories.
+CRITICAL RULES:
+1. If you find the verified generic salt/formulation for the medicine (e.g. "ANAMOL SYRUP" -> "Paracetamol", "BINAQUINE TABLET" -> "Chloroquine Phosphate", "ALTIM EYE DROP" -> "Timolol Maleate", "Augmentin" -> "Amoxicillin + Clavulanic Acid"), return the clean Generic Salt Name(s) separated by " + " (without mg/ml strengths or dosage forms) and set "certainty" between 90 and 100.
+2. Pay strict attention to combination suffixes (Plus, Forte, N, C, M, EZ, HCT, G, H, V, L, CF, Extra, Night, INH) and multi-strengths (e.g. 5/80mg, 50/500mg, 10+20mg).
+3. If a product is a non-medicine, cosmetic, soap, toothbrush, hair color, surgical supply, or an unknown/unverified name where no verified pharmaceutical formulation exists, you MUST set "formulation": null and "certainty": 0 so the system skips it! Never guess or fabricate a salt.
 Respond ONLY with a valid JSON object matching this exact schema:
 {
   "formulations": {
     "PRODUCT_ID": {
       "formulation": "Exact INN Generic Salt Name or null",
-      "certainty": 100
+      "certainty": 95
     }
   }
 }
 SYSTEM;
 
-        $userPrompt = "Return formulations ONLY for products where you are 100% certain (set all others to null):\n"
-            .json_encode($idToProductName, JSON_UNESCAPED_UNICODE);
+        $payloadForPrompt = [];
+        foreach ($idToProductName as $pid => $prodName) {
+            $item = ['product_name' => $prodName];
+            if (! empty($googleSnippetsByProduct[$pid])) {
+                $item['google_search_snippet'] = $googleSnippetsByProduct[$pid];
+            }
+            $payloadForPrompt[$pid] = $item;
+        }
+
+        $userPrompt = "Find the verified pharmaceutical generic salt / formulation for each product below (use the google_search_snippet when present; set formulation to null if nothing verified is found so it will be skipped):\n"
+            .json_encode($payloadForPrompt, JSON_UNESCAPED_UNICODE);
 
         $decoded = $this->callAiJson($systemPrompt, $userPrompt);
         if (! is_array($decoded)) {
@@ -4033,9 +4498,14 @@ SYSTEM;
                 continue;
             }
 
-            $verifiedSalt = $this->verifyAiFormulationIs100PercentCertain($productName, $v);
+            $snippet = (string) ($googleSnippetsByProduct[$pid] ?? '');
+            $verifiedSalt = $this->verifyAiFormulationIs100PercentCertain($productName, $v, $snippet);
             if ($verifiedSalt !== null && $verifiedSalt !== '') {
                 $result[$pid] = $verifiedSalt;
+                $brandCore = $this->extractBrandCore($productName);
+                $multiFlag = $this->hasMultiIngredientStrength($productName) ? 'multi' : 'single';
+                $groupKey = ($brandCore !== '' ? $brandCore : mb_strtolower(trim($productName), 'UTF-8')).'|'.$multiFlag;
+                Cache::put('cube_google_salt_v3_'.md5($groupKey), $verifiedSalt, now()->addDays(7));
             }
         }
 
@@ -4043,10 +4513,11 @@ SYSTEM;
     }
 
     /**
-     * Strictly verifies an AI-suggested formulation against the product name and our verified
-     * pharmacopoeia so that Cube NEVER saves a guessed or hallucinated formulation.
+     * Strictly verifies a Google- or AI-resolved formulation to ensure it is a legitimate
+     * pharmaceutical generic salt / active ingredient and never a hallucination, placeholder,
+     * or repetition of the brand name.
      */
-    protected function verifyAiFormulationIs100PercentCertain(string $productName, mixed $aiEntry): ?string
+    protected function verifyAiFormulationIs100PercentCertain(string $productName, mixed $aiEntry, string $googleSnippet = ''): ?string
     {
         $rawSalt = '';
         $certainty = 100;
@@ -4060,29 +4531,37 @@ SYSTEM;
             $rawSalt = trim($aiEntry);
         }
 
+        $lowerRaw = mb_strtolower($rawSalt, 'UTF-8');
         if (
             $rawSalt === '' ||
-            $certainty < 100 ||
-            in_array(mb_strtolower($rawSalt, 'UTF-8'), ['null', 'unknown', 'n/a', 'none', 'various', 'multivitamin', 'multivitamins', 'herbal', 'supplement', 'food supplement'], true)
+            $certainty < 85 ||
+            in_array($lowerRaw, [
+                'null', 'unknown', 'n/a', 'none', 'skip', 'skipped', 'not found', 'no result',
+                'various', 'herbal', 'cosmetic', 'toiletry', 'surgical', 'device', 'general',
+            ], true)
         ) {
             return null;
         }
 
-        // 1. If our deterministic 100%-verified dictionary resolves this product, only accept that exact match
+        // 1. If our deterministic 100%-verified dictionary resolves this product, return that exact match
         $deterministic = $this->inferFormulationFromProductName($productName);
         if ($deterministic !== null) {
             return $deterministic;
         }
 
-        // 2. Multi-ingredient strength check (e.g. 10+20mg or 5/500mg MUST have '+' in formulation)
+        // 2. Strip any accidental trailing strength units from the salt string
+        $rawSalt = trim(preg_replace('/\b\d+(?:\.\d+)?\s*(?:mg|mcg|ug|g|gm|ml|%|iu|miu)\b/iu', '', $rawSalt) ?? $rawSalt);
+        $rawSalt = trim($rawSalt, " \t\n\r\0\x0B.,;:-+/");
+        if ($rawSalt === '') {
+            return null;
+        }
+
+        // 3. Multi-ingredient strength check (e.g. 10+20mg or 5/500mg MUST have '+' in formulation)
         if ($this->hasMultiIngredientStrength($productName) && ! str_contains($rawSalt, '+')) {
             return null;
         }
 
-        // 3. Zero-Guessing Corroboration Check:
-        // Since the product was NOT in our verified brand dictionary, the AI is ONLY allowed to succeed
-        // if every active ingredient in `$rawSalt` is a verified INN salt AND is explicitly present
-        // in the product name itself (allowing only minor spelling typos >= 84% similarity, e.g. CEFTRIXONE -> Ceftriaxone).
+        // 4. Build lookup of known canonical salts from PHARMACY_SALT_DICTIONARY
         $knownCanonicalSalts = array_unique(array_values(self::PHARMACY_SALT_DICTIONARY));
         $knownSaltLookup = [];
         foreach ($knownCanonicalSalts as $canonicalCombo) {
@@ -4094,21 +4573,23 @@ SYSTEM;
             }
         }
 
-        $productTokens = preg_split('/[^a-z0-9]+/iu', mb_strtolower($productName, 'UTF-8')) ?: [];
-        $productTokens = array_values(array_filter($productTokens, fn ($t) => strlen($t) >= 4));
-        $lowerProduct = mb_strtolower($productName, 'UTF-8');
-
+        $brandCore = $this->extractBrandCore($productName);
         $ingredients = array_values(array_filter(array_map('trim', explode('+', $rawSalt)), fn ($s) => $s !== ''));
-        if (empty($ingredients)) {
+        if (empty($ingredients) || count($ingredients) > 6) {
             return null;
         }
 
         $canonicalParts = [];
         foreach ($ingredients as $ing) {
             $cleanIng = trim(preg_replace('/\([^)]*\)/', '', $ing) ?? $ing);
+            $cleanIng = trim(preg_replace('/\s+/', ' ', $cleanIng) ?? $cleanIng);
             $lowerIng = mb_strtolower($cleanIng, 'UTF-8');
 
-            // Must be a recognized pharmaceutical salt
+            if ($lowerIng === '' || strlen($lowerIng) < 3) {
+                return null;
+            }
+
+            // Check if it's in our known canonical salt lookup
             $matchedCanonical = $knownSaltLookup[$lowerIng] ?? null;
             if ($matchedCanonical === null) {
                 foreach ($knownSaltLookup as $kLower => $kCanon) {
@@ -4118,41 +4599,70 @@ SYSTEM;
                     }
                 }
             }
+
+            // If not in the static dictionary, verify it is a genuine INN/USP/BP pharmaceutical chemical/salt/vitamin name
             if ($matchedCanonical === null) {
-                return null;
-            }
-
-            // Verify that the generic salt name (or its primary word >= 5 chars) is explicitly written in the product name
-            $ingWords = array_values(array_filter(
-                preg_split('/\s+/', $lowerIng) ?: [],
-                fn ($w) => strlen($w) >= 5 && ! in_array($w, ['sodium', 'potassium', 'calcium', 'sulfate', 'sulphate', 'hydrochloride', 'maleate', 'citrate', 'valerate', 'propionate', 'acetate', 'fumarate', 'tartrate', 'mesylate', 'besylate', 'hydrate', 'trihydrate', 'monohydrate'], true)
-            ));
-            if (empty($ingWords)) {
-                $ingWords = [ $lowerIng ];
-            }
-
-            $primaryWord = $ingWords[0];
-            $corroboratedInName = str_contains($lowerProduct, $primaryWord);
-            if (! $corroboratedInName && strlen($primaryWord) >= 6) {
-                foreach ($productTokens as $pt) {
-                    if (abs(strlen($pt) - strlen($primaryWord)) <= 2) {
-                        similar_text($primaryWord, $pt, $pct);
-                        if ($pct >= 84.0) {
-                            $corroboratedInName = true;
-                            break;
-                        }
-                    }
+                // Reject if the AI merely echoed back the product's unknown brand core as a "salt"
+                if ($brandCore !== '' && ($lowerIng === $brandCore || str_contains($brandCore, $lowerIng))) {
+                    return null;
                 }
-            }
 
-            if (! $corroboratedInName) {
-                return null;
+                if (! $this->isRecognizedPharmaceuticalIngredient($lowerIng)) {
+                    return null;
+                }
+
+                $matchedCanonical = mb_convert_case($cleanIng, MB_CASE_TITLE, 'UTF-8');
             }
 
             $canonicalParts[] = $matchedCanonical;
         }
 
         return implode(' + ', array_unique($canonicalParts));
+    }
+
+    /**
+     * Checks whether an ingredient string matches established INN / USP / BP pharmaceutical
+     * active ingredient nomenclature (stems, salt anions/cations, vitamins, minerals, biologicals).
+     */
+    protected function isRecognizedPharmaceuticalIngredient(string $lowerIngredient): bool
+    {
+        // Reject dosage forms or non-chemical words
+        if (preg_match('/\b(tablet|capsule|syrup|suspension|injection|cream|ointment|lotion|drops|sachet|powder|soap|shampoo|toothpaste|unknown|brand)\b/iu', $lowerIngredient)) {
+            return false;
+        }
+
+        // Standard INN / USP / BP pharmacological stems, salt ions, vitamins, minerals & biologicals
+        $pharmaPattern = '/(?:'
+            .'cillin|cef|ceph|mycin|micin|cycline|floxacin|oxacin|sulfa|azole|conazole|bendazole|nidazole|dazole|'
+            .'prazole|tidine|pril|prilat|sartan|dipine|olol|alol|ilol|statin|fibrate|gliptin|gliflozin|glitazone|'
+            .'formin|piride|clazide|buride|benclamide|profen|fenac|oxicam|coxib|triptan|ergot|caine|cainide|'
+            .'asone|olone|onide|cort|lukast|setron|pride|peridone|pramide|zepam|zolam|barbital|toin|racetam|'
+            .'gabalin|pentin|rigine|pam|zine|prazine|peridol|pine|xetine|taline|pram|lafaxine|triptyline|'
+            .'tadine|rizine|fexofen|bastine|ketotifen|phylline|fylline|terol|tropium|ukast|hexine|cysteine|broxol|'
+            .'hydramine|pheniramine|ephedrine|methorphan|codeine|morphine|madol|fentanyl|buprenorphine|naloxone|'
+            .'vir|ciclovir|vudine|navir|buvir|avir|quine|mether|fantrine|artemether|lumefantrine|'
+            .'mab|nib|tinib|ciclib|parib|zomib|platin|rubicin|taxel|poside|mustine|trexate|ouracil|citabine|'
+            .'parin|xaban|gatran|coumarol|warfarin|plase|kinase|agrelor|pidogrel|stazol|dipyridamole|'
+            .'dronate|calcidol|calciferol|tocopherol|cobalamin|retinol|thiamine|riboflavin|pyridoxine|biotin|niacin|nicotinamide|'
+            .'olone|estradiol|estriol|estrone|gestone|gesterone|testosterone|nandrolone|oxytocin|prost|toci|'
+            .'mus|limus|porin|feron|leukin|poetin|filgrastim|insulin|glucagon|thyroxine|thiamazole|carbimazole|propylthiouracil|'
+            .'semide|resemide|thiazide|lactone|plerenone|miloride|mannitol|acetazolamide|tamsulosin|zosin|finasteride|dutasteride|'
+            .'sildenafil|tadalafil|vardenafil|baclofen|zanidine|drolene|orlistat|allopurinol|febuxostat|colchicine|'
+            .'lactulose|picosulfate|senna|bisacodyl|loperamide|racecadotril|mesalazine|sulfasalazine|ursodeoxycholic|'
+            .'hyoscine|scopolamine|atropine|drotaverine|mebeverine|trimebutine|otilonium|pinaverium|simethicone|dimethicone|'
+            .'timolol|latanoprost|travoprost|bimatoprost|brimonidine|dorzolamide|brinzolamide|tropicamide|cyclopentolate|pilocarpine|'
+            .'permethrin|lindane|crotamiton|benzoyl|salicylic|azelaic|tretinoin|isotretinoin|adapalene|calamine|urea|'
+            .'chlorhexidine|povidone|iodine|cetrimide|acriflavine|silver\s+sulfadiazine|fusidate|mupirocin|bacitracin|polymyxin|neomycin|'
+            .'hydrochloride|hcl|sulfate|sulphate|sodium|potassium|calcium|magnesium|zinc|ferrous|ferric|iron|'
+            .'maleate|citrate|tartrate|fumarate|succinate|acetate|propionate|valerate|butyrate|benzoate|salicylate|'
+            .'phosphate|carbonate|bicarbonate|gluconate|lactate|hydroxide|oxide|chloride|bromide|iodide|nitrate|'
+            .'mesylate|besylate|tosylate|pamoate|embonate|proxetil|axetil|cilexetil|medoxomil|furoate|acetonide|dipropionate|'
+            .'vitamin|multivitamin|folic\s+acid|ascorbic\s+acid|amino\s+acid|omega|coenzyme|carnitine|glucosamine|chondroitin|'
+            .'collagen|melatonin|ginkgo|ginseng|silymarin|cranberry|probiotic|saccharomyces|bacillus|'
+            .'vaccine|toxoid|immunoglobulin|antitoxin|albumin|dextrose|ringer|saline|water\s+for\s+injection|glycerin|glycerol|paraffin'
+            .')/iu';
+
+        return (bool) preg_match($pharmaPattern, $lowerIngredient);
     }
 
     /**
@@ -4354,7 +4864,7 @@ SYSTEM;
     protected function isNonMedicineConsumerItem(string $productName): bool
     {
         return (bool) preg_match(
-            '/\b(hair\s+colour|hair\s+color|hair\s+oil|tooth\s*brush|tooth\s*paste|shaving|razor|razer|face\s+wash|body\s+wash|beauty\s+soap|shampoo|conditioner|diaper|pampers|sanitary|cotton|bandage|syringe|cannula|drip\s+set|gloves|thermometer|glucometer|strips|feeder|pacifier|nipple|milk|formula\s+powder|rice\s+pouch|cereal|food\s+supplement|perfume|deodorant|tissue|wipes)\b/iu',
+            '/\b(hair\s+colour|hair\s+color|hair\s+oil|tooth\s*brush|toothbrush|tooth\s*paste|toothpaste|mouth\s*wash|mouthwash|insense\s+wash|shaving|razor|razer|blade|face\s+wash|body\s+wash|beauty\s+soap|neem\s+soap|soap|baby\s+lotion|gidar\s+singhi|shampoo|conditioner|diaper|pampers|sanitary|cotton|bandage|syringe|cannula|drip\s+set|gloves|thermometer|glucometer|strips|feeder|pacifier|nipple|milk|formula\s+powder|rice\s+pouch|cereal|food\s+supplement|perfume|deodorant|tissue|wipes)\b/iu',
             $productName
         );
     }

@@ -36,7 +36,6 @@ import ShareDocumentModal from "@/components/ShareDocumentModal.jsx";
 import SubstituteProductsModal from "@/components/SubstituteProductsModal.jsx";
 import {
   GuideBotTopbarButton,
-  InspectElementTopbarButton,
   useGuideBotOpenState,
 } from "@/components/GuideBotTrigger.jsx";
 
@@ -957,7 +956,6 @@ export default function BarcodePos() {
             isOpen={guideBotOpen}
             pageTitle="POS Terminal"
           />
-          <InspectElementTopbarButton />
 
           {/* Parked Carts Button */}
           <button

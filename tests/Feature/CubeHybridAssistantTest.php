@@ -1497,4 +1497,134 @@ JS;
 
         $this->assertSame(1, \App\Models\Brand::count());
     }
+
+    /**
+     * 29. Iron-Clad Google Search Formulation Auto-Fill & Detailed Report:
+     * - Searches Google first for unfamiliar branded medicines to find the generic salt/formulation
+     * - Fills the formulation when Google Search / AI returns a verified pharmaceutical salt (even for trade names where the salt is not a substring of the brand name)
+     * - Strictly skips products where Google Search finds nothing or where the item is a non-medicine consumer product
+     * - Returns a complete `detailed_report` with filled products, skipped products, and skip reasons
+     */
+    public function test_auto_fill_formulation_searches_google_fills_verified_salts_skips_unfound_and_returns_detailed_report(): void
+    {
+        $adminRole = \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'sanctum']);
+        $this->user->assignRole($adminRole);
+        Sanctum::actingAs($this->user);
+
+        $cat = \App\Models\Category::create(['name' => 'Tablets']);
+        $brand = \App\Models\Brand::create([
+            'name' => 'Hilton Pharma',
+            'expiry_return_policy' => 'before_expiry',
+            'expiry_return_months' => 3,
+        ]);
+        $supplier = \App\Models\Supplier::create(['name' => 'UDL Distribution']);
+
+        // 1. Trade-name medicine resolved via Google Search HTML snippet ("Generic Name: Levocetirizine Dihydrochloride")
+        $googleResolvedProd = \App\Models\Product::create([
+            'name' => 'XyzHistadine 5mg Tablet',
+            'product_code' => 'PRD-7001',
+            'barcode' => 'PRD0000007001',
+            'formulation' => null,
+            'pack_size' => 10,
+            'category_id' => $cat->id,
+            'brand_id' => $brand->id,
+            'supplier_id' => $supplier->id,
+        ]);
+
+        // 2. Trade-name medicine resolved via Google Search + AI pharmacopoeia ("Itopride Hydrochloride")
+        $aiGoogleProd = \App\Models\Product::create([
+            'name' => 'GastronexPro 50mg Tablet',
+            'product_code' => 'PRD-7002',
+            'barcode' => 'PRD0000007002',
+            'formulation' => null,
+            'pack_size' => 20,
+            'category_id' => $cat->id,
+            'brand_id' => $brand->id,
+            'supplier_id' => $supplier->id,
+        ]);
+
+        // 3. Unknown item where Google Search + AI finds nothing -> must be skipped!
+        $unfoundProd = \App\Models\Product::create([
+            'name' => 'MysteryItem999 Unknown Capsule',
+            'product_code' => 'PRD-7003',
+            'barcode' => 'PRD0000007003',
+            'formulation' => null,
+            'pack_size' => 10,
+            'category_id' => $cat->id,
+            'brand_id' => $brand->id,
+            'supplier_id' => $supplier->id,
+        ]);
+
+        // 4. Non-medicine cosmetic item -> must be skipped immediately!
+        $cosmeticProd = \App\Models\Product::create([
+            'name' => 'Keune Hair Colour 3',
+            'product_code' => 'PRD-7004',
+            'barcode' => 'PRD0000007004',
+            'formulation' => null,
+            'pack_size' => 1,
+            'category_id' => $cat->id,
+            'brand_id' => $brand->id,
+            'supplier_id' => $supplier->id,
+        ]);
+
+        Http::fake([
+            'www.google.com/*' => function ($request) {
+                $url = $request->url();
+                if (str_contains($url, 'XyzHistadine')) {
+                    return Http::response(
+                        '<html><body><div>XyzHistadine 5mg Tablet - Generic Name: Levocetirizine. Used for allergy relief.</div></body></html>',
+                        200
+                    );
+                }
+                if (str_contains($url, 'GastronexPro')) {
+                    return Http::response(
+                        '<html><body><div>GastronexPro 50mg contains prokinetic agent Itopride Hydrochloride 50mg for dyspepsia.</div></body></html>',
+                        200
+                    );
+                }
+
+                return Http::response('<html><body>No results found</body></html>', 200);
+            },
+            'api.groq.com/*' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'formulations' => [
+                                    (string) $aiGoogleProd->id => [
+                                        'formulation' => 'Itopride Hydrochloride',
+                                        'certainty' => 98,
+                                    ],
+                                    (string) $unfoundProd->id => [
+                                        'formulation' => null,
+                                        'certainty' => 0,
+                                    ],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $resp = $this->postJson('/api/cube/execute-task', [
+            'task_type' => 'bulk_autofill_missing_formulations',
+            'batch_size' => 20,
+            'after_id' => 0,
+        ]);
+
+        $resp->assertOk()
+            ->assertJsonPath('task_meta.action', 'bulk_autofill_missing_formulations')
+            ->assertJsonPath('task_meta.scanned_count', 4)
+            ->assertJsonPath('task_meta.updated_count', 2)
+            ->assertJsonPath('task_meta.skipped_count', 2)
+            ->assertJsonPath('task_meta.detailed_report.batch_scanned_count', 4)
+            ->assertJsonPath('task_meta.detailed_report.batch_filled_count', 2)
+            ->assertJsonPath('task_meta.detailed_report.batch_skipped_count', 2);
+
+        $this->assertSame('Levocetirizine', $googleResolvedProd->fresh()->formulation);
+        $this->assertSame('Itopride', $aiGoogleProd->fresh()->formulation);
+        $this->assertNull($unfoundProd->fresh()->formulation);
+        $this->assertNull($cosmeticProd->fresh()->formulation);
+    }
 }

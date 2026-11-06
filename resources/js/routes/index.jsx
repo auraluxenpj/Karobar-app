@@ -121,6 +121,7 @@ const CreateRole = registerLazy(() => import("../pages/roles/Create.jsx"), ["/ro
 const EditRole = registerLazy(() => import("../pages/roles/Edit.jsx"));
 const ActivateLicense = registerLazy(() => import("../pages/ActivateLicense.jsx"), ["/activate"]);
 const SetupWizard = registerLazy(() => import("../pages/SetupWizard.jsx"), ["/setup"]);
+const BackgroundTasksPage = registerLazy(() => import("../pages/BackgroundTasks/Index.jsx"), ["/background-tasks"]);
 
 function RouteFallback() {
   return <PageSkeleton fullScreen />;
@@ -224,6 +225,7 @@ export default function AppRoutes() {
           <Route path="/products" element={<ProductsIndex />} />
           <Route path="/products/create" element={<CreateProduct />} />
           <Route path="/products/:id/edit" element={<EditProduct />} />
+          <Route path="/background-tasks" element={<BackgroundTasksPage />} />
 
           {/* Purchase Invoices */}
           <Route path="/purchase-invoices" element={<PurchaseInvoicesIndex />} />

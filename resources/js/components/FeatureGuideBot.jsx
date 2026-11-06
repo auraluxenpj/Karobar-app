@@ -2,7 +2,6 @@
 import React, {
   useState,
   useEffect,
-  useLayoutEffect,
   useRef,
   useMemo,
   useId,
@@ -26,19 +25,16 @@ import {
   ArrowsPointingOutIcon,
   ArrowsPointingInIcon,
   ChevronLeftIcon,
-  CursorArrowRaysIcon,
   ExclamationTriangleIcon,
   LightBulbIcon,
 } from "@heroicons/react/24/outline";
 import { useTheme } from "@/context/ThemeContext.jsx";
 import {
   GuideBotAvatar,
-  CursorBuddyAvatar,
   getGuideBotMascotStyle,
   setGuideBotMascotStyle,
   useGuideBotOpenState,
   useBottomMascotEnabledState,
-  useInspectElementState,
 } from "./GuideBotTrigger.jsx";
 import {
   SCREEN_GUIDES,
@@ -51,9 +47,17 @@ import {
   MODAL_CONTEXT_GUIDES,
   EVIDENCE_TYPES,
   buildEvidenceBadge,
-  explainDomElement,
   saveLearnedCursorKnowledge,
 } from "@/data/guideBotKnowledge.js";
+import {
+  BackgroundTaskDetailView,
+  loadPersistedBgTask,
+  savePersistedBgTask,
+} from "@/pages/BackgroundTasks/Index.jsx";
+import SpotlightTourOverlay, {
+  buildInteractiveSpotlightSteps,
+  findBestTourTargetElement,
+} from "./SpotlightTourOverlay.jsx";
 
 const LANG_STORAGE_KEY = "karobar_guide_bot_lang";
 
@@ -138,1295 +142,6 @@ function FormattedBotMessage({ text, isUrdu = false }) {
         );
       })}
     </div>
-  );
-}
-
-/**
- * Computes the optimal placement ('bottom' | 'top' | 'right' | 'left') and clamped
- * viewport coordinates for the floating Click-to-Explain popover beside a target DOM element.
- */
-function computeBestPopoverPlacement(targetEl, cardWidth = 356, cardHeight = 220) {
-  if (!targetEl || typeof window === "undefined") {
-    return {
-      top: 84,
-      left: 24,
-      placement: "bottom",
-      arrowX: 40,
-      arrowY: 24,
-    };
-  }
-
-  const rect = targetEl.getBoundingClientRect();
-  const vw = window.innerWidth || 1280;
-  const vh = window.innerHeight || 800;
-  const margin = 12;
-  const gap = 12;
-
-  const effectiveWidth = Math.min(cardWidth, vw - margin * 2);
-  const effectiveHeight = Math.min(cardHeight, vh - margin * 2);
-
-  const spaceBottom = vh - rect.bottom - margin;
-  const spaceTop = rect.top - margin;
-  const spaceRight = vw - rect.right - margin;
-  const spaceLeft = rect.left - margin;
-
-  let placement = "bottom";
-  if (spaceBottom >= effectiveHeight + gap) {
-    placement = "bottom";
-  } else if (spaceTop >= effectiveHeight + gap) {
-    placement = "top";
-  } else if (spaceRight >= effectiveWidth + gap) {
-    placement = "right";
-  } else if (spaceLeft >= effectiveWidth + gap) {
-    placement = "left";
-  } else {
-    // Pick the direction with the highest available space ratio
-    const candidates = [
-      { dir: "bottom", score: spaceBottom / Math.max(1, effectiveHeight) },
-      { dir: "top", score: spaceTop / Math.max(1, effectiveHeight) },
-      { dir: "right", score: spaceRight / Math.max(1, effectiveWidth) },
-      { dir: "left", score: spaceLeft / Math.max(1, effectiveWidth) },
-    ];
-    candidates.sort((a, b) => b.score - a.score);
-    placement = candidates[0].dir;
-  }
-
-  const targetCenterX = rect.left + rect.width / 2;
-  const targetCenterY = rect.top + rect.height / 2;
-
-  let top = margin;
-  let left = margin;
-
-  if (placement === "bottom") {
-    top = Math.min(
-      vh - effectiveHeight - margin,
-      Math.max(margin, rect.bottom + gap)
-    );
-    left = Math.min(
-      vw - effectiveWidth - margin,
-      Math.max(margin, targetCenterX - effectiveWidth / 2)
-    );
-  } else if (placement === "top") {
-    top = Math.max(
-      margin,
-      Math.min(vh - effectiveHeight - margin, rect.top - effectiveHeight - gap)
-    );
-    left = Math.min(
-      vw - effectiveWidth - margin,
-      Math.max(margin, targetCenterX - effectiveWidth / 2)
-    );
-  } else if (placement === "right") {
-    left = Math.min(
-      vw - effectiveWidth - margin,
-      Math.max(margin, rect.right + gap)
-    );
-    top = Math.min(
-      vh - effectiveHeight - margin,
-      Math.max(margin, targetCenterY - effectiveHeight / 2)
-    );
-  } else {
-    left = Math.max(
-      margin,
-      Math.min(vw - effectiveWidth - margin, rect.left - effectiveWidth - gap)
-    );
-    top = Math.min(
-      vh - effectiveHeight - margin,
-      Math.max(margin, targetCenterY - effectiveHeight / 2)
-    );
-  }
-
-  const arrowX = Math.round(
-    Math.min(effectiveWidth - 22, Math.max(22, targetCenterX - left))
-  );
-  const arrowY = Math.round(
-    Math.min(effectiveHeight - 22, Math.max(22, targetCenterY - top))
-  );
-
-  return {
-    top: Math.round(top),
-    left: Math.round(left),
-    width: Math.round(effectiveWidth),
-    placement,
-    arrowX,
-    arrowY,
-  };
-}
-
-const STALKER_IDLE_TRICKS = [
-  {
-    id: "clickripple",
-    en: "Hi, I'm Cursor! Click any item & I'll explain it! 🎯",
-    ur: "میں کرسر ہوں! کسی بھی بٹن پر کلک کریں 🎯",
-  },
-  {
-    id: "spy",
-    en: "Cursor is stalking your mouse... click anything! 🕵️‍♂️",
-    ur: "کرسر آپ کے ماؤس کے پیچھے ہے! کسی بھی بٹن پر کلک کریں 🕵️‍♂️",
-  },
-  {
-    id: "rubiks",
-    en: "Cursor is solving a Rubik's Cube beside you 🧩",
-    ur: "کرسر روبکس کیوب حل کر رہا ہے 🧩",
-  },
-  {
-    id: "headphones",
-    en: "Cursor is vibing to music with your mouse 🎧",
-    ur: "کرسر ہیڈ فون لگا کر میوزک سن رہا ہے 🎧",
-  },
-  {
-    id: "shades",
-    en: "Coolest Cursor buddy in town 🕶️",
-    ur: "آپ کا کول کرسر دوست 🕶️",
-  },
-  {
-    id: "spin",
-    en: "Watch Cursor do a 360° pointer spin! 💫",
-    ur: "کرسر کا 360° گھومنے والا کرتب! 💫",
-  },
-];
-
-/**
- * Standalone Topbar-triggered Click-to-Explain UI Inspector (`ScreenElementInspector`).
- * - Summons a cute AI Stalker Mascot that smoothly follows the user's cursor across the screen
- *   with lifelike spring chase physics, funny status bubbles, and cute tricks (solving Rubik's cube,
- *   wearing headphones, peeking through a magnifying glass, 360° flips, etc.).
- * - Highlights any hovered control on the page while `inspectMode` is active.
- * - On click, displays a floating explanation card right beside the clicked element
- *   (bottom, top, right, or left depending on available viewport space).
- * - Automatically dismisses when clicking anywhere else on the page or pressing Escape.
- */
-function ScreenElementInspector({ guide, lang, onSetLang, isDark }) {
-  const location = useLocation();
-  const [inspectMode, setInspectMode] = useInspectElementState();
-  const [inspectedPopover, setInspectedPopover] = useState(null);
-  const [hoveredControlLabel, setHoveredControlLabel] = useState(null);
-  const [stalkerTrickIdx, setStalkerTrickIdx] = useState(0);
-  const [cursorAiLoading, setCursorAiLoading] = useState(false);
-  const [cursorQuestionInput, setCursorQuestionInput] = useState("");
-  const [cursorCustomAnswer, setCursorCustomAnswer] = useState(null);
-  const [cursorIsStreaming, setCursorIsStreaming] = useState(false);
-  const [cursorStreamChars, setCursorStreamChars] = useState(0);
-  const cursorStreamTimerRef = useRef(null);
-  const cursorRequestIdRef = useRef(0);
-  const popoverRef = useRef(null);
-  const highlightedElRef = useRef(null);
-  const stalkerElRef = useRef(null);
-  const stalkerPosRef = useRef({
-    x: typeof window !== "undefined" ? Math.round(window.innerWidth * 0.65) : 520,
-    y: 86,
-  });
-  const isUr = lang === "ur";
-
-  const stopCursorStream = useCallback(() => {
-    if (cursorStreamTimerRef.current) {
-      window.clearInterval(cursorStreamTimerRef.current);
-      cursorStreamTimerRef.current = null;
-    }
-    setCursorIsStreaming(false);
-    setCursorStreamChars(0);
-  }, []);
-
-  const startCursorStream = useCallback((fullText = "") => {
-    if (cursorStreamTimerRef.current) {
-      window.clearInterval(cursorStreamTimerRef.current);
-      cursorStreamTimerRef.current = null;
-    }
-    const totalLen = String(fullText || "").length;
-    if (totalLen <= 20) {
-      setCursorIsStreaming(false);
-      setCursorStreamChars(totalLen);
-      return;
-    }
-    setCursorIsStreaming(true);
-    setCursorStreamChars(16);
-    const stepSize = Math.max(10, Math.min(30, Math.ceil(totalLen / 34)));
-    cursorStreamTimerRef.current = window.setInterval(() => {
-      setCursorStreamChars((prev) => {
-        const next = prev + stepSize;
-        if (next >= totalLen) {
-          if (cursorStreamTimerRef.current) {
-            window.clearInterval(cursorStreamTimerRef.current);
-            cursorStreamTimerRef.current = null;
-          }
-          setCursorIsStreaming(false);
-          return totalLen;
-        }
-        return next;
-      });
-    }, 20);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (cursorStreamTimerRef.current) {
-        window.clearInterval(cursorStreamTimerRef.current);
-      }
-    };
-  }, []);
-
-  const clearElementHighlight = useCallback(() => {
-    if (highlightedElRef.current) {
-      highlightedElRef.current.classList.remove("guide-bot-dom-highlight");
-      highlightedElRef.current = null;
-    }
-    if (typeof document !== "undefined") {
-      document
-        .querySelectorAll(".guide-bot-dom-highlight, .guide-bot-inspect-hover")
-        .forEach((el) => {
-          el.classList.remove("guide-bot-dom-highlight");
-          el.classList.remove("guide-bot-inspect-hover");
-        });
-    }
-  }, []);
-
-  const dismissPopover = useCallback(() => {
-    cursorRequestIdRef.current += 1;
-    stopCursorStream();
-    setCursorAiLoading(false);
-    setCursorQuestionInput("");
-    setCursorCustomAnswer(null);
-    setInspectedPopover(null);
-    clearElementHighlight();
-  }, [clearElementHighlight, stopCursorStream]);
-
-  const requestCursorGenerativeAi = useCallback(
-    async (baseExplanation, customQuestion = null) => {
-      if (!baseExplanation) return;
-      const reqId = ++cursorRequestIdRef.current;
-      setCursorAiLoading(true);
-
-      const routePath = guide?.key || location.pathname || "/dashboard";
-      const controlLabel = baseExplanation.title?.en || "selected control";
-      const controlType = baseExplanation.elementContext?.component_type || "UI control";
-      const screenTitle = guide?.title?.en || routePath;
-
-      const questionToAsk = customQuestion
-        ? String(customQuestion).trim()
-        : `Explain the "${controlLabel}" (${controlType}) on the ${screenTitle} (${routePath}) screen in Karobar ERP, how to use it step-by-step, and how it affects stock or accounting.`;
-
-      try {
-        const res = await axios.post("/api/cube/ask", {
-          question: questionToAsk,
-          language: isUr ? "ur" : "en",
-          current_route: routePath,
-          screen_guide_id: guide?.key || null,
-          explain_mode: "cursor_element",
-          element_context: baseExplanation.elementContext || null,
-        });
-
-        if (cursorRequestIdRef.current !== reqId) return;
-        const data = res?.data || {};
-        const aiEn = data.answer_en || data.en || "";
-        const aiUr = data.answer_ur || data.ur || "";
-        const aiTitleEn = data.title_en || data.title?.en || baseExplanation.title?.en;
-        const aiTitleUr = data.title_ur || data.title?.ur || baseExplanation.title?.ur;
-
-        if (aiEn || aiUr) {
-          const isGeneratedByAi =
-            data.provider === "groq" || data.provider === "gemini";
-
-          if (isGeneratedByAi) {
-            saveLearnedCursorKnowledge({
-              controlKey: customQuestion ? "" : baseExplanation.controlKey || "",
-              questionText: customQuestion || "",
-              route: routePath,
-              titleEn: aiTitleEn,
-              titleUr: aiTitleUr,
-              answerEn: aiEn,
-              answerUr: aiUr,
-              provider: data.provider || "ai",
-            });
-          }
-
-          if (customQuestion) {
-            const nextText = isUr
-              ? aiUr || aiEn || baseExplanation.ur
-              : aiEn || baseExplanation.en;
-            setCursorCustomAnswer({
-              question: customQuestion,
-              title: { en: aiTitleEn, ur: aiTitleUr },
-              en: aiEn || baseExplanation.en,
-              ur: aiUr || baseExplanation.ur,
-              provider: data.provider || "local",
-              aiGenerated: isGeneratedByAi,
-              fallbackUsed: !isGeneratedByAi,
-              knowledgeImproved: Boolean(data.knowledge_improved),
-            });
-            startCursorStream(nextText);
-          } else {
-            const nextText = isUr
-              ? aiUr || aiEn || baseExplanation.ur
-              : aiEn || baseExplanation.en;
-            setInspectedPopover((prev) => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                explanation: {
-                  ...prev.explanation,
-                  title: {
-                    en: aiTitleEn || prev.explanation.title?.en,
-                    ur: aiTitleUr || prev.explanation.title?.ur,
-                  },
-                  en: isGeneratedByAi
-                    ? aiEn || prev.explanation.baselineEn || prev.explanation.en
-                    : prev.explanation.baselineEn || aiEn || prev.explanation.en,
-                  ur: isGeneratedByAi
-                    ? aiUr || prev.explanation.baselineUr || prev.explanation.ur
-                    : prev.explanation.baselineUr || aiUr || prev.explanation.ur,
-                  aiGenerated: isGeneratedByAi,
-                  aiImproved: isGeneratedByAi || prev.explanation.aiImproved,
-                  fallbackUsed: !isGeneratedByAi,
-                  aiProvider: data.provider || "local",
-                  knowledgeImproved: Boolean(data.knowledge_improved),
-                },
-              };
-            });
-            startCursorStream(nextText);
-          }
-        }
-      } catch {
-        // Fallback to local docs if AI endpoint fails or is offline
-        setInspectedPopover((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            explanation: {
-              ...prev.explanation,
-              aiGenerated: false,
-              fallbackUsed: true,
-            },
-          };
-        });
-      } finally {
-        if (cursorRequestIdRef.current === reqId) {
-          setCursorAiLoading(false);
-        }
-      }
-    },
-    [guide, location.pathname, isUr]
-  );
-
-  const handleCursorQuestionSubmit = useCallback(
-    (e, presetPrompt = null) => {
-      if (e) {
-        if (typeof e.preventDefault === "function") e.preventDefault();
-        if (typeof e.stopPropagation === "function") e.stopPropagation();
-      }
-      const q = String(presetPrompt ?? cursorQuestionInput).trim();
-      if (!q || !inspectedPopover?.explanation) return;
-      if (!presetPrompt) setCursorQuestionInput("");
-      requestCursorGenerativeAi(inspectedPopover.explanation, q);
-    },
-    [cursorQuestionInput, inspectedPopover, requestCursorGenerativeAi]
-  );
-
-  // Clear inspect mode and any open popover only when the route actually changes after mount
-  const prevRouteKeyRef = useRef(
-    `${location.pathname}|${location.search}|${location.hash}`
-  );
-  useEffect(() => {
-    const nextKey = `${location.pathname}|${location.search}|${location.hash}`;
-    if (prevRouteKeyRef.current !== nextKey) {
-      prevRouteKeyRef.current = nextKey;
-      setInspectMode(false);
-      dismissPopover();
-    }
-  }, [location.pathname, location.search, location.hash, setInspectMode, dismissPopover]);
-
-  // Clear any previous popover when entering inspect mode
-  useEffect(() => {
-    if (inspectMode) {
-      dismissPopover();
-      setHoveredControlLabel(null);
-    }
-  }, [inspectMode, dismissPopover]);
-
-  // Cycle through cute stalker tricks when following the cursor
-  useEffect(() => {
-    if (!inspectMode && !inspectedPopover) return;
-    const timer = window.setInterval(() => {
-      setStalkerTrickIdx((prev) => (prev + 1) % STALKER_IDLE_TRICKS.length);
-    }, 2800);
-    return () => window.clearInterval(timer);
-  }, [inspectMode, inspectedPopover]);
-
-  // Hide the native OS cursor while `inspectMode` is active and lock our animated
-  // Cursor arrow 1:1 to the exact mouse pointer hotspot (no second cursor, no question mark!)
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    if (!inspectMode) {
-      document.documentElement.classList.remove("guide-bot-inspect-active");
-      return;
-    }
-
-    document.documentElement.classList.add("guide-bot-inspect-active");
-
-    // Seed initial position near the Topbar Explain button if present
-    const triggerBtn = document.querySelector("[data-inspect-trigger]");
-    if (triggerBtn) {
-      const r = triggerBtn.getBoundingClientRect();
-      if (r.width > 0) {
-        const initX = Math.round(r.left + r.width / 2);
-        const initY = Math.round(r.top + r.height / 2);
-        stalkerPosRef.current = { x: initX, y: initY };
-        if (stalkerElRef.current) {
-          stalkerElRef.current.style.transform = `translate3d(${initX - 4}px, ${
-            initY - 3
-          }px, 0)`;
-        }
-      }
-    }
-
-    const handleMouseMove = (e) => {
-      const x = e.clientX;
-      const y = e.clientY;
-      stalkerPosRef.current = { x, y };
-      if (stalkerElRef.current) {
-        // Hotspot of CursorBuddyAvatar tip is at (4px, 3px) -> lock 1:1 to mouse point
-        stalkerElRef.current.style.transform = `translate3d(${x - 4}px, ${
-          y - 3
-        }px, 0)`;
-      }
-    };
-
-    window.addEventListener("mousemove", handleMouseMove, { passive: true });
-    return () => {
-      document.documentElement.classList.remove("guide-bot-inspect-active");
-      window.removeEventListener("mousemove", handleMouseMove);
-    };
-  }, [inspectMode]);
-
-  // Hover + Click-to-Explain capture listener when `inspectMode` is active
-  useEffect(() => {
-    if (!inspectMode || typeof document === "undefined") return;
-
-    let hoveredEl = null;
-    const clearHover = () => {
-      if (hoveredEl) {
-        hoveredEl.classList.remove("guide-bot-inspect-hover");
-        hoveredEl = null;
-      }
-      setHoveredControlLabel(null);
-    };
-
-    const resolveTableHeaderForCell = (el) => {
-      const cell = el?.closest?.("td, th");
-      if (!cell) return "";
-      if (cell.tagName?.toLowerCase() === "th") {
-        return (cell.innerText || "").replace(/\s+/g, " ").trim();
-      }
-      const table = cell.closest?.("table");
-      if (!table) return "";
-      const allThs = Array.from(table.querySelectorAll("thead th"));
-      if (!allThs.length) return "";
-
-      const cellRect = cell.getBoundingClientRect?.();
-      if (cellRect && cellRect.width > 0) {
-        const centerX = cellRect.left + cellRect.width / 2;
-        const matchingThs = allThs
-          .map((th) => ({ th, rect: th.getBoundingClientRect?.() }))
-          .filter(
-            ({ rect }) =>
-              rect &&
-              rect.width > 0 &&
-              centerX >= rect.left - 2 &&
-              centerX <= rect.right + 2
-          );
-        if (matchingThs.length > 0) {
-          matchingThs.sort((a, b) => b.rect.top - a.rect.top);
-          const bestText = (matchingThs[0].th.innerText || "").replace(/\s+/g, " ").trim();
-          if (bestText) return bestText;
-        }
-      }
-
-      const lastRowThs = table.querySelectorAll("thead tr:last-child th");
-      if (lastRowThs && lastRowThs[cell.cellIndex]) {
-        return (lastRowThs[cell.cellIndex].innerText || "").replace(/\s+/g, " ").trim();
-      }
-      if (allThs[cell.cellIndex]) {
-        return (allThs[cell.cellIndex].innerText || "").replace(/\s+/g, " ").trim();
-      }
-      return "";
-    };
-
-    const resolveInspectableTarget = (rawTarget) => {
-      if (!rawTarget || rawTarget === document.body || rawTarget === document.documentElement) {
-        return null;
-      }
-
-      // 1. Direct interactive controls (buttons, inputs, selects, links, custom dropdowns)
-      const directControl = rawTarget.closest?.(
-        "button, a, input, select, textarea, [role='button'], [role='tab'], [role='switch'], [role='combobox'], .react-select__control, .rs__control"
-      );
-      if (directControl && !directControl.classList?.contains("workspace-dock-trigger")) {
-        return directControl;
-      }
-
-      // 2. Labels & Table Headers
-      const labelOrTh = rawTarget.closest?.("label, th");
-      if (labelOrTh) {
-        const innerControl = labelOrTh.querySelector?.("input, select, textarea, button");
-        return innerControl || labelOrTh;
-      }
-
-      // 3. Table Data Cells (if cell wraps a single input/select/button, inspect that control; otherwise inspect the cell)
-      const td = rawTarget.closest?.("td");
-      if (td) {
-        const innerControls = td.querySelectorAll?.("input, select, textarea, button");
-        if (innerControls && innerControls.length === 1) {
-          return innerControls[0];
-        }
-        return td;
-      }
-
-      // 4. Compact UI sections, KPI stat cards, badges, or headings (avoid huge full-page wrappers)
-      let cursor = rawTarget;
-      while (cursor && cursor !== document.body) {
-        const rect = cursor.getBoundingClientRect?.();
-        const tag = (cursor.tagName || "").toLowerCase();
-        if (rect && rect.width > 16 && rect.height > 14) {
-          if (["h1", "h2", "h3", "h4", "dt", "dd", "summary"].includes(tag)) {
-            return cursor;
-          }
-          if (
-            rect.width <= 460 &&
-            rect.height <= 220 &&
-            (cursor.innerText || "").trim().length > 0
-          ) {
-            return cursor;
-          }
-        }
-        cursor = cursor.parentElement;
-      }
-
-      if (
-        rawTarget.matches?.(
-          ".workspace-shell, .workspace-main, .workspace-content, .workspace-page, .workspace-sidebar-slot, .workspace-topbar-slot, .workspace-dock-trigger, .workspace-dock-floating, main, header, aside, nav"
-        )
-      ) {
-        return null;
-      }
-
-      return rawTarget;
-    };
-
-    const extractShortLabel = (el) => {
-      if (!el) return null;
-      const thText = resolveTableHeaderForCell(el);
-      let fieldLabel = "";
-      const closestLabel = el.closest?.("label");
-      if (closestLabel) {
-        fieldLabel = (closestLabel.innerText || "").trim();
-      } else if (el.id) {
-        try {
-          const forLabel = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
-          if (forLabel) fieldLabel = (forLabel.innerText || "").trim();
-        } catch {
-          // ignore selector errors
-        }
-      }
-      if (!fieldLabel) {
-        let p = el.parentElement;
-        for (let i = 0; i < 3 && p && p !== document.body; i++) {
-          const r = p.getBoundingClientRect?.();
-          if (r && r.height <= 110 && p.querySelectorAll?.("input, select, textarea").length <= 2) {
-            const lbl = p.querySelector?.("label");
-            if (lbl && lbl.innerText) {
-              fieldLabel = lbl.innerText.trim();
-              break;
-            }
-          }
-          p = p.parentElement;
-        }
-      }
-
-      const raw =
-        fieldLabel ||
-        thText ||
-        el.getAttribute?.("aria-label") ||
-        el.getAttribute?.("title") ||
-        el.getAttribute?.("placeholder") ||
-        (el.innerText || "").trim() ||
-        (el.value || "").trim();
-      const cleaned = String(raw || "")
-        .replace(/\s+/g, " ")
-        .trim();
-      if (!cleaned) return null;
-      return cleaned.length > 28 ? `${cleaned.slice(0, 26)}…` : cleaned;
-    };
-
-    const handleMouseOver = (e) => {
-      const target = e.target;
-      if (
-        !target ||
-        target.closest?.("[data-inspect-trigger]") ||
-        target.closest?.("[data-inspector-popover]") ||
-        target.closest?.("[data-inspector-banner]") ||
-        target.closest?.("[data-roaming-cube]") ||
-        target.closest?.(".guide-bot-drawer")
-      ) {
-        clearHover();
-        return;
-      }
-      const interactive = resolveInspectableTarget(target);
-      if (!interactive) {
-        clearHover();
-        return;
-      }
-      if (interactive !== hoveredEl) {
-        if (hoveredEl) {
-          hoveredEl.classList.remove("guide-bot-inspect-hover");
-        }
-        hoveredEl = interactive;
-        hoveredEl.classList.add("guide-bot-inspect-hover");
-        setHoveredControlLabel(extractShortLabel(hoveredEl));
-      }
-    };
-
-    const handleClickCapture = (e) => {
-      const target = e.target;
-      if (!target) return;
-
-      // Allow clicking the Topbar Explain button or Cancel pill to toggle/exit
-      if (
-        target.closest?.("[data-inspect-trigger]") ||
-        target.closest?.("[data-inspector-banner]")
-      ) {
-        clearHover();
-        return;
-      }
-
-      e.preventDefault();
-      e.stopPropagation();
-      clearHover();
-
-      const inspectedEl = resolveInspectableTarget(target) || target;
-
-      clearElementHighlight();
-      inspectedEl.classList.add("guide-bot-dom-highlight");
-      highlightedElRef.current = inspectedEl;
-
-      const explanation = explainDomElement(inspectedEl, guide);
-      setInspectMode(false);
-      setCursorCustomAnswer(null);
-      setCursorQuestionInput("");
-
-      if (explanation) {
-        const initialLayout = computeBestPopoverPlacement(inspectedEl, 385, 310);
-        setInspectedPopover({
-          element: inspectedEl,
-          explanation,
-          layout: initialLayout,
-        });
-        // Use Generative AI to explain the inspected element and improve old knowledge
-        requestCursorGenerativeAi(explanation, null);
-      }
-    };
-
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        clearHover();
-        setInspectMode(false);
-      }
-    };
-
-    document.addEventListener("mouseover", handleMouseOver, true);
-    document.addEventListener("click", handleClickCapture, true);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      clearHover();
-      document.removeEventListener("mouseover", handleMouseOver, true);
-      document.removeEventListener("click", handleClickCapture, true);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [inspectMode, guide, setInspectMode, clearElementHighlight, requestCursorGenerativeAi]);
-
-  // Measure actual popover height and keep it anchored beside the target element on scroll/resize
-  useLayoutEffect(() => {
-    if (!inspectedPopover?.element || !popoverRef.current) return;
-
-    const updatePosition = () => {
-      const el = inspectedPopover.element;
-      const card = popoverRef.current;
-      if (!el || !card || !document.body.contains(el)) {
-        dismissPopover();
-        return;
-      }
-      const measuredHeight = card.offsetHeight || 220;
-      const nextLayout = computeBestPopoverPlacement(el, 360, measuredHeight);
-      setInspectedPopover((prev) => {
-        if (!prev) return null;
-        if (
-          prev.layout.top === nextLayout.top &&
-          prev.layout.left === nextLayout.left &&
-          prev.layout.placement === nextLayout.placement &&
-          prev.layout.arrowX === nextLayout.arrowX &&
-          prev.layout.arrowY === nextLayout.arrowY
-        ) {
-          return prev;
-        }
-        return { ...prev, layout: nextLayout };
-      });
-    };
-
-    updatePosition();
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
-    return () => {
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
-    };
-  }, [inspectedPopover?.element, inspectedPopover?.explanation, lang, dismissPopover]);
-
-  // Light-dismiss when clicking anywhere on the page outside the floating explanation popover
-  useEffect(() => {
-    if (!inspectedPopover || typeof document === "undefined") return;
-
-    const handlePointerDownOutside = (e) => {
-      const target = e.target;
-      if (!target) return;
-      if (popoverRef.current && popoverRef.current.contains(target)) {
-        return;
-      }
-      if (target.closest?.("[data-inspect-trigger]")) {
-        return;
-      }
-      dismissPopover();
-    };
-
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape") {
-        dismissPopover();
-      }
-    };
-
-    document.addEventListener("pointerdown", handlePointerDownOutside, true);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDownOutside, true);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [inspectedPopover, dismissPopover]);
-
-  if (typeof document === "undefined" || (!inspectMode && !inspectedPopover)) {
-    return null;
-  }
-
-  const currentStalkerTrick =
-    STALKER_IDLE_TRICKS[stalkerTrickIdx % STALKER_IDLE_TRICKS.length] ||
-    STALKER_IDLE_TRICKS[0];
-
-  const activeStalkerTrickId = hoveredControlLabel
-    ? "spy"
-    : currentStalkerTrick.id;
-
-  return createPortal(
-    <>
-      {/* =================================================================== */}
-      {/* SIMPLE BASELINE CURSOR (Replaces OS cursor 1:1 at tip hotspot 4,3)  */}
-      {/* Wrapped in a viewport-clipped fixed layer so it never overflows right */}
-      {/* =================================================================== */}
-      {inspectMode && (
-        <div
-          aria-hidden="true"
-          className="fixed inset-0 z-[1000002] pointer-events-none overflow-hidden select-none"
-        >
-          <div
-            ref={stalkerElRef}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              pointerEvents: "none",
-              willChange: "transform",
-              transform: `translate3d(${stalkerPosRef.current.x - 4}px, ${
-                stalkerPosRef.current.y - 3
-              }px, 0)`,
-            }}
-          >
-            {/* Simple Baseline Pointer Arrow (Tip anchored at 4px, 3px) */}
-            <CursorBuddyAvatar
-              className="w-6 h-6 drop-shadow-xs"
-              fullBody={true}
-              speaking={Boolean(hoveredControlLabel)}
-            />
-
-            {/* Compact Label Badge Tucked Beside the Cursor Tail only when hovering a control */}
-            {hoveredControlLabel && (
-              <div
-                dir={isUr ? "rtl" : "ltr"}
-                lang={isUr ? "ur" : "en"}
-                className={`ml-5 -mt-1 px-2 py-0.5 rounded-lg text-[10px] font-extrabold whitespace-nowrap shadow-md border bg-slate-900/95 text-amber-300 border-amber-400/70 ${
-                  isUr ? "guide-bot-urdu-inline" : ""
-                }`}
-              >
-                {isUr
-                  ? `کلک کریں: ${hoveredControlLabel}`
-                  : `Click to explain: ${hoveredControlLabel}`}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Top Floating Instruction Pill while Inspect Mode is active */}
-      {inspectMode && (
-        <div
-          data-inspector-banner="true"
-          dir={isUr ? "rtl" : "ltr"}
-          lang={isUr ? "ur" : "en"}
-          className="fixed top-14 left-1/2 -translate-x-1/2 z-[1000001] max-w-[92vw] px-3.5 py-1.5 rounded-2xl border shadow-xl bg-slate-900/95 dark:bg-slate-900/95 border-cyan-400/70 text-white flex items-center gap-2.5 text-xs font-bold backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-150"
-        >
-          <CursorBuddyAvatar
-            className="w-4 h-4 shrink-0"
-            fullBody={false}
-          />
-          <span className={isUr ? "guide-bot-urdu-inline" : ""}>
-            {isUr
-              ? "کسی بھی بٹن، خانے یا کالم کی تفصیل اور شارٹ کٹ دیکھنے کے لیے اس پر کلک کریں!"
-              : "Click any button, field, or column to see its detailed explanation & keyboard shortcut!"}
-          </span>
-          <button
-            type="button"
-            onClick={() => setInspectMode(false)}
-            className="px-2 py-0.5 rounded-lg text-[10.5px] font-extrabold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer shrink-0"
-          >
-            {isUr ? "منسوخ (Esc)" : "Stop (Esc)"}
-          </button>
-        </div>
-      )}
-
-      {/* Floating Explanation Card Positioned Beside the Clicked Element */}
-      {inspectedPopover && (
-        <div
-          ref={popoverRef}
-          data-inspector-popover="true"
-          role="dialog"
-          aria-label="UI Element Explanation"
-          dir={isUr ? "rtl" : "ltr"}
-          lang={isUr ? "ur" : "en"}
-          style={{
-            position: "fixed",
-            top: `${inspectedPopover.layout.top}px`,
-            left: `${inspectedPopover.layout.left}px`,
-            width: `${inspectedPopover.layout.width || 370}px`,
-            zIndex: 1000001,
-          }}
-          className={`rounded-2xl border shadow-2xl transition-opacity duration-150 ${
-            isDark
-              ? "bg-slate-900/98 border-cyan-500/60 text-slate-100 shadow-black/70"
-              : "bg-white/98 border-cyan-500/70 text-slate-800 shadow-slate-900/25"
-          } backdrop-blur-md`}
-        >
-          {/* Directional Pointer Diamond pointing toward the inspected element */}
-          {inspectedPopover.layout.placement === "bottom" && (
-            <div
-              aria-hidden="true"
-              style={{ left: `${inspectedPopover.layout.arrowX - 6}px` }}
-              className={`absolute -top-1.5 w-3 h-3 rotate-45 border-l border-t ${
-                isDark
-                  ? "bg-slate-900 border-cyan-500/60"
-                  : "bg-white border-cyan-500/70"
-              }`}
-            />
-          )}
-          {inspectedPopover.layout.placement === "top" && (
-            <div
-              aria-hidden="true"
-              style={{ left: `${inspectedPopover.layout.arrowX - 6}px` }}
-              className={`absolute -bottom-1.5 w-3 h-3 rotate-45 border-r border-b ${
-                isDark
-                  ? "bg-slate-900 border-cyan-500/60"
-                  : "bg-white border-cyan-500/70"
-              }`}
-            />
-          )}
-          {inspectedPopover.layout.placement === "right" && (
-            <div
-              aria-hidden="true"
-              style={{ top: `${inspectedPopover.layout.arrowY - 6}px` }}
-              className={`absolute -left-1.5 w-3 h-3 rotate-45 border-l border-b ${
-                isDark
-                  ? "bg-slate-900 border-cyan-500/60"
-                  : "bg-white border-cyan-500/70"
-              }`}
-            />
-          )}
-          {inspectedPopover.layout.placement === "left" && (
-            <div
-              aria-hidden="true"
-              style={{ top: `${inspectedPopover.layout.arrowY - 6}px` }}
-              className={`absolute -right-1.5 w-3 h-3 rotate-45 border-r border-t ${
-                isDark
-                  ? "bg-slate-900 border-cyan-500/60"
-                  : "bg-white border-cyan-500/70"
-              }`}
-            />
-          )}
-
-          {/* Header: Simple Baseline Cursor Icon + Control Title + Type & Shortcut Badges + Language Switcher + Close */}
-          <div
-            className={`px-3.5 py-2 border-b flex items-center justify-between gap-2 rounded-t-2xl ${
-              isDark
-                ? "bg-slate-950/80 border-slate-800"
-                : "bg-cyan-50/70 border-slate-200/80"
-            }`}
-          >
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <CursorBuddyAvatar
-                className="w-5 h-5 shrink-0"
-                fullBody={false}
-              />
-              <div className="min-w-0 flex-1">
-                <h3
-                  className={`text-xs font-extrabold truncate text-slate-900 dark:text-white ${
-                    isUr ? "guide-bot-urdu-inline" : ""
-                  }`}
-                >
-                  {(isUr
-                    ? inspectedPopover.explanation.title?.ur
-                    : inspectedPopover.explanation.title?.en
-                  )?.replace(/^(UI Inspector:\s*|اسکرین انسپکٹر:\s*)/i, "") ||
-                    (isUr ? "کنٹرول کی وضاحت" : "Control Explanation")}
-                </h3>
-                <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                  {(inspectedPopover.explanation.badge?.en ||
-                    inspectedPopover.explanation.badge?.ur) && (
-                    <span
-                      className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-bold ${
-                        isDark
-                          ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"
-                          : "bg-cyan-100/90 text-cyan-800 border border-cyan-300/70"
-                      } ${isUr ? "guide-bot-urdu-inline" : ""}`}
-                    >
-                      {isUr
-                        ? inspectedPopover.explanation.badge?.ur ||
-                          inspectedPopover.explanation.badge?.en
-                        : inspectedPopover.explanation.badge?.en}
-                    </span>
-                  )}
-                  {inspectedPopover.explanation.shortcut?.keys && (
-                    <kbd
-                      dir="ltr"
-                      className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-mono font-extrabold ${
-                        isDark
-                          ? "bg-amber-500/20 text-amber-300 border border-amber-400/40"
-                          : "bg-amber-100 text-amber-900 border border-amber-300"
-                      }`}
-                    >
-                      <span>⌨</span>
-                      <span>{inspectedPopover.explanation.shortcut.keys}</span>
-                    </kbd>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1 shrink-0" dir="ltr">
-              <div
-                role="group"
-                aria-label="Explanation Language"
-                className={`inline-flex items-center p-0.5 rounded-lg border ${
-                  isDark
-                    ? "bg-slate-800 border-slate-700"
-                    : "bg-white border-slate-200"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => onSetLang("en")}
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
-                    lang === "en"
-                      ? "bg-slate-900 dark:bg-blue-600 text-white"
-                      : "text-slate-500 dark:text-slate-300"
-                  }`}
-                >
-                  EN
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onSetLang("ur")}
-                  lang="ur"
-                  dir="rtl"
-                  className={`guide-bot-urdu-inline px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
-                    lang === "ur"
-                      ? "bg-emerald-500 text-white"
-                      : "text-slate-500 dark:text-slate-300"
-                  }`}
-                >
-                  اردو
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={dismissPopover}
-                aria-label="Close explanation"
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                <XMarkIcon className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Body: Formatted Explanation + Generative AI Status + Interactive Ask Cursor AI */}
-          <div className="p-3.5 max-h-[58vh] overflow-y-auto space-y-2.5">
-            {/* Generative AI Status / Fallback Indicator */}
-            <div className="flex items-center justify-between gap-2">
-              {cursorAiLoading ? (
-                <span
-                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold animate-pulse ${
-                    isDark
-                      ? "bg-purple-500/20 text-purple-300 border border-purple-400/40"
-                      : "bg-purple-100 text-purple-800 border border-purple-300"
-                  }`}
-                >
-                  <SparklesIcon className="w-3 h-3 shrink-0 animate-spin" />
-                  <span>
-                    {isUr
-                      ? "اے آئی سے براہِ راست وضاحت تیار کی جا رہی ہے..."
-                      : "Generating fresh explanation from AI..."}
-                  </span>
-                </span>
-              ) : inspectedPopover.explanation.aiGenerated ||
-                cursorCustomAnswer?.aiGenerated ? (
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    isDark
-                      ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/35"
-                      : "bg-emerald-50 text-emerald-800 border border-emerald-300"
-                  }`}
-                >
-                  <SparklesIcon className="w-3 h-3 shrink-0" />
-                  <span>
-                    {isUr
-                      ? `✨ ${
-                          (cursorCustomAnswer?.provider ||
-                            inspectedPopover.explanation.aiProvider) === "gemini"
-                            ? "Gemini AI"
-                            : "Groq AI"
-                        } سے تیار کردہ براہِ راست اے آئی وضاحت`
-                      : `✨ Generated by ${
-                          (cursorCustomAnswer?.provider ||
-                            inspectedPopover.explanation.aiProvider) === "gemini"
-                            ? "Gemini AI"
-                            : "Groq AI"
-                        } • Live AI Explanation`}
-                  </span>
-                </span>
-              ) : (
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                    isDark
-                      ? "bg-amber-500/15 text-amber-300 border border-amber-500/35"
-                      : "bg-amber-50 text-amber-800 border border-amber-300"
-                  }`}
-                >
-                  <span>
-                    {isUr
-                      ? "📘 فال بیک: کاروبار گائیڈ (اے آئی دستیاب نہ ہونے پر)"
-                      : "📘 Fallback: Karobar Docs (AI Unavailable)"}
-                  </span>
-                </span>
-              )}
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                {cursorIsStreaming && (
-                  <button
-                    type="button"
-                    onClick={stopCursorStream}
-                    className="px-1.5 py-0.5 rounded text-[9.5px] font-extrabold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 cursor-pointer"
-                  >
-                    {isUr ? "مکمل دکھائیں" : "⏹ Show Full"}
-                  </button>
-                )}
-                {cursorCustomAnswer && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      stopCursorStream();
-                      setCursorCustomAnswer(null);
-                    }}
-                    className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer shrink-0"
-                  >
-                    {isUr ? "واپس کنٹرول وضاحت پر" : "← Back to Control"}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {cursorAiLoading &&
-            !inspectedPopover.explanation.aiGenerated &&
-            !cursorCustomAnswer ? (
-              <div
-                className={`p-3 rounded-xl border space-y-2 ${
-                  isDark
-                    ? "bg-slate-800/60 border-slate-700/80 text-slate-300"
-                    : "bg-slate-50 border-slate-200 text-slate-600"
-                }`}
-              >
-                <div className="h-2.5 w-3/4 rounded bg-cyan-500/25 animate-pulse" />
-                <div className="h-2.5 w-full rounded bg-slate-400/20 animate-pulse" />
-                <div className="h-2.5 w-5/6 rounded bg-slate-400/20 animate-pulse" />
-                <p className="text-[11px] font-medium pt-0.5">
-                  {isUr
-                    ? "جنریٹو اے آئی اس کنٹرول اور اسکرین کا تجزیہ کر کے نئی وضاحت تیار کر رہا ہے..."
-                    : "Generative AI is analyzing this control on your active screen..."}
-                </p>
-              </div>
-            ) : cursorCustomAnswer ? (
-              <div className="space-y-1.5">
-                <div
-                  className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold ${
-                    isDark
-                      ? "bg-slate-800/90 text-cyan-300 border border-slate-700"
-                      : "bg-slate-100 text-slate-700 border border-slate-200"
-                  }`}
-                >
-                  {isUr ? "سوال: " : "Q: "}
-                  {cursorCustomAnswer.question}
-                </div>
-                <FormattedBotMessage
-                  text={(() => {
-                    const full = String(
-                      (isUr
-                        ? cursorCustomAnswer.ur || cursorCustomAnswer.en
-                        : cursorCustomAnswer.en) || ""
-                    );
-                    return cursorIsStreaming
-                      ? `${full.slice(0, cursorStreamChars)} ▍`
-                      : full;
-                  })()}
-                  isUrdu={isUr}
-                />
-              </div>
-            ) : (
-              <FormattedBotMessage
-                text={(() => {
-                  const full = String(
-                    (isUr
-                      ? inspectedPopover.explanation.ur ||
-                        inspectedPopover.explanation.en
-                      : inspectedPopover.explanation.en) || ""
-                  );
-                  return cursorIsStreaming
-                    ? `${full.slice(0, cursorStreamChars)} ▍`
-                    : full;
-                })()}
-                isUrdu={isUr}
-              />
-            )}
-
-            {/* Quick AI Follow-up Prompts inside Explain Cursor */}
-            <div className="pt-1.5 border-t border-slate-200/70 dark:border-slate-800 space-y-1.5">
-              <div className="flex flex-wrap gap-1">
-                {[
-                  {
-                    en: "How to use step-by-step?",
-                    ur: "مرحلہ وار استعمال کیسے کریں؟",
-                  },
-                  {
-                    en: "Stock & accounting impact?",
-                    ur: "اسٹاک اور کھاتوں پر کیا اثر ہوگا؟",
-                  },
-                  {
-                    en: "Common mistakes to avoid?",
-                    ur: "عام غلطیوں سے کیسے بچیں؟",
-                  },
-                ].map((chip, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    disabled={cursorAiLoading}
-                    onClick={(e) =>
-                      handleCursorQuestionSubmit(e, isUr ? chip.ur : chip.en)
-                    }
-                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-colors cursor-pointer border ${
-                      isDark
-                        ? "bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700"
-                        : "bg-slate-100 hover:bg-cyan-50 text-slate-700 border-slate-200"
-                    } ${isUr ? "guide-bot-urdu-inline" : ""}`}
-                  >
-                    ✨ {isUr ? chip.ur : chip.en}
-                  </button>
-                ))}
-              </div>
-
-              {/* Interactive Ask Cursor AI Input */}
-              <div className="flex items-center gap-1.5" role="search">
-                <input
-                  type="text"
-                  value={cursorQuestionInput}
-                  onChange={(e) => setCursorQuestionInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (
-                      e.nativeEvent?.isComposing ||
-                      e.isComposing ||
-                      e.keyCode === 229
-                    ) {
-                      return;
-                    }
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleCursorQuestionSubmit(e);
-                    }
-                  }}
-                  disabled={cursorAiLoading}
-                  placeholder={
-                    isUr
-                      ? "اس کنٹرول یا اسکرین کے بارے میں اے آئی سے پوچھیں..."
-                      : "Ask Cursor AI about this control or screen..."
-                  }
-                  className={`flex-1 min-w-0 px-2.5 py-1.5 rounded-xl text-[11px] border focus:outline-none focus:ring-2 focus:ring-cyan-500/50 ${
-                    isDark
-                      ? "bg-slate-950/90 border-slate-700 text-slate-100 placeholder-slate-500"
-                      : "bg-white border-slate-300 text-slate-800 placeholder-slate-400"
-                  } ${isUr ? "guide-bot-urdu-inline" : ""}`}
-                />
-                <button
-                  type="button"
-                  onClick={(e) => handleCursorQuestionSubmit(e)}
-                  disabled={cursorAiLoading || !cursorQuestionInput.trim()}
-                  className="px-2.5 py-1.5 rounded-xl text-[10.5px] font-extrabold bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white transition-colors cursor-pointer shrink-0 inline-flex items-center gap-1"
-                >
-                  <SparklesIcon className="w-3 h-3 shrink-0" />
-                  <span>{isUr ? "پوچھیں" : "Ask AI"}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Footer: Quick Re-Inspect or Click-Anywhere Hint */}
-          <div
-            className={`px-3.5 py-2 border-t flex items-center justify-between gap-2 rounded-b-2xl text-[10.5px] ${
-              isDark
-                ? "bg-slate-950/50 border-slate-800 text-slate-400"
-                : "bg-slate-50/80 border-slate-200/70 text-slate-500"
-            }`}
-          >
-            <span className="truncate">
-              {isUr
-                ? "بند کرنے کے لیے صفحے پر کہیں بھی کلک کریں"
-                : "Click anywhere on page to dismiss"}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                dismissPopover();
-                setInspectMode(true);
-              }}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg font-extrabold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 transition-colors cursor-pointer shrink-0"
-            >
-              <CursorArrowRaysIcon className="w-3 h-3 shrink-0" />
-              <span>{isUr ? "دوسرا بٹن چیک کریں" : "Explain Another"}</span>
-            </button>
-          </div>
-        </div>
-      )}
-    </>,
-    document.body
   );
 }
 
@@ -1856,6 +571,8 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
   const { isDark } = useTheme();
   const dialogRef = useRef(null);
   const askInputRef = useRef(null);
+  const growableTextareaWrapRef = useRef(null);
+  const chatScrollRef = useRef(null);
   const chatEndRef = useRef(null);
   const typingTimerRef = useRef(null);
   const closingPromiseRef = useRef(null);
@@ -1912,12 +629,16 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
   const [visualTalking, setVisualTalking] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [thinkingStageIdx, setThinkingStageIdx] = useState(0);
+  const [isReasoningExpanded, setIsReasoningExpanded] = useState(false);
   const [streamingMsgId, setStreamingMsgId] = useState(null);
   const [streamedCharCount, setStreamedCharCount] = useState(0);
   const [copiedMsgId, setCopiedMsgId] = useState(null);
   const streamIntervalRef = useRef(null);
   const [questionInput, setQuestionInput] = useState("");
   const [popupTrickIdx, setPopupTrickIdx] = useState(0);
+  const [showScrollToBottomBtn, setShowScrollToBottomBtn] = useState(false);
+  const [slashMenuOpen, setSlashMenuOpen] = useState(false);
+  const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
 
   // Cycle through live AI reasoning stages while waiting for response
   useEffect(() => {
@@ -2011,12 +732,84 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
   const highlightTimerRef = useRef(null);
 
   // Background AI Task State (e.g. multi-product formulation enrichment in background)
-  const [bgTask, setBgTask] = useState(null);
+  const [bgTask, setBgTask] = useState(() => loadPersistedBgTask());
   const [bgFilterQuery, setBgFilterQuery] = useState("");
   const [bgTaskAwaitingPermission, setBgTaskAwaitingPermission] = useState(false);
   const [bgPreviewLoading, setBgPreviewLoading] = useState(false);
   const [bgPreviewData, setBgPreviewData] = useState(null);
+  const [reportFilterTab, setReportFilterTab] = useState("all"); // 'all' | 'filled' | 'skipped'
+  const [reportSearchQuery, setReportSearchQuery] = useState("");
+  const [isBgTaskDetailPopupOpen, setIsBgTaskDetailPopupOpen] = useState(false);
+  const bgDetailDialogRef = useRef(null);
+  const bgDetailTitleId = useId();
   const bgTaskCancelRef = useRef(false);
+
+  // Persist bgTask state so the Separate Page (/background-tasks) and Popup stay synchronized
+  useEffect(() => {
+    if (bgTask !== undefined) {
+      savePersistedBgTask(bgTask);
+    }
+  }, [bgTask]);
+
+  useEffect(() => {
+    const onExternalStop = () => {
+      bgTaskCancelRef.current = true;
+    };
+    window.addEventListener("karobar:bg-task-stop", onExternalStop);
+    return () => window.removeEventListener("karobar:bg-task-stop", onExternalStop);
+  }, []);
+
+  // Native <dialog closedby="any"> control + light-dismiss fallback for the Background Task Detail Popup
+  useEffect(() => {
+    const dialog = bgDetailDialogRef.current;
+    if (!dialog) return;
+
+    if (isBgTaskDetailPopupOpen) {
+      if (!dialog.open && typeof dialog.showModal === "function") {
+        try {
+          dialog.showModal();
+        } catch {
+          dialog.setAttribute("open", "");
+        }
+      }
+    } else if (dialog.open && typeof dialog.close === "function") {
+      try {
+        dialog.close();
+      } catch {
+        dialog.removeAttribute("open");
+      }
+    }
+
+    const handleNativeClose = () => {
+      setIsBgTaskDetailPopupOpen(false);
+    };
+
+    const handleBackdropClick = (event) => {
+      if (event.target !== dialog) return;
+      const rect = dialog.getBoundingClientRect();
+      const isDialogContent =
+        rect.top <= event.clientY &&
+        event.clientY <= rect.top + rect.height &&
+        rect.left <= event.clientX &&
+        event.clientX <= rect.left + rect.width;
+      if (!isDialogContent) {
+        dialog.close();
+      }
+    };
+
+    dialog.addEventListener("close", handleNativeClose);
+    if (
+      typeof HTMLDialogElement !== "undefined" &&
+      !("closedBy" in HTMLDialogElement.prototype)
+    ) {
+      dialog.addEventListener("click", handleBackdropClick);
+    }
+
+    return () => {
+      dialog.removeEventListener("close", handleNativeClose);
+      dialog.removeEventListener("click", handleBackdropClick);
+    };
+  }, [isBgTaskDetailPopupOpen]);
 
   const triggerBotTalking = useCallback((durationMs = 1800) => {
     setVisualTalking(true);
@@ -2026,16 +819,30 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
 
   const scrollToBottom = useCallback(() => {
     window.setTimeout(() => {
+      if (chatScrollRef.current) {
+        chatScrollRef.current.scrollTo({
+          top: chatScrollRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      }
       chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      setShowScrollToBottomBtn(false);
     }, 45);
+  }, []);
+
+  const handleChatScroll = useCallback((e) => {
+    const el = e.currentTarget;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setShowScrollToBottomBtn(distanceFromBottom > 140);
   }, []);
 
   /**
    * Highlights a live DOM element on the user's current screen during a Cube Walkthrough.
-   * Scoped strictly to `.workspace-page, main` so it never highlights Topbar or Sidebar controls!
+   * Uses semantic scoring (`findBestTourTargetElement`) scoped strictly to `.workspace-page, main`.
    */
-  const highlightElementOnScreen = useCallback((selector) => {
-    if (!selector || typeof document === "undefined") return;
+  const highlightElementOnScreen = useCallback((selector, stepMeta = null) => {
+    if (typeof document === "undefined") return;
     if (highlightTimerRef.current) {
       window.clearTimeout(highlightTimerRef.current);
       highlightTimerRef.current = null;
@@ -2044,46 +851,10 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       .querySelectorAll(".guide-bot-dom-highlight")
       .forEach((el) => el.classList.remove("guide-bot-dom-highlight"));
 
-    let target = null;
-    try {
-      const pageContainers = document.querySelectorAll(
-        ".workspace-page, main, [role='dialog']:not(.guide-bot-drawer)"
-      );
-      for (const container of pageContainers) {
-        const candidates = container.querySelectorAll(selector);
-        for (const el of candidates) {
-          if (
-            !el.closest(".guide-bot-drawer") &&
-            !el.closest(".workspace-sidebar") &&
-            !el.closest("aside") &&
-            !el.closest("[data-roaming-cube]") &&
-            el.offsetParent !== null
-          ) {
-            target = el;
-            break;
-          }
-        }
-        if (target) break;
-      }
-      if (!target) {
-        const fallbackCandidates = document.querySelectorAll(selector);
-        for (const el of fallbackCandidates) {
-          if (
-            !el.closest(".guide-bot-drawer") &&
-            !el.closest(".workspace-sidebar") &&
-            !el.closest("aside") &&
-            !el.closest("header") &&
-            !el.closest("[data-roaming-cube]") &&
-            el.offsetParent !== null
-          ) {
-            target = el;
-            break;
-          }
-        }
-      }
-    } catch {
-      target = null;
-    }
+    const target = findBestTourTargetElement(
+      stepMeta || { target: selector, targetSelector: selector },
+      selector
+    );
 
     if (target) {
       target.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -2101,45 +872,18 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
     }
   }, []);
 
-  /**
-   * Launches a Grounded Interactive Step-by-Step Walkthrough in Cube.
-   */
-  const startCubeDemo = useCallback(
-    (workflowId) => {
-      if (!workflowId || !DEMO_MANIFESTS[workflowId]) return;
-      setShowDirectory(false);
-      setHighlightStatus(null);
-      setActiveMainTab("guide");
-      setActiveDemo({
-        workflowId,
-        stepIndex: 0,
-        pausedForDetour: false,
-      });
-      triggerBotTalking(1800);
-    },
-    [triggerBotTalking]
-  );
-
-  // Detect if the currently displayed screen has a matching interactive Cube Demo Manifest
+  // Detect if the currently displayed screen has a matching curated Cube Demo Manifest
+  // Strictly match only when the exact screen is the primaryScreen of a multi-step single-screen workflow
   const currentScreenWorkflowId = useMemo(() => {
     const key = displayedGuide?.key || "";
-    if (key.startsWith("/purchase-orders")) return "create_purchase_order";
-    if (key.startsWith("/purchase-invoices")) return "create_purchase_invoice";
+    if (key === "/purchase-orders/create") return "create_purchase_order";
+    if (key === "/purchase-invoices/create") return "create_purchase_invoice";
     if (key === "/sale-invoices/pos") return "pos_counter_billing";
-    if (key.startsWith("/sale-invoices")) return "create_retail_invoice";
-    if (key.startsWith("/customer-ledger") || key.startsWith("/customers")) {
-      return "customer_udhar_recovery";
-    }
-    if (key.startsWith("/suppliers")) return "manage_suppliers";
-    if (key.startsWith("/products")) return "manage_products";
-    if (key.startsWith("/cash-drawer")) return "cash_drawer_shift";
-    if (key.startsWith("/expenses")) return "record_shop_expense";
-    if (key.startsWith("/accounts")) return "manage_accounts_transfer";
-    if (key.startsWith("/stock-adjustments")) return "inventory_adjustment";
-    const found = Object.values(DEMO_MANIFESTS).find((m) =>
-      m.steps?.some((s) => s.screen === key)
-    );
-    return found ? found.id || found.workflowId : null;
+    if (key === "/sale-invoices/create/retail") return "create_retail_invoice";
+    if (key === "/customer-ledger") return "customer_udhar_recovery";
+    if (key === "/cash-drawer") return "cash_drawer_shift";
+    if (key === "/stock-adjustments/create") return "inventory_adjustment";
+    return null;
   }, [displayedGuide]);
 
   const resetToGreeting = useCallback(
@@ -2185,6 +929,10 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
     setShowDirectory(false);
     setHighlightStatus(null);
   }, [location.pathname, location.search, location.hash]);
+
+  useEffect(() => {
+    setActiveDemo((prev) => (prev ? { ...prev, stepIndex: 0 } : null));
+  }, [location.pathname]);
 
   useEffect(() => {
     setBlueprintTab("overview");
@@ -2297,6 +1045,62 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
     },
     [onClose, setSharedIsOpen]
   );
+
+  /**
+   * Launches an Interactive On-Screen Spotlight Tour (`SpotlightTourOverlay`).
+   * Works on any screen: uses curated `DEMO_MANIFESTS` when available or builds
+   * a dynamic screen-specific spotlight walkthrough (`dynamic_screen_tour`).
+   * Minimizes the modal drawer by default so the underlying ERP screen is live and interactive.
+   */
+  const startCubeDemo = useCallback(
+    (workflowId = null, minimizeDrawer = true) => {
+      const resolvedId =
+        workflowId && DEMO_MANIFESTS[workflowId]
+          ? workflowId
+          : currentScreenWorkflowId && DEMO_MANIFESTS[currentScreenWorkflowId]
+          ? currentScreenWorkflowId
+          : "dynamic_screen_tour";
+
+      setShowDirectory(false);
+      setHighlightStatus(null);
+      setActiveMainTab("guide");
+      setActiveDemo({
+        workflowId: resolvedId,
+        stepIndex: 0,
+        pausedForDetour: false,
+        spotlightActive: true,
+      });
+      triggerBotTalking(1800);
+      if (minimizeDrawer) {
+        runSmoothClose(true);
+      }
+    },
+    [currentScreenWorkflowId, runSmoothClose, triggerBotTalking]
+  );
+
+  // Build the active Spotlight Tour steps for either a curated workflow or any of the 80+ screens
+  const activeSpotlightData = useMemo(() => {
+    if (!activeDemo) return { title: null, steps: [] };
+    const manifest =
+      activeDemo.workflowId && DEMO_MANIFESTS[activeDemo.workflowId]
+        ? DEMO_MANIFESTS[activeDemo.workflowId]
+        : null;
+    const built = buildInteractiveSpotlightSteps({
+      currentPath: location.pathname,
+      guide: displayedGuide,
+      manifest,
+    });
+    if (Array.isArray(built)) {
+      return {
+        title: manifest?.title || displayedGuide?.title || null,
+        steps: built,
+      };
+    }
+    return {
+      title: built?.title || manifest?.title || displayedGuide?.title || null,
+      steps: Array.isArray(built?.steps) ? built.steps : [],
+    };
+  }, [activeDemo, location.pathname, displayedGuide]);
 
   // Sync `isOpen` prop changes with smooth open & smooth close
   useEffect(() => {
@@ -2644,15 +1448,15 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
           remaining = Number(nextBg.remaining_count || 0);
 
           if (newUpdatedList.length > 0) {
-            accumulatedUpdated = [...newUpdatedList, ...accumulatedUpdated].slice(
+            accumulatedUpdated = [...accumulatedUpdated, ...newUpdatedList].slice(
               0,
-              150
+              5000
             );
           }
           if (newSkippedList.length > 0) {
-            accumulatedSkipped = [...newSkippedList, ...accumulatedSkipped].slice(
+            accumulatedSkipped = [...accumulatedSkipped, ...newSkippedList].slice(
               0,
-              80
+              5000
             );
           }
 
@@ -2663,7 +1467,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
           }
 
           const stillRunning = Boolean(nextBg.has_more);
-          setBgTask({
+          const nextReportSnapshot = {
             running: stillRunning,
             status: stillRunning ? "running" : "completed",
             processedCount: totalProcessed,
@@ -2673,7 +1477,9 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
             updatedProducts: accumulatedUpdated,
             skippedProducts: accumulatedSkipped,
             filterQuery,
-          });
+          };
+
+          setBgTask(nextReportSnapshot);
 
           if (cardId) {
             setThread((prev) =>
@@ -2682,13 +1488,14 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   ? {
                       ...item,
                       hasBackgroundTask: true,
+                      autoFillReport: nextReportSnapshot,
                       title: {
                         en: stillRunning
-                          ? `Background Task Running (${totalUpdated} Updated, ${remaining} Remaining)`
-                          : `Background Task Completed (${totalUpdated} Product(s) Updated)`,
+                          ? `Background Task Running (${totalUpdated} Filled, ${totalSkipped} Skipped, ${remaining} Remaining)`
+                          : `Completed: Auto-Filled ${totalUpdated} Formulation(s) • ${totalSkipped} Skipped (Detailed Report Below)`,
                         ur: stillRunning
-                          ? `بیک گراؤنڈ ٹاسک جاری (${totalUpdated} اپڈیٹ، ${remaining} باقی)`
-                          : `بیک گراؤنڈ ٹاسک مکمل (${totalUpdated} پروڈکٹس اپڈیٹ)`,
+                          ? `بیک گراؤنڈ ٹاسک جاری (${totalUpdated} اپڈیٹ، ${totalSkipped} چھوڑی گئیں، ${remaining} باقی)`
+                          : `مکمل: ${totalUpdated} پروڈکٹس میں فارمولیشن شامل • ${totalSkipped} چھوڑی گئیں (تفصیلی رپورٹ نیچے دیکھیں)`,
                       },
                     }
                   : item
@@ -2707,15 +1514,33 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         }
       }
 
+      const finalStatus = bgTaskCancelRef.current ? "stopped" : "completed";
       setBgTask((prev) =>
         prev
           ? {
               ...prev,
               running: false,
-              status: bgTaskCancelRef.current ? "stopped" : prev.status === "running" ? "completed" : prev.status,
+              status: prev.status === "error" ? "error" : finalStatus,
             }
           : null
       );
+
+      if (cardId) {
+        setThread((prev) =>
+          prev.map((item) =>
+            item.id === cardId && item.autoFillReport
+              ? {
+                  ...item,
+                  autoFillReport: {
+                    ...item.autoFillReport,
+                    running: false,
+                    status: finalStatus,
+                  },
+                }
+              : item
+          )
+        );
+      }
     },
     []
   );
@@ -2838,6 +1663,78 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
   }, []);
 
   /**
+   * Exports the Detailed Auto-Fill Formulation Report (both Filled and Skipped items) as a CSV file.
+   */
+  const exportAutoFillReportCsv = useCallback((report) => {
+    if (!report || typeof document === "undefined") return;
+    const filled = Array.isArray(report.updatedProducts) ? report.updatedProducts : [];
+    const skipped = Array.isArray(report.skippedProducts) ? report.skippedProducts : [];
+
+    const escapeCsv = (val) => {
+      const str = String(val ?? "").replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const rows = [
+      [
+        "Status",
+        "Product ID",
+        "Product Code",
+        "Product Name",
+        "Formulation (Generic Salt)",
+        "Verification / Skip Reason",
+        "Google Search Query",
+      ].map(escapeCsv).join(","),
+    ];
+
+    filled.forEach((item) => {
+      rows.push(
+        [
+          "FILLED",
+          item.id || "",
+          item.product_code || "",
+          item.name || "",
+          item.formulation || "",
+          item.source_en || "Google Search Verified",
+          item.search_query || "",
+        ]
+          .map(escapeCsv)
+          .join(",")
+      );
+    });
+
+    skipped.forEach((item) => {
+      rows.push(
+        [
+          "SKIPPED",
+          item.id || "",
+          item.product_code || "",
+          item.name || "",
+          "",
+          item.reason_en || "No verified salt found on Google Search — skipped",
+          item.search_query || "",
+        ]
+          .map(escapeCsv)
+          .join(",")
+      );
+    });
+
+    const csvContent = "\uFEFF" + rows.join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `karobar-autofill-formulation-report-${new Date().toISOString().slice(0, 10)}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, []);
+
+  /**
    * Handles user questions in Cube's Companion Drawer using the 4-layer Hybrid Intelligence Architecture:
    *   Layer 1: Local trained intelligence engine (`routeUserQuery`)
    *   Layer 2: Groq Primary AI (via `POST /api/cube/ask`)
@@ -2890,11 +1787,16 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       lastBotMsg?.providerStatus === "cube_task_awaiting_permission";
 
     // Deterministic walkthrough intelligence: never allow AI to invent selectors or workflow IDs
-    if (!isAnsweringPendingTask && routed.startDemoNow && routed.workflowId && DEMO_MANIFESTS[routed.workflowId]) {
+    if (!isAnsweringPendingTask && routed.startDemoNow) {
+      const targetWf =
+        routed.workflowId && DEMO_MANIFESTS[routed.workflowId]
+          ? routed.workflowId
+          : currentScreenWorkflowId || "dynamic_screen_tour";
       setActiveDemo({
-        workflowId: routed.workflowId,
+        workflowId: targetWf,
         stepIndex: 0,
         pausedForDetour: false,
+        spotlightActive: true,
       });
     } else if (activeDemo && !routed.startDemoNow) {
       setActiveDemo((prev) => (prev ? { ...prev, pausedForDetour: true } : null));
@@ -2921,7 +1823,17 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
     };
 
     setThread((prev) => [...prev, userMsg]);
-    if (!presetQuery) setQuestionInput("");
+    if (!presetQuery) {
+      setQuestionInput("");
+      if (
+        growableTextareaWrapRef.current &&
+        typeof CSS !== "undefined" &&
+        !CSS.supports("field-sizing", "content")
+      ) {
+        growableTextareaWrapRef.current.dataset.replicatedValue = "";
+      }
+    }
+    setSlashMenuOpen(false);
     setShowDirectory(false);
     setIsTyping(true);
     setVisualTalking(true);
@@ -3035,12 +1947,36 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         });
       }
 
+      const initUpdated = Number(data.task_meta?.updated_count || 0);
+      const initProcessed = Number(bgMeta?.processed_in_batch || 0);
+      const initUpdatedProducts = Array.isArray(data.task_meta?.updated_products)
+        ? data.task_meta.updated_products
+        : [];
+      const initSkippedProducts = Array.isArray(data.task_meta?.skipped_products)
+        ? data.task_meta.skipped_products
+        : [];
+      const initRemaining = Number(bgMeta?.remaining_count || 0);
+      const initialReportSnapshot = isBgTaskResponse
+        ? {
+            running: Boolean(bgMeta?.has_more),
+            status: bgMeta?.has_more ? "running" : "completed",
+            processedCount: initProcessed,
+            updatedCount: initUpdated,
+            skippedCount: initSkippedProducts.length,
+            remainingCount: initRemaining,
+            updatedProducts: initUpdatedProducts,
+            skippedProducts: initSkippedProducts,
+            filterQuery: bgMeta?.filter_query || "",
+          }
+        : null;
+
       const nextBotItem = {
         id: nextCardId,
         role: "bot",
         kind: "qa",
         questionText: raw,
         hasBackgroundTask: isBgTaskResponse,
+        autoFillReport: initialReportSnapshot,
         taskMeta: data.task_meta || null,
         title: {
           en: resolvedTitleEn,
@@ -3068,28 +2004,8 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       scrollToBottom();
       window.setTimeout(() => setVisualTalking(false), 1800);
 
-      if (isBgTaskResponse) {
-        const initUpdated = Number(data.task_meta?.updated_count || 0);
-        const initProcessed = Number(bgMeta?.processed_in_batch || 0);
-        const initUpdatedProducts = Array.isArray(data.task_meta?.updated_products)
-          ? data.task_meta.updated_products
-          : [];
-        const initSkippedProducts = Array.isArray(data.task_meta?.skipped_products)
-          ? data.task_meta.skipped_products
-          : [];
-        const initRemaining = Number(bgMeta?.remaining_count || 0);
-
-        setBgTask({
-          running: Boolean(bgMeta?.has_more),
-          status: bgMeta?.has_more ? "running" : "completed",
-          processedCount: initProcessed,
-          updatedCount: initUpdated,
-          skippedCount: initSkippedProducts.length,
-          remainingCount: initRemaining,
-          updatedProducts: initUpdatedProducts,
-          skippedProducts: initSkippedProducts,
-          filterQuery: bgMeta?.filter_query || "",
-        });
+      if (isBgTaskResponse && initialReportSnapshot) {
+        setBgTask(initialReportSnapshot);
 
         if (bgMeta?.has_more) {
           continueBackgroundTaskLoop(
@@ -3154,17 +2070,16 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
 
   // Topic chips for progressive disclosure
   const allScreenChips = useMemo(() => {
-    const chips = [];
-    if (currentScreenWorkflowId && DEMO_MANIFESTS[currentScreenWorkflowId]) {
-      chips.push({
-        id: `walkthrough-${currentScreenWorkflowId}`,
+    const chips = [
+      {
+        id: `walkthrough-${currentScreenWorkflowId || displayedGuide?.key || "screen"}`,
         type: "walkthrough",
-        workflowId: currentScreenWorkflowId,
+        workflowId: currentScreenWorkflowId || "dynamic_screen_tour",
         icon: "🎯",
-        en: "Interactive Walkthrough (Live Demo)",
-        ur: "مرحلہ وار عملی گائیڈ (لائیو ڈیمو)",
-      });
-    }
+        en: "Interactive Spotlight Tour (Live Step-by-Step)",
+        ur: "لائیو اسپاٹ لائٹ گائیڈ (مرحلہ وار عملی ڈیمو)",
+      },
+    ];
     if ((displayedGuide?.steps?.en?.length || 0) > 0) {
       chips.push({
         id: "steps",
@@ -3219,21 +2134,265 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
     [allScreenChips, usedTopics]
   );
 
+  // `/` Slash Command Palette definitions (Notion AI / Linear / Cursor style)
+  const slashCommands = useMemo(
+    () => [
+      {
+        id: "add-product",
+        cmd: "/add-product",
+        icon: "➕",
+        en: "Add New Product",
+        ur: "نئی پروڈکٹ شامل کریں",
+        descEn: "Guided wizard with DB duplicate check & staged preview",
+        descUr: "ڈپلیکیٹ چیک اور پری ویو کے ساتھ نئی پروڈکٹ بنائیں",
+        prompt: "Add a new product",
+      },
+      {
+        id: "edit-product",
+        cmd: "/edit-product",
+        icon: "✏️",
+        en: "Edit Existing Product",
+        ur: "پروڈکٹ کی قیمت یا تفصیل بدلیں",
+        descEn: "Update price, rack, formulation, or barcode with before/after diff",
+        descUr: "پروڈکٹ کی قیمت، ریک یا فارمولیشن تبدیل کریں",
+        prompt: "Edit a product",
+      },
+      {
+        id: "autofill",
+        cmd: "/autofill",
+        icon: "🧪",
+        en: "Auto-Fill Formulations (Google Search)",
+        ur: "گوگل سرچ سے فارمولیشن لگائیں",
+        descEn: "Search Google for verified generic salts & generate detailed report",
+        descUr: "گوگل سرچ سے تصدیق شدہ سالٹ تلاش کریں اور رپورٹ دیکھیں",
+        prompt: "Auto-fill missing formulations for my products",
+      },
+      {
+        id: "add-brand",
+        cmd: "/add-brand",
+        icon: "🏷️",
+        en: "Add New Brand",
+        ur: "نیا برانڈ شامل کریں",
+        descEn: "Create a pharmaceutical or consumer brand with preview",
+        descUr: "نیا برانڈ ڈیٹا بیس میں شامل کریں",
+        prompt: "Add a new brand",
+      },
+      {
+        id: "add-category",
+        cmd: "/add-category",
+        icon: "📂",
+        en: "Add New Category",
+        ur: "نئی کیٹیگری بنائیں",
+        descEn: "Create a product category with staged preview",
+        descUr: "نئی پروڈکٹ کیٹیگری بنائیں",
+        prompt: "Add a new category",
+      },
+      {
+        id: "add-supplier",
+        cmd: "/add-supplier",
+        icon: "🚚",
+        en: "Add New Supplier",
+        ur: "نیا سپلائر شامل کریں",
+        descEn: "Register a distributor or supplier account",
+        descUr: "نیا سپلائر یا ڈسٹری بیوٹر شامل کریں",
+        prompt: "Add a new supplier",
+      },
+      {
+        id: "add-customer",
+        cmd: "/add-customer",
+        icon: "👤",
+        en: "Add New Customer",
+        ur: "نیا کسٹمر شامل کریں",
+        descEn: "Create a customer profile for credit / khata billing",
+        descUr: "ادھار کھاتہ یا بلنگ کے لیے نیا کسٹمر بنائیں",
+        prompt: "Add a new customer",
+      },
+      {
+        id: "demand",
+        cmd: "/demand",
+        icon: "📋",
+        en: "Log Customer Demand",
+        ur: "کسٹمر ڈیمانڈ درج کریں",
+        descEn: "Record an out-of-stock item requested by a customer",
+        descUr: "کم یا ختم شدہ پروڈکٹ کی کسٹمر ڈیمانڈ لکھیں",
+        prompt: "Add a new user demand",
+      },
+      {
+        id: "explain",
+        cmd: "/explain",
+        icon: "📘",
+        en: `Explain ${displayedGuide?.title?.en || "Current Screen"}`,
+        ur: `${displayedGuide?.title?.ur || "اس اسکرین"} کا مکمل طریقہ`,
+        descEn: "Step-by-step workflow, fields & accounting impact",
+        descUr: "مرحلہ وار طریقہ کار اور کھاتوں پر اثر",
+        prompt: isUr
+          ? `${displayedGuide?.title?.ur || "اس اسکرین"} کا مکمل طریقہ اور کھاتوں پر اثر بتائیں`
+          : `Explain ${displayedGuide?.title?.en || "this screen"} step by step and its accounting impact`,
+      },
+      {
+        id: "walkthrough",
+        cmd: "/walkthrough",
+        icon: "🎯",
+        en: "Interactive Spotlight Tour",
+        ur: "لائیو اسپاٹ لائٹ گائیڈ",
+        descEn: "Highlight live buttons and fields step by step on screen",
+        descUr: "اسکرین کے بٹن اور فیلڈز کو لائیو ہائی لائٹ کریں",
+        action: () => {
+          startCubeDemo(currentScreenWorkflowId || "dynamic_screen_tour", true);
+        },
+      },
+      {
+        id: "tasks",
+        cmd: "/tasks",
+        icon: "📊",
+        en: "Open Background Tasks Monitor",
+        ur: "بیک گراؤنڈ ٹاسک رپورٹ کھولیں",
+        descEn: "Open the full-screen detailed popup for formulation auto-fill",
+        descUr: "فارمولیشن ٹاسک کی تفصیلی پاپ اپ ونڈو کھولیں",
+        action: () => setIsBgTaskDetailPopupOpen(true),
+      },
+      {
+        id: "clear",
+        cmd: "/clear",
+        icon: "🧹",
+        en: "Clear Chat Conversation",
+        ur: "چیٹ صاف کریں",
+        descEn: "Reset the current AI chat thread and start fresh",
+        descUr: "موجودہ چیٹ صاف کر کے نئی بات شروع کریں",
+        action: () => {
+          stopLiveStream();
+          clearChatOnly();
+        },
+      },
+    ],
+    [
+      currentScreenWorkflowId,
+      displayedGuide?.title?.en,
+      displayedGuide?.title?.ur,
+      isUr,
+      startCubeDemo,
+      stopLiveStream,
+      clearChatOnly,
+    ]
+  );
+
+  const filteredSlashCommands = useMemo(() => {
+    const trimmed = questionInput.trim();
+    if (!slashMenuOpen && !trimmed.startsWith("/")) return [];
+    const query = trimmed.startsWith("/") ? trimmed.slice(1).toLowerCase() : "";
+    if (!query) return slashCommands;
+    return slashCommands.filter(
+      (item) =>
+        item.cmd.toLowerCase().includes(query) ||
+        item.en.toLowerCase().includes(query) ||
+        item.ur.includes(query) ||
+        item.descEn.toLowerCase().includes(query)
+    );
+  }, [questionInput, slashMenuOpen, slashCommands]);
+
+  const executeSlashCommand = (cmdItem) => {
+    if (!cmdItem) return;
+    setSlashMenuOpen(false);
+    setSlashSelectedIndex(0);
+    setQuestionInput("");
+    if (
+      growableTextareaWrapRef.current &&
+      typeof CSS !== "undefined" &&
+      !CSS.supports("field-sizing", "content")
+    ) {
+      growableTextareaWrapRef.current.dataset.replicatedValue = "";
+    }
+    if (typeof cmdItem.action === "function") {
+      cmdItem.action();
+      return;
+    }
+    if (cmdItem.prompt) {
+      handleAskSubmit(null, cmdItem.prompt, true);
+    }
+  };
+
+  /**
+   * Renders the full-viewport Interactive Spotlight Tour Overlay when a walkthrough is active
+   * and the modal drawer is closed so the user can interact directly with the spotlighted controls.
+   */
+  const renderSpotlightTourOverlay = () => {
+    const spotlightSteps = activeSpotlightData?.steps || [];
+    if (
+      isOpen ||
+      !activeDemo ||
+      activeDemo.pausedForDetour ||
+      activeDemo.spotlightActive === false ||
+      !spotlightSteps.length
+    ) {
+      return null;
+    }
+
+    const activeManifest =
+      activeDemo.workflowId && DEMO_MANIFESTS[activeDemo.workflowId]
+        ? DEMO_MANIFESTS[activeDemo.workflowId]
+        : null;
+
+    return (
+      <SpotlightTourOverlay
+        activeDemo={activeDemo}
+        steps={spotlightSteps}
+        tourTitle={activeSpotlightData?.title}
+        guide={displayedGuide}
+        manifest={activeManifest}
+        currentPathname={location.pathname}
+        isUr={isUr}
+        isDark={isDark}
+        onToggleLang={() => handleSetLang(isUr ? "en" : "ur")}
+        onStepChange={(nextIdx) => {
+          setHighlightStatus(null);
+          setActiveDemo((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  stepIndex: Math.max(0, nextIdx),
+                }
+              : null
+          );
+        }}
+        onCloseTour={() => setActiveDemo(null)}
+        onNavigateToRoute={(routePath) => {
+          if (routePath) {
+            navigate(routePath);
+          }
+        }}
+        onAskAiAboutStep={(stepObj) => {
+          const stepTitle = isUr
+            ? stepObj?.title?.ur || stepObj?.title?.en
+            : stepObj?.title?.en;
+          setActiveDemo((prev) =>
+            prev ? { ...prev, pausedForDetour: true } : null
+          );
+          setActiveMainTab("chat");
+          setSharedIsOpen(true);
+          window.setTimeout(() => {
+            handleAskSubmit(
+              null,
+              isUr
+                ? `${displayedGuide.title.ur} میں "${stepTitle}" کا تفصیلی طریقہ اور مقصد بتائیں`
+                : `Explain the "${stepTitle}" step on ${displayedGuide.title.en} in detail`,
+              true
+            );
+          }, 120);
+        }}
+      />
+    );
+  };
+
   if (!isOpen && !isRendered) {
     return (
       <>
-        <ScreenElementInspector
-          guide={sensedScreenGuide}
-          lang={lang}
-          onSetLang={handleSetLang}
-          isDark={isDark}
-        />
-        {bottomMascotEnabled && (
+        {renderSpotlightTourOverlay()}
+        {bottomMascotEnabled ? (
           <RoamingCubeCompanion
             onOpen={() => setSharedIsOpen(true)}
             screenTitle={sensedScreenGuide?.title?.en}
           />
-        )}
+        ) : null}
       </>
     );
   }
@@ -3395,20 +2554,23 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               )}
 
               <div className="flex flex-wrap gap-1.5 pt-0.5">
-                {currentScreenWorkflowId && DEMO_MANIFESTS[currentScreenWorkflowId] && (
-                  <button
-                    type="button"
-                    onClick={() => startCubeDemo(currentScreenWorkflowId)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white transition-all cursor-pointer shadow-2xs"
-                  >
-                    <span aria-hidden="true">🎯</span>
-                    <span>
-                      {isUr
-                        ? "مرحلہ وار عملی ڈیمو شروع کریں"
-                        : "Start Interactive Walkthrough"}
-                    </span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    startCubeDemo(
+                      currentScreenWorkflowId || "dynamic_screen_tour",
+                      true
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white transition-all cursor-pointer shadow-2xs"
+                >
+                  <span aria-hidden="true">🎯</span>
+                  <span>
+                    {isUr
+                      ? "لائیو اسپاٹ لائٹ گائیڈ شروع کریں (Spotlight Tour)"
+                      : "Start Interactive Spotlight Tour"}
+                  </span>
+                </button>
 
                 {isPreviewingOther && !guide.key.includes(":") && (
                   <button
@@ -3466,8 +2628,8 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               ) : (
                 <p className="text-xs text-slate-500">
                   {isUr
-                    ? "کسی بھی بٹن یا فیلڈ پر کلک کرنے کے لیے ٹاپ بار میں 'سمجھیں (Alt+E)' دبائیں۔"
-                    : "Use the 'Explain (Alt+E)' button in the top navigation bar to click and explain any element on the page."}
+                    ? "اس صفحے کے کسی بھی بٹن یا فیلڈ کے بارے میں نیچے چیٹ میں پوچھیں۔"
+                    : "Ask any question in the chat below to learn about specific buttons or fields on this page."}
                 </p>
               )}
             </div>
@@ -3817,33 +2979,33 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         key={msg.id}
         dir={isUr ? "rtl" : "ltr"}
         lang={isUr ? "ur" : "en"}
-        className={cardBaseClass}
+        className={`${cardBaseClass} guide-bot-msg-card`}
       >
-        {/* Interactive AI Assistant Header Bar */}
-        <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-200/70 dark:border-slate-800/80 flex-wrap">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="inline-flex items-center justify-center w-5 h-5 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-[11px] font-black shrink-0 shadow-2xs">
+        {/* Clean Editorial Bot Message Header (Avatar + Title + Live Streaming Indicator) */}
+        <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-200/60 dark:border-slate-800/80">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-blue-600 via-indigo-600 to-cyan-500 text-white text-xs font-black shrink-0 shadow-2xs">
               🤖
             </span>
-            <span className="text-[11px] font-extrabold text-slate-900 dark:text-white truncate">
-              {isUr ? "کیوب اے آئی" : "Cube AI"}
-            </span>
-            {isActivelyStreaming ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 animate-pulse">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                <span>{isUr ? "لائیو جواب..." : "Streaming live..."}</span>
-              </span>
-            ) : (
-              msg.evidenceBadge && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 truncate max-w-[200px]">
-                  {isUr ? msg.evidenceBadge.ur : msg.evidenceBadge.en}
-                </span>
-              )
-            )}
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                {msg.title
+                  ? isUr
+                    ? msg.title.ur || msg.title.en
+                    : msg.title.en
+                  : isUr
+                  ? "کیوب اے آئی"
+                  : "Cube AI"}
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0" dir="ltr">
-            {isActivelyStreaming && (
+          {isActivelyStreaming && (
+            <div className="flex items-center gap-1.5 shrink-0" dir="ltr">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span>{isUr ? "لائیو..." : "Streaming"}</span>
+              </span>
               <button
                 type="button"
                 onClick={stopLiveStream}
@@ -3851,39 +3013,9 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               >
                 {isUr ? "مکمل دکھائیں" : "⏹ Show Full"}
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof navigator !== "undefined" && navigator.clipboard) {
-                  navigator.clipboard.writeText(fullReplyText).catch(() => {});
-                  setCopiedMsgId(msg.id);
-                  window.setTimeout(() => setCopiedMsgId(null), 1600);
-                }
-              }}
-              title={isUr ? "کاپی کریں" : "Copy response"}
-              className="px-1.5 py-0.5 rounded-md text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            >
-              {copiedMsgId === msg.id ? "✓ Copied" : "📋 Copy"}
-            </button>
-            {msg.questionText && !isTaskAwaitingPermission && (
-              <button
-                type="button"
-                onClick={() => handleAskSubmit(null, msg.questionText, true)}
-                title={isUr ? "دوبارہ تیار کریں" : "Regenerate response"}
-                className="px-1.5 py-0.5 rounded-md text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                🔄
-              </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-
-        {msg.title && (
-          <p className="text-xs font-extrabold text-blue-600 dark:text-blue-400 pt-0.5">
-            {isUr ? msg.title.ur : msg.title.en}
-          </p>
-        )}
 
         {/* STEP-BY-STEP PROGRESS INDICATOR (`taskMeta.step_info`) */}
         {msg.taskMeta?.step_info && (
@@ -4376,21 +3508,62 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
           </div>
         )}
 
+        {/* Detailed Auto-Fill Formulation Report inside Chat Card */}
+        {(msg.autoFillReport ||
+          (msg.taskMeta?.action === "bulk_autofill_missing_formulations" &&
+            msg.providerStatus === "cube_task_executed")) &&
+          renderAutoFillDetailedReport(
+            msg.autoFillReport || {
+              running: Boolean(msg.taskMeta?.background_task?.has_more),
+              status: msg.taskMeta?.background_task?.has_more ? "running" : "completed",
+              processedCount: Number(
+                msg.taskMeta?.scanned_count ||
+                  msg.taskMeta?.background_task?.processed_in_batch ||
+                  0
+              ),
+              updatedCount: Number(msg.taskMeta?.updated_count || 0),
+              skippedCount: Number(
+                msg.taskMeta?.skipped_count ||
+                  (msg.taskMeta?.skipped_products || []).length ||
+                  0
+              ),
+              remainingCount: Number(
+                msg.taskMeta?.background_task?.remaining_count || 0
+              ),
+              updatedProducts: msg.taskMeta?.updated_products || [],
+              skippedProducts: msg.taskMeta?.skipped_products || [],
+            }
+          )}
+
         {(msg.hasBackgroundTask || isTaskWaitingForInput || hasWalkthrough || canEscalateToAi || (msg.links && msg.links.length > 0)) && (
           <div className="flex flex-wrap gap-1.5 pt-1">
             {msg.hasBackgroundTask && (
-              <button
-                type="button"
-                onClick={() => setActiveMainTab("tasks")}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white shadow-2xs transition-all cursor-pointer"
-              >
-                <span aria-hidden="true">⚡</span>
-                <span>
-                  {isUr
-                    ? "بیک گراؤنڈ ٹاسک کی لائیو پراگریس دیکھیں"
-                    : "View Live Progress in Background Tasks"}
-                </span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsBgTaskDetailPopupOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white shadow-2xs transition-all cursor-pointer"
+                >
+                  <ArrowsPointingOutIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    {isUr
+                      ? "تفصیلی رپورٹ پاپ اپ کھولیں"
+                      : "Open Detailed Task Popup"}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleNavigateToRoute("/background-tasks")}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs transition-all cursor-pointer"
+                >
+                  <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    {isUr
+                      ? "الگ صفحے میں کھولیں"
+                      : "Open Separate Task Page"}
+                  </span>
+                </button>
+              </>
             )}
             {isTaskWaitingForInput && (
               <button
@@ -4445,24 +3618,342 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
             ))}
           </div>
         )}
+
+        {/* Editorial Footer Toolbar (Source Badge + Copy + Regenerate) */}
+        <div
+          className="pt-1.5 mt-1 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between gap-2 flex-wrap"
+          dir="ltr"
+        >
+          <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+            {msg.evidenceBadge ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[9.5px] font-bold bg-slate-100 dark:bg-slate-800/90 text-slate-500 dark:text-slate-400 border border-slate-200/80 dark:border-slate-700/80 truncate max-w-[230px]">
+                {isUr ? msg.evidenceBadge.ur : msg.evidenceBadge.en}
+              </span>
+            ) : (
+              <span className="text-[9.5px] font-bold text-slate-400">
+                Cube AI Copilot
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof navigator !== "undefined" && navigator.clipboard) {
+                  navigator.clipboard.writeText(fullReplyText).catch(() => {});
+                  setCopiedMsgId(msg.id);
+                  window.setTimeout(() => setCopiedMsgId(null), 1600);
+                }
+              }}
+              title={isUr ? "کاپی کریں" : "Copy response"}
+              className="px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              {copiedMsgId === msg.id ? "✓ Copied" : "📋 Copy"}
+            </button>
+            {msg.questionText && !isTaskAwaitingPermission && (
+              <button
+                type="button"
+                onClick={() => handleAskSubmit(null, msg.questionText, true)}
+                title={isUr ? "دوبارہ تیار کریں" : "Regenerate response"}
+                className="px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                🔄 {isUr ? "دوبارہ" : "Retry"}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     );
   };
 
   /**
-   * Renders Cube's Grounded Interactive Step-by-Step Walkthrough Player (`DEMO_MANIFESTS`).
+   * Renders the Interactive Detailed Report for Auto-Fill Formulations (`bulk_autofill_missing_formulations`),
+   * showing all Scanned, Filled (with Google Search verification badge), and Skipped (with exact skip reason) products,
+   * plus filter tabs, search, and CSV export.
+   */
+  const renderAutoFillDetailedReport = (reportData) => {
+    if (!reportData) return null;
+    const filledList = Array.isArray(reportData.updatedProducts)
+      ? reportData.updatedProducts
+      : [];
+    const skippedList = Array.isArray(reportData.skippedProducts)
+      ? reportData.skippedProducts
+      : [];
+    const totalScanned =
+      Number(reportData.processedCount || 0) ||
+      filledList.length + skippedList.length;
+    const totalFilled = Number(reportData.updatedCount ?? filledList.length);
+    const totalSkipped = Number(reportData.skippedCount ?? skippedList.length);
+
+    if (totalScanned === 0 && filledList.length === 0 && skippedList.length === 0) {
+      return null;
+    }
+
+    const q = reportSearchQuery.trim().toLowerCase();
+    const matchesSearch = (item) => {
+      if (!q) return true;
+      const nameStr = String(item.name || "").toLowerCase();
+      const codeStr = String(item.product_code || "").toLowerCase();
+      const saltStr = String(item.formulation || "").toLowerCase();
+      const reasonStr = String(item.reason_en || item.source_en || "").toLowerCase();
+      return (
+        nameStr.includes(q) ||
+        codeStr.includes(q) ||
+        saltStr.includes(q) ||
+        reasonStr.includes(q)
+      );
+    };
+
+    const combinedRows = [];
+    if (reportFilterTab === "all" || reportFilterTab === "filled") {
+      filledList.forEach((up) => {
+        if (matchesSearch(up)) {
+          combinedRows.push({ ...up, _rowType: "filled" });
+        }
+      });
+    }
+    if (reportFilterTab === "all" || reportFilterTab === "skipped") {
+      skippedList.forEach((sk) => {
+        if (matchesSearch(sk)) {
+          combinedRows.push({ ...sk, _rowType: "skipped" });
+        }
+      });
+    }
+
+    return (
+      <div
+        className={`mt-2 p-3 rounded-2xl border space-y-2.5 ${
+          isDark
+            ? "bg-slate-950/75 border-indigo-500/35"
+            : "bg-slate-50/90 border-indigo-200"
+        }`}
+      >
+        {/* Report Title & Popup / Separate Page / Export CSV Buttons */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm" aria-hidden="true">
+              📋
+            </span>
+            <span className="text-xs font-extrabold text-indigo-700 dark:text-indigo-300">
+              {isUr
+                ? "تفصیلی آٹو فل رپورٹ (Detailed Formulation Report)"
+                : "Detailed Auto-Fill Formulation Report"}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsBgTaskDetailPopupOpen(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors cursor-pointer"
+            >
+              <ArrowsPointingOutIcon className="w-3 h-3 shrink-0" />
+              <span>{isUr ? "بڑی پاپ اپ ونڈو" : "Open Popup"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleNavigateToRoute("/background-tasks")}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold border transition-colors cursor-pointer ${
+                isDark
+                  ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-indigo-300"
+                  : "bg-white hover:bg-indigo-50 border-slate-200 text-indigo-700"
+              }`}
+            >
+              <ArrowTopRightOnSquareIcon className="w-3 h-3 shrink-0" />
+              <span>{isUr ? "الگ صفحہ" : "Separate Page"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => exportAutoFillReportCsv(reportData)}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold border transition-colors cursor-pointer ${
+                isDark
+                  ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-emerald-300"
+                  : "bg-white hover:bg-emerald-50 border-slate-200 text-emerald-700"
+              }`}
+            >
+              <span aria-hidden="true">📥</span>
+              <span>{isUr ? "CSV ڈاؤن لوڈ" : "Export CSV"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Tabs (All Scanned | Filled | Skipped) */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1 flex-wrap">
+            {[
+              {
+                id: "all",
+                en: `📋 All Scanned (${filledList.length + skippedList.length})`,
+                ur: `📋 تمام (${filledList.length + skippedList.length})`,
+              },
+              {
+                id: "filled",
+                en: `✅ Filled (${totalFilled})`,
+                ur: `✅ فارمولیشن لگی (${totalFilled})`,
+              },
+              {
+                id: "skipped",
+                en: `⏭️ Skipped (${totalSkipped})`,
+                ur: `⏭️ چھوڑی گئیں (${totalSkipped})`,
+              },
+            ].map((tab) => {
+              const active = reportFilterTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setReportFilterTab(tab.id)}
+                  className={`px-2.5 py-1 rounded-lg text-[10.5px] font-extrabold transition-all cursor-pointer ${
+                    active
+                      ? "bg-indigo-600 text-white shadow-2xs"
+                      : isDark
+                      ? "bg-slate-800/80 text-slate-300 hover:bg-slate-800"
+                      : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                  }`}
+                >
+                  {isUr ? tab.ur : tab.en}
+                </button>
+              );
+            })}
+          </div>
+
+          <input
+            type="text"
+            value={reportSearchQuery}
+            onChange={(e) => setReportSearchQuery(e.target.value)}
+            placeholder={
+              isUr
+                ? "رپورٹ میں پروڈکٹ یا سالٹ تلاش کریں..."
+                : "Filter report by product, code, or salt..."
+            }
+            className={`px-2.5 py-1 rounded-lg text-[11px] border outline-hidden w-full sm:w-52 ${
+              isDark
+                ? "bg-slate-900 border-slate-700 text-slate-100 placeholder:text-slate-500"
+                : "bg-white border-slate-200 text-slate-800 placeholder:text-slate-400"
+            }`}
+          />
+        </div>
+
+        {/* Scrollable Detailed Report Rows */}
+        <div
+          className={`max-h-72 overflow-y-auto rounded-xl border divide-y ${
+            isDark
+              ? "bg-slate-900/90 border-slate-800 divide-slate-800"
+              : "bg-white border-slate-200 divide-slate-100"
+          }`}
+        >
+          {combinedRows.length > 0 ? (
+            combinedRows.slice(0, 300).map((row, idx) => {
+              const isFilled = row._rowType === "filled";
+              return (
+                <div
+                  key={`${row._rowType}-${row.id || idx}-${row.product_code || idx}`}
+                  className="px-3 py-2 text-xs flex items-start justify-between gap-2.5"
+                >
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[9.5px] font-extrabold uppercase ${
+                          isFilled
+                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                            : "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                        }`}
+                      >
+                        {isFilled
+                          ? isUr
+                            ? "✅ اپڈیٹ شدہ"
+                            : "✅ Filled"
+                          : isUr
+                          ? "⏭️ چھوڑی گئی"
+                          : "⏭️ Skipped"}
+                      </span>
+                      <span className="font-bold text-slate-900 dark:text-white truncate">
+                        {row.name}
+                      </span>
+                      {row.product_code && (
+                        <span className="text-[10px] font-mono text-slate-400">
+                          ({row.product_code})
+                        </span>
+                      )}
+                    </div>
+
+                    {isFilled ? (
+                      <div className="flex items-center gap-1.5 flex-wrap text-[10.5px]">
+                        <span className="font-semibold text-slate-500 dark:text-slate-400">
+                          {isUr ? "فارمولیشن:" : "Formulation:"}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                          {row.formulation}
+                        </span>
+                        <span className="text-[10px] text-indigo-600 dark:text-indigo-400">
+                          🔍{" "}
+                          {isUr
+                            ? row.source_ur || "گوگل سرچ سے تصدیق شدہ"
+                            : row.source_en || "Google Search Verified"}
+                        </span>
+                      </div>
+                    ) : (
+                      <p className="text-[10.5px] text-amber-700 dark:text-amber-300">
+                        {isUr
+                          ? row.reason_ur ||
+                            "گوگل سرچ پر کوئی تصدیق شدہ فارمولیشن نہیں ملی — چھوڑ دیا گیا"
+                          : row.reason_en ||
+                            "No verified formulation found on Google Search — skipped"}
+                      </p>
+                    )}
+                  </div>
+
+                  {row.id && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleNavigateToRoute(
+                          row.edit_path || `/products/${row.id}/edit`
+                        )
+                      }
+                      className={`px-2 py-1 rounded-lg text-[10px] font-bold border shrink-0 transition-colors cursor-pointer ${
+                        isDark
+                          ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
+                          : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      {isUr ? "کھولیں" : "View / Edit"}
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          ) : (
+            <div className="p-3 text-center text-[11px] text-slate-400">
+              {isUr
+                ? "اس فلٹر میں کوئی پروڈکٹ موجود نہیں ہے۔"
+                : "No products match the current report filter."}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  /**
+   * Renders Cube's Grounded Interactive Step-by-Step Walkthrough Player (`DEMO_MANIFESTS` + `activeSpotlightData`).
    * Distinguishes Observed live screen state vs. Conditional documented state and supports
-   * live DOM target highlighting + mid-demo concept detours.
+   * launching the full-viewport Spotlight Tour Overlay + mid-demo concept detours.
    */
   const renderCubeDemoPlayer = () => {
     if (!activeDemo) return null;
-    const manifest = DEMO_MANIFESTS[activeDemo.workflowId];
-    if (!manifest || !manifest.steps?.length) return null;
+    const stepsList = activeSpotlightData.steps || [];
+    if (!stepsList.length) return null;
 
-    const totalSteps = manifest.steps.length;
+    const tourTitle = activeSpotlightData.title || {
+      en: displayedGuide?.title?.en || "Interactive Screen Walkthrough",
+      ur: displayedGuide?.title?.ur || "مرحلہ وار عملی گائیڈ",
+    };
+
+    const totalSteps = stepsList.length;
     const stepIndex = Math.min(Math.max(0, activeDemo.stepIndex), totalSteps - 1);
-    const step = manifest.steps[stepIndex];
-    const isOnTargetScreen = location.pathname === step.screen;
+    const step = stepsList[stepIndex];
+    const isOnTargetScreen = !step.screen || location.pathname === step.screen;
 
     // If paused for a mid-demo concept detour, show a compact "Resume Walkthrough" bar
     if (activeDemo.pausedForDetour) {
@@ -4478,21 +3969,26 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         >
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              {isUr ? "عملی گائیڈ وقفے پر ہے" : "Walkthrough Paused for Question"}
+              {isUr ? "اسپاٹ لائٹ گائیڈ وقفے پر ہے" : "Spotlight Tour Paused for Question"}
             </p>
             <p className={`text-xs font-bold truncate ${isUr ? "guide-bot-urdu-inline" : ""}`}>
-              {isUr ? manifest.title.ur : manifest.title.en} ({stepIndex + 1}/{totalSteps})
+              {isUr ? tourTitle.ur : tourTitle.en} ({stepIndex + 1}/{totalSteps})
             </p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
-              onClick={() =>
-                setActiveDemo((prev) => (prev ? { ...prev, pausedForDetour: false } : null))
-              }
+              onClick={() => {
+                setActiveDemo((prev) =>
+                  prev
+                    ? { ...prev, pausedForDetour: false, spotlightActive: true }
+                    : null
+                );
+                runSmoothClose(true);
+              }}
               className="px-2.5 py-1 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
             >
-              {isUr ? `مرحلہ ${stepIndex + 1} جاری رکھیں` : `Resume Step ${stepIndex + 1}`}
+              {isUr ? `🎯 مرحلہ ${stepIndex + 1} جاری رکھیں` : `🎯 Resume Step ${stepIndex + 1}`}
             </button>
             <button
               type="button"
@@ -4517,17 +4013,29 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
             : "bg-white border-emerald-400/90 text-slate-900"
         }`}
       >
-        {/* Top Bar: Title + Version + Exit */}
+        {/* Top Bar: Title + Step Counter + Launch Live Spotlight + Exit */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-extrabold shrink-0">
               🎯
             </span>
             <span className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300 truncate">
-              {isUr ? manifest.title.ur : manifest.title.en}
+              {isUr ? tourTitle.ur : tourTitle.en}
             </span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveDemo((prev) =>
+                  prev ? { ...prev, spotlightActive: true, pausedForDetour: false } : null
+                );
+                runSmoothClose(true);
+              }}
+              className="px-2 py-0.5 rounded-lg text-[10px] font-extrabold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-2xs cursor-pointer"
+            >
+              {isUr ? "🔦 لائیو اسپاٹ لائٹ کھولیں" : "🔦 Live On-Screen Spotlight"}
+            </button>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
               {isUr
                 ? `مرحلہ ${stepIndex + 1} از ${totalSteps}`
@@ -4564,8 +4072,8 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
             <span>
               {isOnTargetScreen
                 ? isUr
-                  ? `🟢 موجودہ اسکرین پر مشاہدہ شدہ (${step.screen})`
-                  : `🟢 Observed on current screen (${step.screen})`
+                  ? `🟢 موجودہ اسکرین پر مشاہدہ شدہ (${step.screen || location.pathname})`
+                  : `🟢 Observed on current screen (${step.screen || location.pathname})`
                 : isUr
                 ? `📘 مشروط مرحلہ — اسکرین: ${step.screen} (v${PRODUCT_VERSION})`
                 : `📘 Conditional — Requires ${step.screen} (v${PRODUCT_VERSION})`}
@@ -4575,7 +4083,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
           {isOnTargetScreen ? (
             <button
               type="button"
-              onClick={() => highlightElementOnScreen(step.target || step.targetSelector)}
+              onClick={() => highlightElementOnScreen(step.target || step.targetSelector, step)}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-extrabold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 transition-colors cursor-pointer"
             >
               <span>🎯</span>
@@ -4700,12 +4208,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
 
   return (
     <>
-      <ScreenElementInspector
-        guide={sensedScreenGuide}
-        lang={lang}
-        onSetLang={handleSetLang}
-        isDark={isDark}
-      />
       <dialog
         ref={dialogRef}
         {...({ closedby: "any" })}
@@ -4720,39 +4222,122 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
       >
       <div className="guide-bot-drawer-shell">
         {/* =================================================================== */}
-        {/* 2-ROW HEADER:                                                       */}
-        {/*   ROW 1: Cube Identity Pill + Lang + Utility + Close                */}
-        {/*   ROW 2: Full-Width Mascot + Crisp Unclipped Heading & Subtitle     */}
+        {/* MODERN 2-TIER GLASSMORPHIC COPILOT HEADER:                          */}
+        {/*   TIER 1: Interactive Cube Avatar + Active Screen Title + Controls  */}
+        {/*   TIER 2: Segmented Pill Mode Switcher (Chat | Guide | Tasks)       */}
         {/* =================================================================== */}
         <header
-          className={`px-4 pt-3 pb-3 shrink-0 flex flex-col gap-3 ${
+          className={`px-3.5 pt-2.5 pb-2.5 shrink-0 flex flex-col gap-2 backdrop-blur-md ${
             isDark
-              ? "bg-gradient-to-b from-slate-950 to-slate-900 border-b border-slate-800"
-              : "bg-gradient-to-b from-slate-50 to-white border-b border-slate-200/80"
+              ? "bg-slate-950/90 border-b border-slate-800/90"
+              : "bg-white/95 border-b border-slate-200/85"
           }`}
         >
-          {/* ROW 1: Top Utility Controls Bar */}
+          {/* TIER 1: Compact Identity + Active Screen Title + Utility Controls */}
           <div className="flex items-center justify-between gap-2">
-            {/* Cube Identity Pill */}
-            <span
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-extrabold border ${
-                isDark
-                  ? "bg-slate-800 border-slate-700 text-slate-100"
-                  : "bg-slate-100 border-slate-200 text-slate-900"
-              }`}
-            >
-              <span aria-hidden="true">🤖</span>
-              <span>{isUr ? "کاروبار اسسٹنٹ" : "Cube Assistant"}</span>
-            </span>
+            {/* Left: Interactive Cube Avatar + Screen Context Title */}
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setPopupTrickIdx((prev) => {
+                    const next = (prev + 1) % POPUP_STAGE_TRICKS.length;
+                    if (next === 0) {
+                      const order = ["cube", "pixel", "bot"];
+                      const cur = getGuideBotMascotStyle();
+                      setGuideBotMascotStyle(
+                        order[(order.indexOf(cur) + 1) % order.length]
+                      );
+                    }
+                    return next;
+                  });
+                  triggerBotTalking(1400);
+                }}
+                title={
+                  isUr
+                    ? "اگلا کرتب دیکھنے کے لیے کلک کریں (روبکس کیوب 🧩 / ہیڈ فون 🎧 / فلپ 🤸)"
+                    : "Click Cube for next trick (Rubik's Cube 🧩 / Headphones 🎧 / 360° Flip 🤸)"
+                }
+                className={`group relative shrink-0 flex items-center justify-center w-10 h-11 rounded-2xl border cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-hidden ${
+                  isDark
+                    ? "bg-slate-900 border-slate-700/90 hover:border-cyan-500/60"
+                    : "bg-slate-50 border-slate-200/90 hover:border-blue-400"
+                }`}
+              >
+                <GuideBotAvatar
+                  className="w-9 h-10 drop-shadow-xs"
+                  fullBody={true}
+                  speaking={visualTalking || isTyping}
+                  presenter={true}
+                  trick={
+                    POPUP_STAGE_TRICKS[popupTrickIdx % POPUP_STAGE_TRICKS.length]
+                      ?.id || "rubiks"
+                  }
+                />
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-950" />
+              </button>
 
-            {/* Right Controls: Language (EN | اردو) + Inspect (?) + Directory + Width + Close */}
+              <div
+                className="min-w-0 flex-1"
+                dir={isUr ? "rtl" : "ltr"}
+                lang={isUr ? "ur" : "en"}
+              >
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span
+                    className={`text-[10px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 ${
+                      isUr ? "guide-bot-urdu-inline" : ""
+                    }`}
+                  >
+                    {isPreviewingOther
+                      ? isUr
+                        ? "پری ویو موڈ"
+                        : "Previewing"
+                      : isUr
+                      ? "کیوب اے آئی کوپائلٹ"
+                      : "Cube AI Copilot"}
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-700 text-[10px]">
+                    •
+                  </span>
+                  <span
+                    className={`text-[10.5px] font-bold text-emerald-600 dark:text-emerald-400 truncate ${
+                      isUr ? "guide-bot-urdu-inline" : ""
+                    }`}
+                  >
+                    {isUr ? displayedGuide.section.ur : displayedGuide.section.en}
+                  </span>
+                  {isPreviewingOther && (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewKey(null)}
+                      className="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-blue-500/15 hover:bg-blue-500/25 text-blue-600 dark:text-blue-300 cursor-pointer"
+                    >
+                      {isUr ? "واپس" : "Reset"}
+                    </button>
+                  )}
+                </div>
+
+                <h2
+                  id={titleId}
+                  className={`font-black tracking-tight truncate text-slate-900 dark:text-white ${
+                    isUr
+                      ? "guide-bot-urdu-block text-sm"
+                      : "text-[14.5px] leading-snug"
+                  }`}
+                >
+                  {isUr ? displayedGuide.title.ur : displayedGuide.title.en}
+                </h2>
+              </div>
+            </div>
+
+            {/* Right Controls: Language (EN | اردو) + Directory + Width + Close */}
             <div className="flex items-center gap-1 shrink-0">
               <div
                 role="group"
                 aria-label="Language"
                 className={`inline-flex items-center p-0.5 rounded-lg border ${
                   isDark
-                    ? "bg-slate-800 border-slate-700"
+                    ? "bg-slate-900 border-slate-700/90"
                     : "bg-slate-100 border-slate-200"
                 }`}
               >
@@ -4760,7 +4345,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   type="button"
                   onClick={() => handleSetLang("en")}
                   aria-pressed={lang === "en"}
-                  className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
+                  className={`px-2 py-0.5 rounded-md text-[10.5px] font-extrabold transition-colors cursor-pointer ${
                     lang === "en"
                       ? "bg-slate-900 dark:bg-blue-600 text-white shadow-2xs"
                       : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
@@ -4774,7 +4359,7 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   aria-pressed={lang === "ur"}
                   lang="ur"
                   dir="rtl"
-                  className={`guide-bot-urdu-inline px-2 py-0.5 rounded-md text-[11px] font-bold transition-colors cursor-pointer ${
+                  className={`guide-bot-urdu-inline px-2 py-0.5 rounded-md text-[10.5px] font-bold transition-colors cursor-pointer ${
                     lang === "ur"
                       ? "bg-emerald-500 text-white shadow-2xs"
                       : "text-slate-600 dark:text-slate-300 hover:text-slate-900"
@@ -4784,7 +4369,6 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                 </button>
               </div>
 
-              {/* Directory & Width Controls */}
               <button
                 type="button"
                 onClick={() => setShowDirectory((v) => !v)}
@@ -4823,117 +4407,14 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
             </div>
           </div>
 
-          {/* ROW 2: Mascot + Full-Width Heading Stage (Spacious & Never Truncated!) */}
-          <div className="flex items-center gap-3.5">
-            <button
-              type="button"
-              onClick={() => {
-                setPopupTrickIdx((prev) => {
-                  const next = (prev + 1) % POPUP_STAGE_TRICKS.length;
-                  // Every full trick cycle also rotates the mascot outfit style
-                  if (next === 0) {
-                    const order = ["cube", "pixel", "bot"];
-                    const cur = getGuideBotMascotStyle();
-                    setGuideBotMascotStyle(order[(order.indexOf(cur) + 1) % order.length]);
-                  }
-                  return next;
-                });
-                triggerBotTalking(1400);
-              }}
-              title={
-                isUr
-                  ? "اگلا کرتب دیکھنے کے لیے کلک کریں (روبکس کیوب 🧩 / ہیڈ فون 🎧 / فلپ 🤸)"
-                  : "Click mascot to do next trick (Rubik's Cube 🧩 / Headphones 🎧 / 360° Flip 🤸)"
-              }
-              className="group relative shrink-0 flex flex-col items-center cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-hidden"
-            >
-              <GuideBotAvatar
-                className="w-16 h-20 drop-shadow-md"
-                fullBody={true}
-                speaking={visualTalking || isTyping}
-                presenter={true}
-                trick={
-                  POPUP_STAGE_TRICKS[popupTrickIdx % POPUP_STAGE_TRICKS.length]?.id ||
-                  "rubiks"
-                }
-              />
-              <span
-                className={`-mt-1 px-2 py-0.5 rounded-full text-[9.5px] font-extrabold whitespace-nowrap border shadow-2xs transition-colors ${
-                  isDark
-                    ? "bg-slate-800/95 border-slate-700 text-cyan-300 group-hover:border-cyan-500"
-                    : "bg-slate-900 text-white border-slate-700 group-hover:bg-blue-600"
-                } ${isUr ? "guide-bot-urdu-inline" : ""}`}
-              >
-                {isUr
-                  ? POPUP_STAGE_TRICKS[popupTrickIdx % POPUP_STAGE_TRICKS.length]?.ur
-                  : POPUP_STAGE_TRICKS[popupTrickIdx % POPUP_STAGE_TRICKS.length]?.en}
-              </span>
-            </button>
-
-            <div
-              className="min-w-0 flex-1 space-y-0.5"
-              dir={isUr ? "rtl" : "ltr"}
-              lang={isUr ? "ur" : "en"}
-            >
-              {/* Status Badge Row */}
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="w-2 h-2 rounded-full shrink-0 animate-pulse bg-emerald-500" />
-                <span
-                  className={`text-[11px] font-extrabold uppercase tracking-wider text-blue-600 dark:text-blue-400 ${
-                    isUr ? "guide-bot-urdu-inline" : ""
-                  }`}
-                >
-                  {isPreviewingOther
-                    ? isUr
-                      ? "پری ویو موڈ"
-                      : "Previewing Screen"
-                    : isUr
-                    ? "کاروبار اسسٹنٹ • لائیو گائیڈ"
-                    : "Karobar Sidekick • Live Guide"}
-                </span>
-
-                {isPreviewingOther && (
-                  <button
-                    type="button"
-                    onClick={() => setPreviewKey(null)}
-                    className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/15 hover:bg-blue-500/25 text-blue-600 dark:text-blue-300 cursor-pointer"
-                  >
-                    {isUr ? "واپس" : "Reset"}
-                  </button>
-                )}
-              </div>
-
-              {/* Primary Heading Next to Mascot */}
-              <h2
-                id={titleId}
-                className={`font-black tracking-tight break-words text-slate-900 dark:text-white ${
-                  isUr
-                    ? "guide-bot-urdu-block text-base py-0.5"
-                    : "text-[16px] sm:text-[17px] leading-snug"
-                }`}
-              >
-                {isUr ? displayedGuide.title.ur : displayedGuide.title.en}
-              </h2>
-
-              {/* Subtitle / Active Screen Context */}
-              <p
-                className={`text-xs font-semibold text-emerald-600 dark:text-emerald-400 ${
-                  isUr ? "guide-bot-urdu-inline" : ""
-                }`}
-              >
-                {isUr ? displayedGuide.section.ur : displayedGuide.section.en}
-              </p>
-            </div>
-          </div>
-
-          {/* ROW 3: Clean Top-Level Mode Tabs (AI Chat | Screen Guide | Background Tasks) */}
+          {/* TIER 2: Segmented Pill Mode Switcher (AI Chat | Screen Guide | Tasks) */}
           <div
             role="tablist"
             aria-label={isUr ? "کیوب اسسٹنٹ موڈز" : "Cube Assistant Modes"}
             dir={isUr ? "rtl" : "ltr"}
             className={`grid grid-cols-3 gap-1 p-1 rounded-xl border ${
               isDark
-                ? "bg-slate-950/80 border-slate-800"
+                ? "bg-slate-900/95 border-slate-800"
                 : "bg-slate-100/90 border-slate-200/85"
             }`}
           >
@@ -5360,6 +4841,36 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
 
                 <button
                   type="button"
+                  onClick={() => setIsBgTaskDetailPopupOpen(true)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold border transition-colors cursor-pointer ${
+                    isDark
+                      ? "bg-indigo-950/60 hover:bg-indigo-900/70 border-indigo-500/40 text-indigo-200"
+                      : "bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700"
+                  }`}
+                >
+                  <ArrowsPointingOutIcon className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    {isUr ? "تفصیلی پاپ اپ ونڈو" : "Open Detailed Popup"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleNavigateToRoute("/background-tasks")}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold border transition-colors cursor-pointer ${
+                    isDark
+                      ? "bg-emerald-950/60 hover:bg-emerald-900/70 border-emerald-500/40 text-emerald-200"
+                      : "bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700"
+                  }`}
+                >
+                  <span>
+                    {isUr ? "الگ صفحے میں کھولیں" : "Open Separate Page"}
+                  </span>
+                  <ArrowTopRightOnSquareIcon className="w-3.5 h-3.5 shrink-0" />
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => handleNavigateToRoute("/products")}
                   className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
                     isDark
@@ -5554,71 +5065,8 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   </div>
                 </div>
 
-                {/* Live Feed of Updated Products */}
-                {Array.isArray(bgTask.updatedProducts) &&
-                  bgTask.updatedProducts.length > 0 && (
-                    <div className="space-y-1.5 pt-1">
-                      <p className="text-[11px] font-extrabold text-emerald-600 dark:text-emerald-400">
-                        {isUr
-                          ? `✅ اپڈیٹ شدہ پروڈکٹس (${bgTask.updatedProducts.length}):`
-                          : `✅ Verified Formulations Filled (${bgTask.updatedProducts.length}):`}
-                      </p>
-                      <div
-                        className={`max-h-52 overflow-y-auto rounded-xl border divide-y ${
-                          isDark
-                            ? "bg-slate-950/60 border-slate-800 divide-slate-800"
-                            : "bg-slate-50 border-slate-200 divide-slate-200/70"
-                        }`}
-                      >
-                        {bgTask.updatedProducts.map((up, idx) => (
-                          <div
-                            key={`${up.id || idx}-${up.product_code || idx}`}
-                            className="px-3 py-1.5 text-xs flex items-center justify-between gap-2"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <span className="font-bold text-slate-900 dark:text-white truncate block">
-                                {up.name}
-                              </span>
-                              {up.product_code && (
-                                <span className="text-[10px] font-mono text-slate-400">
-                                  {up.product_code}
-                                </span>
-                              )}
-                            </div>
-                            <span className="px-2 py-0.5 rounded-md text-[11px] font-extrabold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 shrink-0 max-w-[52%] truncate">
-                              {up.formulation}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                {/* Skipped Products Summary (Zero Guessing Proof) */}
-                {Array.isArray(bgTask.skippedProducts) &&
-                  bgTask.skippedProducts.length > 0 && (
-                    <div className="space-y-1 pt-0.5">
-                      <p className="text-[10.5px] font-bold text-slate-400">
-                        {isUr
-                          ? `ℹ️ ${bgTask.skippedCount} پروڈکٹس جن میں فارمولیشن کا اندازہ نہیں لگایا گیا (مثلاً عام اشیاء یا غیر واضح نام):`
-                          : `ℹ️ Safely skipped without guessing (${bgTask.skippedCount} total):`}
-                      </p>
-                      <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-                        {bgTask.skippedProducts.slice(0, 20).map((sk, idx) => (
-                          <span
-                            key={`${sk.id || idx}-sk`}
-                            className={`px-2 py-0.5 rounded-md text-[10.5px] font-medium border ${
-                              isDark
-                                ? "bg-slate-800/80 border-slate-700 text-slate-400"
-                                : "bg-slate-100 border-slate-200 text-slate-600"
-                            }`}
-                          >
-                            {sk.name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                {/* Interactive Detailed Report (All Scanned, Filled via Google Search, & Skipped with Reasons) */}
+                {renderAutoFillDetailedReport(bgTask)}
               </div>
             ) : (
               <div
@@ -5770,50 +5218,16 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
           </div>
         ) : (
           /* ================================================================= */
-          /* TAB 1 (DEFAULT): INTERACTIVE AI CHAT & TASK AGENT                 */
+          /* TAB 1 (DEFAULT): MODERN COPILOT AI CHAT & BENTO ZERO-STATE        */
           /* ================================================================= */
           <div
-            className={`guide-bot-drawer-body p-4 space-y-3.5 ${
+            ref={chatScrollRef}
+            onScroll={handleChatScroll}
+            className={`guide-bot-drawer-body p-3.5 space-y-3 ${
               isDark ? "bg-slate-950/40" : "bg-slate-50/50"
             }`}
           >
-            {/* Interactive AI Chat Status Bar */}
-            <div
-              dir={isUr ? "rtl" : "ltr"}
-              lang={isUr ? "ur" : "en"}
-              className={`px-3 py-1.5 rounded-xl border flex items-center justify-between gap-2 text-[11px] font-bold ${
-                isDark
-                  ? "bg-slate-900/90 border-slate-800 text-slate-300"
-                  : "bg-white border-slate-200/90 text-slate-700 shadow-2xs"
-              }`}
-            >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                <span className="truncate font-extrabold">
-                  {isUr
-                    ? "کیوب اے آئی انٹرایکٹو چیٹ • لائیو جواب اور ٹاسک اسسٹنٹ"
-                    : "Cube AI Interactive Chat • Live Streaming & Task Agent"}
-                </span>
-              </div>
-              {thread.some(
-                (msg) =>
-                  (msg.role === "user" && !msg.fromGuideChip) || msg.kind === "qa"
-              ) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    stopLiveStream();
-                    clearChatOnly();
-                  }}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10.5px] font-extrabold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-                >
-                  <ArrowPathIcon className="w-3 h-3" />
-                  <span>{isUr ? "نئی چیٹ" : "New Chat"}</span>
-                </button>
-              )}
-            </div>
-
-            {/* Subtle 1-Line Pill if Background Task is Running (Switch to Tasks Tab if Wanted) */}
+            {/* Subtle 1-Line Live Telemetry Pill if Background Task is Running */}
             {bgTask?.running && (
               <div
                 dir={isUr ? "rtl" : "ltr"}
@@ -5828,15 +5242,26 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                       : `Background task running (${bgTask.updatedCount} filled)...`}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveMainTab("tasks")}
-                  className="px-2 py-0.5 rounded-lg text-[10.5px] font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer shrink-0"
-                >
-                  {isUr ? "ٹاسک دیکھیں ←" : "View Task →"}
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsBgTaskDetailPopupOpen(true)}
+                    className="px-2 py-0.5 rounded-lg text-[10.5px] font-extrabold bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer"
+                  >
+                    {isUr ? "پاپ اپ رپورٹ" : "Popup Report"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveMainTab("tasks")}
+                    className="px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-700 dark:text-indigo-200 cursor-pointer"
+                  >
+                    {isUr ? "ٹاسک ٹیب" : "Tab →"}
+                  </button>
+                </div>
               </div>
             )}
+
+            {activeDemo && renderCubeDemoPlayer()}
 
             {(() => {
               const chatMessages = thread.filter(
@@ -5849,101 +5274,233 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                   <div
                     dir={isUr ? "rtl" : "ltr"}
                     lang={isUr ? "ur" : "en"}
-                    className={`p-4 rounded-2xl rounded-tl-xs border space-y-3.5 shadow-2xs ${
-                      isDark
-                        ? "bg-slate-900 border-slate-800 text-slate-100"
-                        : "bg-white border-slate-200/90 text-slate-800"
-                    }`}
+                    className="space-y-3"
                   >
-                    {/* AI Avatar Greeting Header */}
-                    <div className="flex items-start gap-2.5">
-                      <span className="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-sm font-black shrink-0 shadow-xs">
-                        🤖
-                      </span>
-                      <div className="space-y-1 min-w-0 flex-1">
+                    {/* Hero Greeting Banner with Interactive Full-Body Mascot */}
+                    <div
+                      className={`p-3.5 rounded-2xl border flex items-center gap-3 shadow-2xs ${
+                        isDark
+                          ? "bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border-slate-800 text-slate-100"
+                          : "bg-gradient-to-br from-white via-slate-50/60 to-blue-50/50 border-slate-200/90 text-slate-800"
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPopupTrickIdx((prev) => {
+                            const next = (prev + 1) % POPUP_STAGE_TRICKS.length;
+                            if (next === 0) {
+                              const order = ["cube", "pixel", "bot"];
+                              const cur = getGuideBotMascotStyle();
+                              setGuideBotMascotStyle(
+                                order[(order.indexOf(cur) + 1) % order.length]
+                              );
+                            }
+                            return next;
+                          });
+                          triggerBotTalking(1400);
+                        }}
+                        title={
+                          isUr
+                            ? "کرتب بدلنے کے لیے کیوب پر کلک کریں"
+                            : "Click Cube to perform next trick"
+                        }
+                        className="group relative shrink-0 flex flex-col items-center cursor-pointer transition-transform duration-200 hover:scale-105 active:scale-95 focus:outline-hidden"
+                      >
+                        <GuideBotAvatar
+                          className="w-14 h-18 drop-shadow-md"
+                          fullBody={true}
+                          speaking={visualTalking || isTyping}
+                          presenter={true}
+                          trick={
+                            POPUP_STAGE_TRICKS[
+                              popupTrickIdx % POPUP_STAGE_TRICKS.length
+                            ]?.id || "rubiks"
+                          }
+                        />
+                        <span
+                          className={`-mt-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold whitespace-nowrap border shadow-2xs transition-colors ${
+                            isDark
+                              ? "bg-slate-800/95 border-slate-700 text-cyan-300 group-hover:border-cyan-500"
+                              : "bg-slate-900 text-white border-slate-700 group-hover:bg-blue-600"
+                          } ${isUr ? "guide-bot-urdu-inline" : ""}`}
+                        >
+                          {isUr
+                            ? POPUP_STAGE_TRICKS[
+                                popupTrickIdx % POPUP_STAGE_TRICKS.length
+                              ]?.ur
+                            : POPUP_STAGE_TRICKS[
+                                popupTrickIdx % POPUP_STAGE_TRICKS.length
+                              ]?.en}
+                        </span>
+                      </button>
+
+                      <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-extrabold text-slate-900 dark:text-white">
-                            {isUr ? "کیوب اے آئی اسسٹنٹ" : "Cube AI Assistant"}
+                          <span className="text-xs font-black text-slate-900 dark:text-white">
+                            {isUr
+                              ? "السلام علیکم! میں کیوب اے آئی ہوں"
+                              : "How can I help you today?"}
                           </span>
-                          <span className="px-2 py-0.5 rounded-full text-[9.5px] font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">
-                            {isUr ? "لائیو اے آئی چیٹ" : "Live Generative AI"}
+                          <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/25">
+                            {isUr ? "🛡️ پری ویو گارڈ" : "🛡️ Pre-DB Preview Guard"}
                           </span>
                         </div>
-                        <p className="text-[12.5px] leading-relaxed text-slate-600 dark:text-slate-300">
+                        <p className="text-[11.5px] leading-relaxed text-slate-600 dark:text-slate-300">
                           {isUr
-                            ? "السلام علیکم! میں آپ کا انٹرایکٹو اے آئی اسسٹنٹ ہوں۔ آپ مجھ سے سافٹ ویئر کے بارے میں کوئی بھی سوال پوچھ سکتے ہیں یا کوئی بھی ٹاسک کروا سکتے ہیں۔ ہر ٹاسک کو ڈیٹا بیس میں پوسٹ کرنے سے پہلے میں آپ کو مکمل نتیجہ (Preview) دکھاؤں گا اور آپ کی اجازت لوں گا۔"
-                            : "Hi! I'm your interactive Karobar ERP AI assistant. Ask me anything about this screen, or tell me to perform a task. Before posting anything to the database, I will always show you the exact staged result preview and ask for your permission."}
+                            ? "اس اسکرین کے بارے میں کچھ بھی پوچھیں یا کوئی بھی ٹاسک کروائیں۔ ڈیٹا بیس میں محفوظ کرنے سے پہلے میں ہمیشہ نتیجہ دکھا کر آپ کی اجازت لوں گا۔"
+                            : "Ask anything about this screen or run an ERP task below. Every database action shows a staged diff preview for your approval first."}
                         </p>
                       </div>
                     </div>
 
-                    {/* Interactive ERP Tasks Section */}
-                    <div className="space-y-1.5 pt-0.5">
-                      <p className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-400">
-                        {isUr
-                          ? "⚡ اے آئی سے ٹاسک کروائیں (پری ویو + اجازت کے ساتھ):"
-                          : "⚡ Ask AI to Perform a Task (Preview + Permission Guarded):"}
-                      </p>
+                    {/* 2x2 Bento Grid of High-Value Copilot Actions */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        {
+                          id: "bento-explain",
+                          icon: "📘",
+                          accent: isDark
+                            ? "from-blue-500/15 to-cyan-500/5 border-blue-500/30 hover:border-blue-400"
+                            : "from-blue-50/90 to-white border-blue-200/90 hover:border-blue-400",
+                          badgeEn: "Screen Guide",
+                          badgeUr: "اسکرین گائیڈ",
+                          titleEn: `Explain ${displayedGuide.title.en}`,
+                          titleUr: `${displayedGuide.title.ur} سمجھائیں`,
+                          descEn: "Workflow, fields & GL accounting impact",
+                          descUr: "مکمل طریقہ اور کھاتوں پر اثر",
+                          onClick: () =>
+                            handleAskSubmit(
+                              null,
+                              isUr
+                                ? `${displayedGuide.title.ur} کا مکمل طریقہ اور کھاتوں پر اثر بتائیں`
+                                : `Explain ${displayedGuide.title.en} step by step and its accounting impact`,
+                              true
+                            ),
+                        },
+                        {
+                          id: "bento-product",
+                          icon: "➕",
+                          accent: isDark
+                            ? "from-emerald-500/15 to-teal-500/5 border-emerald-500/30 hover:border-emerald-400"
+                            : "from-emerald-50/90 to-white border-emerald-200/90 hover:border-emerald-400",
+                          badgeEn: "Task Wizard",
+                          badgeUr: "ٹاسک وزرڈ",
+                          titleEn: "Add or Edit Product",
+                          titleUr: "نئی پروڈکٹ یا تبدیلی",
+                          descEn: "Guided setup with DB duplicate check",
+                          descUr: "ڈپلیکیٹ چیک اور پری ویو کے ساتھ",
+                          onClick: () =>
+                            handleAskSubmit(null, "Add a new product", true),
+                        },
+                        {
+                          id: "bento-autofill",
+                          icon: "🧪",
+                          accent: isDark
+                            ? "from-indigo-500/15 to-purple-500/5 border-indigo-500/30 hover:border-indigo-400"
+                            : "from-indigo-50/90 to-white border-indigo-200/90 hover:border-indigo-400",
+                          badgeEn: "Google Verified",
+                          badgeUr: "گوگل تصدیق شدہ",
+                          titleEn: "Auto-Fill Formulations",
+                          titleUr: "خودکار فارمولیشن",
+                          descEn: "Search Google for salts + detailed report",
+                          descUr: "گوگل سرچ سے سالٹ اور تفصیلی رپورٹ",
+                          onClick: () =>
+                            handleAskSubmit(
+                              null,
+                              "Auto-fill missing formulations for my products",
+                              true
+                            ),
+                        },
+                        {
+                          id: "bento-tour",
+                          icon: "🎯",
+                          accent: isDark
+                            ? "from-amber-500/15 to-orange-500/5 border-amber-500/30 hover:border-amber-400"
+                            : "from-amber-50/90 to-white border-amber-200/90 hover:border-amber-400",
+                          badgeEn: "Spotlight Tour",
+                          badgeUr: "لائیو ڈیمو",
+                          titleEn: "Interactive Walkthrough",
+                          titleUr: "عملی اسپاٹ لائٹ گائیڈ",
+                          descEn: "Highlight live fields step by step",
+                          descUr: "اسکرین کے بٹن مرحلہ وار ہائی لائٹ کریں",
+                          onClick: () => {
+                            startCubeDemo(
+                              currentScreenWorkflowId || "dynamic_screen_tour",
+                              true
+                            );
+                          },
+                        },
+                      ].map((card) => (
+                        <button
+                          key={card.id}
+                          type="button"
+                          onClick={card.onClick}
+                          className={`guide-bot-bento-card p-3 rounded-2xl border bg-gradient-to-br text-left flex flex-col justify-between gap-1.5 shadow-2xs cursor-pointer ${card.accent}`}
+                        >
+                          <div className="flex items-center justify-between gap-1.5 w-full">
+                            <span className="text-base leading-none" aria-hidden="true">
+                              {card.icon}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider bg-slate-900/5 dark:bg-white/10 text-slate-600 dark:text-slate-300">
+                              {isUr ? card.badgeUr : card.badgeEn}
+                            </span>
+                          </div>
+                          <div className="space-y-0.5">
+                            <p className="text-xs font-extrabold text-slate-900 dark:text-white line-clamp-1">
+                              {isUr ? card.titleUr : card.titleEn}
+                            </p>
+                            <p className="text-[10.5px] leading-snug text-slate-500 dark:text-slate-400 line-clamp-2">
+                              {isUr ? card.descUr : card.descEn}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Compact Quick-Action Task Strip */}
+                    <div
+                      className={`p-3 rounded-2xl border space-y-2 ${
+                        isDark
+                          ? "bg-slate-900/90 border-slate-800"
+                          : "bg-white border-slate-200/90 shadow-2xs"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                          {isUr
+                            ? "⚡ ون کلک ٹاسکس (یا نیچے / ٹائپ کریں)"
+                            : "⚡ Quick ERP Tasks (or type / below)"}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsBgTaskDetailPopupOpen(true)}
+                          className="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                        >
+                          {isUr ? "📊 ٹاسک رپورٹ پاپ اپ" : "📊 Task Report Popup →"}
+                        </button>
+                      </div>
                       <div className="flex flex-wrap gap-1.5">
                         {[
-                          { icon: "➕", en: "Add Product", ur: "نئی پروڈکٹ بنائیں", cmd: "Add a new product" },
-                          { icon: "✏️", en: "Edit Product", ur: "پروڈکٹ ایڈٹ کریں", cmd: "Edit a product" },
+                          { icon: "✏️", en: "Edit Product", ur: "پروڈکٹ ایڈٹ", cmd: "Edit a product" },
                           { icon: "🏷️", en: "Add Brand", ur: "نیا برانڈ", cmd: "Add a new brand" },
                           { icon: "📂", en: "Add Category", ur: "نئی کیٹیگری", cmd: "Add a new category" },
                           { icon: "🚚", en: "Add Supplier", ur: "نیا سپلائر", cmd: "Add a new supplier" },
                           { icon: "👤", en: "Add Customer", ur: "نیا کسٹمر", cmd: "Add a new customer" },
                           { icon: "📋", en: "Log Demand", ur: "ڈیمانڈ درج کریں", cmd: "Add a new user demand" },
-                          { icon: "🧪", en: "Auto-Fill Formulations", ur: "فارمولیشن لگائیں", cmd: "Auto-fill missing formulations for my products" },
                         ].map((chip) => (
                           <button
                             key={chip.cmd}
                             type="button"
                             onClick={() => handleAskSubmit(null, chip.cmd, true)}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-95 ${
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all cursor-pointer active:scale-95 ${
                               isDark
-                                ? "bg-slate-800/90 hover:bg-slate-700 border-slate-700 text-slate-100"
-                                : "bg-slate-50 hover:bg-blue-50/80 border-slate-200 text-slate-800"
+                                ? "bg-slate-800/90 hover:bg-slate-700 border-slate-700 text-slate-200"
+                                : "bg-slate-50 hover:bg-blue-50/80 border-slate-200 text-slate-700"
                             }`}
                           >
                             <span aria-hidden="true">{chip.icon}</span>
                             <span>{isUr ? chip.ur : chip.en}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Interactive Software Questions Section */}
-                    <div className="space-y-1.5 pt-0.5">
-                      <p className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-400">
-                        {isUr
-                          ? "💬 اس اسکرین کے بارے میں اے آئی سے پوچھیں:"
-                          : "💬 Ask Live AI About Your Current Screen:"}
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {[
-                          {
-                            en: `Explain ${displayedGuide.title.en} step by step`,
-                            ur: `${displayedGuide.title.ur} کا مکمل طریقہ بتائیں`,
-                          },
-                          {
-                            en: "How does this screen affect stock & accounting?",
-                            ur: "اس اسکرین کا اسٹاک اور کھاتوں پر کیا اثر پڑتا ہے؟",
-                          },
-                        ].map((qChip, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() =>
-                              handleAskSubmit(null, isUr ? qChip.ur : qChip.en, true)
-                            }
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-95 ${
-                              isDark
-                                ? "bg-blue-950/40 hover:bg-blue-900/50 border-blue-500/30 text-blue-200"
-                                : "bg-blue-50/70 hover:bg-blue-100 border-blue-200 text-blue-800"
-                            }`}
-                          >
-                            <SparklesIcon className="w-3.5 h-3.5 shrink-0" />
-                            <span>{isUr ? qChip.ur : qChip.en}</span>
                           </button>
                         ))}
                       </div>
@@ -5982,45 +5539,81 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
               });
             })()}
 
-            {/* Live Multi-Stage AI Reasoning & Streaming Indicator */}
+            {/* Collapsible Multi-Stage AI Reasoning ("Thinking...") Pill */}
             {isTyping && (
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-2 guide-bot-msg-card">
                 <div
                   dir={isUr ? "rtl" : "ltr"}
                   lang={isUr ? "ur" : "en"}
-                  className={`px-3.5 py-2.5 rounded-2xl rounded-tl-xs border space-y-1.5 shadow-2xs ${
+                  className={`w-full px-3.5 py-2.5 rounded-2xl rounded-tl-xs border space-y-2 shadow-2xs ${
                     isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-[11px] font-black shrink-0">
-                      🤖
-                    </span>
-                    <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400">
-                      {thinkingStageIdx === 0
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 text-white text-[11px] font-black shrink-0 animate-pulse">
+                        🤖
+                      </span>
+                      <span className="text-xs font-extrabold text-blue-600 dark:text-blue-400 truncate">
+                        {thinkingStageIdx === 0
+                          ? isUr
+                            ? "🧠 آپ کی بات اور ٹاسک کو سمجھا جا رہا ہے..."
+                            : "🧠 Understanding your request & intent..."
+                          : thinkingStageIdx === 1
+                          ? isUr
+                            ? "🔍 کاروبار ای آر پی سیاق و سباق اور پری ویو چیک ہو رہا ہے..."
+                            : "🔍 Checking Karobar ERP context & staging preview..."
+                          : isUr
+                          ? "✨ لائیو اے آئی جواب تیار کیا جا رہا ہے..."
+                          : "✨ Generating live AI response..."}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsReasoningExpanded((v) => !v)}
+                      className="px-2 py-0.5 rounded-md text-[10px] font-bold text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer shrink-0"
+                    >
+                      {isReasoningExpanded
                         ? isUr
-                          ? "🧠 آپ کی بات اور ٹاسک کو سمجھا جا رہا ہے..."
-                          : "🧠 Understanding your request & intent..."
-                        : thinkingStageIdx === 1
-                        ? isUr
-                          ? "🔍 کاروبار ای آر پی سیاق و سباق اور پری ویو چیک ہو رہا ہے..."
-                          : "🔍 Checking Karobar ERP context & staging preview..."
+                          ? "چھپائیں ▲"
+                          : "Hide ▲"
                         : isUr
-                        ? "✨ لائیو اے آئی جواب تیار کیا جا رہا ہے..."
-                        : "✨ Generating live AI response..."}
-                    </span>
+                        ? "مراحل ▼"
+                        : "Steps ▼"}
+                    </button>
                   </div>
-                  <div className="flex items-center gap-1.5 pl-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-bounce" />
-                    <span
-                      className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-bounce"
-                      style={{ animationDelay: "120ms" }}
-                    />
-                    <span
-                      className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce"
-                      style={{ animationDelay: "240ms" }}
-                    />
+
+                  {/* 3-Step Visual Progress Bar */}
+                  <div className="grid grid-cols-3 gap-1.5" dir="ltr">
+                    {[0, 1, 2].map((stepIdx) => (
+                      <div
+                        key={stepIdx}
+                        className={`h-1 rounded-full transition-all duration-300 ${
+                          stepIdx <= thinkingStageIdx
+                            ? "bg-gradient-to-r from-blue-500 to-cyan-400"
+                            : isDark
+                            ? "bg-slate-800"
+                            : "bg-slate-200"
+                        }`}
+                      />
+                    ))}
                   </div>
+
+                  {isReasoningExpanded && (
+                    <div className="pt-1 space-y-1 text-[11px] text-slate-500 dark:text-slate-400 border-t border-slate-200/60 dark:border-slate-800">
+                      <p className={thinkingStageIdx >= 0 ? "text-emerald-600 dark:text-emerald-400 font-bold" : ""}>
+                        ✓ {isUr ? "1. سوال اور اسکرین سیاق و سباق کی شناخت" : "1. Analyzing screen route & task intent"}
+                      </p>
+                      <p className={thinkingStageIdx >= 1 ? "text-blue-600 dark:text-blue-400 font-bold" : ""}>
+                        {thinkingStageIdx >= 1 ? "✓" : "○"}{" "}
+                        {isUr ? "2. ڈیٹا بیس ریکارڈز اور پری ویو کی جانچ" : "2. Verifying ERP knowledge & staging DB preview"}
+                      </p>
+                      <p className={thinkingStageIdx >= 2 ? "text-indigo-600 dark:text-indigo-400 font-bold" : ""}>
+                        {thinkingStageIdx >= 2 ? "●" : "○"}{" "}
+                        {isUr ? "3. لائیو جواب کی تیاری" : "3. Streaming grounded response"}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -6039,9 +5632,8 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
                     {[
                       { icon: "➕", en: "Add Product", ur: "نئی پروڈکٹ", cmd: "Add a new product" },
                       { icon: "✏️", en: "Edit Product", ur: "پروڈکٹ ایڈٹ", cmd: "Edit a product" },
+                      { icon: "🧪", en: "Auto-Fill Salts", ur: "فارمولیشن", cmd: "Auto-fill missing formulations for my products" },
                       { icon: "🏷️", en: "Add Brand", ur: "نیا برانڈ", cmd: "Add a new brand" },
-                      { icon: "🚚", en: "Add Supplier", ur: "نیا سپلائر", cmd: "Add a new supplier" },
-                      { icon: "👤", en: "Add Customer", ur: "نیا کسٹمر", cmd: "Add a new customer" },
                     ].map((quick) => (
                       <button
                         key={quick.cmd}
@@ -6078,62 +5670,378 @@ export default function FeatureGuideBot({ isOpen, onClose }) {
         )}
 
         {/* =================================================================== */}
-        {/* BOTTOM INTERACTIVE AI CHAT COMPOSER (IME-Safe Enter to Submit)      */}
+        {/* FLOATING ISLAND COMPOSER & SLASH COMMAND PALETTE                    */}
         {/* =================================================================== */}
         <footer
-          className={`p-3 shrink-0 ${
+          className={`relative p-2.5 shrink-0 ${
             isDark
-              ? "bg-slate-900 border-t border-slate-800"
-              : "bg-white border-t border-slate-200"
+              ? "bg-slate-950/90 border-t border-slate-800/80"
+              : "bg-slate-50/90 border-t border-slate-200/80"
           }`}
         >
-          <div className="flex items-end gap-2" role="search">
-            <label htmlFor="guide-bot-ask-input" className="sr-only">
-              Ask Cube AI or request a task
-            </label>
-            <textarea
-              id="guide-bot-ask-input"
-              ref={askInputRef}
-              rows={1}
-              dir={isUr ? "rtl" : "ltr"}
-              value={questionInput}
-              onChange={(e) => setQuestionInput(e.target.value)}
-              onKeyDown={(e) => {
-                // Guard against premature Enter submit during IME composition
-                if (e.nativeEvent?.isComposing || e.isComposing || e.keyCode === 229) {
-                  return;
-                }
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  handleAskSubmit(e);
-                }
-              }}
-              placeholder={
-                isUr
-                  ? "کیوب اے آئی سے سوال پوچھیں یا ٹاسک بتائیں (مثلاً: Add product Panadol، یا پرچیز آرڈر کیسے بنائیں؟)..."
-                  : "Message Cube AI — ask a question or request a task (e.g. Add product, Add brand, Edit price)..."
-              }
-              className={`flex-1 min-h-[40px] max-h-28 py-2 px-3.5 text-base sm:text-[13px] font-medium rounded-xl border resize-none focus:outline-hidden focus:ring-2 focus:ring-blue-500 ${
-                isDark
-                  ? "bg-slate-800 border-slate-700 text-white placeholder-slate-400"
-                  : "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"
-              }`}
-            />
-            <button
-              type="button"
-              disabled={isTyping || !questionInput.trim()}
-              onClick={(e) => handleAskSubmit(e)}
-              aria-label={isUr ? "سوال بھیجیں" : "Send message"}
-              className="h-10 px-3.5 text-white text-xs font-extrabold inline-flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer shrink-0 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50"
+          {/* Floating "Jump to Latest (↓)" Pill when user scrolls up */}
+          {showScrollToBottomBtn && activeMainTab === "chat" && !showDirectory && (
+            <div className="absolute -top-10 left-1/2 -translate-x-1/2 z-20">
+              <button
+                type="button"
+                onClick={scrollToBottom}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-slate-900/95 dark:bg-blue-600 text-white shadow-lg border border-slate-700/80 dark:border-blue-400/40 cursor-pointer hover:scale-105 active:scale-95 transition-transform"
+              >
+                <span aria-hidden="true">↓</span>
+                <span>{isUr ? "تازہ ترین پیغام" : "Jump to latest"}</span>
+              </button>
+            </div>
+          )}
+
+          {/* `/` Slash Command Popover Palette (Keyboard + Click Navigable) */}
+          {filteredSlashCommands.length > 0 &&
+            (slashMenuOpen || questionInput.trim().startsWith("/")) && (
+              <div
+                role="listbox"
+                aria-label={isUr ? "سلیش کمانڈز" : "Slash Commands"}
+                dir={isUr ? "rtl" : "ltr"}
+                className={`absolute bottom-full left-2.5 right-2.5 mb-2 rounded-2xl border shadow-2xl overflow-hidden z-30 guide-bot-msg-card ${
+                  isDark
+                    ? "bg-slate-900/98 border-slate-700 text-slate-100"
+                    : "bg-white/98 border-slate-200 text-slate-900"
+                }`}
+              >
+                <div
+                  className={`px-3 py-1.5 border-b flex items-center justify-between gap-2 text-[10px] font-extrabold uppercase tracking-wider ${
+                    isDark
+                      ? "bg-slate-950/80 border-slate-800 text-slate-400"
+                      : "bg-slate-50 border-slate-200/80 text-slate-500"
+                  }`}
+                >
+                  <span>
+                    {isUr
+                      ? "⚡ کوپائلٹ کمانڈز (منتخب کرنے کے لیے کلک یا Enter دبائیں)"
+                      : "⚡ Copilot Slash Commands (↑↓ Navigate · Enter Select)"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSlashMenuOpen(false)}
+                    className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="max-h-52 overflow-y-auto divide-y divide-slate-200/60 dark:divide-slate-800/70">
+                  {filteredSlashCommands.map((cmdItem, idx) => {
+                    const isSelected =
+                      idx === slashSelectedIndex % filteredSlashCommands.length;
+                    return (
+                      <button
+                        key={cmdItem.id}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        onMouseEnter={() => setSlashSelectedIndex(idx)}
+                        onClick={() => executeSlashCommand(cmdItem)}
+                        className={`w-full px-3 py-2 text-left flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                          isSelected
+                            ? isDark
+                              ? "bg-blue-600/20 text-white"
+                              : "bg-blue-50 text-slate-900"
+                            : "hover:bg-slate-100/70 dark:hover:bg-slate-800/60"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-sm shrink-0" aria-hidden="true">
+                            {cmdItem.icon}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-extrabold text-slate-900 dark:text-white">
+                                {isUr ? cmdItem.ur : cmdItem.en}
+                              </span>
+                              <code
+                                dir="ltr"
+                                className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-blue-500/15 text-blue-600 dark:text-blue-300"
+                              >
+                                {cmdItem.cmd}
+                              </code>
+                            </div>
+                            <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate">
+                              {isUr ? cmdItem.descUr : cmdItem.descEn}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 shrink-0">
+                          ↵
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+          {/* Floating Island Composer Container */}
+          <div
+            className={`rounded-2xl border p-2 transition-all shadow-sm focus-within:ring-2 focus-within:ring-blue-500/40 ${
+              isDark
+                ? "bg-slate-900 border-slate-700/90 focus-within:border-blue-500"
+                : "bg-white border-slate-200/95 focus-within:border-blue-500"
+            }`}
+          >
+            {/* Top Context Strip inside Composer Island */}
+            <div className="flex items-center justify-between gap-1.5 pb-1.5 mb-1 border-b border-slate-200/60 dark:border-slate-800/80 flex-wrap">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border truncate max-w-[190px] ${
+                    isDark
+                      ? "bg-slate-800/90 border-slate-700 text-slate-300"
+                      : "bg-slate-100 border-slate-200/80 text-slate-700"
+                  }`}
+                  title={isUr ? displayedGuide.title.ur : displayedGuide.title.en}
+                >
+                  <span aria-hidden="true">📍</span>
+                  <span className="truncate">
+                    {isUr ? displayedGuide.title.ur : displayedGuide.title.en}
+                  </span>
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSlashMenuOpen((v) => !v);
+                    setSlashSelectedIndex(0);
+                    askInputRef.current?.focus();
+                  }}
+                  title={isUr ? "سلیش کمانڈز کھولیں (/)" : "Open Slash Commands (/)"}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-extrabold border transition-colors cursor-pointer ${
+                    slashMenuOpen || questionInput.trim().startsWith("/")
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : isDark
+                      ? "bg-slate-800 hover:bg-slate-700 border-slate-700 text-cyan-300"
+                      : "bg-blue-50/80 hover:bg-blue-100 border-blue-200 text-blue-700"
+                  }`}
+                >
+                  <span className="font-mono">/</span>
+                  <span>{isUr ? "کمانڈز" : "Commands"}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                {thread.some(
+                  (msg) =>
+                    (msg.role === "user" && !msg.fromGuideChip) || msg.kind === "qa"
+                ) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopLiveStream();
+                      clearChatOnly();
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    <ArrowPathIcon className="w-3 h-3" />
+                    <span>{isUr ? "نئی چیٹ" : "New Chat"}</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Auto-Growing Textarea + Send Action Row */}
+            <div className="flex items-end gap-2" role="search">
+              <label htmlFor="guide-bot-ask-input" className="sr-only">
+                Ask Cube AI or request a task
+              </label>
+              <div
+                ref={growableTextareaWrapRef}
+                className="guide-bot-growable-textarea flex-1"
+              >
+                <textarea
+                  id="guide-bot-ask-input"
+                  ref={askInputRef}
+                  rows={1}
+                  dir={isUr ? "rtl" : "ltr"}
+                  value={questionInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setQuestionInput(val);
+                    if (val.trim().startsWith("/")) {
+                      setSlashMenuOpen(true);
+                      setSlashSelectedIndex(0);
+                    } else if (slashMenuOpen && !val.trim()) {
+                      setSlashMenuOpen(false);
+                    }
+                    if (
+                      growableTextareaWrapRef.current &&
+                      typeof CSS !== "undefined" &&
+                      !CSS.supports("field-sizing", "content")
+                    ) {
+                      growableTextareaWrapRef.current.dataset.replicatedValue = val;
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    // Guard against premature Enter submit during IME composition
+                    if (
+                      e.nativeEvent?.isComposing ||
+                      e.isComposing ||
+                      e.keyCode === 229
+                    ) {
+                      return;
+                    }
+
+                    const isSlashVisible =
+                      filteredSlashCommands.length > 0 &&
+                      (slashMenuOpen || questionInput.trim().startsWith("/"));
+
+                    if (isSlashVisible) {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setSlashSelectedIndex(
+                          (prev) => (prev + 1) % filteredSlashCommands.length
+                        );
+                        return;
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setSlashSelectedIndex(
+                          (prev) =>
+                            (prev - 1 + filteredSlashCommands.length) %
+                            filteredSlashCommands.length
+                        );
+                        return;
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setSlashMenuOpen(false);
+                        if (questionInput.trim().startsWith("/")) {
+                          setQuestionInput("");
+                        }
+                        return;
+                      }
+                      if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const chosen =
+                          filteredSlashCommands[
+                            slashSelectedIndex % filteredSlashCommands.length
+                          ];
+                        if (chosen) {
+                          executeSlashCommand(chosen);
+                        }
+                        return;
+                      }
+                    }
+
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleAskSubmit(e);
+                    }
+                  }}
+                  placeholder={
+                    isUr
+                      ? "سوال پوچھیں، ٹاسک بتائیں، یا کمانڈز کے لیے / ٹائپ کریں..."
+                      : "Ask anything, request a task, or type / for commands..."
+                  }
+                  className={`guide-bot-composer-textarea px-1.5 py-1 text-base sm:text-[13px] font-medium bg-transparent border-0 focus:outline-hidden ${
+                    isDark
+                      ? "text-white placeholder-slate-400"
+                      : "text-slate-900 placeholder-slate-400"
+                  }`}
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                {streamingMsgId && (
+                  <button
+                    type="button"
+                    onClick={stopLiveStream}
+                    title={isUr ? "لائیو اسٹریمنگ روکیں" : "Stop streaming"}
+                    className="h-8 px-2.5 rounded-xl text-[11px] font-extrabold bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 border border-amber-500/30 cursor-pointer"
+                  >
+                    ⏹
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={isTyping || !questionInput.trim()}
+                  onClick={(e) => handleAskSubmit(e)}
+                  aria-label={isUr ? "سوال بھیجیں" : "Send message"}
+                  className="h-8 px-3 text-white text-xs font-extrabold inline-flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer shrink-0 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-40 active:scale-95"
+                >
+                  <PaperAirplaneIcon className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{isUr ? "بھیجیں" : "Send"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Bottom Keyboard Shortcut Hint Strip */}
+            <div
+              className="pt-1 mt-0.5 flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-400 dark:text-slate-500"
+              dir="ltr"
             >
-              <PaperAirplaneIcon className="w-4 h-4" />
-              <span className="hidden sm:inline">{isUr ? "بھیجیں" : "Send"}</span>
-            </button>
+              <span>↵ Send · ⇧↵ New line · / Commands</span>
+              <span>Alt+G Toggle</span>
+            </div>
           </div>
         </footer>
       </div>
       </dialog>
+
+      {/* Full-Screen / Large Detailed Background Task Popup Modal (<dialog closedby="any">) */}
+      <dialog
+        ref={bgDetailDialogRef}
+        {...{ closedby: "any" }}
+        aria-labelledby={bgDetailTitleId}
+        className={`m-auto w-[96vw] max-w-6xl max-h-[92vh] rounded-3xl p-0 border shadow-2xl overflow-hidden backdrop:bg-slate-950/65 backdrop:backdrop-blur-xs ${
+          isDark
+            ? "bg-slate-950 border-slate-800 text-slate-100"
+            : "bg-slate-50 border-slate-200 text-slate-900"
+        }`}
+      >
+        <span id={bgDetailTitleId} className="sr-only">
+          Background Task & Formulation Auto-Fill Detailed Report
+        </span>
+        <div className="p-4 sm:p-6 overflow-y-auto max-h-[90vh]">
+          <BackgroundTaskDetailView
+            bgTask={bgTask}
+            isUr={isUr}
+            isDark={isDark}
+            isPopup={true}
+            onClosePopup={() => setIsBgTaskDetailPopupOpen(false)}
+            onOpenSeparatePage={() => {
+              setIsBgTaskDetailPopupOpen(false);
+              handleNavigateToRoute("/background-tasks");
+            }}
+            filterQuery={bgFilterQuery}
+            onFilterQueryChange={setBgFilterQuery}
+            onPreviewStart={previewBackgroundFormulationTask}
+            onDirectStart={() => {
+              setBgTaskAwaitingPermission(false);
+              setBgPreviewData(null);
+              startBackgroundFormulationTask();
+            }}
+            onStopTask={stopBackgroundTask}
+            onClearReport={() => setBgTask(null)}
+            previewLoading={bgPreviewLoading}
+            awaitingPermission={bgTaskAwaitingPermission}
+            previewData={bgPreviewData}
+            onConfirmPermission={() => {
+              setBgTaskAwaitingPermission(false);
+              setBgPreviewData(null);
+              startBackgroundFormulationTask();
+            }}
+            onCancelPermission={() => {
+              setBgTaskAwaitingPermission(false);
+              setBgPreviewData(null);
+            }}
+            onNavigateProduct={(path) => {
+              setIsBgTaskDetailPopupOpen(false);
+              handleNavigateToRoute(path);
+            }}
+          />
+        </div>
+      </dialog>
+
+      {/* Full-Viewport Interactive Spotlight Tour Overlay (active when drawer is closed) */}
+      {renderSpotlightTourOverlay()}
     </>
   );
 }
