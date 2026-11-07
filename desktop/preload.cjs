@@ -1,7 +1,11 @@
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webFrame } = require("electron");
+
+const isOffscreenPrintWorker =
+  Array.isArray(process.argv) && process.argv.includes("--karobar-offscreen-print=1");
 
 contextBridge.exposeInMainWorld("karobarDesktop", {
   isDesktop: true,
+  isOffscreenPrintWorker,
   platform: process.platform,
   getAppInfo: () => ipcRenderer.invoke("karobar:app-info"),
   getPrinters: () => ipcRenderer.invoke("karobar:get-printers"),
@@ -39,3 +43,49 @@ contextBridge.exposeInMainWorld("karobarDesktop", {
     return () => ipcRenderer.removeListener("karobar:trigger-update-check", handler);
   },
 });
+
+// Intercept window.print() in the page's main world before any DOM onload handlers execute
+// so native OS print dialogs or popup print dialogs are never shown.
+try {
+  if (isOffscreenPrintWorker) {
+    webFrame
+      .executeJavaScript(
+        `
+        window.__karobarSilentPrintWorker = true;
+        window.print = function () {};
+        window.close = function () {};
+        `,
+        false
+      )
+      .catch(() => {});
+  } else {
+    webFrame
+      .executeJavaScript(
+        `
+        (function () {
+          if (window.__karobarWindowPrintPatched) return;
+          window.__karobarWindowPrintPatched = true;
+          window.print = function () {
+            try {
+              if (window.karobarDesktop && typeof window.karobarDesktop.silentPrint === "function") {
+                var preferred = "";
+                try {
+                  preferred = String(window.localStorage.getItem("karobar_preferred_printer") || "").trim();
+                } catch (e) {}
+                var deviceName =
+                  preferred && preferred !== "default" && preferred !== "system_default"
+                    ? preferred
+                    : undefined;
+                window.karobarDesktop.silentPrint({ silent: true, deviceName: deviceName });
+              }
+            } catch (e) {}
+          };
+        })();
+        `,
+        false
+      )
+      .catch(() => {});
+  }
+} catch {
+  // ignore
+}

@@ -75,7 +75,7 @@
   .foot { margin-top:12px; text-align:center; font-size:10px; text-transform:uppercase; }
 </style>
 </head>
-<body onload="if (!window.karobarDesktop && window.self === window.top && !new URLSearchParams(window.location.search).has('silent_print')) window.print()">
+<body onload="if (!window.karobarDesktop && !window.__karobarSilentPrintWorker && !/Electron/i.test(navigator.userAgent) && window.self === window.top && !new URLSearchParams(window.location.search).has('silent_print')) window.print()">
 <div class="print-actions">
   <button onclick="if (window.karobarDesktop && window.karobarDesktop.silentPrint) { window.karobarDesktop.silentPrint(); } else { window.print(); }">PRINT</button>
 </div>

@@ -88,6 +88,20 @@ export default function PurchaseOrders() {
     return () => clearTimeout(timer);
   }, [supplierQuery]);
   useEffect(() => {
+    if (!order || editing) return;
+    const onKeyDown = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      const key = (e.key || '').toLowerCase();
+      if (key === 'p' || e.code === 'KeyP') {
+        e.preventDefault();
+        printCurrentView();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [order, editing]);
+
+  useEffect(() => {
     if (!pendingFocus || loading) return;
     const { index, field } = pendingFocus;
     if (field === 'product') productRefs.current[index]?.focus();

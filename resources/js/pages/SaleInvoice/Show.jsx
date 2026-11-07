@@ -17,7 +17,7 @@ import RecordPaymentModal from "@/components/RecordPaymentModal.jsx";
 import InvoiceDraftsModal from "@/components/InvoiceDraftsModal.jsx";
 import ShareDocumentModal from "@/components/ShareDocumentModal.jsx";
 import { useSaleSystem } from "@/context/SaleSystemContext.jsx";
-import { printUrlViaIframe } from "@/utils/printHelper.js";
+import { printSlipUrl } from "@/utils/printHelper.js";
 
 // Helper to determine text color based on background brightness
 const getContrastText = (hexColor) => {
@@ -303,82 +303,19 @@ export default function SaleInvoiceShow({ defaultSaleType = null }) {
     }
   };
 
-  // Print popup logic
+  // Direct silent print logic (no popup / no print preview dialog)
   const handlePrint = async () => {
     if (!id) return;
 
-    const width = 900;
-    const height = 700;
-    const left = Math.max(
-      0,
-      (window.screenX || window.screenLeft || 0) + (window.outerWidth - width) / 2
-    );
-    const top = Math.max(
-      0,
-      (window.screenY || window.screenTop || 0) + (window.outerHeight - height) / 2
-    );
-
-    const features = [
-      `width=${Math.round(width)}`,
-      `height=${Math.round(height)}`,
-      `left=${Math.round(left)}`,
-      `top=${Math.round(top)}`,
-      "menubar=no",
-      "toolbar=no",
-      "location=no",
-      "status=no",
-      "scrollbars=yes",
-      "resizable=yes",
-    ].join(",");
-
-    let w = popupRef.current;
-
-    if (!w || w.closed) {
-      w = window.open("about:blank", "salePrintWin", features);
-      if (w) {
-        popupRef.current = w;
-      }
-    } else {
-      try { w.focus(); } catch {}
-    }
-
     try {
       const { data } = await axios.get(`/api/sale-invoices/${id}/print-url`);
-      const url = data.url;
-
-      if (!w) {
-        await printUrlViaIframe(url);
+      const url = data?.url;
+      if (!url) {
+        toast.error("Failed to generate print link.");
         return;
       }
-
-      try {
-        w.location.replace(url);
-      } catch {
-        const w2 = window.open(url, "salePrintWin", features);
-        if (!w2) {
-          await printUrlViaIframe(url);
-          return;
-        }
-        popupRef.current = w2;
-        w = w2;
-      }
-
-      try {
-        w.onload = () => {
-          try { w.focus(); w.print(); } catch {}
-        };
-      } catch {}
-
-      const timer = setInterval(() => {
-        try {
-          if (w.location?.href !== "about:blank" && w.document?.readyState === "complete") {
-            w.focus(); w.print(); clearInterval(timer);
-          }
-        } catch {}
-        if (w.closed) clearInterval(timer);
-      }, 400);
+      await printSlipUrl(url);
     } catch (err) {
-      try { if (w) w.close(); } catch {}
       toast.error(err?.response?.data?.message || "Failed to generate print link.");
     }
   };

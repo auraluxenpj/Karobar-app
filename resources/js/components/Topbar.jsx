@@ -27,6 +27,7 @@ import {
   useGuideBotOpenState,
 } from "./GuideBotTrigger.jsx";
 import axios from "axios";
+import { printCurrentView } from "@/utils/printHelper.js";
 
 const ProductSearchModal = lazy(() => import("@/components/ProductSearchModal.jsx"));
 const PageSearchModal = lazy(() => import("@/components/PageSearchModal.jsx"));
@@ -604,15 +605,20 @@ export default function Topbar({
 
       // Ctrl+P opens Product Search Modal on general pages, and yields to Direct Print on all invoice/POS/ledger/barcode/report views
       if (e.code === "KeyP" || (e.key || "").toLowerCase() === "p") {
+        // Always prevent browser/OS native print dialog on Ctrl+P
+        e.preventDefault();
         if (
-          /^\/(sale-invoices|wholesale-invoices|purchase-invoices|stock-adjustments)\/\d+(\/edit)?$/.test(cleanPath) ||
-          /^\/sale-invoices\/(create\/(retail|wholesale)|pos|barcode-pos)$/.test(cleanPath) ||
+          /^\/(sale-invoices|wholesale-invoices)\/(\d+(\/edit)?|create(\/(retail|wholesale))?|create-retail|create-wholesale|pos|barcode-pos)$/.test(cleanPath) ||
+          /^\/(purchase-invoices|stock-adjustments|purchase-orders)\/\d+$/.test(cleanPath) ||
           /^\/(purchase-orders\/forecast|smart-reorder|customer-ledger|supplier-ledger|barcode-labels)$/.test(cleanPath) ||
-          /^\/reports\//.test(cleanPath)
+          (/^\/(sale-returns|purchase-returns)$/.test(cleanPath) && document.querySelector(".fixed.inset-0.z-50"))
         ) {
           return;
         }
-        e.preventDefault();
+        if (/^\/(reports\/|accounting$|hr-payroll$|payments$)/.test(cleanPath)) {
+          printCurrentView();
+          return;
+        }
         setProductSearchModalOpen((v) => !v);
         return;
       }

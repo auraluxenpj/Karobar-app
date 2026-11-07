@@ -294,3 +294,21 @@ export async function printCurrentView(options = {}) {
 
 export const printUrlViaIframe = printSlipUrl;
 export const printHtmlViaIframe = printSlipHtml;
+
+// Ensure window.print() in both the main window and any MDI sub-window <iframe>
+// routes through silent desktop printing when running inside the Windows Desktop .exe
+if (typeof window !== "undefined") {
+  try {
+    const desktop = getDesktopPrintBridge();
+    if (desktop) {
+      if (!window.karobarDesktop) {
+        window.karobarDesktop = desktop;
+      }
+      window.print = () => {
+        printCurrentView();
+      };
+    }
+  } catch {
+    // ignore
+  }
+}

@@ -502,37 +502,54 @@ function createApplicationMenu() {
   }
 }
 
-function isInternalOrPrintPopupUrl(rawUrl) {
+function isLocalPrintRouteUrl(rawUrl) {
   const u = String(rawUrl || "").trim();
-  if (
-    !u ||
-    u === "about:blank" ||
-    u.startsWith("about:") ||
-    u.startsWith("blob:") ||
-    u.startsWith("data:") ||
-    u.startsWith("/") ||
-    u.startsWith("http://127.0.0.1") ||
-    u.startsWith("http://localhost")
-  ) {
-    return true;
-  }
-  return false;
+  if (!u) return false;
+  return /\/(print|customer-ledger\/print|supplier-ledger\/print)(\/|\?|$)/i.test(u) || /[?&]silent_print=/i.test(u);
 }
 
 function configurePopupAndPrintHandler(contents) {
   if (!contents || typeof contents.setWindowOpenHandler !== "function") return;
 
-  contents.setWindowOpenHandler(({ url }) => {
-    if (isInternalOrPrintPopupUrl(url)) {
+  contents.setWindowOpenHandler(({ url, frameName }) => {
+    const rawUrl = String(url || "").trim();
+    const rawFrame = String(frameName || "").trim();
+
+    // Never allow print popup windows: intercept print routes and spool silently in background
+    if (isLocalPrintRouteUrl(rawUrl)) {
+      let resolvedUrl =
+        rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
+          ? rawUrl
+          : `http://127.0.0.1:${activePort}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+      if (!/[?&]silent_print=/i.test(resolvedUrl)) {
+        resolvedUrl += (resolvedUrl.includes("?") ? "&" : "?") + "silent_print=1";
+      }
+      runOffscreenPrintJob((printWin) => printWin.loadURL(resolvedUrl), { silent: true }).catch(() => {});
+      return { action: "deny" };
+    }
+
+    // Block about:blank or named print popups (e.g. salePrintWin) so no blank/print popup window ever appears
+    if (
+      !rawUrl ||
+      rawUrl === "about:blank" ||
+      rawUrl.startsWith("about:") ||
+      /print/i.test(rawFrame)
+    ) {
+      return { action: "deny" };
+    }
+
+    // Allow blob:/data: document previews (such as "Open PDF" in ShareDocumentModal) with preload attached
+    if (rawUrl.startsWith("blob:") || rawUrl.startsWith("data:")) {
       return {
         action: "allow",
         overrideBrowserWindowOptions: {
           width: 980,
           height: 760,
           autoHideMenuBar: true,
-          title: "Karobar-App — Print / Document Preview",
+          title: "Karobar-App — Document Preview",
           icon: resolveIconPath(),
           webPreferences: {
+            preload: path.join(__dirname, "preload.cjs"),
             contextIsolation: true,
             nodeIntegration: false,
           },
@@ -540,8 +557,8 @@ function configurePopupAndPrintHandler(contents) {
       };
     }
 
-    if (/^(https?:|mailto:|whatsapp:|tel:)/i.test(url)) {
-      shell.openExternal(url);
+    if (/^(https?:|mailto:|whatsapp:|tel:)/i.test(rawUrl)) {
+      shell.openExternal(rawUrl);
     }
     return { action: "deny" };
   });
@@ -768,6 +785,7 @@ async function runOffscreenPrintJob(loadTargetFn, options = {}) {
         session: sessionToUse,
         contextIsolation: true,
         nodeIntegration: false,
+        additionalArguments: ["--karobar-offscreen-print=1"],
       },
     });
 
@@ -853,9 +871,12 @@ ipcMain.handle("karobar:print-url", async (_event, payload = {}) => {
     return { ok: false, error: "Missing print URL" };
   }
 
-  const resolvedUrl = rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
+  let resolvedUrl = rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
     ? rawUrl
     : `http://127.0.0.1:${activePort}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+  if (!/[?&]silent_print=/i.test(resolvedUrl)) {
+    resolvedUrl += (resolvedUrl.includes("?") ? "&" : "?") + "silent_print=1";
+  }
 
   return runOffscreenPrintJob(
     async (printWin) => {

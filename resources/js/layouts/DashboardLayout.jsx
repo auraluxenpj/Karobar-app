@@ -12,6 +12,7 @@ import SubWindowManager, {
 import AppUpdateNotification from "../components/AppUpdateNotification.jsx";
 import SessionExpiryModal from "../components/SessionExpiryModal.jsx";
 import { Toaster } from "react-hot-toast";
+import { printCurrentView } from "@/utils/printHelper.js";
 
 const SIDEBAR_PIN_STORAGE_KEY = "karobar_sidebar_pinned";
 
@@ -539,15 +540,20 @@ export default function DashboardLayout({ children }) {
             window.top?.dispatchEvent(new CustomEvent("open-guide-bot"));
           } catch {}
         } else if (key === "p" || e.code === "KeyP") {
+          // Always prevent browser/OS native print dialog on Ctrl+P
+          e.preventDefault();
           if (
-            /^\/(sale-invoices|wholesale-invoices|purchase-invoices|stock-adjustments)\/\d+(\/edit)?$/.test(cleanSubPath) ||
-            /^\/sale-invoices\/(create\/(retail|wholesale)|pos|barcode-pos)$/.test(cleanSubPath) ||
+            /^\/(sale-invoices|wholesale-invoices)\/(\d+(\/edit)?|create(\/(retail|wholesale))?|create-retail|create-wholesale|pos|barcode-pos)$/.test(cleanSubPath) ||
+            /^\/(purchase-invoices|stock-adjustments|purchase-orders)\/\d+$/.test(cleanSubPath) ||
             /^\/(purchase-orders\/forecast|smart-reorder|customer-ledger|supplier-ledger|barcode-labels)$/.test(cleanSubPath) ||
-            /^\/reports\//.test(cleanSubPath)
+            (/^\/(sale-returns|purchase-returns)$/.test(cleanSubPath) && document.querySelector(".fixed.inset-0.z-50"))
           ) {
             return;
           }
-          e.preventDefault();
+          if (/^\/(reports\/|accounting$|hr-payroll$|payments$)/.test(cleanSubPath)) {
+            printCurrentView();
+            return;
+          }
           try {
             window.top?.dispatchEvent(new CustomEvent("open-product-search"));
           } catch {}

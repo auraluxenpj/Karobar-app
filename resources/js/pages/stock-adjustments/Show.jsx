@@ -26,6 +26,7 @@ import { getThemeButtonClasses } from "@/utils/buttonStyles";
 import { GlassCard, DeleteConfirmationModal } from "@/components";
 import PageSkeleton from "@/components/PageSkeleton.jsx";
 import DocumentHistoryModal from "@/components/DocumentHistoryModal.jsx";
+import { printCurrentView } from "@/utils/printHelper.js";
 
 const getContrastText = (hexColor) => {
   hexColor = (hexColor || "#3b82f6").replace("#", "");
@@ -174,6 +175,19 @@ export default function ShowStockAdjustment() {
       setDeleting(false);
     }
   };
+
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
+      const key = (e.key || "").toLowerCase();
+      if (key === "p" || e.code === "KeyP") {
+        e.preventDefault();
+        printCurrentView();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   if (permsLoading || loading) {
     return <PageSkeleton />;
@@ -402,7 +416,7 @@ export default function ShowStockAdjustment() {
 
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => printCurrentView()}
               className={`products-action ${btnSecondary.className}`}
               style={btnSecondary.style}
               title="Print Stock Adjustment Voucher"

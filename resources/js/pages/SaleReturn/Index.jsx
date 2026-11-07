@@ -26,6 +26,7 @@ import {
 import { usePermissions, Guard } from "@/api/usePermissions.js";
 import DocumentHistoryModal from "@/components/DocumentHistoryModal.jsx";
 import ShareDocumentModal from "@/components/ShareDocumentModal.jsx";
+import { printCurrentView } from "@/utils/printHelper.js";
 
 // Reusable components
 import {
@@ -178,9 +179,14 @@ export default function SaleReturnsIndex() {
   // Ctrl+N -> create
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.defaultPrevented) return;
       if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
       const key = (e.key || "").toLowerCase();
+      if ((key === "p" || e.code === "KeyP") && viewingReturn) {
+        e.preventDefault();
+        printCurrentView();
+        return;
+      }
+      if (e.defaultPrevented) return;
       if (key !== "n") return;
       if (!can.create) return;
       e.preventDefault();
@@ -188,7 +194,7 @@ export default function SaleReturnsIndex() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [navigate, can.create]);
+  }, [navigate, can.create, viewingReturn]);
 
   // ===== search + pagination =====
   const norm = (v) => (v ?? "").toString().toLowerCase().trim();
@@ -691,7 +697,7 @@ export default function SaleReturnsIndex() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => window.print()}
+                      onClick={() => printCurrentView()}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
                         isDark ? "border-slate-600 text-slate-200 hover:bg-slate-700" : "border-gray-300 text-gray-700 hover:bg-gray-100"
                       }`}

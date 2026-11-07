@@ -70,7 +70,7 @@
   .footer { margin-top:15px; padding-top:8px; border-top:1px solid var(--border); font-size:9px; color:var(--muted); text-align:center; }
 </style>
 </head>
-<body onload="window.print()">
+<body onload="if (!window.karobarDesktop && !window.__karobarSilentPrintWorker && !/Electron/i.test(navigator.userAgent) && window.self === window.top && !new URLSearchParams(window.location.search).has('silent_print')) window.print()">
 <div class="print-actions">
   <button onclick="window.print()">Print</button>
 </div>

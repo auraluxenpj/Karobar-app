@@ -83,7 +83,7 @@
   .foot { margin-top:8px; text-align:center; font-size:9px; }
 </style>
 </head>
-<body onload="window.print()">
+<body onload="if (!window.karobarDesktop && !window.__karobarSilentPrintWorker && !/Electron/i.test(navigator.userAgent) && window.self === window.top && !new URLSearchParams(window.location.search).has('silent_print')) window.print()">
 <div class="print-actions">
   <button onclick="window.print()">Print</button>
 </div>

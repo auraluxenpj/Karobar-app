@@ -195,9 +195,14 @@ export default function PurchaseReturnsIndex() {
   // Ctrl+N -> create
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.defaultPrevented) return;
       if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return;
       const key = (e.key || "").toLowerCase();
+      if ((key === "p" || e.code === "KeyP") && viewingReturn) {
+        e.preventDefault();
+        printCurrentView();
+        return;
+      }
+      if (e.defaultPrevented) return;
       if (key !== "n") return;
       if (!can.create) return;
       e.preventDefault();
@@ -205,7 +210,7 @@ export default function PurchaseReturnsIndex() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [navigate, can.create]);
+  }, [navigate, can.create, viewingReturn]);
 
   // ===== search + pagination =====
   const norm = (v) => (v ?? "").toString().toLowerCase().trim();

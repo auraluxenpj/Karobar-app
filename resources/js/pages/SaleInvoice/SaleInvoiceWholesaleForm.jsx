@@ -409,15 +409,17 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
   // Ctrl+S / Ctrl+Enter / F9 save, Ctrl+T toggle Debit/Credit, Ctrl+C customer search, Ctrl+R toggle Retail/Wholesale, Ctrl+N add row (edit mode)
   useEffect(() => {
     const handle = (e) => {
-      if (e.defaultPrevented) return;
       const isCtrl = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey;
       const key = (e.key || "").toLowerCase();
+      if (isCtrl && (key === "p" || e.code === "KeyP")) {
+        e.preventDefault();
+        handleSubmit(e, { printAfterSave: true });
+        return;
+      }
+      if (e.defaultPrevented) return;
       if ((isCtrl && (key === "s" || e.key === "Enter")) || e.key === "F9") {
         e.preventDefault();
         handleSubmit(e);
-      } else if (isCtrl && key === "p") {
-        e.preventDefault();
-        handleSubmit(e, { printAfterSave: true });
       } else if (isCtrl && key === "t") {
         e.preventDefault();
         handleInvoiceTypeChange(form.invoice_type === "debit" ? "credit" : "debit");
@@ -1782,7 +1784,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
             localStorage.setItem("accounts_sync", String(Date.now()));
           } catch {}
           toast.success("Wholesale invoice updated");
-          triggerDirectPrintForSavedId(id);
+          await triggerDirectPrintForSavedId(id);
           if (onSuccess) onSuccess(res.data, id);
           else navigate(`/wholesale-invoices/${id}`);
         } else {
@@ -1801,7 +1803,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
           } catch {}
           draftHook.resetToNew();
           toast.success("Wholesale invoice created");
-          if (id) triggerDirectPrintForSavedId(id);
+          if (id) await triggerDirectPrintForSavedId(id);
           if (onSuccess) onSuccess(res.data, id);
           else if (id) navigate(`/wholesale-invoices/${id}`);
           else invoiceErrors.showMessage("Missing invoice ID from server response.");

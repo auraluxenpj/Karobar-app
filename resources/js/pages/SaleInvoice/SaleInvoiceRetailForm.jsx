@@ -348,15 +348,17 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
   // Ctrl+S / Ctrl+Enter / F9 save, Ctrl+T toggle Debit/Credit, Ctrl+C customer search, Ctrl+R toggle Retail/Wholesale, Ctrl+N add row (edit mode)
   useEffect(() => {
     const handle = (e) => {
-      if (e.defaultPrevented) return;
       const isCtrl = (e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey;
       const key = (e.key || "").toLowerCase();
+      if (isCtrl && (key === "p" || e.code === "KeyP")) {
+        e.preventDefault();
+        handleSubmit(e, { printAfterSave: true });
+        return;
+      }
+      if (e.defaultPrevented) return;
       if ((isCtrl && (key === "s" || e.key === "Enter")) || e.key === "F9") {
         e.preventDefault();
         handleSubmit(e);
-      } else if (isCtrl && key === "p") {
-        e.preventDefault();
-        handleSubmit(e, { printAfterSave: true });
       } else if (isCtrl && key === "t") {
         e.preventDefault();
         handleInvoiceTypeChange(form.invoice_type === "debit" ? "credit" : "debit");
@@ -1717,7 +1719,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
           try { localStorage.setItem("cash_drawer_sync", String(Date.now())); } catch {}
           try { localStorage.setItem("accounts_sync", String(Date.now())); } catch {}
           toast.success("Sale invoice updated");
-          triggerDirectPrintForSavedId(id);
+          await triggerDirectPrintForSavedId(id);
           navigate(`/sale-invoices/${id}`);
         } else {
           if (draftHook.activeDraftId) {
@@ -1732,7 +1734,7 @@ export default function SaleInvoiceRetailForm({ saleId, onSuccess }) {
           draftHook.resetToNew();
           toast.success("Sale invoice created");
           if (id) {
-            triggerDirectPrintForSavedId(id);
+            await triggerDirectPrintForSavedId(id);
             navigate(`/sale-invoices/${id}`);
           }
           else invoiceErrors.showMessage("Missing invoice ID from server response.");
