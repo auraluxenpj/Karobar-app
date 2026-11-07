@@ -669,11 +669,11 @@ const [customers, setCustomers] = useState([]);
           to: toDate || undefined,
         },
       });
-      if (!data?.url) {
+      if (!data?.url && !data?.html) {
         toast.error("Failed to generate print link.");
         return;
       }
-      await printUrlViaIframe(data.url);
+      await printUrlViaIframe(data);
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to generate print link.");
     }

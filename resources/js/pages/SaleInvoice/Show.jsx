@@ -309,12 +309,11 @@ export default function SaleInvoiceShow({ defaultSaleType = null }) {
 
     try {
       const { data } = await axios.get(`/api/sale-invoices/${id}/print-url`);
-      const url = data?.url;
-      if (!url) {
+      if (!data?.url && !data?.html) {
         toast.error("Failed to generate print link.");
         return;
       }
-      await printSlipUrl(url);
+      await printSlipUrl(data);
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to generate print link.");
     }

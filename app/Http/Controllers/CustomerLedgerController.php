@@ -738,10 +738,11 @@ class CustomerLedgerController extends Controller
         $customer = \App\Models\Customer::findOrFail($customerId);
 
         $params = array_filter([
-            'customer_id' => $customer->id,
-            'type'        => $request->query('type'),
-            'from'        => $request->query('from'),
-            'to'          => $request->query('to'),
+            'customer_id'  => $customer->id,
+            'type'         => $request->query('type'),
+            'from'         => $request->query('from'),
+            'to'           => $request->query('to'),
+            'silent_print' => 1,
         ], fn ($v) => $v !== null && $v !== '');
 
         $url = \Illuminate\Support\Facades\URL::temporarySignedRoute(
@@ -750,7 +751,17 @@ class CustomerLedgerController extends Controller
             $params
         );
 
-        return response()->json(['url' => $url]);
+        $html = null;
+        try {
+            $html = $this->print($request)->render();
+        } catch (\Throwable) {
+            // Fallback to URL
+        }
+
+        return response()->json([
+            'url'  => $url,
+            'html' => $html,
+        ]);
     }
 
     /** ================================
@@ -765,6 +776,12 @@ class CustomerLedgerController extends Controller
 
     $customer = \App\Models\Customer::findOrFail($customerId);
     $setting  = \App\Models\Setting::first();
+    if ($setting && method_exists($setting, 'resolveLogoDataUri')) {
+        $dataUri = $setting->resolveLogoDataUri();
+        if ($dataUri) {
+            $setting->setAttribute('logo_url', $dataUri);
+        }
+    }
 
     // Accept aliases; default to A4
     $type = strtolower((string) $request->query('type', $setting->printer_type ?? 'a4'));

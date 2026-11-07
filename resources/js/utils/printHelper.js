@@ -164,9 +164,22 @@ function runIframeHtmlPrint(html) {
 }
 
 /**
- * Directly print a slip/receipt/ledger URL without any popup window or system print dialog in Desktop .exe.
+ * Directly print a slip/receipt/ledger URL (or `{ url, html }` response payload)
+ * without any popup window or system print dialog in Desktop .exe.
  */
-export async function printSlipUrl(url, options = {}) {
+export async function printSlipUrl(urlOrPayload, options = {}) {
+  const isObj = urlOrPayload && typeof urlOrPayload === "object";
+  const url = isObj ? String(urlOrPayload.url || "").trim() : String(urlOrPayload || "").trim();
+  const inlineHtml = isObj
+    ? String(urlOrPayload.html || "").trim()
+    : String(options.html || "").trim();
+
+  // Fast-path: if the server already returned the rendered HTML alongside the signed URL,
+  // print the HTML directly to avoid a second HTTP round-trip!
+  if (inlineHtml) {
+    return printSlipHtml(inlineHtml, options);
+  }
+
   const desktop = getDesktopPrintBridge();
   const deviceName = options.deviceName ?? getPreferredPrinter();
 

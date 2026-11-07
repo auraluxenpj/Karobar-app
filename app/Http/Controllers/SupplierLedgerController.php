@@ -535,10 +535,11 @@ class SupplierLedgerController extends Controller
         $supplier = Supplier::findOrFail($supplierId);
 
         $params = array_filter([
-            'supplier_id' => $supplier->id,
-            'type'        => $request->query('type'),
-            'from'        => $request->query('from'),
-            'to'          => $request->query('to'),
+            'supplier_id'  => $supplier->id,
+            'type'         => $request->query('type'),
+            'from'         => $request->query('from'),
+            'to'           => $request->query('to'),
+            'silent_print' => 1,
         ], fn ($v) => $v !== null && $v !== '');
 
         $url = \Illuminate\Support\Facades\URL::temporarySignedRoute(
@@ -547,7 +548,17 @@ class SupplierLedgerController extends Controller
             $params
         );
 
-        return response()->json(['url' => $url]);
+        $html = null;
+        try {
+            $html = $this->print($request)->render();
+        } catch (\Throwable) {
+            // Fallback to URL
+        }
+
+        return response()->json([
+            'url'  => $url,
+            'html' => $html,
+        ]);
     }
 
     public function print(Request $request)
@@ -558,6 +569,12 @@ class SupplierLedgerController extends Controller
 
         $supplier = Supplier::findOrFail($supplierId);
         $setting  = Setting::first();
+        if ($setting && method_exists($setting, 'resolveLogoDataUri')) {
+            $dataUri = $setting->resolveLogoDataUri();
+            if ($dataUri) {
+                $setting->setAttribute('logo_url', $dataUri);
+            }
+        }
 
         $type = strtolower($request->query('type', $setting->printer_type ?? 'a4'));
         if (!in_array($type, ['a4', 'thermal'])) {

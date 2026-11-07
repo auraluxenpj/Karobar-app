@@ -9,11 +9,15 @@ const { spawn, execFileSync } = require("child_process");
 
 let mainWindow = null;
 let splashWindow = null;
+let printWorkerWindow = null;
 let tray = null;
 let phpServerProcess = null;
+let phpWorkerPool = [];
+let gatewayServer = null;
 let schedulerProcess = null;
 let activePort = 18942;
 let isQuitting = false;
+let rrWorkerIdx = 0;
 
 /**
  * Resolve the root Laravel application directory whether running unpacked in an
@@ -103,14 +107,196 @@ function buildRuntimeEnv(port) {
   };
 }
 
+const STATIC_MIME_TYPES = {
+  ".js": "application/javascript; charset=utf-8",
+  ".mjs": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+  ".eot": "application/vnd.ms-fontobject",
+  ".pdf": "application/pdf",
+  ".txt": "text/plain; charset=utf-8",
+};
+
+function spawnPhpWorker(phpBin, workerPort, publicDir, routerScript, env) {
+  const workerObj = {
+    port: workerPort,
+    activeRequests: 0,
+    proc: null,
+  };
+
+  const launch = () => {
+    if (isQuitting) return;
+    const proc = spawn(
+      phpBin,
+      [
+        "-d",
+        "variables_order=EGPCS",
+        "-d",
+        "memory_limit=512M",
+        "-d",
+        "upload_max_filesize=64M",
+        "-d",
+        "post_max_size=64M",
+        "-d",
+        "opcache.enable=1",
+        "-d",
+        "opcache.enable_cli=1",
+        "-d",
+        "opcache.memory_consumption=128",
+        "-d",
+        "opcache.interned_strings_buffer=16",
+        "-d",
+        "opcache.max_accelerated_files=10000",
+        "-d",
+        "realpath_cache_size=4096K",
+        "-d",
+        "realpath_cache_ttl=600",
+        "-S",
+        `127.0.0.1:${workerPort}`,
+        "-t",
+        publicDir,
+        routerScript,
+      ],
+      {
+        cwd: APP_ROOT,
+        env,
+        windowsHide: true,
+        stdio: "ignore",
+      }
+    );
+
+    proc.on("exit", () => {
+      workerObj.activeRequests = 0;
+      if (!isQuitting) {
+        setTimeout(launch, 250);
+      }
+    });
+
+    workerObj.proc = proc;
+  };
+
+  launch();
+  return workerObj;
+}
+
+function tryServeStaticAsset(req, res, publicDir, storagePublicDir) {
+  if (req.method !== "GET" && req.method !== "HEAD") return false;
+
+  const rawUrl = String(req.url || "/");
+  const qIndex = rawUrl.indexOf("?");
+  const rawPath = qIndex >= 0 ? rawUrl.slice(0, qIndex) : rawUrl;
+
+  if (
+    !rawPath ||
+    rawPath === "/" ||
+    rawPath.startsWith("/api/") ||
+    rawPath.startsWith("/print/") ||
+    rawPath.startsWith("/sanctum/") ||
+    rawPath.endsWith(".php")
+  ) {
+    return false;
+  }
+
+  let decodedPath = rawPath;
+  try {
+    decodedPath = decodeURIComponent(rawPath);
+  } catch {
+    return false;
+  }
+
+  const ext = path.extname(decodedPath).toLowerCase();
+  if (!ext || !STATIC_MIME_TYPES[ext]) {
+    return false;
+  }
+
+  let targetFile = null;
+  if (decodedPath.startsWith("/storage/")) {
+    const relStorage = decodedPath.slice("/storage/".length).replace(/^[/\\]+/, "");
+    if (!relStorage) return false;
+    const candidate = path.resolve(storagePublicDir, relStorage);
+    if (candidate.startsWith(storagePublicDir)) {
+      targetFile = candidate;
+    }
+  } else {
+    const relPublic = decodedPath.replace(/^[/\\]+/, "");
+    if (!relPublic) return false;
+    const candidate = path.resolve(publicDir, relPublic);
+    if (candidate.startsWith(publicDir)) {
+      targetFile = candidate;
+    }
+  }
+
+  if (!targetFile) return false;
+
+  try {
+    const stat = fs.statSync(targetFile);
+    if (!stat.isFile()) return false;
+
+    const headers = {
+      "Content-Type": STATIC_MIME_TYPES[ext] || "application/octet-stream",
+      "Content-Length": stat.size,
+      "Cache-Control": decodedPath.startsWith("/build/assets/")
+        ? "public, max-age=31536000, immutable"
+        : "public, max-age=300",
+    };
+
+    res.writeHead(200, headers);
+    if (req.method === "HEAD") {
+      res.end();
+      return true;
+    }
+    const stream = fs.createReadStream(targetFile);
+    stream.on("error", () => {
+      if (!res.headersSent) {
+        res.writeHead(404);
+      }
+      res.end();
+    });
+    stream.pipe(res);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function selectLeastBusyWorker() {
+  if (phpWorkerPool.length === 0) return null;
+  let best = null;
+  const len = phpWorkerPool.length;
+  for (let i = 0; i < len; i++) {
+    const idx = (rrWorkerIdx + i) % len;
+    const candidate = phpWorkerPool[idx];
+    if (!best || candidate.activeRequests < best.activeRequests) {
+      best = candidate;
+      if (candidate.activeRequests === 0) {
+        rrWorkerIdx = (idx + 1) % len;
+        break;
+      }
+    }
+  }
+  return best;
+}
+
 /**
- * Start the embedded PHP HTTP server and Laravel Scheduler background process.
+ * Start the high-speed Node.js static/load-balancer gateway + multi-worker PHP pool
+ * (bypasses Windows single-threaded `php -S` bottleneck and Keep-Alive socket stalls).
  */
 async function startBackendServices() {
   activePort = await findFreePort(18942);
   const phpBin = resolvePhpBinary();
   const routerScript = path.join(APP_ROOT, "desktop", "router.php");
-  const publicDir = path.join(APP_ROOT, "public");
+  const publicDir = path.resolve(APP_ROOT, "public");
+  const storagePublicDir = path.resolve(APP_ROOT, "storage", "app", "public");
   const env = buildRuntimeEnv(activePort);
 
   // Prevent stale public/hot dev marker from hijacking asset URLs in packaged desktop builds
@@ -124,30 +310,100 @@ async function startBackendServices() {
     }
   }
 
-  phpServerProcess = spawn(
-    phpBin,
-    [
-      "-d",
-      "variables_order=EGPCS",
-      "-d",
-      "memory_limit=512M",
-      "-d",
-      "upload_max_filesize=64M",
-      "-d",
-      "post_max_size=64M",
-      "-S",
-      `127.0.0.1:${activePort}`,
-      "-t",
-      publicDir,
-      routerScript,
-    ],
-    {
+  // Spawn 4 parallel PHP workers on internal ports so concurrent API requests never serialize on Windows
+  const WORKER_COUNT = 4;
+  phpWorkerPool = [];
+  let nextPortCandidate = activePort + 1;
+  for (let i = 0; i < WORKER_COUNT; i++) {
+    const wPort = await findFreePort(nextPortCandidate);
+    nextPortCandidate = wPort + 1;
+    const worker = spawnPhpWorker(phpBin, wPort, publicDir, routerScript, env);
+    phpWorkerPool.push(worker);
+  }
+  phpServerProcess = phpWorkerPool[0]?.proc || null;
+
+  // Start Node.js front gateway on 127.0.0.1:activePort
+  await new Promise((resolve) => {
+    gatewayServer = http.createServer((req, res) => {
+      if (req.url === "/up") {
+        res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end("OK");
+        return;
+      }
+
+      if (tryServeStaticAsset(req, res, publicDir, storagePublicDir)) {
+        return;
+      }
+
+      const worker = selectLeastBusyWorker();
+      if (!worker) {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ message: "Backend worker unavailable" }));
+        return;
+      }
+
+      worker.activeRequests++;
+      let decremented = false;
+      const done = () => {
+        if (!decremented) {
+          decremented = true;
+          worker.activeRequests = Math.max(0, worker.activeRequests - 1);
+        }
+      };
+
+      const proxyHeaders = {
+        ...req.headers,
+        host: req.headers.host || `127.0.0.1:${activePort}`,
+        connection: "close",
+      };
+
+      const proxyReq = http.request(
+        {
+          hostname: "127.0.0.1",
+          port: worker.port,
+          path: req.url,
+          method: req.method,
+          headers: proxyHeaders,
+          agent: false,
+        },
+        (proxyRes) => {
+          res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+          proxyRes.pipe(res);
+          proxyRes.on("end", done);
+          proxyRes.on("close", done);
+          proxyRes.on("error", done);
+        }
+      );
+
+      proxyReq.on("error", () => {
+        done();
+        if (!res.headersSent) {
+          res.writeHead(502, { "Content-Type": "application/json" });
+        }
+        res.end(JSON.stringify({ message: "Local PHP worker busy, retrying..." }));
+      });
+
+      req.pipe(proxyReq);
+      req.on("aborted", () => {
+        done();
+        proxyReq.destroy();
+      });
+    });
+
+    gatewayServer.listen(activePort, "127.0.0.1", () => resolve());
+  });
+
+  // Precompile Blade templates in the background so print views never compile on first click
+  try {
+    spawn(phpBin, ["artisan", "view:cache"], {
       cwd: APP_ROOT,
       env,
       windowsHide: true,
       stdio: "ignore",
-    }
-  );
+    });
+  } catch {
+    // ignore
+  }
 
   // Start Laravel Scheduler worker (`php artisan schedule:work`) for automated backups & recurring expenses
   schedulerProcess = spawn(phpBin, ["artisan", "schedule:work"], {
@@ -157,7 +413,9 @@ async function startBackendServices() {
     stdio: "ignore",
   });
 
-  await waitForServerReady(`http://127.0.0.1:${activePort}/up`, 15000);
+  if (phpWorkerPool.length > 0) {
+    await waitForServerReady(`http://127.0.0.1:${phpWorkerPool[0].port}/up`, 15000);
+  }
 }
 
 function waitForServerReady(url, timeoutMs = 15000) {
@@ -172,7 +430,7 @@ function waitForServerReady(url, timeoutMs = 15000) {
         if (Date.now() - start >= timeoutMs) {
           resolve(false);
         } else {
-          setTimeout(check, 200);
+          setTimeout(check, 120);
         }
       });
       req.setTimeout(1000, () => {
@@ -184,6 +442,24 @@ function waitForServerReady(url, timeoutMs = 15000) {
 }
 
 function stopBackendServices() {
+  if (gatewayServer) {
+    try {
+      gatewayServer.close();
+    } catch {
+      // ignore
+    }
+    gatewayServer = null;
+  }
+  for (const w of phpWorkerPool) {
+    if (w?.proc && !w.proc.killed) {
+      try {
+        w.proc.kill();
+      } catch {
+        // ignore
+      }
+    }
+  }
+  phpWorkerPool = [];
   for (const proc of [phpServerProcess, schedulerProcess]) {
     if (proc && !proc.killed) {
       try {
@@ -195,6 +471,14 @@ function stopBackendServices() {
   }
   phpServerProcess = null;
   schedulerProcess = null;
+  if (printWorkerWindow && !printWorkerWindow.isDestroyed()) {
+    try {
+      printWorkerWindow.destroy();
+    } catch {
+      // ignore
+    }
+  }
+  printWorkerWindow = null;
 }
 
 function createSplashWindow() {
@@ -597,6 +881,16 @@ function createMainWindow() {
     mainWindow.maximize();
     mainWindow.show();
     mainWindow.focus();
+
+    // Pre-warm the offscreen print worker window and printer list cache so the first print is instantaneous
+    setTimeout(() => {
+      try {
+        ensurePrintWorkerWindow();
+        getCachedPrinters(mainWindow.webContents).catch(() => {});
+      } catch {
+        // ignore
+      }
+    }, 600);
   });
 
   mainWindow.on("close", () => {
@@ -693,40 +987,145 @@ ipcMain.handle("karobar:app-info", () => ({
   platform: process.platform,
 }));
 
-ipcMain.handle("karobar:get-printers", async () => {
-  if (!mainWindow || mainWindow.isDestroyed()) return [];
-  try {
-    return await mainWindow.webContents.getPrintersAsync();
-  } catch {
-    return [];
+let cachedPrintersList = null;
+let cachedPrintersAt = 0;
+const VIRTUAL_FILE_PRINTER_RE =
+  /^(microsoft print to pdf|microsoft xps document writer|onenote|send to onenote|fax|adobe pdf|foxit.*pdf)/i;
+
+async function getCachedPrinters(contents, forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && Array.isArray(cachedPrintersList) && now - cachedPrintersAt < 15000) {
+    return cachedPrintersList;
   }
+  const target =
+    contents && !contents.isDestroyed()
+      ? contents
+      : mainWindow && !mainWindow.isDestroyed()
+      ? mainWindow.webContents
+      : null;
+  if (!target) return cachedPrintersList || [];
+  try {
+    const list = await target.getPrintersAsync();
+    if (Array.isArray(list)) {
+      cachedPrintersList = list;
+      cachedPrintersAt = Date.now();
+      return list;
+    }
+  } catch {
+    // ignore
+  }
+  return cachedPrintersList || [];
+}
+
+ipcMain.handle("karobar:get-printers", async () => {
+  return getCachedPrinters(mainWindow?.webContents, true);
 });
 
 /**
- * Resolve a requested Windows printer deviceName against currently installed printers.
- * Falls back to undefined (Windows system default printer) if not specified or no longer present.
+ * Resolve target printer strategy:
+ * - Returns { mode: "spooler", deviceName: "<printer name>" } for physical/POS printers
+ * - Returns { mode: "pdf-fallback", deviceName: "Microsoft Print to PDF" } when only virtual
+ *   file-prompting printers exist on the PC (prevents Windows Print Spooler from hanging 20s
+ *   waiting on an invisible Win32 "Save Print Output As" file dialog).
  */
-async function resolveTargetPrinterName(contents, requestedDeviceName) {
+async function resolvePrinterStrategy(contents, requestedDeviceName) {
   const requested = String(requestedDeviceName || "").trim();
-  if (!requested || requested === "default" || requested === "system_default") {
-    return undefined;
+  const printers = await getCachedPrinters(contents);
+
+  if (!Array.isArray(printers) || printers.length === 0) {
+    return { mode: "pdf-fallback", deviceName: undefined };
   }
+
+  // 1. Explicit printer requested in Karobar Settings
+  if (requested && requested !== "default" && requested !== "system_default") {
+    const matched =
+      printers.find((p) => p && p.name === requested) ||
+      printers.find((p) => p && String(p.name || "").toLowerCase() === requested.toLowerCase());
+    if (matched) {
+      if (VIRTUAL_FILE_PRINTER_RE.test(matched.name)) {
+        return { mode: "pdf-fallback", deviceName: matched.name };
+      }
+      return { mode: "spooler", deviceName: matched.name };
+    }
+  }
+
+  // 2. System Default selected: check OS default printer first
+  const osDefault = printers.find((p) => p && p.isDefault && p.name);
+  if (osDefault && !VIRTUAL_FILE_PRINTER_RE.test(osDefault.name)) {
+    return { mode: "spooler", deviceName: osDefault.name };
+  }
+
+  // 3. If OS default is "Microsoft Print to PDF" / "XPS" / "Fax", prefer any connected physical/POS printer
+  const firstPhysical = printers.find((p) => p && p.name && !VIRTUAL_FILE_PRINTER_RE.test(p.name));
+  if (firstPhysical) {
+    return { mode: "spooler", deviceName: firstPhysical.name };
+  }
+
+  // 4. No physical printer installed on PC (only virtual PDF/XPS/Fax printers): use instant printToPDF
+  return { mode: "pdf-fallback", deviceName: osDefault?.name || undefined };
+}
+
+async function saveInstantPdfFallback(contents) {
   try {
-    const printers = await contents.getPrintersAsync();
-    if (!Array.isArray(printers) || printers.length === 0) return undefined;
-    const exact = printers.find((p) => p && p.name === requested);
-    if (exact) return exact.name;
-    const caseInsensitive = printers.find(
-      (p) => p && String(p.name || "").toLowerCase() === requested.toLowerCase()
-    );
-    return caseInsensitive ? caseInsensitive.name : undefined;
-  } catch {
-    return undefined;
+    const pdfBuffer = await contents.printToPDF({
+      printBackground: true,
+      preferCSSPageSize: true,
+      margins: { top: 0, bottom: 0, left: 0, right: 0 },
+    });
+    const outDir = path.join(app.getPath("documents"), "Karobar-Prints");
+    fs.mkdirSync(outDir, { recursive: true });
+    const filePath = path.join(outDir, `Slip-${Date.now()}.pdf`);
+    fs.writeFileSync(filePath, pdfBuffer);
+    return { ok: true, pdfFallback: true, filePath };
+  } catch (err) {
+    return { ok: false, error: err?.message || "No physical printer connected" };
   }
 }
 
+async function executeSilentSpoolOrPdf(contents, options = {}) {
+  const strategy = await resolvePrinterStrategy(contents, options.deviceName);
+
+  if (strategy.mode === "pdf-fallback") {
+    return saveInstantPdfFallback(contents);
+  }
+
+  const printOptions = {
+    silent: options.silent !== false,
+    printBackground: true,
+    margins: { marginType: "none" },
+  };
+  if (strategy.deviceName) {
+    printOptions.deviceName = strategy.deviceName;
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const safetyTimer = setTimeout(async () => {
+      if (settled) return;
+      settled = true;
+      const fallback = await saveInstantPdfFallback(contents);
+      resolve(fallback);
+    }, 5000);
+
+    try {
+      contents.print(printOptions, (success, errorType) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(safetyTimer);
+        resolve({ ok: Boolean(success), error: errorType || null });
+      });
+    } catch (err) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(safetyTimer);
+      resolve({ ok: false, error: err?.message || "Print failed" });
+    }
+  });
+}
+
 /**
- * Wait for all images, SVGs, and fonts inside an offscreen print window to finish rendering.
+ * Wait for any local images inside the offscreen print window to finish decoding.
+ * Never uses requestAnimationFrame (which is paused by Chromium in hidden windows).
  */
 async function waitForPrintResources(contents) {
   try {
@@ -735,108 +1134,90 @@ async function waitForPrintResources(contents) {
         `
         (async () => {
           try { window.print = () => {}; } catch {}
-          if (document.fonts && document.fonts.ready) {
-            try { await document.fonts.ready; } catch {}
-          }
           const imgs = Array.from(document.images || []);
-          await Promise.all(
-            imgs.map((img) =>
-              img.complete
-                ? Promise.resolve()
-                : new Promise((res) => {
-                    img.addEventListener("load", res, { once: true });
-                    img.addEventListener("error", res, { once: true });
-                    setTimeout(res, 2500);
-                  })
-            )
-          );
-          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          if (imgs.length > 0) {
+            await Promise.all(
+              imgs.map((img) =>
+                img.complete
+                  ? Promise.resolve()
+                  : new Promise((res) => {
+                      img.addEventListener("load", res, { once: true });
+                      img.addEventListener("error", res, { once: true });
+                      setTimeout(res, 250);
+                    })
+              )
+            );
+          }
           return true;
         })()
         `,
         true
       ),
-      new Promise((resolve) => setTimeout(resolve, 3500)),
+      new Promise((resolve) => setTimeout(resolve, 350)),
     ]);
   } catch {
-    // Proceed even if script evaluation fails
+    // Proceed immediately
   }
 }
 
-/**
- * Run a silent print job on a hidden offscreen BrowserWindow and clean up afterwards.
- */
-async function runOffscreenPrintJob(loadTargetFn, options = {}) {
-  let printWin = null;
-  try {
-    const sessionToUse =
-      mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.session : undefined;
-
-    printWin = new BrowserWindow({
-      width: 820,
-      height: 900,
-      show: false,
-      skipTaskbar: true,
-      frame: false,
-      transparent: false,
-      backgroundColor: "#ffffff",
-      webPreferences: {
-        preload: path.join(__dirname, "preload.cjs"),
-        session: sessionToUse,
-        contextIsolation: true,
-        nodeIntegration: false,
-        additionalArguments: ["--karobar-offscreen-print=1"],
-      },
-    });
-
-    // Ensure window.print() inside the loaded template never triggers the native dialog
-    printWin.webContents.on("dom-ready", () => {
-      if (printWin && !printWin.isDestroyed()) {
-        printWin.webContents.executeJavaScript("window.print = () => {};").catch(() => {});
-      }
-    });
-
-    await loadTargetFn(printWin);
-    await waitForPrintResources(printWin.webContents);
-
-    const resolvedDeviceName = await resolveTargetPrinterName(
-      printWin.webContents,
-      options.deviceName
-    );
-
-    const printOptions = {
-      silent: options.silent !== false,
-      printBackground: true,
-      margins: { marginType: "none" },
-    };
-    if (resolvedDeviceName) {
-      printOptions.deviceName = resolvedDeviceName;
-    }
-
-    const result = await new Promise((resolve) => {
-      const safetyTimer = setTimeout(() => {
-        resolve({ ok: false, error: "Print spooler timed out" });
-      }, 20000);
-
-      printWin.webContents.print(printOptions, (success, errorType) => {
-        clearTimeout(safetyTimer);
-        resolve({ ok: Boolean(success), error: errorType || null });
-      });
-    });
-
-    return result;
-  } catch (err) {
-    return { ok: false, error: err?.message || "Failed to print slip" };
-  } finally {
-    if (printWin && !printWin.isDestroyed()) {
-      try {
-        printWin.close();
-        printWin.destroy();
-      } catch {
-        // ignore
-      }
-    }
+function ensurePrintWorkerWindow() {
+  if (printWorkerWindow && !printWorkerWindow.isDestroyed()) {
+    return printWorkerWindow;
   }
+
+  const sessionToUse =
+    mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.session : undefined;
+
+  printWorkerWindow = new BrowserWindow({
+    width: 820,
+    height: 900,
+    show: false,
+    paintWhenInitiallyHidden: true,
+    skipTaskbar: true,
+    frame: false,
+    transparent: false,
+    backgroundColor: "#ffffff",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.cjs"),
+      session: sessionToUse,
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+      additionalArguments: ["--karobar-offscreen-print=1"],
+    },
+  });
+
+  printWorkerWindow.webContents.on("dom-ready", () => {
+    if (printWorkerWindow && !printWorkerWindow.isDestroyed()) {
+      printWorkerWindow.webContents.executeJavaScript("window.print = () => {};").catch(() => {});
+    }
+  });
+
+  printWorkerWindow.on("closed", () => {
+    printWorkerWindow = null;
+  });
+
+  return printWorkerWindow;
+}
+
+let printJobChain = Promise.resolve();
+
+/**
+ * Run a silent print job on the pre-warmed persistent offscreen BrowserWindow.
+ */
+function runOffscreenPrintJob(loadTargetFn, options = {}) {
+  const job = printJobChain.then(async () => {
+    try {
+      const printWin = ensurePrintWorkerWindow();
+      await loadTargetFn(printWin);
+      await waitForPrintResources(printWin.webContents);
+      return await executeSilentSpoolOrPdf(printWin.webContents, options);
+    } catch (err) {
+      return { ok: false, error: err?.message || "Failed to print slip" };
+    }
+  });
+  printJobChain = job.catch(() => {});
+  return job;
 }
 
 ipcMain.handle("karobar:silent-print", async (event, options = {}) => {
@@ -848,21 +1229,7 @@ ipcMain.handle("karobar:silent-print", async (event, options = {}) => {
       : null;
 
   if (!targetContents) return { ok: false, error: "No active window to print" };
-
-  const resolvedDeviceName = await resolveTargetPrinterName(targetContents, options.deviceName);
-  const printOptions = {
-    silent: options.silent !== false,
-    printBackground: true,
-  };
-  if (resolvedDeviceName) {
-    printOptions.deviceName = resolvedDeviceName;
-  }
-
-  return new Promise((resolve) => {
-    targetContents.print(printOptions, (success, errorType) => {
-      resolve({ ok: Boolean(success), error: errorType || null });
-    });
-  });
+  return executeSilentSpoolOrPdf(targetContents, options);
 });
 
 ipcMain.handle("karobar:print-url", async (_event, payload = {}) => {
@@ -871,12 +1238,10 @@ ipcMain.handle("karobar:print-url", async (_event, payload = {}) => {
     return { ok: false, error: "Missing print URL" };
   }
 
-  let resolvedUrl = rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
-    ? rawUrl
-    : `http://127.0.0.1:${activePort}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
-  if (!/[?&]silent_print=/i.test(resolvedUrl)) {
-    resolvedUrl += (resolvedUrl.includes("?") ? "&" : "?") + "silent_print=1";
-  }
+  const resolvedUrl =
+    rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
+      ? rawUrl
+      : `http://127.0.0.1:${activePort}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
 
   return runOffscreenPrintJob(
     async (printWin) => {

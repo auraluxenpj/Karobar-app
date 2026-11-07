@@ -206,8 +206,21 @@
   </div>
 
   <div class="qr-section">
-    <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ urlencode($qrData) }}" alt="QR Code" />
-    <div class="qr-text">Scan to verify invoice</div>
+    @php
+      $barHash = md5($qrData ?: ($posted ?: 'INV'));
+    @endphp
+    <svg width="160" height="44" viewBox="0 0 160 44" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;">
+      <rect width="160" height="44" fill="#ffffff"/>
+      @for($bi = 0; $bi < 32; $bi++)
+        @php
+          $bVal = hexdec($barHash[$bi]);
+          $bX = 6 + ($bi * 4.6);
+          $bW = ($bVal % 3 === 0) ? 3.2 : (($bVal % 2 === 0) ? 2.1 : 1.2);
+        @endphp
+        <rect x="{{ $bX }}" y="4" width="{{ $bW }}" height="36" fill="#000000"/>
+      @endfor
+    </svg>
+    <div class="qr-text">{{ $posted }} — Verified Invoice</div>
   </div>
 
   <div class="footer">

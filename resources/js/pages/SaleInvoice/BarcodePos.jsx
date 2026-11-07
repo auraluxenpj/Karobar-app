@@ -677,8 +677,8 @@ export default function BarcodePos() {
     if (!invoiceId) return;
     try {
       const { data } = await axios.get(`/api/sale-invoices/${invoiceId}/print-url`);
-      if (data?.url) {
-        await printSlipUrl(data.url);
+      if (data?.url || data?.html) {
+        await printSlipUrl(data);
       } else {
         toast.error("Failed to generate receipt print link.");
       }

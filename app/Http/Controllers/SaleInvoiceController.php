@@ -1282,8 +1282,9 @@ class SaleInvoiceController extends Controller
         }
 
         $params = array_filter([
-            'invoice' => $saleInvoice->id,
-            'type'    => $request->query('type'),
+            'invoice'      => $saleInvoice->id,
+            'type'         => $request->query('type'),
+            'silent_print' => 1,
         ], fn ($v) => $v !== null && $v !== '');
 
         $url = \Illuminate\Support\Facades\URL::temporarySignedRoute(
@@ -1292,13 +1293,29 @@ class SaleInvoiceController extends Controller
             $params
         );
 
-        return response()->json(['url' => $url]);
+        $html = null;
+        try {
+            $html = $this->print($request, $saleInvoice)->render();
+        } catch (\Throwable) {
+            // Fallback to URL if inline render fails
+        }
+
+        return response()->json([
+            'url'  => $url,
+            'html' => $html,
+        ]);
     }
 
     public function print(Request $request, SaleInvoice $invoice)
     {
         $invoice->load(['items.product', 'customer', 'user']);
         $setting = Setting::first();
+        if ($setting && method_exists($setting, 'resolveLogoDataUri')) {
+            $dataUri = $setting->resolveLogoDataUri();
+            if ($dataUri) {
+                $setting->setAttribute('logo_url', $dataUri);
+            }
+        }
 
         $type = strtolower($request->query('type', $setting->printer_type ?? 'a4'));
         if (!in_array($type, ['a4', 'thermal'])) {

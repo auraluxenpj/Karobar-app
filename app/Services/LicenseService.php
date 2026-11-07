@@ -547,6 +547,7 @@ class LicenseService
     public function getHighWaterMarkTimestamp(): int
     {
         $maxTs = 0;
+        $hasValidClockFile = false;
 
         // 1. Check HMAC-protected monotonic clock file (skip during unit tests for test isolation)
         if (!app()->runningUnitTests()) {
@@ -559,12 +560,13 @@ class LicenseService
                     $expectedSig = hash_hmac('sha256', (string) $ts, 'KAROBAR-CLOCK-SEAL-V2:' . self::MASTER_PUBLIC_KEY);
                     if (hash_equals($expectedSig, (string) $data['sig']) && $ts > $maxTs) {
                         $maxTs = $ts;
+                        $hasValidClockFile = true;
                     }
                 }
             }
         }
 
-        // 2. Check active license timestamps
+        // 2. Check active license timestamps (and scan core tables only if clock file is missing or in unit tests)
         try {
             $rec = License::latest('id')->first();
             if ($rec) {
@@ -576,14 +578,16 @@ class LicenseService
                 }
             }
 
-            // 3. Check latest system-generated created_at in core tables
-            foreach (['sale_invoices', 'purchase_invoices', 'payments', 'personal_access_tokens'] as $table) {
-                if (Schema::hasTable($table)) {
-                    $latest = DB::table($table)->max('created_at');
-                    if ($latest) {
-                        $ts = strtotime((string) $latest);
-                        if ($ts !== false && $ts > $maxTs) {
-                            $maxTs = $ts;
+            // 3. Check latest system-generated created_at in core tables when initializing clock or running tests
+            if (!$hasValidClockFile || app()->runningUnitTests()) {
+                foreach (['sale_invoices', 'purchase_invoices', 'payments', 'personal_access_tokens'] as $table) {
+                    if (Schema::hasTable($table)) {
+                        $latest = DB::table($table)->max('created_at');
+                        if ($latest) {
+                            $ts = strtotime((string) $latest);
+                            if ($ts !== false && $ts > $maxTs) {
+                                $maxTs = $ts;
+                            }
                         }
                     }
                 }

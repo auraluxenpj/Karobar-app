@@ -1759,8 +1759,8 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
       if (!shouldPrintAfterSave || !savedId) return;
       try {
         const { data } = await axios.get(`/api/sale-invoices/${savedId}/print-url`);
-        if (data?.url) {
-          await printSlipUrl(data.url);
+        if (data?.url || data?.html) {
+          await printSlipUrl(data);
         }
       } catch (printErr) {
         toast.error(printErr?.response?.data?.message || "Saved invoice, but failed to print slip.");
