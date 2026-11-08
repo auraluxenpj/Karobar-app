@@ -205,7 +205,7 @@ export default function SessionExpiryModal() {
             <ShieldCheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
             <div>
               <span className="font-semibold text-emerald-300">Your Current Work is Safe:</span>{" "}
-              All open invoices, forms, and sub-windows remain intact while you decide.
+              All open invoices and forms remain intact while you decide.
             </div>
           </div>
 

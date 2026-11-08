@@ -1153,34 +1153,13 @@ export default function ClassicSidebar({
                               )}
                             </Link>
 
-                            {/* Pop-up Action Buttons: Open in Sub-Window (⧉), Quick-Create (+) and Favorite Star (★) */}
+                            {/* Pop-up Action Buttons: Quick-Create (+) and Favorite Star (★) */}
                             {!effectiveCollapsed && (
                               <div
                                 className={`workspace-nav-actions absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-20 ${
                                   isFav ? "has-fav" : ""
                                 }`}
                               >
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    if (!isPinned && onRequestCloseDock) {
-                                      onRequestCloseDock();
-                                    }
-                                    window.dispatchEvent(
-                                      new CustomEvent("karobar:open-subwindow", {
-                                        detail: { path: item.path, title: item.name },
-                                      })
-                                    );
-                                  }}
-                                  title={`Open "${item.name}" in a Sub-Window inside Main Window`}
-                                  aria-label={`Open ${item.name} in Sub-Window`}
-                                  className="workspace-nav-action-btn px-1.5 py-0.5 rounded-lg text-[11px] font-bold text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-500/15 transition-all cursor-pointer"
-                                >
-                                  ⧉
-                                </button>
-
                                 {item.canQuickCreate && (
                                   <button
                                     type="button"
