@@ -195,7 +195,8 @@ export default function PrinterSetting({
             <span className="settings-template-preview">
               <iframe
                 src={`/print/${type}-preview/${template.id}`}
-                className="border-0"
+                sandbox="allow-same-origin"
+                className="border-0 pointer-events-none"
                 title={`${template.name} Thumbnail`}
               />
             </span>
@@ -438,6 +439,7 @@ export default function PrinterSetting({
               >
                 <iframe
                   src={`/print/${previewingType}-preview/${previewingTemplate.id}`}
+                  sandbox="allow-same-origin"
                   className="border-0"
                   style={{ minHeight: '400px', width: '100%' }}
                   title={`${previewingTemplate.name} Template Preview`}

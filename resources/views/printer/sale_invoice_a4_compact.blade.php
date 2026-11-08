@@ -70,10 +70,12 @@
   .footer { margin-top:15px; padding-top:8px; border-top:1px solid var(--border); font-size:9px; color:var(--muted); text-align:center; }
 </style>
 </head>
-<body onload="window.print()">
+<body @if(empty($isPreview)) onload="window.print()" @endif>
+@if(empty($isPreview))
 <div class="print-actions">
   <button onclick="window.print()">Print</button>
 </div>
+@endif
 
 <div class="page">
   <div class="header">

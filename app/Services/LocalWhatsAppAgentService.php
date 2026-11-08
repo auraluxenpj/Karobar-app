@@ -518,12 +518,6 @@ class LocalWhatsAppAgentService
             return $envBinary;
         }
 
-        // Bundled Portable Node.js inside Windows .exe Desktop Installation (runtime/node/node.exe)
-        $bundledWinNode = base_path('runtime' . DIRECTORY_SEPARATOR . 'node' . DIRECTORY_SEPARATOR . 'node.exe');
-        if (is_file($bundledWinNode)) {
-            return $bundledWinNode;
-        }
-
         $candidates = [];
 
         if (DIRECTORY_SEPARATOR === '\\') {

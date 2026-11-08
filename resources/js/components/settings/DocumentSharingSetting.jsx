@@ -1432,6 +1432,7 @@ export default function DocumentSharingSetting({
                 src={`/print/share-preview/${activePaperSize}/${previewTemplate}?show_logo=${
                   showLogo ? 1 : 0
                 }&note=${encodeURIComponent(form.note ?? "")}`}
+                sandbox="allow-same-origin"
                 title="Shared PDF Template Preview"
                 className="w-full h-full rounded-xl bg-white border border-gray-200 dark:border-slate-700"
               />

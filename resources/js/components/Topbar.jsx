@@ -996,18 +996,6 @@ export default function Topbar({
                   >
                     {licLoading ? "License Status" : licValid ? `License (${leftTxt} left)` : "Activate License"}
                   </button>
-                  {typeof window !== "undefined" && window.karobarDesktop?.isDesktop && (
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        setOpen(false);
-                        window.dispatchEvent(new CustomEvent("karobar:check-updates"));
-                      }}
-                      className="workspace-user-menu-item"
-                    >
-                      Check for Updates
-                    </button>
-                  )}
                   <button
                     role="menuitem"
                     onClick={() => {

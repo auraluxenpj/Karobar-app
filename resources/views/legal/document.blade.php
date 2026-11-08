@@ -57,11 +57,11 @@
     <div class="container">
         <span class="badge">Karobar App ERP v2.0 — Legal Agreement</span>
         <h1>{{ $title }}</h1>
-        <div class="meta">Effective Version: 2.0 &bull; Applies to Windows Desktop (.exe) &amp; On-Premise Installations</div>
+        <div class="meta">Effective Version: 2.0 &bull; Applies to On-Premise &amp; Web Installations</div>
 
         @if($type === 'terms')
             <h2>1. Single-Machine License Grant &amp; Hardware Binding</h2>
-            <p>Karobar App ERP ("the Software") is licensed, not sold. Each license key (<code>KRBL.</code> cryptographic certificate) is permanently bound to the unique hardware fingerprint (<strong>Machine ID</strong>) of the single Windows computer on which it is activated during installation. A license key bound to one machine cannot be transferred, cloned, or reused on any other computer.</p>
+            <p>Karobar App ERP ("the Software") is licensed, not sold. Each license key (<code>KRBL.</code> cryptographic certificate) is permanently bound to the unique hardware fingerprint (<strong>Machine ID</strong>) of the single computer or server on which it is activated. A license key bound to one machine cannot be transferred, cloned, or reused on any other computer.</p>
 
             <h2>2. Anti-Tampering &amp; System Clock Integrity</h2>
             <p>The Software employs Ed25519 digital signatures, hardware-sealed database records, and monotonic clock verification. Attempting to bypass license enforcement, modify application binaries or scripts, clone the SQLite database to an unlicensed machine, or roll back the system clock will automatically revoke the active license session.</p>

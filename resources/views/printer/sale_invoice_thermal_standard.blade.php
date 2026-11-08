@@ -83,10 +83,12 @@
   .foot { margin-top:8px; text-align:center; font-size:9px; }
 </style>
 </head>
-<body onload="window.print()">
+<body @if(empty($isPreview)) onload="window.print()" @endif>
+@if(empty($isPreview))
 <div class="print-actions">
   <button onclick="window.print()">Print</button>
 </div>
+@endif
 <div class="receipt">
   @if($logo)
     <div class="wm">

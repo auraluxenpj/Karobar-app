@@ -38,7 +38,6 @@ import {
   CheckCircleIcon,
   ArrowRightIcon,
   ArrowLeftIcon,
-  FolderOpenIcon,
   ServerStackIcon,
 } from "@heroicons/react/24/solid";
 
@@ -453,15 +452,6 @@ export default function SetupWizard() {
     }
   };
 
-  const handleChooseNativeBackupFolder = async () => {
-    if (window.karobarDesktop?.selectDirectory) {
-      const selected = await window.karobarDesktop.selectDirectory();
-      if (selected) {
-        setForm((s) => ({ ...s, custom_backup_path: selected }));
-      }
-    }
-  };
-
   const handleCompleteSetup = async () => {
     if (!form.store_name || form.store_name.trim().length < 2) {
       toast.error("Please enter your Store Name in Step 1 before finishing.");
@@ -826,16 +816,6 @@ export default function SetupWizard() {
                       placeholder="Leave blank for default storage/app/backups"
                       className="flex-1 rounded-xl border border-gray-300 dark:border-slate-700 bg-transparent px-3 py-2 text-xs"
                     />
-                    {typeof window !== "undefined" && window.karobarDesktop?.selectDirectory && (
-                      <button
-                        type="button"
-                        onClick={handleChooseNativeBackupFolder}
-                        className="px-3 py-2 rounded-xl border border-gray-300 dark:border-slate-700 text-xs font-medium flex items-center gap-1"
-                      >
-                        <FolderOpenIcon className="w-4 h-4" />
-                        <span>Browse</span>
-                      </button>
-                    )}
                   </div>
                 </div>
 

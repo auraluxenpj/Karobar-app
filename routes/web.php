@@ -113,8 +113,9 @@ Route::get('/print/thermal-preview/{template}', function ($template) {
         : ($dbSetting ? (string) ($dbSetting->note ?? '') : 'Thank you for your business!');
     
     return view("printer.sale_invoice_thermal_{$template}", [
-        'invoice' => $sampleInvoice,
-        'setting' => $sampleSetting,
+        'invoice'   => $sampleInvoice,
+        'setting'   => $sampleSetting,
+        'isPreview' => true,
     ]);
 })->name('thermal.preview');
 
@@ -210,8 +211,9 @@ Route::get('/print/a4-preview/{template}', function ($template) {
         : ($dbSetting ? (string) ($dbSetting->note ?? '') : 'Thank you for your business!');
     
     return view("printer.sale_invoice_a4_{$template}", [
-        'invoice' => $sampleInvoice,
-        'setting' => $sampleSetting,
+        'invoice'   => $sampleInvoice,
+        'setting'   => $sampleSetting,
+        'isPreview' => true,
     ]);
 })->name('a4.preview');
 

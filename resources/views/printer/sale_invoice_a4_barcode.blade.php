@@ -98,10 +98,12 @@
   .powered { font-size:9px; color:#adb5bd; margin-top:5px; }
 </style>
 </head>
-<body onload="window.print()">
+<body @if(empty($isPreview)) onload="window.print()" @endif>
+@if(empty($isPreview))
 <div class="print-actions">
   <button onclick="window.print()">Print Invoice</button>
 </div>
+@endif
 
 <div class="page">
   <div class="header">

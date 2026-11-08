@@ -74,10 +74,12 @@
   .thankyou { text-align:center; margin-top:15px; font-size:12px; font-style:italic; }
 </style>
 </head>
-<body onload="window.print()">
+<body @if(empty($isPreview)) onload="window.print()" @endif>
+@if(empty($isPreview))
 <div class="print-actions">
   <button onclick="window.print()">Print</button>
 </div>
+@endif
 
 <div class="page">
   <div class="header">

@@ -11,7 +11,7 @@ class LicenseMachineIdCommand extends Command
                             {--json : Output as JSON object}
                             {--out= : Optional file path to write the raw Machine ID string}';
 
-    protected $description = 'Compute and output the deterministic hardware Machine ID for this computer (used by the Windows .exe installer)';
+    protected $description = 'Compute and output the deterministic hardware Machine ID for this computer';
 
     public function handle(LicenseService $licenseService): int
     {

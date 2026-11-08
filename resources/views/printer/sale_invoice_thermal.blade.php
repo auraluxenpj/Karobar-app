@@ -105,10 +105,12 @@
   .foot { margin-top:6px; text-align:center; }
 </style>
 </head>
-<body onload="window.print()">
+<body @if(empty($isPreview)) onload="window.print()" @endif>
+@if(empty($isPreview))
 <div class="print-actions">
   <button onclick="window.print()">Print</button>
 </div>
+@endif
 
 <div class="receipt">
   {{-- Watermark behind everything --}}

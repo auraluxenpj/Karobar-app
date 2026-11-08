@@ -75,10 +75,12 @@
   .foot { margin-top:12px; text-align:center; font-size:10px; text-transform:uppercase; }
 </style>
 </head>
-<body onload="window.print()">
+<body @if(empty($isPreview)) onload="window.print()" @endif>
+@if(empty($isPreview))
 <div class="print-actions">
   <button onclick="window.print()">PRINT</button>
 </div>
+@endif
 <div class="receipt">
   @if($logo)
     <img src="{{ $logo }}" alt="Logo" class="logo">

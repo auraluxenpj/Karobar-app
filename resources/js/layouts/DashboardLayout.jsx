@@ -9,7 +9,6 @@ import PageSkeleton from "../components/PageSkeleton.jsx";
 import SubWindowManager, {
   resolveTitleForPath,
 } from "../components/SubWindowManager.jsx";
-import AppUpdateNotification from "../components/AppUpdateNotification.jsx";
 import SessionExpiryModal from "../components/SessionExpiryModal.jsx";
 import { Toaster } from "react-hot-toast";
 
@@ -482,7 +481,7 @@ export default function DashboardLayout({ children }) {
     });
   }, [openSubWindow]);
 
-  // Listen to Electron Native Top Menu IPC events & Custom DOM events (only in main window)
+  // Listen to Custom DOM events & keyboard shortcuts for Sub-Windows (only in main window)
   useEffect(() => {
     if (isSubWindow) return;
 
@@ -495,40 +494,6 @@ export default function DashboardLayout({ children }) {
     };
 
     window.addEventListener("karobar:open-subwindow", handleCustomOpen);
-
-    const desktopApi = window.karobarDesktop;
-    const unsubNav = desktopApi?.onNavigate?.((payload) => {
-      if (payload?.path) {
-        navigate(payload.path);
-      }
-    });
-    const unsubSubWin = desktopApi?.onOpenSubWindow?.((payload) => {
-      if (payload?.path) {
-        openSubWindow(payload.path, payload.title);
-      }
-    });
-    const unsubCmd = desktopApi?.onWindowCommand?.((payload) => {
-      const cmd = payload?.command;
-      if (cmd === "open-current") {
-        openSubWindow(currentPath || "/dashboard", pageTitle);
-      } else if (cmd === "preset-sale-purchase") {
-        openSalePurchaseSplit();
-      } else if (cmd === "tile") {
-        tileSubWindows();
-      } else if (cmd === "grid") {
-        gridSubWindows();
-      } else if (cmd === "cascade") {
-        cascadeSubWindows();
-      } else if (cmd === "minimize-all") {
-        minimizeAllSubWindows();
-      } else if (cmd === "restore-all") {
-        restoreAllSubWindows();
-      } else if (cmd === "close-all") {
-        closeAllSubWindows();
-      } else if (cmd === "set-menu-subwindow-mode") {
-        setDefaultSubWindowMode(Boolean(payload?.enabled));
-      }
-    });
 
     const handleKeyShortcuts = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
@@ -556,23 +521,13 @@ export default function DashboardLayout({ children }) {
     return () => {
       window.removeEventListener("karobar:open-subwindow", handleCustomOpen);
       window.removeEventListener("keydown", handleKeyShortcuts);
-      if (typeof unsubNav === "function") unsubNav();
-      if (typeof unsubSubWin === "function") unsubSubWin();
-      if (typeof unsubCmd === "function") unsubCmd();
     };
   }, [
     isSubWindow,
     currentPath,
     pageTitle,
-    navigate,
     openSubWindow,
-    openSalePurchaseSplit,
     tileSubWindows,
-    gridSubWindows,
-    cascadeSubWindows,
-    minimizeAllSubWindows,
-    restoreAllSubWindows,
-    closeAllSubWindows,
   ]);
 
   // Close mobile sidebar and floating dock on route change
@@ -762,9 +717,6 @@ export default function DashboardLayout({ children }) {
           onCloseAll={closeAllSubWindows}
         />
 
-        {typeof window !== "undefined" && window.karobarDesktop?.isDesktop && (
-          <AppUpdateNotification />
-        )}
         <SessionExpiryModal />
       </div>
     </div>

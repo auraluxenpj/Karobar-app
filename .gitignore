@@ -13,9 +13,6 @@
 /.zed
 /auth.json
 /node_modules
-/desktop/node_modules
-/dist
-/installer/*.seal
 /public/build
 /public/hot
 /public/storage
