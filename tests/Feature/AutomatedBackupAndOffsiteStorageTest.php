@@ -337,7 +337,7 @@ class AutomatedBackupAndOffsiteStorageTest extends TestCase
     public function test_file_backed_sqlite_wal_mmap_restore_with_concurrent_worker_does_not_corrupt_database(): void
     {
         $tempDbFile = sys_get_temp_dir() . '/karobar_wal_restore_test_' . uniqid() . '.sqlite';
-        copy(database_path('database.sqlite'), $tempDbFile);
+        @unlink($tempDbFile);
 
         $originalDbConfig = config('database.connections.sqlite.database');
         $concurrentWorkerPdo = null;
@@ -347,6 +347,10 @@ class AutomatedBackupAndOffsiteStorageTest extends TestCase
             while (DB::connection('sqlite')->transactionLevel() > 0) {
                 DB::connection('sqlite')->rollBack();
             }
+            // Export the migrated in-memory test schema directly into the temporary file-backed SQLite database
+            $escapedTempDb = str_replace("'", "''", $tempDbFile);
+            DB::connection('sqlite')->statement("VACUUM INTO '{$escapedTempDb}';");
+
             // Switch Laravel's sqlite connection to the file-backed SQLite database in WAL + mmap mode
             config(['database.connections.sqlite.database' => $tempDbFile]);
             DB::purge('sqlite');

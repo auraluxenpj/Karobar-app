@@ -36,24 +36,15 @@ import {
   KeyIcon,
   ServerIcon,
   ArrowRightIcon,
+  PlusIcon,
 } from "@heroicons/react/24/outline";
 import { usePermissions } from "@/api/usePermissions.js";
 import { useSaleSystem } from "@/context/SaleSystemContext.jsx";
 import { useTheme } from "@/context/ThemeContext.jsx";
 
-export default function PageSearchModal({ isOpen, onClose }) {
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
+export function useAvailablePages() {
   const { loading: permsLoading, has } = usePermissions();
   const { hasWholesale } = useSaleSystem();
-  const { isDark } = useTheme();
-
-  const [query, setQuery] = useState("");
-  const [activeIdx, setActiveIdx] = useState(0);
-
-  const inputRef = useRef(null);
-  const rowRefs = useRef([]);
-  const mouseDownTargetRef = useRef(null);
 
   const allPages = useMemo(
     () => [
@@ -115,6 +106,14 @@ export default function PageSearchModal({ isOpen, onClose }) {
         perm: "brand.view",
       },
       {
+        name: "Add Brand",
+        path: "/brands/create",
+        section: "Items & Masters",
+        keywords: "new brand create company manufacturer",
+        icon: TagIcon,
+        perm: "brand.create",
+      },
+      {
         name: "Suppliers",
         path: "/suppliers",
         section: "Items & Masters",
@@ -123,12 +122,28 @@ export default function PageSearchModal({ isOpen, onClose }) {
         perm: "supplier.view",
       },
       {
+        name: "Add Supplier",
+        path: "/suppliers/create",
+        section: "Items & Masters",
+        keywords: "new supplier create vendor distributor",
+        icon: TruckIcon,
+        perm: "supplier.create",
+      },
+      {
         name: "Customers",
         path: "/customers",
         section: "Items & Masters",
         keywords: "clients buyers patients customer",
         icon: UserPlusIcon,
         perm: "customer.view",
+      },
+      {
+        name: "Add Customer",
+        path: "/customers/create",
+        section: "Items & Masters",
+        keywords: "new customer create client buyer patient",
+        icon: UserPlusIcon,
+        perm: "customer.create",
       },
       {
         name: "Barcode Studio",
@@ -147,6 +162,7 @@ export default function PageSearchModal({ isOpen, onClose }) {
         keywords: "pos terminal point of sale counter billing",
         icon: QrCodeIcon,
         permAny: ["barcode-pos.view", "barcode-pos.create"],
+        shortcut: "Ctrl+Shift+P",
       },
       {
         name: "Sale Invoices",
@@ -163,6 +179,7 @@ export default function PageSearchModal({ isOpen, onClose }) {
         keywords: "new sale invoice retail bill create",
         icon: DocumentCurrencyDollarIcon,
         perm: "sale-invoice.create",
+        shortcut: "Ctrl+Shift+S",
       },
       ...(hasWholesale
         ? [
@@ -181,6 +198,7 @@ export default function PageSearchModal({ isOpen, onClose }) {
               keywords: "new wholesale sale invoice create b2b",
               icon: BuildingStorefrontIcon,
               perm: "sale-invoice.create",
+              shortcut: "Ctrl+Shift+W",
             },
           ]
         : []),
@@ -199,6 +217,7 @@ export default function PageSearchModal({ isOpen, onClose }) {
         keywords: "new purchase invoice bill add stock",
         icon: ClipboardDocumentListIcon,
         perm: "purchase-invoice.create",
+        shortcut: "Ctrl+Shift+U",
       },
       {
         name: "Purchase Orders",
@@ -215,6 +234,14 @@ export default function PageSearchModal({ isOpen, onClose }) {
         keywords: "new po create purchase order",
         icon: ClipboardDocumentCheckIcon,
         perm: "purchase-order.create",
+      },
+      {
+        name: "Smart Reorder Forecast",
+        path: "/smart-reorder",
+        section: "Invoices",
+        keywords: "smart reorder forecast ai stock ordering",
+        icon: BoltIcon,
+        permAny: ["purchase-order.view", "purchase-order.create", "report.reorder.view"],
       },
 
       // Returns
@@ -333,6 +360,7 @@ export default function PageSearchModal({ isOpen, onClose }) {
         keywords: "receivables customer statement balance ledger",
         icon: UsersIcon,
         perm: "customer-ledger.view",
+        shortcut: "Ctrl+Shift+L",
       },
       {
         name: "Supplier Ledger",
@@ -524,6 +552,14 @@ export default function PageSearchModal({ isOpen, onClose }) {
         perm: "settings.view",
       },
       {
+        name: "SQLite Data Import",
+        path: "/settings/sqlite-import",
+        section: "System & Settings",
+        keywords: "sqlite database import migration legacy",
+        icon: ServerIcon,
+        perm: "settings.update",
+      },
+      {
         name: "Users",
         path: "/users",
         section: "System & Settings",
@@ -567,7 +603,6 @@ export default function PageSearchModal({ isOpen, onClose }) {
     [hasWholesale]
   );
 
-  // Filter pages by user permissions
   const availablePages = useMemo(() => {
     return allPages.filter((page) => {
       if (page.permAny) {
@@ -580,37 +615,61 @@ export default function PageSearchModal({ isOpen, onClose }) {
     });
   }, [allPages, permsLoading, has]);
 
-  // Filter & rank by search query
-  const filteredPages = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return availablePages;
+  return availablePages;
+}
 
-    const startsWithName = [];
-    const wordStartsWithName = [];
-    const includesMatches = [];
+export function rankPagesByQuery(availablePages, query) {
+  const q = (query || "").trim().toLowerCase();
+  if (!q) return availablePages;
 
-    for (const page of availablePages) {
-      const nameLower = page.name.toLowerCase();
-      const sectionLower = page.section.toLowerCase();
-      const keywordsLower = (page.keywords || "").toLowerCase();
-      const pathLower = page.path.toLowerCase();
+  const startsWithName = [];
+  const wordStartsWithName = [];
+  const includesMatches = [];
 
-      if (nameLower.startsWith(q)) {
-        startsWithName.push(page);
-      } else if (nameLower.split(/\s+/).some((w) => w.startsWith(q))) {
-        wordStartsWithName.push(page);
-      } else if (
-        nameLower.includes(q) ||
-        sectionLower.includes(q) ||
-        keywordsLower.includes(q) ||
-        pathLower.includes(q)
-      ) {
-        includesMatches.push(page);
-      }
+  for (const page of availablePages) {
+    const nameLower = page.name.toLowerCase();
+    const sectionLower = page.section.toLowerCase();
+    const keywordsLower = (page.keywords || "").toLowerCase();
+    const pathLower = page.path.toLowerCase();
+
+    if (nameLower.startsWith(q)) {
+      startsWithName.push(page);
+    } else if (nameLower.split(/\s+/).some((w) => w.startsWith(q))) {
+      wordStartsWithName.push(page);
+    } else if (
+      nameLower.includes(q) ||
+      sectionLower.includes(q) ||
+      keywordsLower.includes(q) ||
+      pathLower.includes(q)
+    ) {
+      includesMatches.push(page);
     }
+  }
 
-    return [...startsWithName, ...wordStartsWithName, ...includesMatches];
-  }, [availablePages, query]);
+  return [...startsWithName, ...wordStartsWithName, ...includesMatches];
+}
+
+export default function PageSearchModal({ isOpen, onClose }) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const { isDark, theme } = useTheme();
+  const primaryColor = theme?.primary_color || (isDark ? "#60A5FA" : "#2563EB");
+  const successColor = theme?.success_color || (isDark ? "#4ADE80" : "#15803D");
+
+  const [query, setQuery] = useState("");
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  const inputRef = useRef(null);
+  const rowRefs = useRef([]);
+  const mouseDownTargetRef = useRef(null);
+
+  const availablePages = useAvailablePages();
+
+  // Filter & rank by search query
+  const filteredPages = useMemo(
+    () => rankPagesByQuery(availablePages, query),
+    [availablePages, query]
+  );
 
   // Reset search and focus input on open
   useEffect(() => {
@@ -642,7 +701,21 @@ export default function PageSearchModal({ isOpen, onClose }) {
     if (!page) return;
     onClose?.();
     if (openInNewTab) {
-      window.open(page.path, "_blank", "noopener,noreferrer");
+      window.dispatchEvent(
+        new CustomEvent("karobar:open-subwindow", {
+          detail: { path: page.path, title: page.name },
+        })
+      );
+    } else if (
+      typeof window !== "undefined" &&
+      window.__karobarActiveTabId &&
+      window.__karobarActiveTabId !== "main"
+    ) {
+      window.dispatchEvent(
+        new CustomEvent("karobar:navigate-active-tab", {
+          detail: { path: page.path, title: page.name },
+        })
+      );
     } else {
       navigate(page.path);
     }
@@ -704,7 +777,7 @@ export default function PageSearchModal({ isOpen, onClose }) {
             isDark ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-white"
           }`}
         >
-          <MagnifyingGlassIcon className="w-5 h-5 text-blue-500 shrink-0" />
+          <MagnifyingGlassIcon className="w-5 h-5 shrink-0" style={{ color: primaryColor }} />
           <input
             ref={inputRef}
             type="text"
@@ -755,11 +828,18 @@ export default function PageSearchModal({ isOpen, onClose }) {
                   type="button"
                   onMouseEnter={() => setActiveIdx(idx)}
                   onClick={(e) => handleSelectPage(page, e.ctrlKey || e.metaKey)}
+                  onAuxClick={(e) => {
+                    if (e.button === 1) {
+                      e.preventDefault();
+                      handleSelectPage(page, true);
+                    }
+                  }}
                   className={`w-full flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-left transition-colors cursor-pointer ${
                     isActive
-                      ? "bg-blue-600 text-white shadow-xs"
+                      ? "text-white shadow-xs"
                       : "hover:bg-slate-100 dark:hover:bg-slate-800/70 text-slate-800 dark:text-slate-200"
                   }`}
+                  style={isActive ? { backgroundColor: primaryColor, color: "#ffffff" } : {}}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
@@ -776,11 +856,16 @@ export default function PageSearchModal({ isOpen, onClose }) {
                         <span className="text-sm font-bold truncate">{page.name}</span>
                         {isCurrentRoute && (
                           <span
-                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                            className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                            style={
                               isActive
-                                ? "bg-white/25 text-white"
-                                : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                            }`}
+                                ? { backgroundColor: "rgba(255, 255, 255, 0.25)", color: "#ffffff" }
+                                : {
+                                    backgroundColor: `${successColor}1A`,
+                                    color: successColor,
+                                    border: `1px solid ${successColor}33`,
+                                  }
+                            }
                           >
                             Current
                           </span>
@@ -788,7 +873,7 @@ export default function PageSearchModal({ isOpen, onClose }) {
                       </div>
                       <div
                         className={`text-[11px] truncate ${
-                          isActive ? "text-blue-100" : "text-slate-400 dark:text-slate-500"
+                          isActive ? "text-white/80" : "text-slate-400 dark:text-slate-500"
                         }`}
                       >
                         {page.section}
@@ -797,6 +882,23 @@ export default function PageSearchModal({ isOpen, onClose }) {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      role="button"
+                      tabIndex={-1}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectPage(page, true);
+                      }}
+                      title={`Open ${page.name} in a new browser tab`}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold transition-colors ${
+                        isActive
+                          ? "bg-white/20 hover:bg-white/30 text-white"
+                          : "bg-slate-100 dark:bg-slate-800 hover:opacity-85 text-slate-600 dark:text-slate-300"
+                      }`}
+                    >
+                      <PlusIcon className="w-3 h-3" />
+                      <span>New Tab</span>
+                    </span>
                     <ArrowRightIcon
                       className={`w-4 h-4 transition-transform ${
                         isActive ? "text-white translate-x-0.5" : "text-slate-300 dark:text-slate-600"
@@ -829,6 +931,12 @@ export default function PageSearchModal({ isOpen, onClose }) {
                 ↵
               </kbd>
               <span>Go to page</span>
+            </span>
+            <span className="hidden sm:flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 font-mono text-[10px]">
+                Ctrl+↵
+              </kbd>
+              <span>Open in New Tab</span>
             </span>
           </div>
           <span>{filteredPages.length} available pages</span>

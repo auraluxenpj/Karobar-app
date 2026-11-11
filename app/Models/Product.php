@@ -30,6 +30,7 @@ class Product extends Model
         'narcotic',
         'max_discount',
         'expiry_warning_days',
+        'expiry_critical_days',
         'category_id',
         'brand_id',
         'supplier_id',

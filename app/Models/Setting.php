@@ -42,6 +42,8 @@ class Setting extends Model
         'currency_position',
         'currency_decimal_places',
         'expiry_warning_days',
+        'expiry_critical_days',
+        'expiry_daily_flash_limit',
         'smtp_enabled',
         'smtp_host',
         'smtp_port',
@@ -78,6 +80,9 @@ class Setting extends Model
     ];
 
     protected $casts = [
+        'expiry_warning_days'      => 'integer',
+        'expiry_critical_days'     => 'integer',
+        'expiry_daily_flash_limit' => 'integer',
         'print_paper_width_mm'    => 'integer',
         'print_margin_top_mm'     => 'integer',
         'print_margin_bottom_mm'  => 'integer',

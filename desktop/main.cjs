@@ -544,7 +544,7 @@ function buildSectionMenu(sectionLabel, items) {
       })),
       { type: "separator" },
       {
-        label: "Open in Sub-Window ▸",
+        label: "Open in New Tab ▸",
         submenu: items.map((item) => ({
           label: `⧉ ${item.label}`,
           click: () => sendOpenSubWindow(item.path, item.label),
@@ -565,33 +565,38 @@ function createApplicationMenu() {
           click: () => sendNavigate("/dashboard", "Dashboard"),
         },
         {
-          label: "Open Current Page in Sub-Window",
+          label: "Open New Browser Tab",
           accelerator: "CmdOrCtrl+Shift+N",
-          click: () => sendWindowCommand("open-current"),
+          click: () => sendWindowCommand("new-tab"),
+        },
+        {
+          label: "Duplicate Active Tab",
+          accelerator: "CmdOrCtrl+Shift+D",
+          click: () => sendWindowCommand("duplicate-tab"),
         },
         { type: "separator" },
         {
-          label: "Quick Sub-Window: Barcode POS",
+          label: "Quick Tab: Barcode POS",
           accelerator: "CmdOrCtrl+Shift+P",
-          click: () => sendOpenSubWindow("/sale-invoices/pos", "Barcode POS"),
+          click: () => sendOpenSubWindow("/sale-invoices/pos", "POS Terminal"),
         },
         {
-          label: "Quick Sub-Window: Retail Sale Invoice",
+          label: "Quick Tab: Retail Sale Invoice",
           accelerator: "CmdOrCtrl+Shift+S",
-          click: () => sendOpenSubWindow("/sale-invoices/create/retail", "Create Retail Sale"),
+          click: () => sendOpenSubWindow("/sale-invoices/create/retail", "Retail Sale Invoice"),
         },
         {
-          label: "Quick Sub-Window: Wholesale Invoice",
+          label: "Quick Tab: Wholesale Invoice",
           accelerator: "CmdOrCtrl+Shift+W",
-          click: () => sendOpenSubWindow("/sale-invoices/create/wholesale", "Create Wholesale Sale"),
+          click: () => sendOpenSubWindow("/sale-invoices/create/wholesale", "Wholesale Sale Invoice"),
         },
         {
-          label: "Quick Sub-Window: Purchase Invoice",
+          label: "Quick Tab: Purchase Invoice",
           accelerator: "CmdOrCtrl+Shift+U",
-          click: () => sendOpenSubWindow("/purchase-invoices/create", "Create Purchase Invoice"),
+          click: () => sendOpenSubWindow("/purchase-invoices/create", "Purchase Invoice"),
         },
         {
-          label: "Quick Sub-Window: Customer Ledger",
+          label: "Quick Tab: Customer Ledger",
           accelerator: "CmdOrCtrl+Shift+L",
           click: () => sendOpenSubWindow("/customer-ledger", "Customer Ledger"),
         },
@@ -629,7 +634,7 @@ function createApplicationMenu() {
         { type: "separator" },
         {
           label: "Exit Karobar-App",
-          accelerator: "Alt+F4",
+          accelerator: "CmdOrCtrl+Q",
           click: () => {
             isQuitting = true;
             app.quit();
@@ -717,10 +722,10 @@ function createApplicationMenu() {
       { label: "License Activation", path: "/license-activation" },
     ]),
     {
-      label: "Sub-Windows (MDI)",
+      label: "Workspace Tabs",
       submenu: [
         {
-          label: "Always Open Top Menu Clicks in Sub-Window",
+          label: "Always Open Top Menu Clicks in New Tab",
           type: "checkbox",
           checked: openMenuClicksInSubWindow,
           click: (menuItem) => {
@@ -730,43 +735,54 @@ function createApplicationMenu() {
         },
         { type: "separator" },
         {
-          label: "+ New Sub-Window (Current Page)",
-          accelerator: "CmdOrCtrl+Shift+N",
-          click: () => sendWindowCommand("open-current"),
+          label: "Switch to Next Tab (Forward)",
+          accelerator: "Ctrl+Tab",
+          click: () => sendWindowCommand("next-tab"),
         },
         {
-          label: "+ Sale & Purchase Split Workspace (Dual Sub-Windows)",
-          accelerator: "CmdOrCtrl+Shift+D",
-          click: () => sendWindowCommand("preset-sale-purchase"),
+          label: "Switch to Previous Tab (Reverse)",
+          accelerator: "Ctrl+Shift+Tab",
+          click: () => sendWindowCommand("prev-tab"),
         },
         { type: "separator" },
         {
-          label: "Tile Sub-Windows Side-by-Side (2 Columns)",
+          label: "Search Open Tabs & Open Page in New Tab...",
+          accelerator: "CmdOrCtrl+Shift+O",
+          click: () => sendWindowCommand("open-tab-search", { mode: "new-tab" }),
+        },
+        {
+          label: "Search Open Tabs & All Pages...",
+          accelerator: "CmdOrCtrl+Shift+A",
+          click: () => sendWindowCommand("open-tab-search", { mode: "all" }),
+        },
+        {
+          label: "+ New Dashboard Tab",
+          accelerator: "CmdOrCtrl+Shift+N",
+          click: () => sendWindowCommand("new-tab"),
+        },
+        {
+          label: "Duplicate Active Tab",
+          accelerator: "CmdOrCtrl+Shift+D",
+          click: () => sendWindowCommand("duplicate-tab"),
+        },
+        {
+          label: "Reopen Last Closed Tab",
           accelerator: "CmdOrCtrl+Shift+T",
-          click: () => sendWindowCommand("tile"),
+          click: () => sendWindowCommand("reopen-closed-tab"),
+        },
+        { type: "separator" },
+        {
+          label: "Close Active Tab",
+          accelerator: "Ctrl+F4",
+          click: () => sendWindowCommand("close-active-tab"),
         },
         {
-          label: "Grid Sub-Windows (2x2 Quad View)",
-          accelerator: "CmdOrCtrl+Shift+G",
-          click: () => sendWindowCommand("grid"),
-        },
-        {
-          label: "Cascade Sub-Windows",
-          accelerator: "CmdOrCtrl+Shift+C",
-          click: () => sendWindowCommand("cascade"),
-        },
-        {
-          label: "Minimize All Sub-Windows",
-          accelerator: "CmdOrCtrl+Shift+M",
-          click: () => sendWindowCommand("minimize-all"),
-        },
-        {
-          label: "Restore All Sub-Windows",
-          click: () => sendWindowCommand("restore-all"),
-        },
-        {
-          label: "Close All Sub-Windows",
+          label: "Close All Other Tabs",
           accelerator: "CmdOrCtrl+Shift+X",
+          click: () => sendWindowCommand("close-others"),
+        },
+        {
+          label: "Reset to Main Tab",
           click: () => sendWindowCommand("close-all"),
         },
         { type: "separator" },
@@ -794,6 +810,23 @@ function isLocalPrintRouteUrl(rawUrl) {
 
 function configurePopupAndPrintHandler(contents) {
   if (!contents || typeof contents.setWindowOpenHandler !== "function") return;
+
+  // Intercept Ctrl+Tab / Ctrl+Shift+Tab for Browser Tab cycling
+  if (!contents.__karobarTabShortcutHooked && typeof contents.on === "function") {
+    contents.__karobarTabShortcutHooked = true;
+    contents.on("before-input-event", (event, input) => {
+      if (input.type !== "keyDown") return;
+      if (
+        (input.key === "Tab" || input.code === "Tab") &&
+        input.control &&
+        !input.alt &&
+        !input.meta
+      ) {
+        event.preventDefault();
+        sendWindowCommand(input.shift ? "prev-tab" : "next-tab");
+      }
+    });
+  }
 
   contents.setWindowOpenHandler(({ url, frameName }) => {
     const rawUrl = String(url || "").trim();

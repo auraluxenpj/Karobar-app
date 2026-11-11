@@ -99,7 +99,7 @@ jobs:
           - **In-App Over-The-Air (OTA) Updates with 100% Zero Data Loss**: Installed copies of `Karobar-App` automatically detect this release when connected to the internet and offer a 1-click **"Update & Restart Now"** upgrade that backs up and preserves 100% of your SQLite database, invoices, products, ledgers, users, WhatsApp session, and license.
           - **Existing Herd SQLite Database Import**: Import an existing Laravel Herd `database.sqlite` file during installation (clears only old users & old license records while keeping 100% of business data intact).
           - **Hardware-Bound Ed25519 Licensing (`KRB-XXXX-XXXX-XXXX-XXXX`)**: Single-machine cryptographic binding with 1-click Machine ID copy.
-          - **Windows Native Top Menu Bar + Multi-Window (MDI Sub-Windows)**: Open multiple floating or tiled sub-windows (Sales, Purchases, POS, Ledgers) simultaneously inside the main window.
+          - **Windows Native Top Menu Bar + Chrome-Style Top Browser Tabs**: Open multiple live workspace tabs (Sales, Purchases, POS, Ledgers) simultaneously with `Ctrl+Tab` / `Ctrl+Shift+Tab` switching and `Ctrl+Shift+A` tab search.
 
           ### Installation / Manual Update Instructions
           - **Existing Users**: Simply open `Karobar-App` while connected to the internet and click **"Update & Restart Now"** on the update notification!

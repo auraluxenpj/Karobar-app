@@ -980,9 +980,43 @@ export default function ClassicSidebar({
                   to="/dashboard"
                   onMouseEnter={() => preloadRoute("/dashboard")}
                   onFocus={() => preloadRoute("/dashboard")}
-                  onClick={() => {
+                  onClick={(e) => {
                     if (!isPinned && onRequestCloseDock) {
                       onRequestCloseDock();
+                    }
+                    if (e.ctrlKey || e.metaKey) {
+                      e.preventDefault();
+                      window.dispatchEvent(
+                        new CustomEvent("karobar:open-subwindow", {
+                          detail: { path: "/dashboard", title: "Dashboard" },
+                        })
+                      );
+                      return;
+                    }
+                    if (
+                      typeof window !== "undefined" &&
+                      window.__karobarActiveTabId &&
+                      window.__karobarActiveTabId !== "main"
+                    ) {
+                      e.preventDefault();
+                      window.dispatchEvent(
+                        new CustomEvent("karobar:navigate-active-tab", {
+                          detail: { path: "/dashboard", title: "Dashboard" },
+                        })
+                      );
+                    }
+                  }}
+                  onAuxClick={(e) => {
+                    if (e.button === 1) {
+                      e.preventDefault();
+                      if (!isPinned && onRequestCloseDock) {
+                        onRequestCloseDock();
+                      }
+                      window.dispatchEvent(
+                        new CustomEvent("karobar:open-subwindow", {
+                          detail: { path: "/dashboard", title: "Dashboard" },
+                        })
+                      );
                     }
                   }}
                   className={`workspace-nav-item flex-1 min-w-0 ${
@@ -1147,9 +1181,43 @@ export default function ClassicSidebar({
                                 itemRefs.current[uniqueKey] = el;
                               }}
                               onMouseEnter={() => preloadRoute(item.path)}
-                              onClick={() => {
+                              onClick={(e) => {
                                 if (!isPinned && onRequestCloseDock) {
                                   onRequestCloseDock();
+                                }
+                                if (e.ctrlKey || e.metaKey) {
+                                  e.preventDefault();
+                                  window.dispatchEvent(
+                                    new CustomEvent("karobar:open-subwindow", {
+                                      detail: { path: item.path, title: item.name },
+                                    })
+                                  );
+                                  return;
+                                }
+                                if (
+                                  typeof window !== "undefined" &&
+                                  window.__karobarActiveTabId &&
+                                  window.__karobarActiveTabId !== "main"
+                                ) {
+                                  e.preventDefault();
+                                  window.dispatchEvent(
+                                    new CustomEvent("karobar:navigate-active-tab", {
+                                      detail: { path: item.path, title: item.name },
+                                    })
+                                  );
+                                }
+                              }}
+                              onAuxClick={(e) => {
+                                if (e.button === 1) {
+                                  e.preventDefault();
+                                  if (!isPinned && onRequestCloseDock) {
+                                    onRequestCloseDock();
+                                  }
+                                  window.dispatchEvent(
+                                    new CustomEvent("karobar:open-subwindow", {
+                                      detail: { path: item.path, title: item.name },
+                                    })
+                                  );
                                 }
                               }}
                               className={`workspace-nav-item flex-1 min-w-0 ${
@@ -1233,7 +1301,7 @@ export default function ClassicSidebar({
                               )}
                             </Link>
 
-                            {/* Pop-up Action Buttons: Open in Sub-Window (⧉), Quick-Create (+) and Favorite Star (★) */}
+                            {/* Pop-up Action Buttons: Open in New Tab (⧉), Quick-Create (+) and Favorite Star (★) */}
                             {!effectiveCollapsed && (
                               <div
                                 className={`workspace-nav-actions absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-20 ${
@@ -1254,8 +1322,8 @@ export default function ClassicSidebar({
                                       })
                                     );
                                   }}
-                                  title={`Open "${item.name}" in a Sub-Window inside Main Window`}
-                                  aria-label={`Open ${item.name} in Sub-Window`}
+                                  title={`Open "${item.name}" in a New Browser Tab`}
+                                  aria-label={`Open ${item.name} in New Tab`}
                                   className="workspace-nav-action-btn px-1.5 py-0.5 rounded-lg text-[11px] font-bold text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-500/15 transition-all cursor-pointer"
                                 >
                                   ⧉
@@ -1271,6 +1339,32 @@ export default function ClassicSidebar({
                                       e.stopPropagation();
                                       if (!isPinned && onRequestCloseDock) {
                                         onRequestCloseDock();
+                                      }
+                                      if (e.ctrlKey || e.metaKey) {
+                                        window.dispatchEvent(
+                                          new CustomEvent("karobar:open-subwindow", {
+                                            detail: {
+                                              path: item.quickCreatePath,
+                                              title: item.quickCreateLabel || `Add ${item.name}`,
+                                            },
+                                          })
+                                        );
+                                        return;
+                                      }
+                                      if (
+                                        typeof window !== "undefined" &&
+                                        window.__karobarActiveTabId &&
+                                        window.__karobarActiveTabId !== "main"
+                                      ) {
+                                        window.dispatchEvent(
+                                          new CustomEvent("karobar:navigate-active-tab", {
+                                            detail: {
+                                              path: item.quickCreatePath,
+                                              title: item.quickCreateLabel || `Add ${item.name}`,
+                                            },
+                                          })
+                                        );
+                                        return;
                                       }
                                       navigate(item.quickCreatePath);
                                     }}

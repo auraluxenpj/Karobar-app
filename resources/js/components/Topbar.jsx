@@ -169,7 +169,7 @@ export default function Topbar({
   }, [permsLoading, fetchDrawerStatus, fetchAccountsStatus]);
 
   const showLiveNotificationCard = useCallback(
-    ({ id, category, badge, title, subtitle, meta, primaryLabel, onPrimary, secondaryLabel, onSecondary }) => {
+    ({ id, category, badge, title, subtitle, meta, primaryLabel, onPrimary, secondaryLabel, onSecondary, flashPulse = false, duration = 7000 }) => {
       const styleMap = {
         "low-stock": {
           icon: ExclamationTriangleIcon,
@@ -183,8 +183,8 @@ export default function Topbar({
         },
         expiry: {
           icon: ClockIcon,
-          accent: "border-l-4 border-l-rose-500",
-          badgeCls: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
+          accent: "border-l-4 border-l-amber-500",
+          badgeCls: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
         },
       };
       const cfg = styleMap[category] || styleMap["low-stock"];
@@ -197,11 +197,13 @@ export default function Topbar({
             aria-live="polite"
             className={`${
               t.visible ? "animate-in fade-in slide-in-from-top-2" : "opacity-0"
-            } max-w-sm w-full bg-white dark:bg-slate-800 shadow-xl rounded-xl pointer-events-auto ring-1 ring-slate-200 dark:ring-slate-700 overflow-hidden transition-all duration-200 ${cfg.accent}`}
+            } max-w-sm w-full bg-white dark:bg-slate-800 shadow-xl rounded-xl pointer-events-auto ring-1 ring-slate-200 dark:ring-slate-700 overflow-hidden transition-all duration-200 ${cfg.accent} ${
+              flashPulse ? "expiry-warning-flash-active" : ""
+            }`}
           >
             <div className="p-3.5">
               <div className="flex items-start justify-between gap-2">
-                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${cfg.badgeCls}`}>
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold ${cfg.badgeCls} ${flashPulse ? "expiry-badge-flash-active" : ""}`}>
                   <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                   <span>{badge}</span>
                 </span>
@@ -260,7 +262,7 @@ export default function Topbar({
             </div>
           </div>
         ),
-        { id, duration: 7000 }
+        { id, duration }
       );
     },
     []
@@ -466,11 +468,55 @@ export default function Topbar({
           }
         }
 
-        // 3. Live Batch Expiry Notifications
+        // 3. Live Batch Expiry Notifications & Controlled Daily Flash Waves (at least 5x/day)
         const expiryRows =
           expiryRes.status === "fulfilled" && Array.isArray(expiryRes.value.data?.rows)
             ? expiryRes.value.data.rows
             : [];
+        const dailyFlashLimit = Math.max(
+          1,
+          Number(expiryRes.status === "fulfilled" ? expiryRes.value.data?.daily_flash_limit || 5 : 5)
+        );
+        const flashStorageKey = `karobar_expiry_daily_flash_${user?.id || "anon"}_${todayKey}`;
+
+        const readDailyFlashState = () => {
+          try {
+            const raw = localStorage.getItem(flashStorageKey);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              return {
+                waveCount: Number(parsed?.waveCount || 0),
+                lastFlashAt: Number(parsed?.lastFlashAt || 0),
+                mutedToday: Boolean(parsed?.mutedToday),
+                batchFlashCounts: parsed?.batchFlashCounts && typeof parsed.batchFlashCounts === "object"
+                  ? parsed.batchFlashCounts
+                  : {},
+              };
+            }
+          } catch {
+            // ignore storage errors
+          }
+          return { waveCount: 0, lastFlashAt: 0, mutedToday: false, batchFlashCounts: {} };
+        };
+
+        const saveDailyFlashState = (state) => {
+          try {
+            localStorage.setItem(flashStorageKey, JSON.stringify(state));
+          } catch {
+            // ignore storage errors
+          }
+        };
+
+        const flashState = readDailyFlashState();
+        const nowMs = Date.now();
+        // Space out daily flash waves (~25 mins apart, or immediately on first check of the day)
+        const minWaveIntervalMs = 25 * 60 * 1000;
+        const canFireScheduledWave =
+          expiryRows.length > 0 &&
+          !flashState.mutedToday &&
+          flashState.waveCount < dailyFlashLimit &&
+          (flashState.waveCount === 0 || nowMs - flashState.lastFlashAt >= minWaveIntervalMs);
+
         const newExpiry = [];
         for (const b of expiryRows) {
           const key = `expiry:${b.batch_id}:${b.status || "warn"}`;
@@ -481,38 +527,76 @@ export default function Topbar({
           }
         }
 
-        if (shouldShowToasts) {
-          newExpiry.slice(0, 2).forEach((b) => {
+        const batchesToFlash = canFireScheduledWave ? expiryRows : shouldShowToasts ? newExpiry : [];
+
+        if (batchesToFlash.length > 0) {
+          const nextWave = canFireScheduledWave
+            ? Math.min(dailyFlashLimit, flashState.waveCount + 1)
+            : Math.max(1, flashState.waveCount);
+
+          if (canFireScheduledWave) {
+            flashState.waveCount = nextWave;
+            flashState.lastFlashAt = nowMs;
+            for (const b of expiryRows) {
+              const bid = String(b.batch_id);
+              flashState.batchFlashCounts[bid] = Number(flashState.batchFlashCounts[bid] || 0) + 1;
+            }
+            saveDailyFlashState(flashState);
+            window.dispatchEvent(
+              new CustomEvent("expiry-flash-wave", {
+                detail: { wave: nextWave, limit: dailyFlashLimit, rows: expiryRows },
+              })
+            );
+          }
+
+          const muteDailyFlashes = () => {
+            const current = readDailyFlashState();
+            current.mutedToday = true;
+            saveDailyFlashState(current);
+          };
+
+          batchesToFlash.slice(0, 2).forEach((b) => {
             const isExp = b.days_remaining < 0;
+            const isCrit = !isExp && b.status === "critical";
+            const monthsLabel =
+              b.months_remaining_label ||
+              (isExp ? `Expired ${Math.abs(b.days_remaining)}d ago` : `${b.days_remaining}d left`);
+            const warnMonths = Math.max(1, Math.round(Number(b.effective_warning_days || 180) / 30));
+
             showLiveNotificationCard({
-              id: `live-expiry-${b.batch_id}`,
+              id: `live-expiry-${b.batch_id}-w${nextWave}`,
               category: "expiry",
-              badge: isExp ? "Batch Expired" : "Expiry Warning",
-              title: `${b.product_name} — Batch ${b.batch_number}`,
+              badge: isExp
+                ? `Batch Expired (${nextWave}/${dailyFlashLimit})`
+                : isCrit
+                ? `Critical Expiry (${nextWave}/${dailyFlashLimit})`
+                : `Near-Expiry Warning (${nextWave}/${dailyFlashLimit})`,
+              title: `${b.product_name} — ${monthsLabel}`,
               subtitle: isExp
-                ? `Expired ${Math.abs(b.days_remaining)} day(s) ago · ${b.quantity} units on hand`
-                : `${b.days_remaining} day(s) remaining · Exp: ${b.expiry_date} (${b.quantity} units)`,
-              primaryLabel: "Open Batch Tracking",
+                ? `Batch ${b.batch_number} · Expired ${Math.abs(b.days_remaining)}d ago · ${b.quantity} units`
+                : `Batch ${b.batch_number} · ${b.days_remaining}d left (Exp: ${b.expiry_date}) · ${b.quantity} units`,
+              meta: `Alert window: ≤ ${warnMonths}M (${b.effective_warning_days || 90}d)`,
+              primaryLabel: "Open Batch Expiry",
               onPrimary: () => navigate("/batch-expiry"),
-              secondaryLabel: "Open Center",
-              onSecondary: () => {
-                setNotifInitialTab("expiry");
-                setNotifOpen(true);
-              },
+              secondaryLabel: "Mute Today",
+              onSecondary: muteDailyFlashes,
+              flashPulse: true,
+              duration: 8000,
             });
           });
-          if (newExpiry.length > 2) {
+          if (batchesToFlash.length > 2) {
             showLiveNotificationCard({
-              id: "live-expiry-summary",
+              id: `live-expiry-summary-w${nextWave}`,
               category: "expiry",
-              badge: "Expiry Alerts",
-              title: `+${newExpiry.length - 2} more batch expiry alert(s)`,
-              subtitle: `${expiryCount} batch(es) require attention.`,
-              primaryLabel: "Open Expiry Alerts",
-              onPrimary: () => {
-                setNotifInitialTab("expiry");
-                setNotifOpen(true);
-              },
+              badge: `Expiry Alert (${nextWave}/${dailyFlashLimit} Today)`,
+              title: `+${batchesToFlash.length - 2} more near-expiry product(s) flashing`,
+              subtitle: `${expiryCount} batch(es) within your near-expiry warning window.`,
+              primaryLabel: "View All in Batch Expiry",
+              onPrimary: () => navigate("/batch-expiry"),
+              secondaryLabel: "Mute Today",
+              onSecondary: muteDailyFlashes,
+              flashPulse: true,
+              duration: 8000,
             });
           }
         }
@@ -805,16 +889,16 @@ export default function Topbar({
               pageTitle={pageTitle}
             />
 
-            {/* Open Current View in a Floating Sub-Window inside Main Window */}
+            {/* Open / Duplicate Current View in a New Browser Tab */}
             {onOpenCurrentInSubWindow && (
               <button
                 type="button"
                 onClick={onOpenCurrentInSubWindow}
-                title={`Open "${pageTitle || "Current View"}" in a floating Sub-Window inside Main Window (Ctrl+Shift+N)`}
-                className="inline-flex items-center justify-center gap-1.5 h-9 px-2.5 rounded-xl bg-blue-50/90 dark:bg-blue-950/60 hover:bg-blue-600 hover:text-white border border-blue-200 dark:border-blue-800 text-xs font-semibold text-blue-700 dark:text-blue-300 transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap"
+                title={`Open "${pageTitle || "Current View"}" in a New Browser Tab (Ctrl+Shift+D · Switch Tabs: Ctrl+Tab / Ctrl+Shift+Tab)`}
+                className="inline-flex items-center justify-center gap-1.5 h-9 px-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/70 hover:bg-slate-200/70 dark:hover:bg-slate-700/80 border border-slate-200/80 dark:border-slate-700/80 text-xs font-medium text-slate-700 dark:text-slate-200 transition-all duration-150 cursor-pointer shrink-0 whitespace-nowrap"
               >
-                <span>⧉</span>
-                <span className="hidden xl:inline">Sub-Window</span>
+                <span aria-hidden="true">⧉</span>
+                <span className="hidden xl:inline">New Tab</span>
               </button>
             )}
           </div>
