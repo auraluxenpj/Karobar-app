@@ -91,7 +91,74 @@ function invalidateCacheForMutation(mutationUrl = "") {
 
 let notifDebounceTimer = null;
 let drawerDebounceTimer = null;
+let inventoryDebounceTimer = null;
 let inflightSessionExtend = null;
+let inventoryChannel = null;
+
+try {
+  if (typeof BroadcastChannel !== "undefined") {
+    inventoryChannel = new BroadcastChannel("karobar_inventory_bus");
+    inventoryChannel.onmessage = (event) => {
+      if (event?.data?.type === "inventory_changed") {
+        clearApiCache("/api/products");
+        clearApiCache("/api/batches");
+        try {
+          window.dispatchEvent(
+            new CustomEvent("karobar:inventory-changed", { detail: event.data })
+          );
+          window.dispatchEvent(new CustomEvent("karobar:products-updated"));
+        } catch {}
+      }
+    };
+  }
+} catch {
+  // BroadcastChannel unavailable in current environment
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (e) => {
+    if (e.key === "karobar_inventory_sync") {
+      clearApiCache("/api/products");
+      clearApiCache("/api/batches");
+      try {
+        window.dispatchEvent(new CustomEvent("karobar:inventory-changed"));
+        window.dispatchEvent(new CustomEvent("karobar:products-updated"));
+      } catch {}
+    }
+  });
+}
+
+function broadcastInventoryChange(meta = {}) {
+  if (inventoryDebounceTimer) window.clearTimeout(inventoryDebounceTimer);
+  inventoryDebounceTimer = window.setTimeout(() => {
+    try {
+      window.dispatchEvent(
+        new CustomEvent("karobar:inventory-changed", { detail: meta })
+      );
+      window.dispatchEvent(new CustomEvent("karobar:products-updated"));
+      if (window.top && window.top !== window) {
+        window.top.dispatchEvent(
+          new CustomEvent("karobar:inventory-changed", { detail: meta })
+        );
+        window.top.dispatchEvent(new CustomEvent("karobar:products-updated"));
+      }
+    } catch {}
+
+    try {
+      if (inventoryChannel) {
+        inventoryChannel.postMessage({
+          type: "inventory_changed",
+          ...meta,
+          timestamp: Date.now(),
+        });
+      }
+    } catch {}
+
+    try {
+      localStorage.setItem("karobar_inventory_sync", String(Date.now()));
+    } catch {}
+  }, 100);
+}
 
 function dispatchSessionExpiredModal() {
   try {
@@ -222,6 +289,10 @@ export function initAxiosAuth() {
           ) &&
           !url.includes("/notifications/")
         ) {
+          clearApiCache("/api/products");
+          clearApiCache("/api/batches");
+          broadcastInventoryChange({ url, method });
+
           if (notifDebounceTimer) window.clearTimeout(notifDebounceTimer);
           notifDebounceTimer = window.setTimeout(() => {
             window.dispatchEvent(

@@ -62,9 +62,18 @@ const isPendingRow = (r) => r.id === undefined || r.id === null;
    Supplier Ledger Page (Modernized)
    ========================= */
 export default function SupplierLedgerPage() {
-const [suppliers, setSuppliers] = useState([]);
-  const [supplierId, setSupplierId] = useState("");
-  const [supplierSearchOpen, setSupplierSearchOpen] = useState(false);
+  const [suppliers, setSuppliers] = useState([]);
+  const [supplierId, setSupplierId] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const p = new URLSearchParams(window.location.search);
+    return p.get("supplier_id") || p.get("id") || "";
+  });
+  const [supplierSearchOpen, setSupplierSearchOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const p = new URLSearchParams(window.location.search);
+    const initialId = p.get("supplier_id") || p.get("id");
+    return !initialId;
+  });
   const [rows, setRows] = useState([]);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -210,6 +219,16 @@ const [suppliers, setSuppliers] = useState([]);
         e.preventDefault();
         if (!can.view) return;
         handlePrint();
+      }
+      if (k === "c") {
+        const sel = window.getSelection?.()?.toString?.() || "";
+        const el = document.activeElement;
+        const hasInputSel =
+          el && typeof el.selectionStart === "number" && el.selectionStart !== el.selectionEnd;
+        if (!sel && !hasInputSel) {
+          e.preventDefault();
+          setSupplierSearchOpen(true);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -752,9 +771,12 @@ return (
               {supplierId && (
                 <button
                   type="button"
-                  onClick={() => setSupplierId("")}
+                  onClick={() => {
+                    setSupplierId("");
+                    setSupplierSearchOpen(true);
+                  }}
                   className="h-full px-2 flex items-center justify-center hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0"
-                  title="Clear supplier"
+                  title="Clear and select another supplier"
                   aria-label="Clear supplier"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

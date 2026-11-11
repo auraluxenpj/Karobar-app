@@ -61,12 +61,18 @@ export default function BarcodePos() {
   const [scanPulse, setScanPulse] = useState(false);
   const manualInputRef = useRef(null);
   const productSearchRef = useRef(null);
+  const qtyInputRefs = useRef({});
+  const pendingFocusUidRef = useRef(null);
 
   // Products for search by name
   const [products, setProducts] = useState([]);
 
   // Cart & Line Items state
   const [items, setItems] = useState([]);
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
   const [flashedRowId, setFlashedRowId] = useState(null);
   const [substituteTargetRow, setSubstituteTargetRow] = useState(null);
 
@@ -141,7 +147,8 @@ export default function BarcodePos() {
   const fetchProducts = useCallback(async (q = "") => {
     try {
       const res = await axios.get("/api/products/search", {
-        params: { q, limit: 50 },
+        params: { q, limit: 150 },
+        cache: false,
       });
       const list = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
       setProducts(list);
@@ -153,6 +160,21 @@ export default function BarcodePos() {
 
   useEffect(() => {
     fetchProducts();
+  }, [fetchProducts]);
+
+  // Real-time stock sync listeners for POS
+  useEffect(() => {
+    const handleInventoryChange = () => {
+      fetchProducts();
+    };
+    window.addEventListener("karobar:inventory-changed", handleInventoryChange);
+    window.addEventListener("karobar:products-updated", handleInventoryChange);
+    window.addEventListener("focus", handleInventoryChange);
+    return () => {
+      window.removeEventListener("karobar:inventory-changed", handleInventoryChange);
+      window.removeEventListener("karobar:products-updated", handleInventoryChange);
+      window.removeEventListener("focus", handleInventoryChange);
+    };
   }, [fetchProducts]);
 
   // Sync default account when payment method changes
@@ -296,6 +318,47 @@ export default function BarcodePos() {
     setTimeout(() => setScanPulse(false), 800);
   };
 
+  // Auto-focus quantity input helper when a product is scanned or added
+  const focusQuantity = useCallback((uid) => {
+    if (!uid) return;
+    pendingFocusUidRef.current = uid;
+    let retries = 0;
+    const maxRetries = 40;
+    const attempt = () => {
+      const el = qtyInputRefs.current[uid];
+      if (el && typeof el.focus === "function") {
+        el.focus();
+        el.select?.();
+        if (document.activeElement === el) {
+          pendingFocusUidRef.current = null;
+          return;
+        }
+      }
+      if (retries < maxRetries) {
+        retries++;
+        setTimeout(attempt, 25);
+      }
+    };
+    attempt();
+    requestAnimationFrame(attempt);
+    setTimeout(attempt, 30);
+    setTimeout(attempt, 80);
+    setTimeout(attempt, 160);
+    setTimeout(attempt, 300);
+  }, []);
+
+  // Ensure newly rendered rows get their quantity focused and selected immediately
+  useEffect(() => {
+    if (pendingFocusUidRef.current) {
+      const uid = pendingFocusUidRef.current;
+      const el = qtyInputRefs.current[uid];
+      if (el && typeof el.focus === "function") {
+        el.focus();
+        el.select?.();
+      }
+    }
+  }, [items]);
+
   // Add or increment item in cart
   const handleProductResolved = useCallback((product, replaceUid = null) => {
     if (!product || !product.id) return;
@@ -311,18 +374,27 @@ export default function BarcodePos() {
       });
     }
 
+    // Determine targetUid synchronously before queuing setItems
+    const currentItems = itemsRef.current || [];
+    const existingIndex = !replaceUid
+      ? currentItems.findIndex((it) => String(it.product_id) === String(product.id))
+      : -1;
+    const targetUid = existingIndex > -1
+      ? currentItems[existingIndex].uid
+      : (replaceUid || `pos_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`);
+
     setItems((prevItems) => {
       if (!replaceUid) {
-        const existingIndex = prevItems.findIndex((it) => it.product_id === product.id);
+        const idx = prevItems.findIndex((it) => String(it.product_id) === String(product.id));
 
-        if (existingIndex > -1) {
+        if (idx > -1) {
           // Item already in cart -> increment quantity
           const updated = [...prevItems];
-          const current = updated[existingIndex];
+          const current = updated[idx];
           const newQty = Math.round(((Number(current.quantity) || 0) + addQty) * 1000) / 1000;
           const subTotal = (Number(current.price) || 0) * newQty * (1 - (Number(current.item_discount_percentage) || 0) / 100);
 
-          updated[existingIndex] = {
+          updated[idx] = {
             ...current,
             quantity: newQty,
             is_weight_barcode: Boolean(current.is_weight_barcode || product.is_weight_barcode),
@@ -344,7 +416,7 @@ export default function BarcodePos() {
         bestBatch && Number(bestBatch.unit_sale_price) > 0
           ? Number(bestBatch.unit_sale_price)
           : Number(product.unit_sale_price) || 0;
-      const rowUid = replaceUid || `pos_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const rowUid = targetUid;
 
       const newItem = {
         uid: rowUid,
@@ -381,7 +453,9 @@ export default function BarcodePos() {
       }
       return [newItem, ...prevItems];
     });
-  }, []);
+
+    focusQuantity(targetUid);
+  }, [focusQuantity]);
 
   // Scan handler called by hardware barcode scanner
   const handleBarcodeScan = useCallback(
@@ -456,12 +530,19 @@ export default function BarcodePos() {
 
   // Cart item modifications
   const handleUpdateQuantity = (uid, newQty) => {
-    const qty = Math.max(0.001, Math.round((Number(newQty) || 1) * 1000) / 1000);
+    if (newQty === "" || newQty === null) {
+      setItems((prev) =>
+        prev.map((it) => (it.uid === uid ? { ...it, quantity: "" } : it))
+      );
+      return;
+    }
+    const parsed = parseFloat(newQty);
+    const qty = isNaN(parsed) ? 1 : Math.max(0.001, Math.round(parsed * 1000) / 1000);
     setItems((prev) =>
       prev.map((it) => {
         if (it.uid !== uid) return it;
         const subTotal = (Number(it.price) || 0) * qty * (1 - (Number(it.item_discount_percentage) || 0) / 100);
-        return { ...it, quantity: qty, sub_total: Math.round(subTotal * 100) / 100 };
+        return { ...it, quantity: newQty, sub_total: Math.round(subTotal * 100) / 100 };
       })
     );
   };
@@ -779,7 +860,7 @@ export default function BarcodePos() {
         card_number: paymentMethod === "card" ? paymentRef : undefined,
         items: items.map((it) => ({
           product_id: it.product_id,
-          quantity: it.quantity,
+          quantity: Number(it.quantity) > 0 ? Number(it.quantity) : 1,
           price: it.price,
           pack_size: it.pack_size || 1,
           batch_number: it.batch_number || "",
@@ -1382,32 +1463,60 @@ export default function BarcodePos() {
                             <div className="inline-flex items-center rounded-lg border border-slate-300 dark:border-slate-700 overflow-hidden shadow-2xs">
                               <button
                                 type="button"
-                                onClick={() => handleUpdateQuantity(it.uid, it.quantity - 1)}
+                                onClick={() => handleUpdateQuantity(it.uid, Math.max(1, (Number(it.quantity) || 1) - 1))}
                                 className={`p-1.5 transition-colors ${
                                   isDark
                                     ? "bg-slate-800 hover:bg-slate-700 text-slate-300"
                                     : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                                 }`}
+                                title="Decrease quantity"
                               >
                                 <MinusIcon className="w-3 h-3" />
                               </button>
                               <input
+                                ref={(el) => {
+                                  if (el) qtyInputRefs.current[it.uid] = el;
+                                  else delete qtyInputRefs.current[it.uid];
+                                }}
                                 type="number"
-                                min="1"
+                                min="0.001"
+                                step="any"
                                 value={it.quantity}
+                                onFocus={(e) => e.target.select()}
                                 onChange={(e) => handleUpdateQuantity(it.uid, e.target.value)}
-                                className={`w-12 text-center text-xs font-bold font-mono py-1 focus:outline-hidden ${
+                                onBlur={() => {
+                                  if (!it.quantity || Number(it.quantity) <= 0) {
+                                    handleUpdateQuantity(it.uid, 1);
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    if (!it.quantity || Number(it.quantity) <= 0) {
+                                      handleUpdateQuantity(it.uid, 1);
+                                    }
+                                    manualInputRef.current?.focus();
+                                    manualInputRef.current?.select?.();
+                                  } else if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    manualInputRef.current?.focus();
+                                    manualInputRef.current?.select?.();
+                                  }
+                                }}
+                                className={`w-14 text-center text-xs font-bold font-mono py-1 focus:ring-2 focus:ring-blue-500 focus:outline-hidden ${
                                   isDark ? "bg-slate-900 text-white" : "bg-white text-slate-900"
                                 }`}
+                                title="Quantity (Press Enter to return to barcode scanner)"
                               />
                               <button
                                 type="button"
-                                onClick={() => handleUpdateQuantity(it.uid, it.quantity + 1)}
+                                onClick={() => handleUpdateQuantity(it.uid, (Number(it.quantity) || 0) + 1)}
                                 className={`p-1.5 transition-colors ${
                                   isDark
                                     ? "bg-slate-800 hover:bg-slate-700 text-slate-300"
                                     : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                                 }`}
+                                title="Increase quantity"
                               >
                                 <PlusIcon className="w-3 h-3" />
                               </button>

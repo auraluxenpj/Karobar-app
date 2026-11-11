@@ -61,9 +61,18 @@ const isPendingRow = (r) => r.id === undefined || r.id === null;
    Customer Ledger Page (Modernized)
    ========================= */
 export default function CustomerLedgerPage() {
-const [customers, setCustomers] = useState([]);
-  const [customerId, setCustomerId] = useState("");
-  const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
+  const [customers, setCustomers] = useState([]);
+  const [customerId, setCustomerId] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const p = new URLSearchParams(window.location.search);
+    return p.get("customer_id") || p.get("id") || "";
+  });
+  const [customerSearchOpen, setCustomerSearchOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const p = new URLSearchParams(window.location.search);
+    const initialId = p.get("customer_id") || p.get("id");
+    return !initialId;
+  });
   const [rows, setRows] = useState([]);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -209,6 +218,16 @@ const [customers, setCustomers] = useState([]);
         e.preventDefault();
         if (!can.view) return;
         handlePrint();
+      }
+      if (k === "c") {
+        const sel = window.getSelection?.()?.toString?.() || "";
+        const el = document.activeElement;
+        const hasInputSel =
+          el && typeof el.selectionStart === "number" && el.selectionStart !== el.selectionEnd;
+        if (!sel && !hasInputSel) {
+          e.preventDefault();
+          setCustomerSearchOpen(true);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -732,9 +751,12 @@ return (
               {customerId && (
                 <button
                   type="button"
-                  onClick={() => setCustomerId("")}
+                  onClick={() => {
+                    setCustomerId("");
+                    setCustomerSearchOpen(true);
+                  }}
                   className="h-full px-2 flex items-center justify-center hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0"
-                  title="Clear customer"
+                  title="Clear and select another customer"
                   aria-label="Clear customer"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

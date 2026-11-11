@@ -1368,8 +1368,11 @@ const contRect = container.getBoundingClientRect();
             setArrangement('original');
             window.dispatchEvent(new CustomEvent("cash-drawer-changed"));
             window.dispatchEvent(new CustomEvent("accounts-changed"));
+            window.dispatchEvent(new CustomEvent("karobar:inventory-changed"));
+            window.dispatchEvent(new CustomEvent("karobar:products-updated"));
             try { localStorage.setItem("cash_drawer_sync", String(Date.now())); } catch {}
             try { localStorage.setItem("accounts_sync", String(Date.now())); } catch {}
+            try { localStorage.setItem("karobar_inventory_sync", String(Date.now())); } catch {}
             draftHook.resetToNew();
             onSuccess && onSuccess();
             return result;
@@ -1383,16 +1386,22 @@ const contRect = container.getBoundingClientRect();
             setArrangement('original');
             window.dispatchEvent(new CustomEvent("cash-drawer-changed"));
             window.dispatchEvent(new CustomEvent("accounts-changed"));
+            window.dispatchEvent(new CustomEvent("karobar:inventory-changed"));
+            window.dispatchEvent(new CustomEvent("karobar:products-updated"));
             try { localStorage.setItem("cash_drawer_sync", String(Date.now())); } catch {}
             try { localStorage.setItem("accounts_sync", String(Date.now())); } catch {}
+            try { localStorage.setItem("karobar_inventory_sync", String(Date.now())); } catch {}
             toast.success("Invoice updated successfully");
             onSuccess && onSuccess();
           } else {
             const { data: saved } = await axios.post("/api/purchase-invoices", dataPayload);
             window.dispatchEvent(new CustomEvent("cash-drawer-changed"));
             window.dispatchEvent(new CustomEvent("accounts-changed"));
+            window.dispatchEvent(new CustomEvent("karobar:inventory-changed"));
+            window.dispatchEvent(new CustomEvent("karobar:products-updated"));
             try { localStorage.setItem("cash_drawer_sync", String(Date.now())); } catch {}
             try { localStorage.setItem("accounts_sync", String(Date.now())); } catch {}
+            try { localStorage.setItem("karobar_inventory_sync", String(Date.now())); } catch {}
             draftHook.resetToNew();
             // Server returns created invoice with posted_number assigned — reflect it locally.
             setForm((prev) => ({

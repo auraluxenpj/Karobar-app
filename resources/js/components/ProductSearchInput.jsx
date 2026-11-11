@@ -141,7 +141,8 @@ const MIN_WIDTH = typeof window !== "undefined" && window.innerWidth < 1024
       return async (q = "") => {
         try {
           const { data } = await axios.get("/api/products/search", {
-            params: { q: q || "", limit: 200 },
+            params: { q: q || "", limit: 200, _t: Date.now() },
+            cache: false,
           });
           const list = Array.isArray(data?.data)
             ? data.data
@@ -173,32 +174,29 @@ const MIN_WIDTH = typeof window !== "undefined" && window.innerWidth < 1024
       if (highlightIndex >= items.length) setHighlightIndex(0);
     }, [items.length, highlightIndex]);
 
-    // Sync display + selectedProduct from value
+    // Sync display + selectedProduct from value (resolves fresh matching product from items)
     useEffect(() => {
       if (!value) {
         setDisplay("");
         setSelectedProduct(null);
         return;
       }
-      if (typeof value === "object") {
-        const objName = value?.name || value?.product_name || "";
-        if (objName) {
-          setDisplay(objName);
-          setSelectedProduct(value);
-          return;
-        }
-        const selected = items.find((p) => String(p?.id) === String(value?.id));
-        if (selected) {
-          setDisplay(selected.name || "");
-          setSelectedProduct(selected);
-        }
+      const valId = typeof value === "object" ? value?.id : value;
+      const matchingProduct = items.find((p) => String(p?.id) === String(valId));
+
+      if (matchingProduct) {
+        setDisplay(matchingProduct.name || "");
+        setSelectedProduct(matchingProduct);
         return;
       }
-      const selected = items.find((p) => String(p?.id) === String(value));
-      if (selected) {
-        setDisplay(selected.name || "");
-        setSelectedProduct(selected);
+
+      if (typeof value === "object") {
+        const objName = value?.name || value?.product_name || "";
+        setDisplay(objName);
+        setSelectedProduct(value);
+        return;
       }
+      setDisplay(String(value));
     }, [value, items]);
 
     useImperativeHandle(ref, () => ({
@@ -224,11 +222,16 @@ const MIN_WIDTH = typeof window !== "undefined" && window.innerWidth < 1024
       triggerRef.current?.blur?.();
       setIsOpen(true);
       setHighlightIndex(0);
-      setSearch(
+      const initialSearch =
         typeof seedChar === "string" && seedChar.length === 1
-          ? (search + seedChar).toLowerCase() // Append character to existing search
-          : (display || "")
-      );
+          ? (search + seedChar).toLowerCase()
+          : (display || "");
+      setSearch(initialSearch);
+
+      // Force fresh product fetch immediately upon opening modal
+      if (effectiveRefreshProducts) {
+        Promise.resolve(effectiveRefreshProducts(initialSearch)).catch(() => {});
+      }
     };
     const closeModal = () => setIsOpen(false);
 
@@ -247,20 +250,30 @@ const MIN_WIDTH = typeof window !== "undefined" && window.innerWidth < 1024
       }, 50);
     }, [isOpen]);
 
+    // Fetch fresh product quantities when modal opens
     useEffect(() => {
-      if (isOpen && effectiveRefreshProducts && !didRefreshRef.current) {
-        didRefreshRef.current = true;
+      if (isOpen && effectiveRefreshProducts) {
         Promise.resolve(effectiveRefreshProducts(search)).catch(() => {});
       }
-      if (!isOpen) didRefreshRef.current = false;
-    }, [isOpen, effectiveRefreshProducts, search]);
+    }, [isOpen]);
 
+    // Live inventory sync: re-fetch products when inventory changes across tabs or window regains focus
     useEffect(() => {
-      if (!isOpen || !effectiveRefreshProducts) return undefined;
-      const handler = () => effectiveRefreshProducts?.(search);
+      if (!effectiveRefreshProducts) return undefined;
+      const handler = () => {
+        Promise.resolve(effectiveRefreshProducts(search)).catch(() => {});
+      };
       window.addEventListener("product:created", handler);
-      return () => window.removeEventListener("product:created", handler);
-    }, [isOpen, effectiveRefreshProducts, search]);
+      window.addEventListener("karobar:inventory-changed", handler);
+      window.addEventListener("karobar:products-updated", handler);
+      window.addEventListener("focus", handler);
+      return () => {
+        window.removeEventListener("product:created", handler);
+        window.removeEventListener("karobar:inventory-changed", handler);
+        window.removeEventListener("karobar:products-updated", handler);
+        window.removeEventListener("focus", handler);
+      };
+    }, [effectiveRefreshProducts, search]);
 
     useEffect(() => {
       if (!effectiveRefreshProducts || !isOpen) return;
@@ -298,7 +311,12 @@ const MIN_WIDTH = typeof window !== "undefined" && window.innerWidth < 1024
     const getPackSize = (p) => p?.pack_size ?? p?.packSize ?? p?.packsize ?? "";
     const getSupplierName = (p) => p?.supplier?.name || p?.supplier_name || "";
     const getBrandName = (p) => p?.brand?.name || p?.brand_name || "";
-const getQuantity = (p) => p?.quantity ?? p?.current_quantity ?? null;
+    const getQuantity = (p) =>
+      p?.quantity ??
+      p?.current_quantity ??
+      p?.available_units ??
+      p?.batches_sum_quantity ??
+      null;
     const getMargin = (p) =>
       p?.margin ?? p?.margin_percentage ?? p?.marginPercent ?? null;
     const getAvgPrice = (p) =>

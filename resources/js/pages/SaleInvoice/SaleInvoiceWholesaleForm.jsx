@@ -1,6 +1,6 @@
 import { useInvoiceErrors, InvoiceErrorSummary, InvoiceRowError } from "../../components/InvoiceErrors";
 // /src/pages/sales/SaleInvoiceWholesaleForm.jsx - True B2B Wholesale Sale Invoice Form
-import { lazy, Suspense, useEffect, useRef, useState, useMemo } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { TrashIcon, PlusIcon, CheckIcon } from "@heroicons/react/24/outline";
@@ -209,6 +209,16 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
   const [focusedRowIndex, setFocusedRowIndex] = useState(0);
   const [customerSearchOpen, setCustomerSearchOpen] = useState(false);
   const [originalInvoiceQuantities, setOriginalInvoiceQuantities] = useState({});
+
+  const formRef = useRef(form);
+  useEffect(() => {
+    formRef.current = form;
+  }, [form]);
+
+  const originalInvoiceQuantitiesRef = useRef(originalInvoiceQuantities);
+  useEffect(() => {
+    originalInvoiceQuantitiesRef.current = originalInvoiceQuantities;
+  }, [originalInvoiceQuantities]);
   const [drawerPrompt, setDrawerPrompt] = useState(null);
   const [customerCreditSummary, setCustomerCreditSummary] = useState(null);
   const [creditOverridePrompt, setCreditOverridePrompt] = useState(null);
@@ -578,6 +588,34 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
     });
   };
 
+
+  const upsertProducts = (list) => {
+    if (!Array.isArray(list)) return;
+    setProducts((prev) => {
+      const map = new Map((prev || []).map((p) => [String(p.id), p]));
+      list.forEach((p) => p?.id != null && map.set(String(p.id), p));
+      return Array.from(map.values());
+    });
+    setProductDataCache((prev) => {
+      const next = { ...prev };
+      list.forEach((p) => {
+        if (!p || p.id == null) return;
+        next[p.id] = {
+          avg_price: Number(p?.avg_price || 0),
+          pack_purchase_price: Number(p?.pack_purchase_price || 0),
+          unit_purchase_price: Number(p?.unit_purchase_price || 0),
+          whole_sale_pack_price: Number(p?.whole_sale_pack_price || 0),
+          whole_sale_unit_price: Number(p?.whole_sale_unit_price || 0),
+          pack_sale_price: Number(p?.pack_sale_price || 0),
+          unit_sale_price: Number(p?.unit_sale_price || 0),
+          pack_size: Number(p?.pack_size || 1),
+          margin: p?.whole_sale_margin || p?.margin || "",
+        };
+      });
+      return next;
+    });
+  };
+
   /* -------- data -------- */
   const fetchCustomers = async () => {
     try {
@@ -600,15 +638,19 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
 
   const fetchProducts = async (q = "") => {
     try {
-      const { data } = await axios.get("/api/products/search", { params: { q, limit: 30 } });
-      setProducts(Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []);
-    } catch {}
+      const { data } = await axios.get("/api/products/search", { params: { q, limit: 150 }, cache: false });
+      const list = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+      upsertProducts(list);
+      return list;
+    } catch {
+      return [];
+    }
   };
 
-  const fetchBatches = async (productId) => {
+  const fetchBatches = async (productId, forceFresh = false) => {
     if (!productId) return [];
     const key = String(productId);
-    if (batchesByProduct[key]) return batchesByProduct[key];
+    if (!forceFresh && batchesByProduct[key]) return batchesByProduct[key];
     const normalizeBatch = (b) => ({
       id: b?.id,
       batch_number: String(b?.batch_number ?? b?.batch ?? b?.number ?? "").trim(),
@@ -625,7 +667,9 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
       is_unbatched: Boolean(b?.is_unbatched),
     });
     try {
-      const res = await axios.get(`/api/products/${productId}/batches?include_unbatched=1`);
+      const res = await axios.get(`/api/products/${productId}/batches?include_unbatched=1`, {
+        cache: false,
+      });
       const raw = Array.isArray(res.data) ? res.data : [];
       let list = raw
         .map(normalizeBatch)
@@ -662,6 +706,149 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
       return [];
     }
   };
+
+  const isRefreshingStockRef = useRef(false);
+  const refreshActiveInvoiceStock = useCallback(async () => {
+    if (isRefreshingStockRef.current) return;
+    isRefreshingStockRef.current = true;
+    try {
+      // 1. Fetch fresh product catalog list
+      let freshCatalog = [];
+      try {
+        const { data } = await axios.get("/api/products/search", {
+          params: { limit: 150 },
+          cache: false,
+        });
+        freshCatalog = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : [];
+        if (freshCatalog.length > 0) {
+          upsertProducts(freshCatalog);
+        }
+      } catch {}
+
+      // 2. Identify all products currently in the invoice rows
+      const currentItems = formRef.current?.items || [];
+      const productIds = Array.from(
+        new Set(currentItems.map((it) => it.product_id).filter(Boolean))
+      );
+
+      if (productIds.length === 0) return;
+
+      // 3. For each active product, fetch fresh batches and fresh product details
+      const freshBatchMap = {};
+      const freshProdMap = {};
+
+      await Promise.all(
+        productIds.map(async (pid) => {
+          try {
+            const batches = await fetchBatches(pid, true);
+            freshBatchMap[String(pid)] = batches;
+          } catch {}
+
+          try {
+            const { data } = await axios.get(`/api/products/${pid}`, { cache: false });
+            if (data?.id) {
+              freshProdMap[String(pid)] = data;
+            }
+          } catch {}
+        })
+      );
+
+      if (Object.keys(freshProdMap).length > 0) {
+        upsertProducts(Object.values(freshProdMap));
+      }
+
+      // 4. Update current_quantity and product snapshot on active rows
+      setForm((prev) => {
+        let changed = false;
+        const updatedItems = (prev.items || []).map((row, rowIdx) => {
+          if (!row.product_id) return row;
+          const pKey = String(row.product_id);
+          const batches = freshBatchMap[pKey] || [];
+          const freshProd = freshProdMap[pKey];
+
+          let matchingBatch = null;
+          if (row.is_unbatched) {
+            matchingBatch = batches.find((b) => b.is_unbatched);
+          } else if (row.batch_number) {
+            matchingBatch = batches.find(
+              (b) => String(b.batch_number).trim() === String(row.batch_number).trim()
+            );
+          }
+
+          const origUnits = Number(
+            originalInvoiceQuantitiesRef.current[rowIdx]?.total_units || 0
+          );
+          let newAvailable;
+          if (matchingBatch) {
+            newAvailable = Number(matchingBatch.available_units || 0) + (saleId ? origUnits : 0);
+          } else if (row.batch_number) {
+            newAvailable = 0 + (saleId ? origUnits : 0);
+          } else {
+            const baseStock = Number(
+              freshProd?.quantity ??
+                freshProd?.available_units ??
+                freshProd?.batches_sum_quantity ??
+                row.product?.quantity ??
+                row.product?.available_units ??
+                0
+            );
+            newAvailable = baseStock + (saleId ? origUnits : 0);
+          }
+
+          const newAvailStr = String(newAvailable);
+          if (row.current_quantity !== newAvailStr || (freshProd && row.product !== freshProd)) {
+            changed = true;
+            return {
+              ...row,
+              current_quantity: newAvailStr,
+              ...(freshProd ? { product: freshProd, product_name: freshProd.name || row.product_name } : {}),
+            };
+          }
+          return row;
+        });
+
+        if (!changed) return prev;
+        return {
+          ...prev,
+          items: updatedItems,
+        };
+      });
+    } finally {
+      isRefreshingStockRef.current = false;
+    }
+  }, [saleId]);
+
+  // Real-time stock sync listeners
+  useEffect(() => {
+    const handleInventoryChange = () => {
+      refreshActiveInvoiceStock();
+    };
+
+    window.addEventListener("karobar:inventory-changed", handleInventoryChange);
+    window.addEventListener("karobar:products-updated", handleInventoryChange);
+    window.addEventListener("focus", handleInventoryChange);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        refreshActiveInvoiceStock();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible" && formRef.current?.items?.some((it) => it.product_id)) {
+        refreshActiveInvoiceStock();
+      }
+    }, 15000);
+
+    return () => {
+      window.removeEventListener("karobar:inventory-changed", handleInventoryChange);
+      window.removeEventListener("karobar:products-updated", handleInventoryChange);
+      window.removeEventListener("focus", handleInventoryChange);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      clearInterval(interval);
+    };
+  }, [refreshActiveInvoiceStock]);
 
   const fetchSale = async () => {
     const res = await axios.get(`/api/sale-invoices/${saleId}`);
@@ -1157,7 +1344,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
       packPrice = Number((catalogRetailUnit * packSize).toFixed(2));
     }
 
-    const batchList = await fetchBatches(productId);
+    const batchList = await fetchBatches(productId, true);
     const assignedBatches = (batchList || []).filter(
       (b) => !b.is_unbatched && b.batch_number && String(b.batch_number).trim() !== ""
     );
@@ -1357,7 +1544,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
       batchNum === "[Unbatched Stock]" ||
       batchNum === "[Unassigned Stock]"
     ) {
-      const batches = await fetchBatches(row0.product_id);
+      const batches = await fetchBatches(row0.product_id, true);
       const unbatchedItem = batchObj || (batches || []).find((x) => x.is_unbatched);
       let unbatchedAvailable = unbatchedItem?.available_units;
       if (unbatchedAvailable == null) {
@@ -1375,7 +1562,7 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
     }
 
     try {
-      const batches = await fetchBatches(row0.product_id);
+      const batches = await fetchBatches(row0.product_id, true);
       const b = batchObj || (batches || []).find((x) => String(x.batch_number) === String(batchNum));
 
       const batchExpiry = b?.expiry || b?.expiry_date || "";
@@ -1485,32 +1672,6 @@ export default function SaleInvoiceWholesaleForm({ saleId, onSuccess }) {
     }, 40);
   };
 
-  const upsertProducts = (list) => {
-    if (!Array.isArray(list)) return;
-    setProducts((prev) => {
-      const map = new Map((prev || []).map((p) => [String(p.id), p]));
-      list.forEach((p) => p?.id != null && map.set(String(p.id), p));
-      return Array.from(map.values());
-    });
-    setProductDataCache((prev) => {
-      const next = { ...prev };
-      list.forEach((p) => {
-        if (!p || p.id == null) return;
-        next[p.id] = {
-          avg_price: Number(p?.avg_price || 0),
-          pack_purchase_price: Number(p?.pack_purchase_price || 0),
-          unit_purchase_price: Number(p?.unit_purchase_price || 0),
-          whole_sale_pack_price: Number(p?.whole_sale_pack_price || 0),
-          whole_sale_unit_price: Number(p?.whole_sale_unit_price || 0),
-          pack_sale_price: Number(p?.pack_sale_price || 0),
-          unit_sale_price: Number(p?.unit_sale_price || 0),
-          pack_size: Number(p?.pack_size || 1),
-          margin: p?.whole_sale_margin || p?.margin || "",
-        };
-      });
-      return next;
-    });
-  };
 
   const ensureProductsForItems = async (items = []) => {
     const ids = Array.from(new Set(items.map((it) => it.product_id).filter(Boolean))).map(String);
