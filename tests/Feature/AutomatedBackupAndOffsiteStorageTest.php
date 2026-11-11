@@ -344,6 +344,9 @@ class AutomatedBackupAndOffsiteStorageTest extends TestCase
         $createdBackupFilename = null;
 
         try {
+            while (DB::connection('sqlite')->transactionLevel() > 0) {
+                DB::connection('sqlite')->rollBack();
+            }
             // Switch Laravel's sqlite connection to the file-backed SQLite database in WAL + mmap mode
             config(['database.connections.sqlite.database' => $tempDbFile]);
             DB::purge('sqlite');
@@ -413,6 +416,7 @@ class AutomatedBackupAndOffsiteStorageTest extends TestCase
             config(['database.connections.sqlite.database' => $originalDbConfig]);
             DB::purge('sqlite');
             DB::reconnect('sqlite');
+            \Illuminate\Foundation\Testing\RefreshDatabaseState::$migrated = false;
 
             if ($createdBackupFilename) {
                 @unlink(storage_path('app/backups/' . $createdBackupFilename . '.zip'));

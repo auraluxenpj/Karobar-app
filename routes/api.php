@@ -37,6 +37,7 @@ use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SaleInvoiceController;
 use App\Http\Controllers\SaleReturnController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\SqliteImportController;
 use App\Http\Controllers\StockAdjustmentController;
 use App\Http\Controllers\StorageLocationController;
 use App\Http\Controllers\SupplierController;
@@ -365,6 +366,13 @@ Route::middleware(['auth:sanctum', 'licensed', 'token.expiry'])->group(function 
     Route::post('/settings/whatsapp-agent/logout',       [SettingController::class, 'whatsappAgentLogout']);
     Route::post('/settings/whatsapp-agent/stop',         [SettingController::class, 'whatsappAgentStop']);
     Route::post('/settings/test-cube-ai',                [SettingController::class, 'testCubeAi']);
+
+    // Intelligent SQLite Database Import & Migration (Software Admin Protected)
+    Route::post('/settings/sqlite-import/unlock',        [SqliteImportController::class, 'unlock'])->middleware('throttle:10,1');
+    Route::post('/settings/sqlite-import/upload',        [SqliteImportController::class, 'uploadAndInspect']);
+    Route::post('/settings/sqlite-import/preview-table', [SqliteImportController::class, 'previewTable']);
+    Route::post('/settings/sqlite-import/commit',        [SqliteImportController::class, 'commit'])->middleware('throttle:10,1');
+    Route::delete('/settings/sqlite-import/{token}',     [SqliteImportController::class, 'cancel']);
 
     // Theme Settings (CRUD operations require license)
     Route::put('/theme-settings/active',          [ThemeSettingController::class, 'updateActive']);

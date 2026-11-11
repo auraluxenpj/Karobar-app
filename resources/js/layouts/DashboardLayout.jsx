@@ -170,6 +170,8 @@ export default function DashboardLayout({ children }) {
     "/user-demands": "User Demands",
     "/user-demands/create": "Request Product",
     "/settings": "Settings",
+    "/settings/sqlite-import": "SQLite Data Import & Migration Studio",
+    "/sqlite-import": "SQLite Data Import & Migration Studio",
     "/reports": "Reports",
     "/users": "Users",
     "/users/create": "Add User",

@@ -117,22 +117,33 @@ class AuthController extends Controller
     }
     public function updateProfile(Request $request)
     {
+        /** @var User $user */
         $user = $request->user();
 
         $data = $request->validate([
-            'name'             => 'required|string|max:255',
-            'email'            => 'required|email|unique:users,email,' . $user->id,
+            'name'             => 'sometimes|required|string|max:255',
+            'email'            => 'sometimes|required|email|unique:users,email,' . $user->id,
             'current_password' => 'nullable|string',
             'password'         => 'nullable|confirmed|min:6',
         ]);
+
+        $data['name'] = $data['name'] ?? $user->name;
+        $data['email'] = $data['email'] ?? $user->email;
 
         $changingPassword = !empty($data['password']);
         $changingEmail = isset($data['email']) && strcasecmp($data['email'], $user->email) !== 0;
 
         if ($changingPassword || $changingEmail) {
-            if (empty($data['current_password']) || !Hash::check($data['current_password'], $user->password)) {
+            if (empty($data['current_password'])) {
                 return response()->json([
-                    'message' => 'Current password is required and must be valid to change your email or password.',
+                    'message' => 'Current password is required to change your email or password.',
+                    'errors'  => ['current_password' => ['Current password is required to change your email or password.']],
+                ], 422);
+            }
+
+            if (!Hash::check($data['current_password'], $user->password)) {
+                return response()->json([
+                    'message' => 'The provided current password is incorrect.',
                     'errors'  => ['current_password' => ['The provided current password is incorrect.']],
                 ], 422);
             }
@@ -141,7 +152,7 @@ class AuthController extends Controller
         unset($data['current_password']);
 
         if ($changingPassword) {
-            $data['password'] = bcrypt($data['password']);
+            $data['password'] = Hash::make($data['password']);
         } else {
             unset($data['password']);
         }
@@ -149,15 +160,34 @@ class AuthController extends Controller
         $user->update($data);
 
         if ($changingPassword) {
-            $currentTokenId = $user->currentAccessToken()?->id;
+            // Resolve active token ID from currentAccessToken or Bearer header
+            // (When Sanctum authenticates via stateful web guard on localhost/127.0.0.1,
+            // currentAccessToken() is a TransientToken without an id; we must NOT wipe the active Bearer token.)
+            $currentToken = $user->currentAccessToken();
+            $currentTokenId = ($currentToken instanceof PersonalAccessToken) ? $currentToken->id : null;
+
+            if (!$currentTokenId && $request->bearerToken()) {
+                $bearerToken = PersonalAccessToken::findToken((string) $request->bearerToken());
+                if ($bearerToken && (int) $bearerToken->tokenable_id === (int) $user->id) {
+                    $currentTokenId = $bearerToken->id;
+                }
+            }
+
             if ($currentTokenId) {
                 $user->tokens()->where('id', '!=', $currentTokenId)->delete();
-            } else {
-                $user->tokens()->delete();
+            }
+
+            // Refresh web session guard if active so password hash change doesn't invalidate the session
+            try {
+                if (Auth::guard('web')->check()) {
+                    Auth::guard('web')->login($user);
+                }
+            } catch (\Throwable) {
+                // Ignore if stateless request has no session store attached
             }
         }
 
-        return response()->json($user);
+        return response()->json($user->fresh()->load('roles'));
     }
 // AuthController.php
 public function logout(Request $request): \Illuminate\Http\JsonResponse

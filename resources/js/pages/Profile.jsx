@@ -1,50 +1,50 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import toast from "react-hot-toast";
 import { useTheme } from "@/context/ThemeContext";
+import { useAuth } from "@/context/AuthContext";
 import {
   UserCircleIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from "@heroicons/react/24/solid";
 
-// Helper to determine text color based on background brightness
-const getContrastText = (hexColor) => {
-  hexColor = hexColor.replace('#', '');
-  const r = parseInt(hexColor.substring(0, 2), 16);
-  const g = parseInt(hexColor.substring(2, 4), 16);
-  const b = parseInt(hexColor.substring(4, 6), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5 ? '#1f2937' : '#ffffff';
-};
-
 export default function Profile() {
+  const { user, setUser } = useAuth();
   const [form, setForm] = useState({
-    name: "",
-    email: "",
+    name: user?.name || "",
+    email: user?.email || "",
     current_password: "",
     password: "",
     password_confirmation: "",
   });
+  const [initialEmail, setInitialEmail] = useState(user?.email || "");
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState("success");
 
-  const { theme } = useTheme();
-  const token = localStorage.getItem("token");
+  useTheme();
 
-  const primaryColor = theme?.primary_color || '#3b82f6';
-  const primaryTextColor = getContrastText(primaryColor);
-
-  // Load user data
+  // Load latest user data from API
   useEffect(() => {
     axios
-      .get("/api/user", { headers: { Authorization: `Bearer ${token}` } })
+      .get("/api/user", { cache: false })
       .then((res) => {
-        setForm((prev) => ({
-          ...prev,
-          name: res.data.name,
-          email: res.data.email,
-        }));
+        const userData = res.data?.user || res.data;
+        if (userData) {
+          setForm((prev) => ({
+            ...prev,
+            name: userData.name || prev.name,
+            email: userData.email || prev.email,
+          }));
+          setInitialEmail(userData.email || "");
+        }
       })
       .catch((err) => {
         console.error(err);
@@ -52,26 +52,121 @@ export default function Profile() {
   }, []);
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    setLoading(true);
     setMessage("");
+    setFieldErrors({});
+
+    const nextErrors = {};
+    const trimmedName = (form.name || "").trim();
+    const trimmedEmail = (form.email || "").trim();
+    const isChangingPassword = Boolean(form.password || form.password_confirmation);
+    const isChangingEmail =
+      Boolean(initialEmail) &&
+      trimmedEmail.toLowerCase() !== initialEmail.trim().toLowerCase();
+
+    if (!trimmedName) {
+      nextErrors.name = "Name is required.";
+    }
+    if (!trimmedEmail) {
+      nextErrors.email = "Email is required.";
+    }
+
+    if (isChangingPassword || isChangingEmail) {
+      if (!form.current_password) {
+        nextErrors.current_password =
+          "Please enter your current password to confirm this change.";
+      }
+    }
+
+    if (isChangingPassword) {
+      if (!form.password || form.password.length < 6) {
+        nextErrors.password = "New password must be at least 6 characters.";
+      }
+      if (form.password !== form.password_confirmation) {
+        nextErrors.password_confirmation =
+          "New password and confirmation do not match.";
+      }
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      const firstError = Object.values(nextErrors)[0];
+      setMessage(firstError);
+      setMessageTone("error");
+      toast.error(firstError);
+      return;
+    }
+
+    setLoading(true);
+
+    const payload = {
+      name: trimmedName,
+      email: trimmedEmail,
+      current_password: form.current_password || undefined,
+      password: form.password || undefined,
+      password_confirmation: form.password_confirmation || undefined,
+    };
 
     axios
-      .put("/api/profile", form, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      .put("/api/profile", payload)
       .then((res) => {
-        setMessage("Profile updated successfully!");
+        const updatedUser = res.data?.user || res.data;
+        setMessage(
+          isChangingPassword
+            ? "Profile and password updated successfully!"
+            : "Profile updated successfully!"
+        );
         setMessageTone("success");
-        localStorage.setItem("user", JSON.stringify(res.data));
+        toast.success(
+          isChangingPassword
+            ? "Password updated successfully!"
+            : "Profile updated successfully!"
+        );
+        if (updatedUser && typeof updatedUser === "object") {
+          localStorage.setItem("user", JSON.stringify(updatedUser));
+          if (typeof setUser === "function") {
+            setUser(updatedUser);
+          }
+          setInitialEmail(updatedUser.email || trimmedEmail);
+        }
+        setForm((prev) => ({
+          ...prev,
+          name: updatedUser?.name || trimmedName,
+          email: updatedUser?.email || trimmedEmail,
+          current_password: "",
+          password: "",
+          password_confirmation: "",
+        }));
       })
       .catch((err) => {
-        setMessage("Failed to update profile.");
+        const apiErrors = err?.response?.data?.errors || {};
+        const normalizedErrors = {};
+        Object.keys(apiErrors).forEach((key) => {
+          const val = apiErrors[key];
+          normalizedErrors[key] = Array.isArray(val) ? val[0] : String(val);
+        });
+        if (Object.keys(normalizedErrors).length > 0) {
+          setFieldErrors(normalizedErrors);
+        }
+        const errorMsg =
+          Object.values(normalizedErrors)[0] ||
+          err?.response?.data?.message ||
+          "Failed to update profile.";
+        setMessage(errorMsg);
         setMessageTone("error");
+        toast.error(errorMsg);
         console.error(err);
       })
       .finally(() => setLoading(false));
@@ -95,7 +190,7 @@ export default function Profile() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="people-form">
+        <form onSubmit={handleSubmit} className="people-form" autoComplete="off">
           {message && (
             <p
               className={`people-message ${
@@ -122,7 +217,13 @@ export default function Profile() {
                 value={form.name}
                 onChange={handleChange}
                 placeholder="Your full name"
+                autoComplete="name"
               />
+              {fieldErrors.name && (
+                <span className="text-xs text-red-600 dark:text-red-400">
+                  {fieldErrors.name}
+                </span>
+              )}
             </div>
 
             <div className="people-field people-field-wide">
@@ -134,47 +235,119 @@ export default function Profile() {
                 value={form.email}
                 onChange={handleChange}
                 placeholder="you@example.com"
+                autoComplete="username"
               />
+              {fieldErrors.email && (
+                <span className="text-xs text-red-600 dark:text-red-400">
+                  {fieldErrors.email}
+                </span>
+              )}
             </div>
 
             <div className="people-field people-field-wide">
               <label className="people-label" htmlFor="profile-current-password">
                 Current password (required when changing email or password)
               </label>
-              <input
-                id="profile-current-password"
-                type="password"
-                name="current_password"
-                value={form.current_password}
-                onChange={handleChange}
-                placeholder="Enter current password to confirm changes"
-              />
+              <div className="relative">
+                <input
+                  id="profile-current-password"
+                  type={showCurrentPassword ? "text" : "password"}
+                  name="current_password"
+                  value={form.current_password}
+                  onChange={handleChange}
+                  placeholder="Enter current password to confirm changes"
+                  autoComplete="current-password"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrentPassword((v) => !v)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  tabIndex={-1}
+                  aria-label={showCurrentPassword ? "Hide current password" : "Show current password"}
+                >
+                  {showCurrentPassword ? (
+                    <EyeSlashIcon className="w-5 h-5" />
+                  ) : (
+                    <EyeIcon className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
+              {fieldErrors.current_password && (
+                <span className="text-xs text-red-600 dark:text-red-400">
+                  {fieldErrors.current_password}
+                </span>
+              )}
             </div>
 
             <div className="people-field">
               <label className="people-label" htmlFor="profile-password">New password</label>
-              <input
-                id="profile-password"
-                type="password"
-                name="password"
-                value={form.password}
-                onChange={handleChange}
-                placeholder="Leave blank to keep current"
-              />
+              <div className="relative">
+                <input
+                  id="profile-password"
+                  type={showNewPassword ? "text" : "password"}
+                  name="password"
+                  value={form.password}
+                  onChange={handleChange}
+                  placeholder="Leave blank to keep current (min. 6 chars)"
+                  autoComplete="new-password"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword((v) => !v)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  tabIndex={-1}
+                  aria-label={showNewPassword ? "Hide new password" : "Show new password"}
+                >
+                  {showNewPassword ? (
+                    <EyeSlashIcon className="w-5 h-5" />
+                  ) : (
+                    <EyeIcon className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
+              {fieldErrors.password && (
+                <span className="text-xs text-red-600 dark:text-red-400">
+                  {fieldErrors.password}
+                </span>
+              )}
             </div>
 
             <div className="people-field">
               <label className="people-label" htmlFor="profile-password-confirmation">
                 Confirm new password
               </label>
-              <input
-                id="profile-password-confirmation"
-                type="password"
-                name="password_confirmation"
-                value={form.password_confirmation}
-                onChange={handleChange}
-                placeholder="Repeat the new password"
-              />
+              <div className="relative">
+                <input
+                  id="profile-password-confirmation"
+                  type={showConfirmPassword ? "text" : "password"}
+                  name="password_confirmation"
+                  value={form.password_confirmation}
+                  onChange={handleChange}
+                  placeholder="Repeat the new password"
+                  autoComplete="new-password"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((v) => !v)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  tabIndex={-1}
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                >
+                  {showConfirmPassword ? (
+                    <EyeSlashIcon className="w-5 h-5" />
+                  ) : (
+                    <EyeIcon className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
+              {fieldErrors.password_confirmation && (
+                <span className="text-xs text-red-600 dark:text-red-400">
+                  {fieldErrors.password_confirmation}
+                </span>
+              )}
             </div>
           </div>
 

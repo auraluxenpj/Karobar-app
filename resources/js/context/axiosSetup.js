@@ -71,7 +71,7 @@ export function clearApiCache(prefix = null) {
 }
 
 const SESSION_CONFIG_MUTATION_REGEX =
-  /\/api\/(settings|theme-settings|preferences|roles|permissions|users|license|login|logout)/;
+  /\/api\/(settings|theme-settings|preferences|roles|permissions|users|profile|license|login|logout)/;
 
 function invalidateCacheForMutation(mutationUrl = "") {
   if (!mutationUrl || SESSION_CONFIG_MUTATION_REGEX.test(mutationUrl)) {

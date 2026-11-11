@@ -31,6 +31,9 @@ import {
   ClockIcon,
   ServerIcon,
   QrCodeIcon,
+  CircleStackIcon,
+  LockClosedIcon,
+  LockOpenIcon,
 } from "@heroicons/react/24/outline";
 import { usePermissions } from "@/api/usePermissions";
 import { useTheme } from "@/context/ThemeContext";
@@ -45,13 +48,51 @@ const FeatureGuideBot = lazy(() => import("./FeatureGuideBot.jsx"));
 export default function TopNavigation() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { loading: permsLoading, has } = usePermissions();
+  const { loading: permsLoading, has, roles } = usePermissions();
   const { theme } = useTheme();
   const { hasWholesale } = useSaleSystem();
   const [openDropdown, setOpenDropdown] = useState(null);
   const [guideBotOpen, setGuideBotOpen] = useGuideBotOpenState();
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const [hoveredDropdown, setHoveredDropdown] = useState(null);
+  const [swAdminUnlocked, setSwAdminUnlocked] = useState(() => {
+    try {
+      return Boolean(sessionStorage.getItem("karobar_sw_admin_sqlite_token"));
+    } catch {
+      return false;
+    }
+  });
+
+  const isApplicationAdmin = useMemo(
+    () =>
+      !permsLoading &&
+      Boolean(
+        roles?.has("Admin") ||
+          roles?.has("Super Admin") ||
+          roles?.has("admin") ||
+          roles?.has("super-admin")
+      ),
+    [permsLoading, roles]
+  );
+
+  useEffect(() => {
+    const syncSwAdminLock = () => {
+      try {
+        setSwAdminUnlocked(
+          Boolean(sessionStorage.getItem("karobar_sw_admin_sqlite_token"))
+        );
+      } catch {
+        setSwAdminUnlocked(false);
+      }
+    };
+    window.addEventListener("karobar:sw-admin-unlock-changed", syncSwAdminLock);
+    return () => {
+      window.removeEventListener(
+        "karobar:sw-admin-unlock-changed",
+        syncSwAdminLock
+      );
+    };
+  }, []);
   const buttonRefs = useRef({});
   const dropdownRef = useRef(null);
   const brandName = "Karobar App";
@@ -178,6 +219,7 @@ export default function TopNavigation() {
       icon: <Cog6ToothIcon className="w-5 h-5" />,
       items: [
         { name: "Settings", path: "/settings", icon: <Cog6ToothIcon className="w-5 h-5" />, perm: "settings.view" },
+        { name: "SQLite Data Import", path: "/settings/sqlite-import", icon: <CircleStackIcon className="w-5 h-5" />, adminOnly: true, swAdminLocked: true },
         { name: "Users", path: "/users", icon: <UserGroupIcon className="w-5 h-5" />, permAny: ["user.view", "user.manage"] },
         { name: "Roles", path: "/roles", icon: <KeyIcon className="w-5 h-5" />, perm: "role.view" },
         { name: "Backups & Storage", path: "/backups", icon: <ServerIcon className="w-5 h-5" />, perm: "backup.view" },
@@ -193,6 +235,7 @@ export default function TopNavigation() {
   // Filter items based on permissions
   const getFilteredItems = (items) => {
     return items.filter((item) => {
+      if (item.adminOnly) return isApplicationAdmin;
       if (item.permAny) return !permsLoading && item.permAny.some((p) => has(p));
       if (item.perm) return !permsLoading && has(item.perm);
       return true;
@@ -477,7 +520,24 @@ export default function TopNavigation() {
                         {React.cloneElement(item.icon, { className: "w-5 h-5" })}
                       </div>
                     </span>
-                    <span className={itemActive ? "font-semibold" : ""}>{item.name}</span>
+                    <span className={`flex-1 flex items-center justify-between gap-2 ${itemActive ? "font-semibold" : ""}`}>
+                      <span>{item.name}</span>
+                      {item.swAdminLocked && (
+                        <span
+                          className={`inline-flex items-center justify-center p-0.5 rounded shrink-0 ${
+                            swAdminUnlocked
+                              ? "text-emerald-500 bg-emerald-500/10"
+                              : "text-amber-500 bg-amber-500/10"
+                          }`}
+                        >
+                          {swAdminUnlocked ? (
+                            <LockOpenIcon className="w-3.5 h-3.5" />
+                          ) : (
+                            <LockClosedIcon className="w-3.5 h-3.5" />
+                          )}
+                        </span>
+                      )}
+                    </span>
                   </button>
                 );
               })}

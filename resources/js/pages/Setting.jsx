@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import toast from "react-hot-toast";
 
@@ -23,6 +24,7 @@ import {
   ShoppingCartIcon,
   SparklesIcon,
   ShareIcon,
+  CircleStackIcon,
 } from "@heroicons/react/24/solid";
 
 // Setting Components
@@ -127,6 +129,9 @@ function resolveHashDestination(rawHash) {
   if (hash === "sharing" || hash === "pdf") {
     return { tab: "sharing", subTab: "pdf_design" };
   }
+  if (hash === "import" || hash === "sqlite-import" || hash === "sqlite_import") {
+    return { tab: "sqlite_import", subTab: "pdf_design" };
+  }
   if (ALL_TABS.some((t) => t.id === hash)) {
     return { tab: hash, subTab: "pdf_design" };
   }
@@ -134,6 +139,7 @@ function resolveHashDestination(rawHash) {
 }
 
 export default function Setting() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { isDark, theme } = useTheme();
@@ -216,6 +222,10 @@ export default function Setting() {
     const syncFromHash = () => {
       const dest = resolveHashDestination(window.location.hash);
       if (dest) {
+        if (dest.tab === "sqlite_import") {
+          navigate("/settings/sqlite-import", { replace: true });
+          return;
+        }
         setActiveTab(dest.tab);
         setSharingSubTab(dest.subTab);
       }
@@ -223,7 +233,7 @@ export default function Setting() {
     syncFromHash();
     window.addEventListener("hashchange", syncFromHash);
     return () => window.removeEventListener("hashchange", syncFromHash);
-  }, []);
+  }, [navigate]);
 
   // License management state
   const [licenseStatus, setLicenseStatus] = useState(null);
@@ -725,6 +735,10 @@ export default function Setting() {
                 aria-selected={isActive}
                 aria-controls={`settings-panel-${item.id}`}
                 onClick={(e) => {
+                  if (item.externalPath) {
+                    navigate(item.externalPath);
+                    return;
+                  }
                   setActiveTab(item.id);
                   if (typeof window !== "undefined") {
                     window.history.replaceState(null, "", `#${item.id}`);
@@ -781,6 +795,10 @@ export default function Setting() {
                       aria-selected={isActive}
                       aria-controls={`settings-panel-${item.id}`}
                       onClick={() => {
+                        if (item.externalPath) {
+                          navigate(item.externalPath);
+                          return;
+                        }
                         setActiveTab(item.id);
                         if (typeof window !== "undefined") {
                           window.history.replaceState(null, "", `#${item.id}`);
@@ -957,7 +975,7 @@ export default function Setting() {
           )}
 
           {/* Bottom Save Bar */}
-          {activeTab !== "license" && (
+          {activeTab !== "license" && activeTab !== "sqlite_import" && (
             <div className="settings-panel">
               <div className="settings-body">
                 <div className="settings-actions settings-actions-between">

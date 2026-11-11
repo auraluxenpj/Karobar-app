@@ -395,13 +395,22 @@ class ComprehensiveSecurityAuditTest extends TestCase
             'password_confirmation' => 'newpassword123',
         ])->assertStatus(422);
 
-        $this->putJson('/api/profile', [
-            'name' => $user->name,
-            'email' => $user->email,
-            'current_password' => 'oldpassword123',
-            'password' => 'newpassword123',
-            'password_confirmation' => 'newpassword123',
-        ])->assertOk();
+        $activeToken = $user->createToken('active_device');
+        $otherToken = $user->createToken('other_device');
+
+        $this->withHeader('Authorization', 'Bearer ' . $activeToken->plainTextToken)
+            ->putJson('/api/profile', [
+                'name' => $user->name,
+                'email' => $user->email,
+                'current_password' => 'oldpassword123',
+                'password' => 'newpassword123',
+                'password_confirmation' => 'newpassword123',
+            ])->assertOk()
+            ->assertJsonStructure(['id', 'name', 'email', 'roles']);
+
+        $this->assertTrue(Hash::check('newpassword123', $user->fresh()->password));
+        $this->assertDatabaseHas('personal_access_tokens', ['id' => $activeToken->accessToken->id]);
+        $this->assertDatabaseMissing('personal_access_tokens', ['id' => $otherToken->accessToken->id]);
 
         // S15: Unprivileged user cannot fetch customer wholesale prices
         $this->getJson('/api/customers/1/whole-sale-prices')->assertForbidden();

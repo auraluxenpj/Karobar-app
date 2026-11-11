@@ -340,7 +340,8 @@ export default function UserForm({ onSubmit, initial, submitting }) {
                 type="password"
                 value={form.password}
                 onChange={(e) => set("password", e.target.value)}
-                placeholder={initial ? "••••••" : "Set a password"}
+                autoComplete="new-password"
+                placeholder={initial ? "Leave blank to keep current" : "Set a password"}
               />
               {initial && (
                 <span className="people-hint">Leave blank to keep the current password.</span>

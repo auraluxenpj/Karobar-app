@@ -5381,4 +5381,118 @@ html:not([data-btn-style]) :is(.theme-btn-success, .products-action-success) {
   }
 }
 
+/* ===== Native <dialog> Modal Scroll Containment & Styling ===== */
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+dialog.sqlite-import-dialog {
+  margin: auto;
+  width: min(520px, calc(100vw - 24px));
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 20px;
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text-primary, #0f172a);
+  box-shadow: 0 24px 64px -16px rgba(15, 23, 42, 0.45);
+}
+
+.dark dialog.sqlite-import-dialog {
+  background: #0f172a;
+  color: #f8fafc;
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+dialog.sqlite-import-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== SQLite Import Responsive Table Container & Sticky Headers ===== */
+.sqlite-import-table-region {
+  overflow-x: auto;
+  max-width: 100%;
+  container-type: inline-size;
+  border-radius: 12px;
+}
+
+.sqlite-import-table-region:focus-visible {
+  outline: 2px solid var(--workspace-accent, #2563eb);
+  outline-offset: 2px;
+}
+
+.sqlite-import-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.sqlite-import-table thead th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  background: var(--color-surface, #f8fafc);
+}
+
+.dark .sqlite-import-table thead th {
+  background: #1e293b;
+}
+
+.sqlite-import-table tbody th {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: var(--color-surface, #ffffff);
+  text-align: start;
+}
+
+.dark .sqlite-import-table tbody th {
+  background: #0f172a;
+}
+
+@container (max-width: 600px) {
+  .sqlite-import-stackable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .sqlite-import-stackable tbody tr {
+    display: grid;
+    gap: 0.35rem;
+    padding-block: 0.75rem;
+    padding-inline: 0.75rem;
+    border-block-end: 1px solid rgba(148, 163, 184, 0.25);
+  }
+
+  .sqlite-import-stackable tbody th {
+    position: static;
+  }
+
+  .sqlite-import-stackable td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .sqlite-import-stackable td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    font-size: 0.75rem;
+    opacity: 0.75;
+  }
+}
+
+
 

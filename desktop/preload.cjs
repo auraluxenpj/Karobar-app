@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld("karobarDesktop", {
   printUrl: (url, options = {}) => ipcRenderer.invoke("karobar:print-url", { url, ...options }),
   printHtml: (html, options = {}) => ipcRenderer.invoke("karobar:print-html", { html, ...options }),
   selectDirectory: () => ipcRenderer.invoke("karobar:select-directory"),
+  selectSqliteFile: () => ipcRenderer.invoke("karobar:select-sqlite-file"),
   runBackupNow: () => ipcRenderer.invoke("karobar:run-backup-now"),
   checkForUpdates: (force = false) => ipcRenderer.invoke("karobar:check-for-updates", { force }),
   downloadAndInstallUpdate: (payload = {}) => ipcRenderer.invoke("karobar:download-and-install-update", payload),

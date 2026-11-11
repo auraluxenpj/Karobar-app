@@ -1886,6 +1886,25 @@ ipcMain.handle("karobar:select-directory", async () => {
   return result.filePaths[0];
 });
 
+ipcMain.handle("karobar:select-sqlite-file", async () => {
+  if (!mainWindow) return null;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Select SQLite Database to Import",
+    properties: ["openFile"],
+    filters: [
+      {
+        name: "SQLite Databases & Backups",
+        extensions: ["sqlite", "sqlite3", "db", "db3", "zip", "gz", "sql"],
+      },
+      { name: "All Files", extensions: ["*"] },
+    ],
+  });
+  if (result.canceled || !result.filePaths?.length) {
+    return null;
+  }
+  return result.filePaths[0];
+});
+
 ipcMain.handle("karobar:run-backup-now", async () => {
   try {
     execFileSync(resolvePhpBinary(), ["artisan", "backup:run-scheduled", "--force"], {

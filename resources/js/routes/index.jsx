@@ -89,6 +89,7 @@ const MissingReports = registerLazy(() => import("../pages/Reports/MissingReport
   "/reports/reorder",
 ]);
 const Setting = registerLazy(() => import("../pages/Setting.jsx"), ["/settings"]);
+const SqliteImportPage = registerLazy(() => import("../pages/SqliteImportPage.jsx"), ["/settings/sqlite-import", "/sqlite-import"]);
 const BackupsIndex = registerLazy(() => import("../pages/Backups/Index.jsx"), ["/backups"]);
 const BarcodeIndex = registerLazy(() => import("../pages/Barcodes/Index.jsx"), ["/barcode-labels"]);
 const StockAdjustmentsIndex = registerLazy(() => import("../pages/stock-adjustments/index.jsx"), ["/stock-adjustments"]);
@@ -329,6 +330,8 @@ export default function AppRoutes() {
 
           {/* Settings & Backups */}
           <Route path="/settings" element={<Setting />} />
+          <Route path="/settings/sqlite-import" element={<SqliteImportPage />} />
+          <Route path="/sqlite-import" element={<SqliteImportPage />} />
           <Route path="/backups" element={<BackupsIndex />} />
 
           {/* Barcode Studio & Label Printing */}

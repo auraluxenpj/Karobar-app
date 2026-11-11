@@ -1506,12 +1506,16 @@ class BackupService
         } catch (Throwable) {
         }
 
-        // Preserve active user sessions & tokens so the user stays logged in after restore on Herd / Desktop
+        // Preserve active user accounts, sessions & tokens so the user stays logged in and their current password is not reverted after restore
+        $preservedUsers = [];
         $preservedSessions = [];
         $preservedTokens = [];
         $preservedBackupLogs = [];
         $preservedBackupSchedules = [];
         try {
+            if (Schema::hasTable('users')) {
+                $preservedUsers = DB::table('users')->get()->map(fn ($r) => (array) $r)->all();
+            }
             if (Schema::hasTable('sessions')) {
                 $preservedSessions = DB::table('sessions')->get()->map(fn ($r) => (array) $r)->all();
             }
@@ -1648,7 +1652,8 @@ class BackupService
                     $preservedSessions,
                     $preservedTokens,
                     $preservedLicenseAttributes,
-                    true
+                    true,
+                    $preservedUsers
                 );
                 return;
             } else {
@@ -1666,7 +1671,8 @@ class BackupService
             $preservedSessions,
             $preservedTokens,
             $preservedLicenseAttributes,
-            false
+            false,
+            $preservedUsers
         );
     }
 
@@ -1699,7 +1705,8 @@ class BackupService
         array $preservedSessions,
         array $preservedTokens,
         ?array $preservedLicenseAttributes,
-        bool $runPendingMigrations = false
+        bool $runPendingMigrations = false,
+        array $preservedUsers = []
     ): void {
         if ($runPendingMigrations) {
             try {
@@ -1711,7 +1718,7 @@ class BackupService
 
         $this->ensureBackupSchema();
         $this->restorePreservedBackupMetadata($preservedBackupLogs, $preservedBackupSchedules);
-        $this->restorePreservedAuthState($preservedSessions, $preservedTokens);
+        $this->restorePreservedAuthState($preservedSessions, $preservedTokens, $preservedUsers);
         $this->reconcileLicenseAfterRestore($preservedLicenseAttributes);
 
         try {
@@ -1778,11 +1785,20 @@ class BackupService
     }
 
     /**
-     * Restore active user sessions and personal access tokens after a database restore.
+     * Restore active user accounts, sessions, and personal access tokens after a database restore.
      */
-    protected function restorePreservedAuthState(array $preservedSessions, array $preservedTokens): void
+    protected function restorePreservedAuthState(array $preservedSessions, array $preservedTokens, array $preservedUsers = []): void
     {
         try {
+            if (!empty($preservedUsers) && Schema::hasTable('users')) {
+                $userColumns = array_flip(Schema::getColumnListing('users'));
+                foreach ($preservedUsers as $userRow) {
+                    if (!empty($userRow['id'])) {
+                        $filtered = array_intersect_key($userRow, $userColumns);
+                        DB::table('users')->updateOrInsert(['id' => $userRow['id']], $filtered);
+                    }
+                }
+            }
             if (!empty($preservedSessions) && Schema::hasTable('sessions')) {
                 $sessionColumns = array_flip(Schema::getColumnListing('sessions'));
                 foreach ($preservedSessions as $sessionRow) {

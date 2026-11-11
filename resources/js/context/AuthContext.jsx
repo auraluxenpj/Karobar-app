@@ -34,6 +34,7 @@ export function AuthProvider({ children }) {
           axios.defaults.headers.common["Authorization"] = `Bearer ${nextToken}`;
         } else {
           delete axios.defaults.headers.common["Authorization"];
+          delete axios.defaults.headers.common["X-Software-Admin-Token"];
           clearApiCache();
           invalidatePermissionsCache();
         }
@@ -107,6 +108,8 @@ export function AuthProvider({ children }) {
     setToken(null);
     setUser(null);
     delete axios.defaults.headers.common["Authorization"];
+    delete axios.defaults.headers.common["X-Software-Admin-Token"];
+    window.dispatchEvent(new CustomEvent("karobar:sw-admin-unlock-changed"));
   }, []);
 
   const contextValue = useMemo(

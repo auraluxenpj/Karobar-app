@@ -46,6 +46,7 @@ import {
   ArrowsPointingInIcon,
   LockClosedIcon,
   LockOpenIcon,
+  CircleStackIcon,
 } from "@heroicons/react/24/outline";
 import { StarIcon as StarSolidIcon } from "@heroicons/react/24/solid";
 import { usePermissions } from "@/api/usePermissions";
@@ -91,10 +92,48 @@ export default function ClassicSidebar({
   const navigate = useNavigate();
   const { theme } = useTheme();
   const { hasWholesale } = useSaleSystem();
-  const { loading: permsLoading, has } = usePermissions();
+  const { loading: permsLoading, has, roles } = usePermissions();
   const [expiryAlertCount, setExpiryAlertCount] = useState(
     () => Number(window.__karobarExpiryAlertCount || 0)
   );
+  const [swAdminUnlocked, setSwAdminUnlocked] = useState(() => {
+    try {
+      return Boolean(sessionStorage.getItem("karobar_sw_admin_sqlite_token"));
+    } catch {
+      return false;
+    }
+  });
+
+  const isApplicationAdmin = useMemo(
+    () =>
+      !permsLoading &&
+      Boolean(
+        roles?.has("Admin") ||
+          roles?.has("Super Admin") ||
+          roles?.has("admin") ||
+          roles?.has("super-admin")
+      ),
+    [permsLoading, roles]
+  );
+
+  useEffect(() => {
+    const syncSwAdminLock = () => {
+      try {
+        setSwAdminUnlocked(
+          Boolean(sessionStorage.getItem("karobar_sw_admin_sqlite_token"))
+        );
+      } catch {
+        setSwAdminUnlocked(false);
+      }
+    };
+    window.addEventListener("karobar:sw-admin-unlock-changed", syncSwAdminLock);
+    return () => {
+      window.removeEventListener(
+        "karobar:sw-admin-unlock-changed",
+        syncSwAdminLock
+      );
+    };
+  }, []);
 
   // Favorites state persisted in localStorage
   const [favorites, setFavorites] = useState(() => {
@@ -539,8 +578,17 @@ export default function ClassicSidebar({
           {
             name: "Settings",
             path: "/settings",
+            exactExclude: ["/settings/sqlite-import"],
             icon: <Cog6ToothIcon className="w-5 h-5" />,
             perm: "settings.view",
+          },
+          {
+            name: "SQLite Data Import",
+            path: "/settings/sqlite-import",
+            matchPaths: ["/settings/sqlite-import", "/sqlite-import"],
+            icon: <CircleStackIcon className="w-5 h-5" />,
+            adminOnly: true,
+            swAdminLocked: true,
           },
           {
             name: "Users",
@@ -593,6 +641,9 @@ export default function ClassicSidebar({
       .map((section) => {
         const permittedItems = section.items
           .filter((it) => {
+            if (it.adminOnly) {
+              return isApplicationAdmin;
+            }
             if (it.permAny) {
               return !permsLoading && it.permAny.some((p) => has(p));
             }
@@ -646,7 +697,7 @@ export default function ClassicSidebar({
     }
 
     return allowedSections;
-  }, [rawSections, permsLoading, has, searchQuery, favorites]);
+  }, [rawSections, permsLoading, has, isApplicationAdmin, searchQuery, favorites]);
 
   // Automatically expand whichever section owns the currently active route
   useEffect(() => {
@@ -1136,12 +1187,41 @@ export default function ClassicSidebar({
                                   expiryAlertCount > 0 && (
                                     <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-800" />
                                   )}
+                                {effectiveCollapsed && item.swAdminLocked && (
+                                  <span
+                                    className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-slate-800 ${
+                                      swAdminUnlocked
+                                        ? "bg-emerald-500"
+                                        : "bg-amber-500"
+                                    }`}
+                                  />
+                                )}
                               </span>
 
                               {!effectiveCollapsed && (
                                 <span className="flex items-center justify-between flex-1 min-w-0">
-                                  <span className="workspace-nav-title truncate font-bold">
-                                    {item.name}
+                                  <span className="workspace-nav-title truncate font-bold flex items-center gap-1.5">
+                                    <span className="truncate">{item.name}</span>
+                                    {item.swAdminLocked && (
+                                      <span
+                                        className={`inline-flex items-center justify-center p-0.5 rounded shrink-0 ${
+                                          swAdminUnlocked
+                                            ? "text-emerald-500 bg-emerald-500/10"
+                                            : "text-amber-500 bg-amber-500/10"
+                                        }`}
+                                        title={
+                                          swAdminUnlocked
+                                            ? "Software Admin Unlocked"
+                                            : "Locked — Requires Software Admin Master Password"
+                                        }
+                                      >
+                                        {swAdminUnlocked ? (
+                                          <LockOpenIcon className="w-3.5 h-3.5" />
+                                        ) : (
+                                          <LockClosedIcon className="w-3.5 h-3.5" />
+                                        )}
+                                      </span>
+                                    )}
                                   </span>
                                   {item.path === "/batch-expiry" &&
                                     expiryAlertCount > 0 && (
