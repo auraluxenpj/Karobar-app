@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld("karobarDesktop", {
   platform: process.platform,
   getAppInfo: () => ipcRenderer.invoke("karobar:app-info"),
   getPrinters: () => ipcRenderer.invoke("karobar:get-printers"),
+  getPreferredPrinter: () => ipcRenderer.invoke("karobar:get-preferred-printer"),
+  setPreferredPrinter: (deviceName) =>
+    ipcRenderer.invoke("karobar:set-preferred-printer", { deviceName }),
   silentPrint: (options = {}) => ipcRenderer.invoke("karobar:silent-print", options),
   printUrl: (url, options = {}) => ipcRenderer.invoke("karobar:print-url", { url, ...options }),
   printHtml: (html, options = {}) => ipcRenderer.invoke("karobar:print-html", { html, ...options }),

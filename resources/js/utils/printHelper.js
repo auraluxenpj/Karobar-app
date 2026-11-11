@@ -39,16 +39,34 @@ export function getPreferredPrinter() {
 
 export function setPreferredPrinter(deviceName) {
   if (typeof window === "undefined") return;
+  const clean = String(deviceName || "").trim();
+  const normalized = !clean || clean === "default" || clean === "system_default" ? "" : clean;
   try {
-    const clean = String(deviceName || "").trim();
-    if (!clean || clean === "default" || clean === "system_default") {
+    if (!normalized) {
       window.localStorage.removeItem(PREFERRED_PRINTER_STORAGE_KEY);
     } else {
-      window.localStorage.setItem(PREFERRED_PRINTER_STORAGE_KEY, clean);
+      window.localStorage.setItem(PREFERRED_PRINTER_STORAGE_KEY, normalized);
     }
   } catch {
     // ignore storage errors
   }
+  try {
+    const desktop = getDesktopPrintBridge();
+    if (desktop && typeof desktop.setPreferredPrinter === "function") {
+      desktop.setPreferredPrinter(normalized).catch(() => {});
+    }
+  } catch {
+    // ignore IPC errors
+  }
+}
+
+function formatSuccessToastMessage(baseMessage, res) {
+  const base = baseMessage || "Sent to printer";
+  const printerName = String(res?.printer || "").trim();
+  if (printerName && !base.includes(printerName)) {
+    return `${base} (${printerName})`;
+  }
+  return base;
 }
 
 function runIframeUrlPrint(url) {
@@ -195,14 +213,16 @@ export async function printSlipUrl(urlOrPayload, options = {}) {
       });
       if (res?.ok) {
         if (!options.quiet) {
-          toast.success(options.successMessage || "Slip sent to printer", { id: toastId });
+          toast.success(formatSuccessToastMessage(options.successMessage || "Slip sent to printer", res), {
+            id: toastId,
+          });
         }
         return true;
       }
       if (!options.quiet) {
         toast.error(
           res?.error ? `Printer error: ${res.error}` : "Could not print slip. Check printer connection.",
-          { id: toastId }
+          { id: toastId, duration: 5000 }
         );
       }
       return false;
@@ -237,14 +257,16 @@ export async function printSlipHtml(html, options = {}) {
       });
       if (res?.ok) {
         if (!options.quiet) {
-          toast.success(options.successMessage || "Sent to printer", { id: toastId });
+          toast.success(formatSuccessToastMessage(options.successMessage || "Sent to printer", res), {
+            id: toastId,
+          });
         }
         return true;
       }
       if (!options.quiet) {
         toast.error(
           res?.error ? `Printer error: ${res.error}` : "Could not print. Check printer connection.",
-          { id: toastId }
+          { id: toastId, duration: 5000 }
         );
       }
       return false;
@@ -279,14 +301,17 @@ export async function printCurrentView(options = {}) {
       });
       if (res?.ok) {
         if (!options.quiet) {
-          toast.success(options.successMessage || "Document sent to printer", { id: toastId });
+          toast.success(
+            formatSuccessToastMessage(options.successMessage || "Document sent to printer", res),
+            { id: toastId }
+          );
         }
         return true;
       }
       if (!options.quiet) {
         toast.error(
           res?.error ? `Printer error: ${res.error}` : "Could not print document. Check printer connection.",
-          { id: toastId }
+          { id: toastId, duration: 5000 }
         );
       }
       return false;
@@ -320,6 +345,20 @@ if (typeof window !== "undefined") {
       window.print = () => {
         printCurrentView();
       };
+      // Synchronize preferred printer between localStorage and Electron main process
+      const localPreferred = getPreferredPrinter();
+      if (localPreferred && typeof desktop.setPreferredPrinter === "function") {
+        desktop.setPreferredPrinter(localPreferred).catch(() => {});
+      } else if (!localPreferred && typeof desktop.getPreferredPrinter === "function") {
+        desktop
+          .getPreferredPrinter()
+          .then((info) => {
+            if (info?.preferredPrinter) {
+              window.localStorage.setItem(PREFERRED_PRINTER_STORAGE_KEY, info.preferredPrinter);
+            }
+          })
+          .catch(() => {});
+      }
     }
   } catch {
     // ignore

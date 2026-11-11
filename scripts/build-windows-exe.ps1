@@ -79,6 +79,11 @@ foreach ($dFile in @("router.php", "main.cjs", "preload.cjs", "splash.html", "pa
         Copy-Item -Path $dSrc -Destination (Join-Path $DesktopStage $dFile) -Force
     }
 }
+$SumatraSrc = Join-Path $RepoRoot "desktop\node_modules\pdf-to-printer\dist\SumatraPDF-3.4.6-32.exe"
+if (Test-Path $SumatraSrc) {
+    Copy-Item -Path $SumatraSrc -Destination (Join-Path $DesktopStage "SumatraPDF.exe") -Force
+    Copy-Item -Path $SumatraSrc -Destination (Join-Path $DesktopStage "SumatraPDF-3.4.6-32.exe") -Force
+}
 
 $CopyFiles = @("artisan", "composer.json", "composer.lock", "package.json", ".env.example")
 foreach ($file in $CopyFiles) {

@@ -5,7 +5,7 @@ const os = require("os");
 const net = require("net");
 const http = require("http");
 const https = require("https");
-const { spawn, execFileSync } = require("child_process");
+const { spawn, execFile, execFileSync } = require("child_process");
 
 let mainWindow = null;
 let splashWindow = null;
@@ -973,9 +973,19 @@ if (!gotSingleLock) {
 
   app.whenReady().then(async () => {
     createSplashWindow();
+    if (process.platform === "win32") {
+      refreshWindowsWmiPrinters().catch(() => {});
+    }
     await startBackendServices();
     createSystemTray();
     createMainWindow();
+    setTimeout(() => {
+      try {
+        prewarmPrintWindow();
+      } catch {
+        // ignore
+      }
+    }, 600);
   });
 }
 
@@ -987,153 +997,425 @@ ipcMain.handle("karobar:app-info", () => ({
   platform: process.platform,
 }));
 
+// ============================================================================
+// KAROBAR WINDOWS DIRECT HARDWARE PRINT ENGINE (SumatraPDF + Chromium Dual-Engine)
+// ============================================================================
+
 let cachedPrintersList = null;
 let cachedPrintersAt = 0;
-const VIRTUAL_FILE_PRINTER_RE =
-  /^(microsoft print to pdf|microsoft xps document writer|onenote|send to onenote|fax|adobe pdf|foxit.*pdf)/i;
+let cachedWmiPrintersMap = new Map();
+let cachedWmiPrintersAt = 0;
+let wmiRefreshInFlight = null;
 
-async function getCachedPrinters(contents, forceRefresh = false) {
-  const now = Date.now();
-  if (!forceRefresh && Array.isArray(cachedPrintersList) && now - cachedPrintersAt < 15000) {
-    return cachedPrintersList;
-  }
-  const target =
-    contents && !contents.isDestroyed()
-      ? contents
-      : mainWindow && !mainWindow.isDestroyed()
-      ? mainWindow.webContents
-      : null;
-  if (!target) return cachedPrintersList || [];
+const VIRTUAL_PRINTER_NAME_OR_DRIVER_RE =
+  /(microsoft print to pdf|microsoft xps|xps document writer|onenote|send to onenote|fax|anydesk|teamviewer|adobe pdf|foxit|cutepdf|dopdf|bullzip|nitro pdf|pdfcreator|pdffactory|clawpdf|pdf24|wondershare|wps pdf|fineprint|snagit|paperport|priprinter|universal document|canva|save as pdf)/i;
+
+const VIRTUAL_PRINTER_PORT_RE =
+  /^(portprompt:|file:|nul:|xpsport:|shrfax:|microsoft\.office\.onenote|anydesk|pdf)/i;
+
+const THERMAL_POS_PRINTER_RE =
+  /(pos|thermal|receipt|58mm|80mm|78mm|72mm|xprinter|xp-|black\s*copper|bc-|epson.*tm|tm-t|tm-u|bixolon|star\s*tsp|citizen|rongta|rp58|rp80|birch|sewoo|gainscha|hprt|deli|zywell|munbyn|netum|goojprt|milestone|gp-)/i;
+
+function getPrinterConfigFilePath() {
   try {
-    const list = await target.getPrintersAsync();
-    if (Array.isArray(list)) {
-      cachedPrintersList = list;
-      cachedPrintersAt = Date.now();
-      return list;
+    return path.join(app.getPath("userData"), "printer-config.json");
+  } catch {
+    return path.join(os.tmpdir(), "karobar-printer-config.json");
+  }
+}
+
+function readPreferredPrinterConfig() {
+  try {
+    const file = getPrinterConfigFilePath();
+    if (!fs.existsSync(file)) return "";
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+    const name = String(parsed?.preferredPrinter || "").trim();
+    if (!name || name === "default" || name === "system_default") return "";
+    return name;
+  } catch {
+    return "";
+  }
+}
+
+function writePreferredPrinterConfig(deviceName) {
+  try {
+    const clean = String(deviceName || "").trim();
+    const normalized =
+      !clean || clean === "default" || clean === "system_default" ? "" : clean;
+    const file = getPrinterConfigFilePath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ preferredPrinter: normalized, updatedAt: new Date().toISOString() }, null, 2),
+      "utf8"
+    );
+    return normalized;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Read the last physical printer the user selected in Chromium's print dialog
+ * from Electron's userData/Preferences (`printing.print_preview_sticky_settings.appState`).
+ */
+function getLastUsedChromiumPrinter() {
+  try {
+    const prefsPath = path.join(app.getPath("userData"), "Preferences");
+    if (!fs.existsSync(prefsPath)) return "";
+    const prefs = JSON.parse(fs.readFileSync(prefsPath, "utf8"));
+    const rawAppState = prefs?.printing?.print_preview_sticky_settings?.appState;
+    if (!rawAppState || typeof rawAppState !== "string") return "";
+    const appState = JSON.parse(rawAppState);
+    const recent = Array.isArray(appState?.recentDestinations) ? appState.recentDestinations : [];
+    for (const dest of recent) {
+      const id = String(dest?.id || "").trim();
+      if (id && id !== "Save as PDF" && !VIRTUAL_PRINTER_NAME_OR_DRIVER_RE.test(id)) {
+        return id;
+      }
     }
   } catch {
     // ignore
   }
-  return cachedPrintersList || [];
+  return "";
+}
+
+/**
+ * Resolve bundled SumatraPDF CLI binary for direct Win32 GDI silent printing on Windows.
+ */
+function resolveSumatraPdfBinary() {
+  if (process.platform !== "win32") return null;
+
+  const candidates = [
+    path.join(APP_ROOT, "desktop", "SumatraPDF.exe"),
+    path.join(APP_ROOT, "desktop", "SumatraPDF-3.4.6-32.exe"),
+    path.join(__dirname, "SumatraPDF.exe").replace("app.asar", "app.asar.unpacked"),
+    path
+      .join(__dirname, "node_modules", "pdf-to-printer", "dist", "SumatraPDF-3.4.6-32.exe")
+      .replace("app.asar", "app.asar.unpacked"),
+    path.join(
+      path.dirname(process.execPath),
+      "resources",
+      "app.asar.unpacked",
+      "node_modules",
+      "pdf-to-printer",
+      "dist",
+      "SumatraPDF-3.4.6-32.exe"
+    ),
+    path.join(
+      APP_ROOT,
+      "desktop",
+      "node_modules",
+      "pdf-to-printer",
+      "dist",
+      "SumatraPDF-3.4.6-32.exe"
+    ),
+    path.join(__dirname, "node_modules", "pdf-to-printer", "dist", "SumatraPDF-3.4.6-32.exe"),
+  ];
+
+  for (const candidate of candidates) {
+    try {
+      if (candidate && !candidate.includes("app.asar" + path.sep) && fs.existsSync(candidate)) {
+        return candidate;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return null;
+}
+
+/**
+ * Query Windows WMI Win32_Printer asynchronously to detect PortName, DriverName, and WorkOffline
+ * (which Electron's getPrintersAsync() does not expose when a USB printer is unplugged).
+ */
+function refreshWindowsWmiPrinters(force = false) {
+  if (process.platform !== "win32") return Promise.resolve(cachedWmiPrintersMap);
+  const now = Date.now();
+  if (!force && cachedWmiPrintersMap.size > 0 && now - cachedWmiPrintersAt < 20000) {
+    return Promise.resolve(cachedWmiPrintersMap);
+  }
+  if (wmiRefreshInFlight) return wmiRefreshInFlight;
+
+  wmiRefreshInFlight = new Promise((resolve) => {
+    execFile(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-NonInteractive",
+        "-WindowStyle",
+        "Hidden",
+        "-Command",
+        "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); Get-CimInstance -ClassName Win32_Printer -Property Name,Default,WorkOffline,PrinterStatus,PortName,DriverName | Select-Object Name,Default,WorkOffline,PrinterStatus,PortName,DriverName | ConvertTo-Json -Compress",
+      ],
+      { windowsHide: true, timeout: 4500 },
+      (err, stdout) => {
+        wmiRefreshInFlight = null;
+        if (!err && stdout && String(stdout).trim()) {
+          try {
+            const parsed = JSON.parse(String(stdout).trim());
+            const rows = Array.isArray(parsed) ? parsed : [parsed];
+            const nextMap = new Map();
+            for (const row of rows) {
+              const pName = String(row?.Name || "").trim();
+              if (!pName) continue;
+              nextMap.set(pName.toLowerCase(), {
+                name: pName,
+                isDefault: Boolean(row?.Default),
+                workOffline: Boolean(row?.WorkOffline),
+                printerStatus: Number(row?.PrinterStatus || 0),
+                portName: String(row?.PortName || "").trim(),
+                driverName: String(row?.DriverName || "").trim(),
+              });
+            }
+            if (nextMap.size > 0) {
+              cachedWmiPrintersMap = nextMap;
+              cachedWmiPrintersAt = Date.now();
+            }
+          } catch {
+            // ignore JSON parse errors
+          }
+        }
+        resolve(cachedWmiPrintersMap);
+      }
+    );
+  });
+
+  return wmiRefreshInFlight;
+}
+
+function classifyPrinterInfo(rawPrinter, wmiMap, preferredName, lastChromiumName) {
+  const name = String(rawPrinter?.name || "").trim();
+  const displayName = String(rawPrinter?.displayName || name).trim();
+  const wmi = wmiMap.get(name.toLowerCase()) || null;
+  const driverName = String(
+    wmi?.driverName ||
+      rawPrinter?.options?.["system_driverinfo"] ||
+      rawPrinter?.options?.["printer-make-and-model"] ||
+      rawPrinter?.description ||
+      ""
+  ).trim();
+  const portName = String(wmi?.portName || "").trim();
+  const statusMask = Number(rawPrinter?.status || 0);
+  const wmiPrinterStatus = Number(wmi?.printerStatus || 0);
+
+  const isVirtual =
+    VIRTUAL_PRINTER_NAME_OR_DRIVER_RE.test(name) ||
+    VIRTUAL_PRINTER_NAME_OR_DRIVER_RE.test(displayName) ||
+    VIRTUAL_PRINTER_NAME_OR_DRIVER_RE.test(driverName) ||
+    VIRTUAL_PRINTER_PORT_RE.test(portName);
+
+  // Win32 status flags: 0x80 = OFFLINE, 0x02 = ERROR, 0x04 = PENDING_DELETION, 0x1000 = NOT_AVAILABLE
+  // WMI PrinterStatus: 7 = Offline
+  const workOffline =
+    Boolean(wmi?.workOffline) ||
+    wmiPrinterStatus === 7 ||
+    (statusMask & (0x00000080 | 0x00001000)) !== 0;
+
+  const hasHardwareError = (statusMask & (0x00000002 | 0x00000004)) !== 0;
+  const isOnline = !isVirtual && !workOffline && !hasHardwareError;
+  const isThermalPos =
+    !isVirtual &&
+    (THERMAL_POS_PRINTER_RE.test(name) ||
+      THERMAL_POS_PRINTER_RE.test(displayName) ||
+      THERMAL_POS_PRINTER_RE.test(driverName));
+
+  const isDefault = Boolean(rawPrinter?.isDefault || wmi?.isDefault);
+  const isPreferred =
+    Boolean(preferredName) && name.toLowerCase() === String(preferredName).toLowerCase();
+  const isLastUsedInChromium =
+    Boolean(lastChromiumName) && name.toLowerCase() === String(lastChromiumName).toLowerCase();
+
+  return {
+    ...rawPrinter,
+    name,
+    displayName,
+    driverName,
+    portName,
+    isDefault,
+    isVirtual,
+    workOffline,
+    isOnline,
+    isThermalPos,
+    isPreferred,
+    isLastUsedInChromium,
+  };
+}
+
+async function getCachedPrinters(contents, forceRefresh = false) {
+  const now = Date.now();
+  if (process.platform === "win32") {
+    if (forceRefresh || cachedWmiPrintersMap.size === 0) {
+      await Promise.race([
+        refreshWindowsWmiPrinters(forceRefresh),
+        new Promise((r) => setTimeout(r, 800)),
+      ]);
+    } else if (now - cachedWmiPrintersAt >= 20000) {
+      refreshWindowsWmiPrinters(false).catch(() => {});
+    }
+  }
+
+  let rawList = cachedPrintersList;
+  if (forceRefresh || !Array.isArray(rawList) || now - cachedPrintersAt >= 15000) {
+    const target =
+      contents && !contents.isDestroyed()
+        ? contents
+        : mainWindow && !mainWindow.isDestroyed()
+        ? mainWindow.webContents
+        : null;
+    if (target) {
+      try {
+        const fetched = await target.getPrintersAsync();
+        if (Array.isArray(fetched)) {
+          rawList = fetched;
+          cachedPrintersList = fetched;
+          cachedPrintersAt = Date.now();
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  const list = Array.isArray(rawList) ? rawList : [];
+  const preferredName = readPreferredPrinterConfig();
+  const lastChromiumName = getLastUsedChromiumPrinter();
+
+  return list.map((p) =>
+    classifyPrinterInfo(p, cachedWmiPrintersMap, preferredName, lastChromiumName)
+  );
 }
 
 ipcMain.handle("karobar:get-printers", async () => {
   return getCachedPrinters(mainWindow?.webContents, true);
 });
 
+ipcMain.handle("karobar:get-preferred-printer", async () => {
+  const saved = readPreferredPrinterConfig();
+  const strategy = await resolvePrinterStrategy(mainWindow?.webContents, saved, false);
+  return {
+    preferredPrinter: saved,
+    resolvedPrinter: strategy?.deviceName || "",
+    mode: strategy?.mode || "no-printer",
+  };
+});
+
+ipcMain.handle("karobar:set-preferred-printer", async (_event, payload = {}) => {
+  const saved = writePreferredPrinterConfig(payload?.deviceName);
+  const strategy = await resolvePrinterStrategy(mainWindow?.webContents, saved, false);
+  return {
+    ok: true,
+    preferredPrinter: saved,
+    resolvedPrinter: strategy?.deviceName || "",
+  };
+});
+
 /**
- * Resolve target printer strategy:
- * - Returns { mode: "spooler", deviceName: "<printer name>" } for physical/POS printers
- * - Returns { mode: "pdf-fallback", deviceName: "Microsoft Print to PDF" } when only virtual
- *   file-prompting printers exist on the PC (prevents Windows Print Spooler from hanging 20s
- *   waiting on an invisible Win32 "Save Print Output As" file dialog).
+ * Resolve the exact target hardware printer on Windows:
+ * 1. Explicit printer requested in options.deviceName or saved in printer-config.json
+ * 2. Last-used physical printer from Chromium's PrintPreviewStickySettings (if online)
+ * 3. Connected/online physical printer (matching thermal vs A4 when applicable, or OS default if physical & online)
+ * 4. Any installed physical printer (if WMI status reports offline for all)
+ * 5. Returns { mode: "no-printer" } if zero physical printers exist (never lies with a fake "Sent to printer"!)
  */
-async function resolvePrinterStrategy(contents, requestedDeviceName) {
-  const requested = String(requestedDeviceName || "").trim();
+async function resolvePrinterStrategy(contents, requestedDeviceName, isThermalDoc = false) {
+  const explicitRequest = String(
+    requestedDeviceName || readPreferredPrinterConfig() || ""
+  ).trim();
   const printers = await getCachedPrinters(contents);
 
   if (!Array.isArray(printers) || printers.length === 0) {
-    return { mode: "pdf-fallback", deviceName: undefined };
+    return {
+      mode: "no-printer",
+      deviceName: undefined,
+      error: "No printers found on Windows. Please connect and install a printer.",
+    };
   }
 
-  // 1. Explicit printer requested in Karobar Settings
-  if (requested && requested !== "default" && requested !== "system_default") {
+  // 1. User explicitly chose a target printer in Karobar Settings
+  if (
+    explicitRequest &&
+    explicitRequest !== "default" &&
+    explicitRequest !== "system_default"
+  ) {
     const matched =
-      printers.find((p) => p && p.name === requested) ||
-      printers.find((p) => p && String(p.name || "").toLowerCase() === requested.toLowerCase());
-    if (matched) {
-      if (VIRTUAL_FILE_PRINTER_RE.test(matched.name)) {
-        return { mode: "pdf-fallback", deviceName: matched.name };
+      printers.find((p) => p && p.name === explicitRequest) ||
+      printers.find(
+        (p) => p && String(p.name || "").toLowerCase() === explicitRequest.toLowerCase()
+      );
+    if (matched && !matched.isVirtual) {
+      // If the user's configured printer is currently unplugged/offline (workOffline === true),
+      // check whether another physical printer is online; if not, still attempt the configured printer.
+      if (matched.workOffline) {
+        const onlineAlternative = printers.find((p) => !p.isVirtual && p.isOnline);
+        if (onlineAlternative) {
+          return {
+            mode: "spooler",
+            deviceName: onlineAlternative.name,
+            printerInfo: onlineAlternative,
+          };
+        }
       }
-      return { mode: "spooler", deviceName: matched.name };
+      return { mode: "spooler", deviceName: matched.name, printerInfo: matched };
     }
   }
 
-  // 2. System Default selected: check OS default printer first
-  const osDefault = printers.find((p) => p && p.isDefault && p.name);
-  if (osDefault && !VIRTUAL_FILE_PRINTER_RE.test(osDefault.name)) {
-    return { mode: "spooler", deviceName: osDefault.name };
+  // 2. Filter out virtual/file-prompting printers (Microsoft Print to PDF, OneNote, XPS, AnyDesk, Fax, PORTPROMPT:)
+  const physicalPrinters = printers.filter((p) => p && p.name && !p.isVirtual);
+  if (physicalPrinters.length === 0) {
+    return {
+      mode: "no-printer",
+      deviceName: undefined,
+      error:
+        "No physical hardware printer connected (only virtual PDF/OneNote printers detected). Please connect your printer or select it in Settings → Print & Receipt Layouts.",
+    };
   }
 
-  // 3. If OS default is "Microsoft Print to PDF" / "XPS" / "Fax", prefer any connected physical/POS printer
-  const firstPhysical = printers.find((p) => p && p.name && !VIRTUAL_FILE_PRINTER_RE.test(p.name));
-  if (firstPhysical) {
-    return { mode: "spooler", deviceName: firstPhysical.name };
+  // Prefer online (connected & ready) physical printers over unplugged USB printer drivers
+  const onlinePhysical = physicalPrinters.filter((p) => p.isOnline);
+  const candidatePool = onlinePhysical.length > 0 ? onlinePhysical : physicalPrinters;
+
+  // 2A. Check Chromium's last-used printer from native print dialog history
+  const lastChromium = candidatePool.find((p) => p.isLastUsedInChromium);
+  if (lastChromium) {
+    return { mode: "spooler", deviceName: lastChromium.name, printerInfo: lastChromium };
   }
 
-  // 4. No physical printer installed on PC (only virtual PDF/XPS/Fax printers): use instant printToPDF
-  return { mode: "pdf-fallback", deviceName: osDefault?.name || undefined };
-}
-
-async function saveInstantPdfFallback(contents) {
-  try {
-    const pdfBuffer = await contents.printToPDF({
-      printBackground: true,
-      preferCSSPageSize: true,
-      margins: { top: 0, bottom: 0, left: 0, right: 0 },
-    });
-    const outDir = path.join(app.getPath("documents"), "Karobar-Prints");
-    fs.mkdirSync(outDir, { recursive: true });
-    const filePath = path.join(outDir, `Slip-${Date.now()}.pdf`);
-    fs.writeFileSync(filePath, pdfBuffer);
-    return { ok: true, pdfFallback: true, filePath };
-  } catch (err) {
-    return { ok: false, error: err?.message || "No physical printer connected" };
-  }
-}
-
-async function executeSilentSpoolOrPdf(contents, options = {}) {
-  const strategy = await resolvePrinterStrategy(contents, options.deviceName);
-
-  if (strategy.mode === "pdf-fallback") {
-    return saveInstantPdfFallback(contents);
-  }
-
-  const printOptions = {
-    silent: options.silent !== false,
-    printBackground: true,
-    margins: { marginType: "none" },
-  };
-  if (strategy.deviceName) {
-    printOptions.deviceName = strategy.deviceName;
-  }
-
-  return new Promise((resolve) => {
-    let settled = false;
-    const safetyTimer = setTimeout(async () => {
-      if (settled) return;
-      settled = true;
-      const fallback = await saveInstantPdfFallback(contents);
-      resolve(fallback);
-    }, 5000);
-
-    try {
-      contents.print(printOptions, (success, errorType) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(safetyTimer);
-        resolve({ ok: Boolean(success), error: errorType || null });
-      });
-    } catch (err) {
-      if (settled) return;
-      settled = true;
-      clearTimeout(safetyTimer);
-      resolve({ ok: false, error: err?.message || "Print failed" });
+  // 2B. If printing a thermal receipt and an online thermal POS printer exists, prefer it
+  if (isThermalDoc) {
+    const thermalMatch = candidatePool.find((p) => p.isThermalPos);
+    if (thermalMatch) {
+      return { mode: "spooler", deviceName: thermalMatch.name, printerInfo: thermalMatch };
     }
-  });
+  }
+
+  // 2C. If OS Default Printer is in the online physical pool, use it
+  const osDefaultPhysical = candidatePool.find((p) => p.isDefault);
+  if (osDefaultPhysical) {
+    return { mode: "spooler", deviceName: osDefaultPhysical.name, printerInfo: osDefaultPhysical };
+  }
+
+  // 2D. Otherwise pick the first online physical printer
+  const chosen = candidatePool[0];
+  return { mode: "spooler", deviceName: chosen.name, printerInfo: chosen };
 }
 
 /**
- * Wait for any local images inside the offscreen print window to finish decoding.
- * Never uses requestAnimationFrame (which is paused by Chromium in hidden windows).
+ * Prepare the loaded document inside the offscreen print window:
+ * - Waits for any <img> elements to decode
+ * - Detects whether the document is a Thermal receipt (58mm / 72mm / 78mm / 80mm) or A4 document
+ * - Injects @media print normalization so invalid `@page { size: 78mm auto }` or `.receipt { margin: 0 auto }`
+ *   never misalign or shrink thermal receipts
+ * - Measures exact rendered pixel height for continuous-roll thermal PDF generation
  */
-async function waitForPrintResources(contents) {
+async function prepareDocumentForPrint(contents) {
+  const fallbackLayout = { isThermal: false, widthMm: 210, heightPx: 1122 };
   try {
-    await Promise.race([
+    const layout = await Promise.race([
       contents.executeJavaScript(
         `
         (async () => {
-          try { window.print = () => {}; } catch {}
+          try { window.print = () => {}; window.close = () => {}; } catch {}
           const imgs = Array.from(document.images || []);
           if (imgs.length > 0) {
             await Promise.all(
@@ -1143,32 +1425,252 @@ async function waitForPrintResources(contents) {
                   : new Promise((res) => {
                       img.addEventListener("load", res, { once: true });
                       img.addEventListener("error", res, { once: true });
-                      setTimeout(res, 250);
+                      setTimeout(res, 350);
                     })
               )
             );
           }
-          return true;
+
+          const styleText = Array.from(document.querySelectorAll("style"))
+            .map((s) => s.textContent || "")
+            .join("\\n");
+          const titleText = String(document.title || "");
+          const receiptEl = document.querySelector(".receipt");
+
+          const is58mm = /58mm/i.test(styleText);
+          const isThermal =
+            Boolean(receiptEl) ||
+            is58mm ||
+            /(72mm|78mm|80mm)/i.test(styleText) ||
+            /thermal/i.test(titleText);
+
+          const widthMm = is58mm ? 58 : isThermal ? 80 : 210;
+
+          if (isThermal) {
+            const fixStyle = document.createElement("style");
+            fixStyle.textContent = \`
+              @page { margin: 0 !important; }
+              html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: \${widthMm}mm !important;
+                max-width: \${widthMm}mm !important;
+                background: #ffffff !important;
+              }
+              .print-actions, .no-print { display: none !important; }
+              .receipt {
+                margin: 0 !important;
+                width: 100% !important;
+                max-width: 100% !important;
+              }
+            \`;
+            document.head.appendChild(fixStyle);
+          }
+
+          const body = document.body;
+          const docEl = document.documentElement;
+          const heightPx = Math.max(
+            receiptEl ? receiptEl.scrollHeight : 0,
+            receiptEl ? receiptEl.offsetHeight : 0,
+            body ? body.scrollHeight : 0,
+            body ? body.offsetHeight : 0,
+            docEl ? docEl.scrollHeight : 0,
+            180
+          );
+
+          return { isThermal, widthMm, heightPx };
         })()
         `,
         true
       ),
-      new Promise((resolve) => setTimeout(resolve, 350)),
+      new Promise((resolve) => setTimeout(() => resolve(fallbackLayout), 600)),
     ]);
+    return layout && typeof layout === "object" ? layout : fallbackLayout;
   } catch {
-    // Proceed immediately
+    return fallbackLayout;
   }
 }
 
-function ensurePrintWorkerWindow() {
-  if (printWorkerWindow && !printWorkerWindow.isDestroyed()) {
-    return printWorkerWindow;
+/**
+ * Spool a generated PDF file directly to a Windows hardware printer using SumatraPDF CLI (`pdf-to-printer`).
+ */
+function spoolPdfViaSumatra(sumatraExe, pdfFilePath, deviceName, isThermal) {
+  return new Promise((resolve) => {
+    const args = [];
+    if (deviceName) {
+      args.push("-print-to", deviceName);
+    } else {
+      args.push("-print-to-default");
+    }
+    args.push("-silent");
+    args.push("-print-settings", isThermal ? "noscale" : "fit");
+    args.push(pdfFilePath);
+
+    execFile(
+      sumatraExe,
+      args,
+      { windowsHide: true, timeout: 15000 },
+      (err, _stdout, stderr) => {
+        if (err) {
+          resolve({
+            ok: false,
+            error: String(stderr || err.message || "SumatraPDF spooler failed").trim(),
+          });
+          return;
+        }
+        resolve({ ok: true });
+      }
+    );
+  });
+}
+
+/**
+ * Fallback direct spooler using Chromium's webContents.print() WITHOUT `margins: { marginType: "none" }`
+ * (which causes Windows thermal and laser printer drivers to reject the DEVMODE with InvalidPrinterSettings).
+ */
+function spoolViaWebContentsPrint(contents, deviceName, silent = true) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const printOptions = {
+      silent: silent !== false,
+      printBackground: true,
+    };
+    if (deviceName) {
+      printOptions.deviceName = deviceName;
+    }
+
+    const safetyTimer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      resolve({
+        ok: false,
+        error: `Printer "${deviceName || "Default"}" did not respond in time. Please verify the printer is powered on and connected.`,
+      });
+    }, 9000);
+
+    try {
+      contents.print(printOptions, (success, errorType) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(safetyTimer);
+        if (success) {
+          resolve({ ok: true, printer: deviceName, engine: "chromium" });
+        } else {
+          resolve({
+            ok: false,
+            error: errorType || `Printer "${deviceName || "Default"}" rejected the print job.`,
+            printer: deviceName,
+          });
+        }
+      });
+    } catch (err) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(safetyTimer);
+      resolve({
+        ok: false,
+        error: err?.message || "Failed to invoke Windows print spooler",
+        printer: deviceName,
+      });
+    }
+  });
+}
+
+/**
+ * Execute silent hardware printing using:
+ * - Engine 1 (Windows Primary): Chromium `printToPDF` (~40ms) + `SumatraPDF.exe -print-to "<deviceName>" -silent`
+ *   (100% immune to Electron 35's `webContents.print({ silent: true })` spooler hang).
+ * - Engine 2 (Fallback): `webContents.print({ silent: true, printBackground: true, deviceName })`
+ *   with driver-compatible default margins.
+ */
+async function executeSilentSpoolOrPdf(contents, options = {}, layout = null) {
+  const docLayout = layout || (await prepareDocumentForPrint(contents));
+  const strategy = await resolvePrinterStrategy(
+    contents,
+    options.deviceName,
+    Boolean(docLayout?.isThermal)
+  );
+
+  if (strategy.mode === "no-printer" || !strategy.deviceName) {
+    return {
+      ok: false,
+      noPhysicalPrinter: true,
+      error:
+        strategy.error ||
+        "No physical hardware printer detected on Windows. Please connect a printer or select one in Settings → Print & Receipt Layouts.",
+    };
   }
 
+  const targetPrinter = strategy.deviceName;
+  const sumatraExe = resolveSumatraPdfBinary();
+
+  // Primary Engine on Windows: printToPDF + SumatraPDF direct Win32 spooling
+  if (process.platform === "win32" && sumatraExe) {
+    const tempPdfPath = path.join(
+      os.tmpdir(),
+      `karobar-spool-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.pdf`
+    );
+    try {
+      const pdfOptions = {
+        printBackground: true,
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+      };
+
+      if (docLayout?.isThermal) {
+        const widthIn = docLayout.widthMm === 58 ? 2.283 : 3.15;
+        const heightIn = Math.max(Number(docLayout.heightPx || 400) / 96 + 0.25, 2.2);
+        pdfOptions.pageSize = { width: widthIn, height: heightIn };
+        pdfOptions.preferCSSPageSize = false;
+      } else {
+        pdfOptions.pageSize = "A4";
+        pdfOptions.preferCSSPageSize = true;
+      }
+
+      const pdfBuffer = await contents.printToPDF(pdfOptions);
+      fs.writeFileSync(tempPdfPath, pdfBuffer);
+
+      const sumatraResult = await spoolPdfViaSumatra(
+        sumatraExe,
+        tempPdfPath,
+        targetPrinter,
+        Boolean(docLayout?.isThermal)
+      );
+
+      setTimeout(() => {
+        try {
+          if (fs.existsSync(tempPdfPath)) fs.unlinkSync(tempPdfPath);
+        } catch {
+          // ignore
+        }
+      }, 15000);
+
+      if (sumatraResult.ok) {
+        return {
+          ok: true,
+          printer: targetPrinter,
+          engine: "sumatra-win32",
+        };
+      }
+    } catch {
+      setTimeout(() => {
+        try {
+          if (fs.existsSync(tempPdfPath)) fs.unlinkSync(tempPdfPath);
+        } catch {
+          // ignore
+        }
+      }, 5000);
+    }
+  }
+
+  // Fallback Engine: Chromium webContents.print() with driver-safe default margins
+  return spoolViaWebContentsPrint(contents, targetPrinter, options.silent !== false);
+}
+
+function createHiddenPrintWindow() {
   const sessionToUse =
     mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents.session : undefined;
 
-  printWorkerWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     width: 820,
     height: 900,
     show: false,
@@ -1187,33 +1689,78 @@ function ensurePrintWorkerWindow() {
     },
   });
 
-  printWorkerWindow.webContents.on("dom-ready", () => {
-    if (printWorkerWindow && !printWorkerWindow.isDestroyed()) {
-      printWorkerWindow.webContents.executeJavaScript("window.print = () => {};").catch(() => {});
+  win.webContents.on("dom-ready", () => {
+    if (!win.isDestroyed()) {
+      win.webContents
+        .executeJavaScript("window.print = () => {}; window.close = () => {};")
+        .catch(() => {});
     }
   });
 
-  printWorkerWindow.on("closed", () => {
-    printWorkerWindow = null;
-  });
+  return win;
+}
 
+function prewarmPrintWindow() {
+  if (!printWorkerWindow || printWorkerWindow.isDestroyed()) {
+    printWorkerWindow = createHiddenPrintWindow();
+    printWorkerWindow.on("closed", () => {
+      if (printWorkerWindow === winRef) {
+        printWorkerWindow = null;
+      }
+    });
+    const winRef = printWorkerWindow;
+  }
   return printWorkerWindow;
+}
+
+function acquirePrintWindow() {
+  let win = printWorkerWindow;
+  printWorkerWindow = null;
+  if (!win || win.isDestroyed()) {
+    win = createHiddenPrintWindow();
+  }
+  // Pre-warm the next isolated print window in the background for zero-latency subsequent prints
+  setTimeout(() => {
+    try {
+      if (!isQuitting) prewarmPrintWindow();
+    } catch {
+      // ignore
+    }
+  }, 50);
+  return win;
+}
+
+function releasePrintWindow(win) {
+  if (!win) return;
+  setTimeout(() => {
+    try {
+      if (!win.isDestroyed()) {
+        win.destroy();
+      }
+    } catch {
+      // ignore
+    }
+  }, 5000);
 }
 
 let printJobChain = Promise.resolve();
 
 /**
- * Run a silent print job on the pre-warmed persistent offscreen BrowserWindow.
+ * Run a silent print job on a dedicated pre-warmed offscreen BrowserWindow.
+ * Each print job gets a clean BrowserWindow instance that is destroyed 5s after spooling
+ * so Chromium's PrintViewManager never locks up across jobs.
  */
 function runOffscreenPrintJob(loadTargetFn, options = {}) {
   const job = printJobChain.then(async () => {
+    const printWin = acquirePrintWindow();
     try {
-      const printWin = ensurePrintWorkerWindow();
       await loadTargetFn(printWin);
-      await waitForPrintResources(printWin.webContents);
-      return await executeSilentSpoolOrPdf(printWin.webContents, options);
+      const layout = await prepareDocumentForPrint(printWin.webContents);
+      return await executeSilentSpoolOrPdf(printWin.webContents, options, layout);
     } catch (err) {
       return { ok: false, error: err?.message || "Failed to print slip" };
+    } finally {
+      releasePrintWindow(printWin);
     }
   });
   printJobChain = job.catch(() => {});
@@ -1229,7 +1776,11 @@ ipcMain.handle("karobar:silent-print", async (event, options = {}) => {
       : null;
 
   if (!targetContents) return { ok: false, error: "No active window to print" };
-  return executeSilentSpoolOrPdf(targetContents, options);
+  return executeSilentSpoolOrPdf(targetContents, options, {
+    isThermal: false,
+    widthMm: 210,
+    heightPx: 1122,
+  });
 });
 
 ipcMain.handle("karobar:print-url", async (_event, payload = {}) => {
@@ -1238,10 +1789,13 @@ ipcMain.handle("karobar:print-url", async (_event, payload = {}) => {
     return { ok: false, error: "Missing print URL" };
   }
 
-  const resolvedUrl =
+  let resolvedUrl =
     rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
       ? rawUrl
       : `http://127.0.0.1:${activePort}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+  if (!/[?&]silent_print=/i.test(resolvedUrl)) {
+    resolvedUrl += (resolvedUrl.includes("?") ? "&" : "?") + "silent_print=1";
+  }
 
   return runOffscreenPrintJob(
     async (printWin) => {
@@ -1276,13 +1830,16 @@ ipcMain.handle("karobar:print-html", async (_event, payload = {}) => {
       payload
     );
   } finally {
-    try {
-      if (fs.existsSync(tempFilePath)) {
-        fs.unlinkSync(tempFilePath);
+    // Delay temp HTML file removal by 15s so Chromium's compositor & Windows spooler never lose the file mid-job
+    setTimeout(() => {
+      try {
+        if (fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+        }
+      } catch {
+        // ignore temp file cleanup errors
       }
-    } catch {
-      // ignore temp file cleanup errors
-    }
+    }, 15000);
   }
 });
 

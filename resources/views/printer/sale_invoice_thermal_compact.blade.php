@@ -36,7 +36,7 @@
 <meta charset="utf-8"/>
 <title>Sale Invoice (Compact Thermal) - {{ $posted }}</title>
 <style>
-  @page { size: 58mm auto; margin: 0; }
+  @page { margin: 0; }
   * { box-sizing: border-box; }
   html, body { margin:0; padding:0; color:#000; background:#fff; }
   body {
@@ -49,7 +49,7 @@
   }
   .print-actions { margin:4px; text-align:right; }
   .print-actions button { padding:3px 6px; cursor:pointer; font-size:9px; }
-  @media print { .print-actions { display:none; } }
+  @media print { .print-actions { display:none; } .receipt { margin:0; } }
   .receipt { width:58mm; max-width:100%; margin:0 auto; padding:0 3px 3px; }
   .center { text-align:center; }
   .right  { text-align:right; }

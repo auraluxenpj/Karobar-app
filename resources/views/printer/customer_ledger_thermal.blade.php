@@ -15,6 +15,7 @@
     .right { text-align: right; }
     .logo { text-align:center; margin-bottom: 4px; }
     .logo img { max-width: 48mm; max-height: 18mm; object-fit: contain; }
+    @page { margin: 0; }
     @media print {
       .no-print { display:none }
       body { margin: 0; }

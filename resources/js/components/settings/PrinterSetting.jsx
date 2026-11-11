@@ -32,6 +32,7 @@ export default function PrinterSetting({
   const [previewingType, setPreviewingType] = useState('thermal'); // 'thermal' or 'a4'
   const [installedPrinters, setInstalledPrinters] = useState([]);
   const [preferredDeviceName, setPreferredDeviceName] = useState(() => getPreferredPrinter());
+  const [resolvedPrinterName, setResolvedPrinterName] = useState("");
   const [loadingPrinters, setLoadingPrinters] = useState(false);
 
   const desktopBridge = getDesktopPrintBridge();
@@ -44,6 +45,13 @@ export default function PrinterSetting({
     try {
       const list = await bridge.getPrinters();
       setInstalledPrinters(Array.isArray(list) ? list : []);
+      if (typeof bridge.getPreferredPrinter === "function") {
+        const info = await bridge.getPreferredPrinter();
+        if (info?.preferredPrinter && !preferredDeviceName) {
+          setPreferredDeviceName(info.preferredPrinter);
+        }
+        setResolvedPrinterName(String(info?.resolvedPrinter || ""));
+      }
     } catch {
       setInstalledPrinters([]);
     } finally {
@@ -57,14 +65,25 @@ export default function PrinterSetting({
     }
   }, [isDesktopApp]);
 
-  const handlePreferredPrinterChange = (e) => {
+  const handlePreferredPrinterChange = async (e) => {
     const nextName = e.target.value;
     setPreferredDeviceName(nextName);
     setPreferredPrinter(nextName);
+    try {
+      const bridge = getDesktopPrintBridge();
+      if (bridge && typeof bridge.setPreferredPrinter === "function") {
+        const res = await bridge.setPreferredPrinter(nextName);
+        if (res?.resolvedPrinter !== undefined) {
+          setResolvedPrinterName(String(res.resolvedPrinter || ""));
+        }
+      }
+    } catch {
+      // ignore
+    }
     toast.success(
       nextName
         ? `Direct print target set to: ${nextName}`
-        : "Direct print target set to Windows Default Printer"
+        : "Direct print target set to Automatic Hardware Detection"
     );
   };
 
@@ -361,13 +380,19 @@ export default function PrinterSetting({
                   disabled={disableInputs || loadingPrinters}
                   className="flex-1 min-w-[240px]"
                 >
-                  <option value="">Windows System Default Printer (Automatic)</option>
-                  {installedPrinters.map((p) => (
-                    <option key={p.name} value={p.name}>
-                      {p.displayName || p.name}
-                      {p.isDefault ? " (Windows Default)" : ""}
-                    </option>
-                  ))}
+                  <option value="">
+                    Automatic Hardware Printer Detection
+                    {resolvedPrinterName ? ` (Active: ${resolvedPrinterName})` : ""}
+                  </option>
+                  {installedPrinters
+                    .filter((p) => !p.isVirtual)
+                    .map((p) => (
+                      <option key={p.name} value={p.name}>
+                        {p.displayName || p.name}
+                        {p.isOnline ? " — [Online / Ready]" : p.workOffline ? " — [Offline / Unplugged]" : ""}
+                        {p.isDefault ? " (Windows Default)" : ""}
+                      </option>
+                    ))}
                 </select>
                 <button
                   type="button"
@@ -387,7 +412,9 @@ export default function PrinterSetting({
                 </button>
               </div>
               <p className="settings-hint">
-                Selected printer is used immediately for silent Ctrl+P receipt and invoice printing.
+                {resolvedPrinterName
+                  ? `Active Hardware Printer: ${resolvedPrinterName} — Ctrl+P and Print buttons spool directly to this printer.`
+                  : "Connect and turn on your thermal or A4 printer, then click Refresh Printers or Test Direct Print."}
               </p>
             </div>
           </div>

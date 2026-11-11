@@ -14,10 +14,13 @@
   "private": true,
   "scripts": {
     "start": "electron .",
-    "pack:win64": "npx @electron/packager . \"Karobar-App\" --platform=win32 --arch=x64 --icon=icon.ico --app-copyright=\"Copyright (C) 2026 Malik Asim Shahzad (https://github.com/shzdasim)\" --win32metadata.CompanyName=\"Malik Asim Shahzad (shzdasim)\" --win32metadata.FileDescription=\"Karobar-App\" --win32metadata.ProductName=\"Karobar-App\" --win32metadata.InternalName=\"Karobar-App\" --win32metadata.OriginalFilename=\"Karobar-App.exe\" --out=../dist/win-shell --overwrite --asar"
+    "pack:win64": "npx @electron/packager . \"Karobar-App\" --platform=win32 --arch=x64 --icon=icon.ico --app-copyright=\"Copyright (C) 2026 Malik Asim Shahzad (https://github.com/shzdasim)\" --win32metadata.CompanyName=\"Malik Asim Shahzad (shzdasim)\" --win32metadata.FileDescription=\"Karobar-App\" --win32metadata.ProductName=\"Karobar-App\" --win32metadata.InternalName=\"Karobar-App\" --win32metadata.OriginalFilename=\"Karobar-App.exe\" --out=../dist/win-shell --overwrite --asar --asar.unpack=\"*.exe\""
   },
   "devDependencies": {
     "@electron/packager": "^18.3.6",
     "electron": "^35.0.0"
+  },
+  "dependencies": {
+    "pdf-to-printer": "^5.8.1"
   }
 }
