@@ -105,6 +105,15 @@ class SettingController extends Controller
             'printer_type'            => ['required', Rule::in(['thermal','a4'])],
             'thermal_template'        => ['nullable', Rule::in(['standard','minimal','detailed','compact','bold','barcode'])],
             'a4_template'             => ['nullable', Rule::in(['standard','minimal','detailed','compact','bold','barcode'])],
+            'print_paper_width_mm'    => ['nullable', 'integer', 'min:0', 'max:250'],
+            'print_margin_top_mm'     => ['nullable', 'integer', 'min:-15', 'max:40'],
+            'print_margin_bottom_mm'  => ['nullable', 'integer', 'min:0', 'max:50'],
+            'print_margin_left_mm'    => ['nullable', 'integer', 'min:-20', 'max:30'],
+            'print_margin_right_mm'   => ['nullable', 'integer', 'min:0', 'max:30'],
+            'print_font_scale'        => ['nullable', 'integer', 'min:70', 'max:150'],
+            'print_contrast_mode'     => ['nullable', Rule::in(['standard', 'high_contrast', 'extra_bold'])],
+            'print_scale_mode'        => ['nullable', Rule::in(['auto', 'noscale', 'fit', 'shrink'])],
+            'print_show_logo'         => ['nullable', 'boolean'],
             'share_paper_size'        => ['nullable', Rule::in(['thermal','a4'])],
             'share_show_logo'         => ['nullable', 'boolean'],
             'remove_logo'             => ['nullable', 'boolean'],
@@ -216,8 +225,53 @@ class SettingController extends Controller
             'cube_gemini_daily_limit',
         ];
 
+        $printCalibrationFields = [
+            'print_paper_width_mm',
+            'print_margin_top_mm',
+            'print_margin_bottom_mm',
+            'print_margin_left_mm',
+            'print_margin_right_mm',
+            'print_font_scale',
+            'print_contrast_mode',
+            'print_scale_mode',
+            'print_show_logo',
+        ];
+
         // Fill non-SMTP / non-WhatsApp / non-Cube fields first
-        $setting->fill(collect($validated)->except(array_merge(['logo', 'remove_logo', 'share_paper_size', 'share_show_logo'], $smtpFields, $whatsappFields, $cubeFields))->toArray());
+        $setting->fill(collect($validated)->except(array_merge(['logo', 'remove_logo', 'share_paper_size', 'share_show_logo'], $printCalibrationFields, $smtpFields, $whatsappFields, $cubeFields))->toArray());
+
+        if (Schema::hasColumn('settings', 'print_paper_width_mm')) {
+            if ($request->has('print_paper_width_mm')) {
+                $rawWidth = (int) $request->input('print_paper_width_mm', 0);
+                $setting->print_paper_width_mm = $rawWidth > 0 ? $rawWidth : null;
+            }
+            if ($request->has('print_margin_top_mm')) {
+                $setting->print_margin_top_mm = (int) $request->input('print_margin_top_mm', 0);
+            }
+            if ($request->has('print_margin_bottom_mm')) {
+                $setting->print_margin_bottom_mm = (int) $request->input('print_margin_bottom_mm', 4);
+            }
+            if ($request->has('print_margin_left_mm')) {
+                $setting->print_margin_left_mm = (int) $request->input('print_margin_left_mm', 0);
+            }
+            if ($request->has('print_margin_right_mm')) {
+                $setting->print_margin_right_mm = (int) $request->input('print_margin_right_mm', 0);
+            }
+            if ($request->has('print_font_scale')) {
+                $setting->print_font_scale = max(70, min(150, (int) $request->input('print_font_scale', 100)));
+            }
+            if ($request->has('print_contrast_mode')) {
+                $mode = (string) $request->input('print_contrast_mode', 'standard');
+                $setting->print_contrast_mode = in_array($mode, ['standard', 'high_contrast', 'extra_bold'], true) ? $mode : 'standard';
+            }
+            if ($request->has('print_scale_mode')) {
+                $scaleMode = (string) $request->input('print_scale_mode', 'auto');
+                $setting->print_scale_mode = in_array($scaleMode, ['auto', 'noscale', 'fit', 'shrink'], true) ? $scaleMode : 'auto';
+            }
+            if ($request->has('print_show_logo')) {
+                $setting->print_show_logo = $request->boolean('print_show_logo');
+            }
+        }
 
         if (Schema::hasColumn('settings', 'share_paper_size') && $request->has('share_paper_size')) {
             $setting->share_paper_size = in_array($request->input('share_paper_size'), ['thermal', 'a4'], true)

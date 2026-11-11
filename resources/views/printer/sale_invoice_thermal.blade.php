@@ -104,6 +104,7 @@
   .note { margin-top:6px; white-space:pre-wrap; }
   .foot { margin-top:6px; text-align:center; }
 </style>
+@include('printer.partials.calibration_styles')
 </head>
 <body onload="if (!window.karobarDesktop && !window.__karobarSilentPrintWorker && !/Electron/i.test(navigator.userAgent) && window.self === window.top && !new URLSearchParams(window.location.search).has('silent_print')) window.print()">
 <div class="print-actions">

@@ -74,6 +74,7 @@
   .note { margin-top:10px; padding:8px; background:#ffff00; color:#000; font-weight:bold; white-space:pre-wrap; }
   .foot { margin-top:12px; text-align:center; font-size:10px; text-transform:uppercase; }
 </style>
+@include('printer.partials.calibration_styles')
 </head>
 <body onload="if (!window.karobarDesktop && !window.__karobarSilentPrintWorker && !/Electron/i.test(navigator.userAgent) && window.self === window.top && !new URLSearchParams(window.location.search).has('silent_print')) window.print()">
 <div class="print-actions">

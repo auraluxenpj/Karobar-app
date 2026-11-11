@@ -97,6 +97,7 @@
   .thankyou { font-style:italic; color:var(--muted); }
   .powered { font-size:9px; color:#adb5bd; margin-top:5px; }
 </style>
+@include('printer.partials.calibration_styles')
 </head>
 <body onload="if (!window.karobarDesktop && !window.__karobarSilentPrintWorker && !/Electron/i.test(navigator.userAgent) && window.self === window.top && !new URLSearchParams(window.location.search).has('silent_print')) window.print()">
 <div class="print-actions">

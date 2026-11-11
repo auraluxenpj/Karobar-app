@@ -100,17 +100,29 @@ Route::get('/print/thermal-preview/{template}', function ($template) {
     $sampleInvoice->items = new \Illuminate\Support\Collection($items);
     
     $dbSetting = \Illuminate\Support\Facades\Schema::hasTable('settings') ? \App\Models\Setting::first() : null;
-    $showLogo = request()->has('show_logo')
-        ? request()->boolean('show_logo')
-        : (bool) ($dbSetting?->share_show_logo ?? true);
+    $showLogo = request()->has('print_show_logo')
+        ? request()->boolean('print_show_logo')
+        : (request()->has('show_logo')
+            ? request()->boolean('show_logo')
+            : (bool) ($dbSetting?->print_show_logo ?? $dbSetting?->share_show_logo ?? true));
     $sampleSetting = new \stdClass();
     $sampleSetting->store_name = $dbSetting?->store_name ?: 'PHARMACY STORE';
     $sampleSetting->phone_number = $dbSetting?->phone_number ?: '+92 300 1234567';
     $sampleSetting->address = $dbSetting?->address ?: '123 Main Street, City';
+    $sampleSetting->license_number = $dbSetting?->license_number ?: '';
     $sampleSetting->logo_url = $showLogo ? ($dbSetting?->resolveLogoDataUri() ?? $dbSetting?->logo_url ?? null) : null;
     $sampleSetting->note = request()->has('note')
         ? (string) request()->query('note', '')
         : ($dbSetting ? (string) ($dbSetting->note ?? '') : 'Thank you for your business!');
+    $sampleSetting->print_paper_width_mm = $dbSetting?->print_paper_width_mm ?? null;
+    $sampleSetting->print_margin_top_mm = $dbSetting?->print_margin_top_mm ?? 0;
+    $sampleSetting->print_margin_bottom_mm = $dbSetting?->print_margin_bottom_mm ?? 4;
+    $sampleSetting->print_margin_left_mm = $dbSetting?->print_margin_left_mm ?? 0;
+    $sampleSetting->print_margin_right_mm = $dbSetting?->print_margin_right_mm ?? 0;
+    $sampleSetting->print_font_scale = $dbSetting?->print_font_scale ?? 100;
+    $sampleSetting->print_contrast_mode = $dbSetting?->print_contrast_mode ?? 'standard';
+    $sampleSetting->print_scale_mode = $dbSetting?->print_scale_mode ?? 'auto';
+    $sampleSetting->print_show_logo = $showLogo;
     
     return view("printer.sale_invoice_thermal_{$template}", [
         'invoice' => $sampleInvoice,
@@ -197,17 +209,29 @@ Route::get('/print/a4-preview/{template}', function ($template) {
     $sampleInvoice->items = new \Illuminate\Support\Collection($items);
     
     $dbSetting = \Illuminate\Support\Facades\Schema::hasTable('settings') ? \App\Models\Setting::first() : null;
-    $showLogo = request()->has('show_logo')
-        ? request()->boolean('show_logo')
-        : (bool) ($dbSetting?->share_show_logo ?? true);
+    $showLogo = request()->has('print_show_logo')
+        ? request()->boolean('print_show_logo')
+        : (request()->has('show_logo')
+            ? request()->boolean('show_logo')
+            : (bool) ($dbSetting?->print_show_logo ?? $dbSetting?->share_show_logo ?? true));
     $sampleSetting = new \stdClass();
     $sampleSetting->store_name = $dbSetting?->store_name ?: 'PHARMACY STORE';
     $sampleSetting->phone_number = $dbSetting?->phone_number ?: '+92 300 1234567';
     $sampleSetting->address = $dbSetting?->address ?: '123 Main Street, City';
+    $sampleSetting->license_number = $dbSetting?->license_number ?: '';
     $sampleSetting->logo_url = $showLogo ? ($dbSetting?->resolveLogoDataUri() ?? $dbSetting?->logo_url ?? null) : null;
     $sampleSetting->note = request()->has('note')
         ? (string) request()->query('note', '')
         : ($dbSetting ? (string) ($dbSetting->note ?? '') : 'Thank you for your business!');
+    $sampleSetting->print_paper_width_mm = $dbSetting?->print_paper_width_mm ?? null;
+    $sampleSetting->print_margin_top_mm = $dbSetting?->print_margin_top_mm ?? 0;
+    $sampleSetting->print_margin_bottom_mm = $dbSetting?->print_margin_bottom_mm ?? 4;
+    $sampleSetting->print_margin_left_mm = $dbSetting?->print_margin_left_mm ?? 0;
+    $sampleSetting->print_margin_right_mm = $dbSetting?->print_margin_right_mm ?? 0;
+    $sampleSetting->print_font_scale = $dbSetting?->print_font_scale ?? 100;
+    $sampleSetting->print_contrast_mode = $dbSetting?->print_contrast_mode ?? 'standard';
+    $sampleSetting->print_scale_mode = $dbSetting?->print_scale_mode ?? 'auto';
+    $sampleSetting->print_show_logo = $showLogo;
     
     return view("printer.sale_invoice_a4_{$template}", [
         'invoice' => $sampleInvoice,

@@ -88,6 +88,7 @@
   .qr-section img, .qr-section svg { width:50mm; height:50mm; }
   .foot { margin-top:10px; text-align:center; font-size:8px; color:#666; border-top:1px dotted #999; padding-top:6px; }
 </style>
+@include('printer.partials.calibration_styles')
 </head>
 <body onload="if (!window.karobarDesktop && !window.__karobarSilentPrintWorker && !/Electron/i.test(navigator.userAgent) && window.self === window.top && !new URLSearchParams(window.location.search).has('silent_print')) window.print()">
 <div class="print-actions">

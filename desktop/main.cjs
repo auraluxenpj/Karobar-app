@@ -1431,6 +1431,14 @@ async function prepareDocumentForPrint(contents) {
             );
           }
 
+          const metaEl = document.querySelector('meta[name="karobar-print-config"]');
+          let calConfig = {};
+          if (metaEl && metaEl.content) {
+            try {
+              calConfig = JSON.parse(metaEl.content) || {};
+            } catch {}
+          }
+
           const styleText = Array.from(document.querySelectorAll("style"))
             .map((s) => s.textContent || "")
             .join("\\n");
@@ -1441,10 +1449,21 @@ async function prepareDocumentForPrint(contents) {
           const isThermal =
             Boolean(receiptEl) ||
             is58mm ||
-            /(72mm|78mm|80mm)/i.test(styleText) ||
+            /(48mm|58mm|68mm|72mm|76mm|78mm|80mm)/i.test(styleText) ||
             /thermal/i.test(titleText);
 
-          const widthMm = is58mm ? 58 : isThermal ? 80 : 210;
+          const customWidthMm = Number(calConfig.paperWidthMm || 0);
+          const widthMm =
+            customWidthMm >= 40 && customWidthMm <= 240
+              ? customWidthMm
+              : is58mm
+              ? 58
+              : isThermal
+              ? 80
+              : 210;
+
+          const scaleMode = String(calConfig.scaleMode || "auto");
+          const marginBottomMm = Number(calConfig.marginBottomMm ?? 4);
 
           if (isThermal) {
             const fixStyle = document.createElement("style");
@@ -1478,7 +1497,7 @@ async function prepareDocumentForPrint(contents) {
             180
           );
 
-          return { isThermal, widthMm, heightPx };
+          return { isThermal, widthMm, heightPx, scaleMode, marginBottomMm };
         })()
         `,
         true
@@ -1494,7 +1513,7 @@ async function prepareDocumentForPrint(contents) {
 /**
  * Spool a generated PDF file directly to a Windows hardware printer using SumatraPDF CLI (`pdf-to-printer`).
  */
-function spoolPdfViaSumatra(sumatraExe, pdfFilePath, deviceName, isThermal) {
+function spoolPdfViaSumatra(sumatraExe, pdfFilePath, deviceName, isThermal, scaleMode = "auto") {
   return new Promise((resolve) => {
     const args = [];
     if (deviceName) {
@@ -1503,7 +1522,13 @@ function spoolPdfViaSumatra(sumatraExe, pdfFilePath, deviceName, isThermal) {
       args.push("-print-to-default");
     }
     args.push("-silent");
-    args.push("-print-settings", isThermal ? "noscale" : "fit");
+    const effectiveScale =
+      scaleMode === "noscale" || scaleMode === "fit" || scaleMode === "shrink"
+        ? scaleMode
+        : isThermal
+        ? "noscale"
+        : "fit";
+    args.push("-print-settings", effectiveScale);
     args.push(pdfFilePath);
 
     execFile(
@@ -1617,8 +1642,13 @@ async function executeSilentSpoolOrPdf(contents, options = {}, layout = null) {
       };
 
       if (docLayout?.isThermal) {
-        const widthIn = docLayout.widthMm === 58 ? 2.283 : 3.15;
-        const heightIn = Math.max(Number(docLayout.heightPx || 400) / 96 + 0.25, 2.2);
+        const rawMm = Number(docLayout.widthMm || 80);
+        const widthIn = Math.max(1.5, Math.min(8.5, Number((rawMm / 25.4).toFixed(3))));
+        const extraBottomIn = Math.max(0, Number(docLayout.marginBottomMm || 4)) / 25.4;
+        const heightIn = Math.max(
+          Number(docLayout.heightPx || 400) / 96 + 0.2 + extraBottomIn,
+          2.2
+        );
         pdfOptions.pageSize = { width: widthIn, height: heightIn };
         pdfOptions.preferCSSPageSize = false;
       } else {
@@ -1633,7 +1663,8 @@ async function executeSilentSpoolOrPdf(contents, options = {}, layout = null) {
         sumatraExe,
         tempPdfPath,
         targetPrinter,
-        Boolean(docLayout?.isThermal)
+        Boolean(docLayout?.isThermal),
+        String(docLayout?.scaleMode || options.scaleMode || "auto")
       );
 
       setTimeout(() => {

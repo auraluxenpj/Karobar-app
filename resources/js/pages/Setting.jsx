@@ -158,6 +158,15 @@ export default function Setting() {
     printer_type: "thermal",
     thermal_template: "standard",
     a4_template: "standard",
+    print_paper_width_mm: 0,
+    print_margin_top_mm: 0,
+    print_margin_bottom_mm: 4,
+    print_margin_left_mm: 0,
+    print_margin_right_mm: 0,
+    print_font_scale: 100,
+    print_contrast_mode: "standard",
+    print_scale_mode: "auto",
+    print_show_logo: true,
     share_paper_size: "a4",
     share_show_logo: true,
     logo_url: null,
@@ -349,6 +358,36 @@ export default function Setting() {
         printer_type: data.printer_type || "thermal",
         thermal_template: data.thermal_template || "standard",
         a4_template: data.a4_template || "standard",
+        print_paper_width_mm:
+          data.print_paper_width_mm !== undefined && data.print_paper_width_mm !== null
+            ? Number(data.print_paper_width_mm)
+            : 0,
+        print_margin_top_mm:
+          data.print_margin_top_mm !== undefined && data.print_margin_top_mm !== null
+            ? Number(data.print_margin_top_mm)
+            : 0,
+        print_margin_bottom_mm:
+          data.print_margin_bottom_mm !== undefined && data.print_margin_bottom_mm !== null
+            ? Number(data.print_margin_bottom_mm)
+            : 4,
+        print_margin_left_mm:
+          data.print_margin_left_mm !== undefined && data.print_margin_left_mm !== null
+            ? Number(data.print_margin_left_mm)
+            : 0,
+        print_margin_right_mm:
+          data.print_margin_right_mm !== undefined && data.print_margin_right_mm !== null
+            ? Number(data.print_margin_right_mm)
+            : 0,
+        print_font_scale:
+          data.print_font_scale !== undefined && data.print_font_scale !== null
+            ? Number(data.print_font_scale)
+            : 100,
+        print_contrast_mode: data.print_contrast_mode || "standard",
+        print_scale_mode: data.print_scale_mode || "auto",
+        print_show_logo:
+          data.print_show_logo !== undefined && data.print_show_logo !== null
+            ? Boolean(data.print_show_logo)
+            : true,
         share_paper_size: data.share_paper_size || "a4",
         share_show_logo:
           data.share_show_logo !== undefined && data.share_show_logo !== null
@@ -468,6 +507,15 @@ export default function Setting() {
       fd.append("printer_type", form.printer_type || "a4");
       fd.append("thermal_template", form.thermal_template || "standard");
       fd.append("a4_template", form.a4_template || "standard");
+      fd.append("print_paper_width_mm", String(form.print_paper_width_mm ?? 0));
+      fd.append("print_margin_top_mm", String(form.print_margin_top_mm ?? 0));
+      fd.append("print_margin_bottom_mm", String(form.print_margin_bottom_mm ?? 4));
+      fd.append("print_margin_left_mm", String(form.print_margin_left_mm ?? 0));
+      fd.append("print_margin_right_mm", String(form.print_margin_right_mm ?? 0));
+      fd.append("print_font_scale", String(form.print_font_scale ?? 100));
+      fd.append("print_contrast_mode", form.print_contrast_mode || "standard");
+      fd.append("print_scale_mode", form.print_scale_mode || "auto");
+      fd.append("print_show_logo", form.print_show_logo !== false ? "1" : "0");
       fd.append("share_paper_size", form.share_paper_size || "a4");
       fd.append("share_show_logo", form.share_show_logo !== false ? "1" : "0");
       fd.append("navigation_style", form.navigation_style || "sidebar");
@@ -878,6 +926,7 @@ export default function Setting() {
           {activeTab === "printer" && (
             <PrinterSetting
               form={form}
+              setForm={setForm}
               handleChange={handleChange}
               disableInputs={disableInputs}
               saving={saving}
