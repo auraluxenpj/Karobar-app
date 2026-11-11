@@ -160,8 +160,13 @@ class BackupController extends Controller
             ]);
             
         } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Controller restore error: ' . $e->getMessage(), [
+                'backup_id' => $id,
+                'exception' => get_class($e),
+            ]);
+
             return response()->json([
-                'message' => 'Restore failed: ' . $e->getMessage(),
+                'message' => $e->getMessage(),
                 'error' => $e->getMessage(),
             ], 422);
         }
@@ -348,20 +353,20 @@ class BackupController extends Controller
                 ], 404);
             }
 
-            $this->backupService->restoreFromFile($filepath, $request->password);
-
-            // Update backup log status
-            $backup->update([
-                'status' => 'restored',
-            ]);
+            $this->backupService->restoreBackup((int) $backup->id, (string) $request->password);
 
             return response()->json([
                 'message' => 'Backup restored successfully. Please refresh the page.',
             ]);
 
         } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Controller restoreFromUpload error: ' . $e->getMessage(), [
+                'file_id' => $request->file_id,
+                'exception' => get_class($e),
+            ]);
+
             return response()->json([
-                'message' => 'Restore failed: ' . $e->getMessage(),
+                'message' => $e->getMessage(),
                 'error' => $e->getMessage(),
             ], 422);
         }

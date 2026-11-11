@@ -333,4 +333,94 @@ class AutomatedBackupAndOffsiteStorageTest extends TestCase
             ->assertJsonPath('backup.status', 'completed')
             ->assertJsonPath('backup.storage_destination', 'local');
     }
+
+    public function test_file_backed_sqlite_wal_mmap_restore_with_concurrent_worker_does_not_corrupt_database(): void
+    {
+        $tempDbFile = sys_get_temp_dir() . '/karobar_wal_restore_test_' . uniqid() . '.sqlite';
+        copy(database_path('database.sqlite'), $tempDbFile);
+
+        $originalDbConfig = config('database.connections.sqlite.database');
+        $concurrentWorkerPdo = null;
+        $createdBackupFilename = null;
+
+        try {
+            // Switch Laravel's sqlite connection to the file-backed SQLite database in WAL + mmap mode
+            config(['database.connections.sqlite.database' => $tempDbFile]);
+            DB::purge('sqlite');
+            DB::reconnect('sqlite');
+            DB::connection('sqlite')->statement('PRAGMA journal_mode = WAL;');
+            DB::connection('sqlite')->statement('PRAGMA synchronous = NORMAL;');
+            DB::connection('sqlite')->statement('PRAGMA mmap_size = 268435456;');
+
+            // Ensure adminUser with restore/create/view permissions exists in this file-backed DB
+            app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+            $role = Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'sanctum']);
+            foreach (['backup.view', 'backup.create', 'backup.restore', 'backup.delete', 'backup.upload'] as $p) {
+                $perm = Permission::firstOrCreate(['name' => $p, 'guard_name' => 'sanctum']);
+                $role->givePermissionTo($perm);
+            }
+            $fileAdmin = User::firstOrCreate(
+                ['email' => 'wal_admin@karobar.test'],
+                ['name' => 'WAL Admin', 'password' => bcrypt('password123')]
+            );
+            $fileAdmin->assignRole($role);
+
+            \App\Models\Customer::forceCreate([
+                'name' => 'Pre-Backup WAL Customer',
+                'phone' => '03005556677',
+                'address' => 'WAL Mode Street',
+            ]);
+
+            // 1. Create a full backup from the file-backed WAL database
+            $createRes = $this->actingAs($fileAdmin)
+                ->postJson('/api/backups', ['type' => 'full']);
+            $createRes->assertStatus(201);
+            $backupId = $createRes->json('backup.id');
+            $createdBackupFilename = $createRes->json('backup.filename');
+
+            // 2. Open a second concurrent PDO connection in WAL + mmap mode (simulating PHP worker #2 / schedule:work)
+            $concurrentWorkerPdo = new \PDO('sqlite:' . $tempDbFile);
+            $concurrentWorkerPdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+            $concurrentWorkerPdo->exec('PRAGMA journal_mode = WAL;');
+            $concurrentWorkerPdo->exec('PRAGMA mmap_size = 268435456;');
+            $concurrentWorkerPdo->exec("INSERT INTO customers (name, phone, address, created_at, updated_at) VALUES ('Post-Backup Concurrent Worker Customer', '03008889999', 'Worker Addr', datetime('now'), datetime('now'))");
+
+            $this->assertDatabaseHas('customers', ['phone' => '03008889999']);
+
+            // 3. Restore the full backup while the concurrent worker connection is still open and memory-mapped
+            $restoreRes = $this->actingAs($fileAdmin)
+                ->postJson("/api/backups/{$backupId}/restore", [
+                    'password' => 'password123',
+                ]);
+            $restoreRes->assertStatus(200);
+
+            // 4. Verify database integrity on both Laravel's connection and the concurrent worker connection
+            $laravelIntegrity = DB::connection('sqlite')->selectOne('PRAGMA integrity_check;');
+            $this->assertEquals('ok', $laravelIntegrity->integrity_check ?? null);
+
+            $workerIntegrity = $concurrentWorkerPdo->query('PRAGMA integrity_check;')->fetchColumn();
+            $this->assertEquals('ok', $workerIntegrity);
+
+            // 5. Verify post-backup mutation was reverted and pre-backup customer + backup_logs remain intact
+            $this->assertDatabaseHas('customers', ['phone' => '03005556677']);
+            $this->assertDatabaseMissing('customers', ['phone' => '03008889999']);
+
+            // 6. Verify subsequent API calls succeed without 500 Server Error
+            $listRes = $this->actingAs($fileAdmin)->getJson('/api/backups');
+            $listRes->assertStatus(200);
+        } finally {
+            $concurrentWorkerPdo = null;
+            config(['database.connections.sqlite.database' => $originalDbConfig]);
+            DB::purge('sqlite');
+            DB::reconnect('sqlite');
+
+            if ($createdBackupFilename) {
+                @unlink(storage_path('app/backups/' . $createdBackupFilename . '.zip'));
+            }
+
+            foreach (glob($tempDbFile . '*') ?: [] as $f) {
+                @unlink($f);
+            }
+        }
+    }
 }

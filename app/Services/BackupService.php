@@ -157,6 +157,34 @@ class BackupService
     }
 
     /**
+     * Resolve the existing file path on disk for a BackupLog record across default storage,
+     * relative storage paths, and custom backup folders.
+     */
+    public function resolveExistingBackupFilePath(BackupLog $backup): ?string
+    {
+        $candidates = [
+            $this->getBackupFilePath($backup->filename, $backup->type),
+        ];
+
+        if (!empty($backup->path)) {
+            $candidates[] = storage_path('app/' . ltrim($backup->path, '/\\'));
+            $candidates[] = $this->backupPath . '/' . basename($backup->path);
+        }
+
+        if (!empty($backup->remote_path)) {
+            $candidates[] = $backup->remote_path;
+        }
+
+        foreach (array_unique(array_filter($candidates)) as $candidate) {
+            if (is_file($candidate) && is_readable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Generate a unique backup filename that will not collide with backup_logs.filename unique constraint.
      */
     protected function generateUniqueBackupFilename(string $type, string $prefix = 'backup'): string
@@ -573,9 +601,49 @@ class BackupService
             }
         }
 
-        // Fallback: checkpoint WAL passively then read file bytes directly
+        // Second strategy: SQLite3 Online Backup API (atomic across active WAL connections)
+        if (class_exists(\SQLite3::class)) {
+            $srcDb = null;
+            $dstDb = null;
+            try {
+                if (file_exists($snapshotPath)) {
+                    @unlink($snapshotPath);
+                }
+                $srcDb = new \SQLite3($dbPath, SQLITE3_OPEN_READONLY);
+                $srcDb->busyTimeout(15000);
+                $dstDb = new \SQLite3($snapshotPath, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE);
+                $dstDb->busyTimeout(15000);
+                if ($srcDb->backup($dstDb)) {
+                    $dstDb->close();
+                    $dstDb = null;
+                    $srcDb->close();
+                    $srcDb = null;
+                    if (is_file($snapshotPath) && filesize($snapshotPath) > 0) {
+                        $content = file_get_contents($snapshotPath);
+                        @unlink($snapshotPath);
+                        if ($content !== false && $content !== '') {
+                            return $content;
+                        }
+                    }
+                }
+            } catch (Throwable) {
+                // Fall through to checkpoint + file read
+            } finally {
+                if ($dstDb instanceof \SQLite3) {
+                    @$dstDb->close();
+                }
+                if ($srcDb instanceof \SQLite3) {
+                    @$srcDb->close();
+                }
+                if (file_exists($snapshotPath)) {
+                    @unlink($snapshotPath);
+                }
+            }
+        }
+
+        // Fallback: checkpoint WAL fully then read file bytes directly
         try {
-            DB::connection('sqlite')->statement('PRAGMA wal_checkpoint(PASSIVE);');
+            DB::connection('sqlite')->statement('PRAGMA wal_checkpoint(FULL);');
         } catch (Throwable) {
         }
 
@@ -1302,8 +1370,8 @@ class BackupService
             return null;
         }
 
-        $filepath = $this->getBackupFilePath($backup->filename, $backup->type);
-        if (!file_exists($filepath)) {
+        $filepath = $this->resolveExistingBackupFilePath($backup);
+        if (!$filepath) {
             return null;
         }
 
@@ -1342,10 +1410,13 @@ class BackupService
             throw new \RuntimeException('Invalid password');
         }
 
-        $filepath = $this->getBackupFilePath($backup->filename, $backup->type);
-        if (!file_exists($filepath)) {
+        $filepath = $this->resolveExistingBackupFilePath($backup);
+        if (!$filepath) {
             throw new \RuntimeException('Backup file not found');
         }
+
+        $backupId = $backup->id;
+        $backupFilename = $backup->filename;
 
         try {
             switch ($backup->type) {
@@ -1364,9 +1435,12 @@ class BackupService
             $this->ensureBackupSchema();
 
             try {
-                BackupLog::where('id', $backup->id)->update([
-                    'status' => 'restored',
-                ]);
+                BackupLog::where('id', $backupId)
+                    ->orWhere('filename', $backupFilename)
+                    ->update([
+                        'status' => 'restored',
+                        'error_message' => null,
+                    ]);
             } catch (Throwable) {
                 // Ignore if the backup record was created after the restored snapshot
             }
@@ -1374,12 +1448,23 @@ class BackupService
             return true;
 
         } catch (Throwable $e) {
+            Log::error('Backup restore failed: ' . $e->getMessage(), [
+                'backup_id' => $backupId,
+                'filename' => $backupFilename,
+                'type' => $backup->type,
+                'exception' => get_class($e),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
             try {
                 $this->ensureBackupSchema();
-                $backup->update([
-                    'status' => 'failed',
-                    'error_message' => 'Restore failed: ' . $e->getMessage(),
-                ]);
+                BackupLog::where('id', $backupId)
+                    ->orWhere('filename', $backupFilename)
+                    ->update([
+                        'status' => 'failed',
+                        'error_message' => 'Restore failed: ' . $e->getMessage(),
+                    ]);
             } catch (Throwable) {
             }
 
@@ -1421,15 +1506,23 @@ class BackupService
         } catch (Throwable) {
         }
 
-        // Preserve active user sessions & tokens so the user stays logged in after restore on Herd
+        // Preserve active user sessions & tokens so the user stays logged in after restore on Herd / Desktop
         $preservedSessions = [];
         $preservedTokens = [];
+        $preservedBackupLogs = [];
+        $preservedBackupSchedules = [];
         try {
             if (Schema::hasTable('sessions')) {
                 $preservedSessions = DB::table('sessions')->get()->map(fn ($r) => (array) $r)->all();
             }
             if (Schema::hasTable('personal_access_tokens')) {
                 $preservedTokens = DB::table('personal_access_tokens')->get()->map(fn ($r) => (array) $r)->all();
+            }
+            if (Schema::hasTable('backup_logs')) {
+                $preservedBackupLogs = DB::table('backup_logs')->get()->map(fn ($r) => (array) $r)->all();
+            }
+            if (Schema::hasTable('backup_schedules')) {
+                $preservedBackupSchedules = DB::table('backup_schedules')->get()->map(fn ($r) => (array) $r)->all();
             }
         } catch (Throwable) {
         }
@@ -1447,47 +1540,100 @@ class BackupService
 
             if ($sqliteMagicPos !== false && $dbPath !== ':memory:') {
                 $rawDbContent = substr($sqlContent, $sqliteMagicPos);
+                if (strlen($rawDbContent) < 100) {
+                    throw new \RuntimeException('The backup database snapshot is truncated or invalid.');
+                }
 
-                // Disconnect SQLite PDO to release active file locks
+                $this->ensureBackupDirectoryExists();
+                $tempRestoreSqlite = $this->backupPath . '/temp_restore_src_' . uniqid('', true) . '.sqlite';
+                if (@file_put_contents($tempRestoreSqlite, $rawDbContent) === false) {
+                    throw new \RuntimeException('Failed to stage temporary SQLite database for restore.');
+                }
+
+                // Validate integrity of the staged backup snapshot before touching the live database
+                if (class_exists(\SQLite3::class)) {
+                    $checkDb = null;
+                    try {
+                        $checkDb = new \SQLite3($tempRestoreSqlite, SQLITE3_OPEN_READONLY);
+                        $checkDb->busyTimeout(5000);
+                        $integrity = $checkDb->querySingle('PRAGMA quick_check;');
+                        $checkDb->close();
+                        $checkDb = null;
+                        if ($integrity !== 'ok') {
+                            @unlink($tempRestoreSqlite);
+                            throw new \RuntimeException("Backup database snapshot failed integrity check ({$integrity}).");
+                        }
+                    } catch (Throwable $checkErr) {
+                        if ($checkDb instanceof \SQLite3) {
+                            @$checkDb->close();
+                        }
+                        @unlink($tempRestoreSqlite);
+                        throw new \RuntimeException('Invalid or corrupted SQLite backup snapshot: ' . $checkErr->getMessage(), 0, $checkErr);
+                    }
+                }
+
+                // Create a safety backup of the current live database and prune old .bak.* files
+                if (file_exists($dbPath)) {
+                    $safetyBackupPath = $dbPath . '.bak.' . time();
+                    @copy($dbPath, $safetyBackupPath);
+                    $this->pruneDatabaseSafetyBackups($dbPath, 3);
+                }
+
+                // Disable memory-mapped I/O on the current connection before disconnecting
+                try {
+                    DB::connection('sqlite')->statement('PRAGMA mmap_size = 0;');
+                } catch (Throwable) {
+                }
+
                 DB::disconnect('sqlite');
                 DB::purge('sqlite');
                 if (function_exists('gc_collect_cycles')) {
                     gc_collect_cycles();
                 }
 
-                // Safety backup of current database
-                if (file_exists($dbPath)) {
-                    @copy($dbPath, $dbPath . '.bak.' . time());
-                }
+                // Restore atomically using SQLite's ACID Online Backup API (\SQLite3::backup).
+                // IMPORTANT: Never unlink -wal or -shm or overwrite $dbPath via file_put_contents while
+                // other PHP workers or background processes have the WAL database open and memory-mapped,
+                // as that violates SQLite's WAL locking protocol and corrupts the database.
+                $restoredViaOnlineBackup = false;
+                if (class_exists(\SQLite3::class)) {
+                    $srcDb = null;
+                    $dstDb = null;
+                    try {
+                        $srcDb = new \SQLite3($tempRestoreSqlite, SQLITE3_OPEN_READONLY);
+                        $srcDb->busyTimeout(30000);
 
-                // Remove WAL journal files if present to prevent stale transaction replay
-                if (file_exists($dbPath . '-wal')) {
-                    @unlink($dbPath . '-wal');
-                }
-                if (file_exists($dbPath . '-shm')) {
-                    @unlink($dbPath . '-shm');
-                }
+                        $dstDb = new \SQLite3($dbPath, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE);
+                        $dstDb->busyTimeout(30000);
+                        @$dstDb->exec('PRAGMA mmap_size = 0;');
 
-                $written = @file_put_contents($dbPath, $rawDbContent);
+                        if (!$srcDb->backup($dstDb)) {
+                            throw new \RuntimeException('SQLite online backup failed: ' . $dstDb->lastErrorMsg());
+                        }
 
-                if ($written === false) {
-                    // Fallback for Windows Herd when the database file is held open by a process handle:
-                    // write raw SQLite bytes to a temporary file and use SQLite3::backup() online backup API
-                    $tempRestoreSqlite = $this->backupPath . '/temp_restore_src_' . uniqid('', true) . '.sqlite';
-                    if (@file_put_contents($tempRestoreSqlite, $rawDbContent) !== false && class_exists(\SQLite3::class)) {
-                        try {
-                            $srcDb = new \SQLite3($tempRestoreSqlite, SQLITE3_OPEN_READONLY);
-                            $dstDb = new \SQLite3($dbPath, SQLITE3_OPEN_READWRITE | SQLITE3_OPEN_CREATE);
-                            $srcDb->backup($dstDb);
-                            $dstDb->close();
-                            $srcDb->close();
-                            $written = strlen($rawDbContent);
-                        } catch (Throwable $sqliteErr) {
-                            @unlink($tempRestoreSqlite);
-                            throw new \RuntimeException("Failed to write to database file [{$dbPath}]: " . $sqliteErr->getMessage());
+                        // Checkpoint and truncate the WAL file cleanly through SQLite's locking protocol
+                        @$dstDb->exec('PRAGMA wal_checkpoint(TRUNCATE);');
+                        $dstDb->close();
+                        $dstDb = null;
+                        $srcDb->close();
+                        $srcDb = null;
+                        $restoredViaOnlineBackup = true;
+                    } catch (Throwable $sqliteErr) {
+                        if ($dstDb instanceof \SQLite3) {
+                            @$dstDb->close();
+                        }
+                        if ($srcDb instanceof \SQLite3) {
+                            @$srcDb->close();
                         }
                         @unlink($tempRestoreSqlite);
-                    } else {
+                        throw new \RuntimeException("Failed to restore SQLite database [{$dbPath}]: " . $sqliteErr->getMessage(), 0, $sqliteErr);
+                    }
+                }
+
+                @unlink($tempRestoreSqlite);
+
+                if (!$restoredViaOnlineBackup) {
+                    if (@file_put_contents($dbPath, $rawDbContent) === false) {
                         throw new \RuntimeException("Failed to write to database file [{$dbPath}]. Check file permissions.");
                     }
                 }
@@ -1496,9 +1642,14 @@ class BackupService
                 DB::purge('sqlite');
                 DB::reconnect('sqlite');
 
-                $this->ensureBackupSchema();
-                $this->restorePreservedAuthState($preservedSessions, $preservedTokens);
-                $this->reconcileLicenseAfterRestore($preservedLicenseAttributes);
+                $this->finalizePostDatabaseRestore(
+                    $preservedBackupLogs,
+                    $preservedBackupSchedules,
+                    $preservedSessions,
+                    $preservedTokens,
+                    $preservedLicenseAttributes,
+                    true
+                );
                 return;
             } else {
                 // SQL statements
@@ -1509,9 +1660,121 @@ class BackupService
             $this->executeSqlStatements($sqlContent);
         }
 
+        $this->finalizePostDatabaseRestore(
+            $preservedBackupLogs,
+            $preservedBackupSchedules,
+            $preservedSessions,
+            $preservedTokens,
+            $preservedLicenseAttributes,
+            false
+        );
+    }
+
+    /**
+     * Prune old database.sqlite.bak.* safety files so disk space does not grow unbounded.
+     */
+    protected function pruneDatabaseSafetyBackups(string $dbPath, int $maxKeep = 3): void
+    {
+        try {
+            $pattern = $dbPath . '.bak.*';
+            $files = glob($pattern);
+            if (!is_array($files) || count($files) <= $maxKeep) {
+                return;
+            }
+
+            usort($files, fn ($a, $b) => (@filemtime($b) ?: 0) <=> (@filemtime($a) ?: 0));
+            foreach (array_slice($files, $maxKeep) as $oldBak) {
+                @unlink($oldBak);
+            }
+        } catch (Throwable) {
+        }
+    }
+
+    /**
+     * Run post-restore schema reconciliation, pending migrations, and state preservation.
+     */
+    protected function finalizePostDatabaseRestore(
+        array $preservedBackupLogs,
+        array $preservedBackupSchedules,
+        array $preservedSessions,
+        array $preservedTokens,
+        ?array $preservedLicenseAttributes,
+        bool $runPendingMigrations = false
+    ): void {
+        if ($runPendingMigrations) {
+            try {
+                \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+            } catch (Throwable $e) {
+                Log::warning('Post-restore migration warning: ' . $e->getMessage());
+            }
+        }
+
         $this->ensureBackupSchema();
+        $this->restorePreservedBackupMetadata($preservedBackupLogs, $preservedBackupSchedules);
         $this->restorePreservedAuthState($preservedSessions, $preservedTokens);
         $this->reconcileLicenseAfterRestore($preservedLicenseAttributes);
+
+        try {
+            if (class_exists(\Spatie\Permission\PermissionRegistrar::class)) {
+                app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+            }
+        } catch (Throwable) {
+        }
+    }
+
+    /**
+     * Preserve backup_logs and backup_schedules records across a database snapshot restore
+     * so backups taken after the restored snapshot (or the snapshot's own pending record) are not lost,
+     * and old deleted backups from the historical snapshot do not reappear as broken entries.
+     */
+    protected function restorePreservedBackupMetadata(array $preservedBackupLogs, array $preservedBackupSchedules): void
+    {
+        try {
+            if (!empty($preservedBackupLogs) && Schema::hasTable('backup_logs')) {
+                $columns = Schema::getColumnListing('backup_logs');
+                $allowedKeys = array_flip($columns);
+
+                DB::table('backup_logs')->delete();
+
+                foreach ($preservedBackupLogs as $logRow) {
+                    if (empty($logRow['filename'])) {
+                        continue;
+                    }
+                    $filtered = array_intersect_key($logRow, $allowedKeys);
+                    $type = (string) ($logRow['type'] ?? 'full');
+                    $expectedFile = $this->getBackupFilePath((string) $logRow['filename'], $type);
+
+                    if (($filtered['status'] ?? '') === 'pending' && is_file($expectedFile) && filesize($expectedFile) > 0) {
+                        $filtered['status'] = 'completed';
+                        $filtered['size'] = (int) @filesize($expectedFile);
+                        $filtered['path'] = 'backups/' . basename($expectedFile);
+                    }
+
+                    DB::table('backup_logs')->updateOrInsert(
+                        ['filename' => $logRow['filename']],
+                        $filtered
+                    );
+                }
+            }
+
+            if (!empty($preservedBackupSchedules) && Schema::hasTable('backup_schedules')) {
+                $schedColumns = Schema::getColumnListing('backup_schedules');
+                $allowedSchedKeys = array_flip(array_diff($schedColumns, ['id']));
+                $firstSchedule = $preservedBackupSchedules[0] ?? null;
+
+                if (is_array($firstSchedule)) {
+                    $filteredSched = array_intersect_key($firstSchedule, $allowedSchedKeys);
+                    $existing = DB::table('backup_schedules')->orderBy('id')->first();
+                    if ($existing) {
+                        DB::table('backup_schedules')->where('id', $existing->id)->update($filteredSched);
+                    } else {
+                        DB::table('backup_schedules')->insert($filteredSched);
+                    }
+                }
+            }
+        } catch (Throwable $e) {
+            Log::warning('Could not restore preserved backup metadata: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -1521,16 +1784,22 @@ class BackupService
     {
         try {
             if (!empty($preservedSessions) && Schema::hasTable('sessions')) {
+                $sessionColumns = array_flip(Schema::getColumnListing('sessions'));
                 foreach ($preservedSessions as $sessionRow) {
                     if (!empty($sessionRow['id'])) {
-                        DB::table('sessions')->updateOrInsert(['id' => $sessionRow['id']], $sessionRow);
+                        $filtered = array_intersect_key($sessionRow, $sessionColumns);
+                        DB::table('sessions')->updateOrInsert(['id' => $sessionRow['id']], $filtered);
                     }
                 }
             }
             if (!empty($preservedTokens) && Schema::hasTable('personal_access_tokens')) {
+                $tokenColumns = array_flip(Schema::getColumnListing('personal_access_tokens'));
                 foreach ($preservedTokens as $tokenRow) {
                     if (!empty($tokenRow['token'])) {
-                        DB::table('personal_access_tokens')->updateOrInsert(['token' => $tokenRow['token']], $tokenRow);
+                        $filtered = array_intersect_key($tokenRow, $tokenColumns);
+                        $withoutId = $filtered;
+                        unset($withoutId['id']);
+                        DB::table('personal_access_tokens')->updateOrInsert(['token' => $tokenRow['token']], $withoutId);
                     }
                 }
             }
@@ -1775,6 +2044,12 @@ class BackupService
 
             // Restore database
             $dbBackupPath = $tempDir . '/database/database.sql.gz';
+            if (!file_exists($dbBackupPath) && is_dir($tempDir . '/database')) {
+                $dbCandidates = glob($tempDir . '/database/*');
+                if (!empty($dbCandidates) && is_file($dbCandidates[0])) {
+                    $dbBackupPath = $dbCandidates[0];
+                }
+            }
             if (file_exists($dbBackupPath)) {
                 $this->restoreDatabaseBackup($dbBackupPath);
             }
@@ -1790,6 +2065,27 @@ class BackupService
                     $filtered = $this->filterRestoredSettingsAttributes($data['data']);
                     if (!empty($filtered)) {
                         $settings->forceFill($filtered)->save();
+                    }
+                }
+            }
+
+            // Restore bundled logo / media files if present in the archive
+            $filesDir = $tempDir . '/files';
+            if (is_dir($filesDir)) {
+                $settings = \App\Models\Setting::first();
+                $logoRelDir = ($settings && !empty($settings->logo_path))
+                    ? dirname(ltrim($settings->logo_path, '/\\'))
+                    : 'logos';
+                if ($logoRelDir === '.' || $logoRelDir === '') {
+                    $logoRelDir = 'logos';
+                }
+                $publicDestDir = storage_path('app/public/' . $logoRelDir);
+                if (!File::exists($publicDestDir)) {
+                    File::makeDirectory($publicDestDir, 0755, true, true);
+                }
+                foreach (glob($filesDir . '/*') ?: [] as $extractedFile) {
+                    if (is_file($extractedFile)) {
+                        @copy($extractedFile, $publicDestDir . '/' . basename($extractedFile));
                     }
                 }
             }
@@ -1809,7 +2105,8 @@ class BackupService
             return false;
         }
 
-        $filepath = $this->getBackupFilePath($backup->filename, $backup->type);
+        $filepath = $this->resolveExistingBackupFilePath($backup)
+            ?? $this->getBackupFilePath($backup->filename, $backup->type);
         if (file_exists($filepath)) {
             @unlink($filepath);
         }
