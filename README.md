@@ -1,4 +1,4 @@
-# 💼 Karobar-App (کاروبار)
+# 💼 Karobar-App 
 
 ## 📖 Overview
 
